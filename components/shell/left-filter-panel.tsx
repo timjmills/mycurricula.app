@@ -421,7 +421,7 @@ export function LeftFilterPanel(): ReactNode {
                 style={{
                   fontSize: "var(--t-11)",
                   color: "var(--ink-400)",
-                  padding: "2px 0",
+                  padding: "var(--r-2) 0",
                 }}
               >
                 No standards in this subject yet.

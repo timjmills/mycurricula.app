@@ -40,7 +40,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button } from "@/components/ui";
+import { Button, PlannerEmpty } from "@/components/ui";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { CURRENT_WEEK } from "@/lib/mock";
@@ -374,10 +374,16 @@ export function WeeklyBoard(): ReactNode {
           role="grid"
           aria-label={`Weekly plan, week ${week}`}
         >
-          {/* Empty-week fallback — shown when the week has no lessons. */}
+          {/* Empty-week fallback — shown when the week has no lessons. The
+              wrapper keeps the grid-column:1/-1 span so the state fills the
+              board; PlannerEmpty makes an empty week mid-hydrate read as
+              "loading" (skeleton) rather than a false "no lessons". */}
           {!weekHasLessons && (
-            <div className={styles.emptyWeek} role="status">
-              No lessons planned for week {week} yet.
+            <div className={styles.emptyWeek}>
+              <PlannerEmpty
+                size="sm"
+                heading={`No lessons planned for week ${week} yet.`}
+              />
             </div>
           )}
 

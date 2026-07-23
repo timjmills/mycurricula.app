@@ -40,7 +40,6 @@ export function Skeleton({
       className={[styles.root, sizeClass, className].filter(Boolean).join(" ")}
       role="status"
       aria-busy="true"
-      aria-live="polite"
     >
       <span className={styles.srOnly}>{label}</span>
       {Array.from({ length: Math.max(1, lines) }).map((_, i) => (

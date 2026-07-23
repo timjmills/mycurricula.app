@@ -11,6 +11,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { stripHtml } from "@/lib/html-text";
 import { ResourceEmbed } from "@/components/resources";
+import { PlannerEmpty } from "@/components/ui";
 import type { HubBrowseProps } from "./browse-data";
 import { queryMatches, flattenResources } from "./browse-data";
 import type { BrowseResourceRef } from "./browse-data";
@@ -33,7 +34,10 @@ const FILTERS: ReadonlyArray<{ key: KindFilter; label: string }> = [
   { key: "image", label: "Images" },
 ];
 
-export function ResourceBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
+export function ResourceBrowse({
+  query,
+  onOpenDoc,
+}: HubBrowseProps): ReactNode {
   const { lessons, subjectById } = usePlanner();
   const [filter, setFilter] = useState<KindFilter>("all");
 
@@ -80,17 +84,20 @@ export function ResourceBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode 
       </div>
 
       {refs.length === 0 ? (
-        <p className={styles.empty}>
-          {query.trim() || filter !== "all"
-            ? "No resources match your filters."
-            : "No resources attached yet."}
-        </p>
+        query.trim() || filter !== "all" ? (
+          <p className={styles.empty}>No resources match your filters.</p>
+        ) : (
+          <PlannerEmpty size="sm" heading="No resources attached yet." />
+        )
       ) : (
         <div className={styles.wallGrid}>
           {refs.map((ref) => {
             const subj = subjectById[ref.subject];
             return (
-              <div key={ref.key} className={`cp-subj ${subj?.cls ?? ""} ${styles.resCard}`}>
+              <div
+                key={ref.key}
+                className={`cp-subj ${subj?.cls ?? ""} ${styles.resCard}`}
+              >
                 {/* ResourceEmbed owns the resource's OWN affordance (link-out /
                     preview) and re-vets every url/src through the isSafeUrl /
                     isSafeImgSrc sink. Its onClick only fires for image embeds,

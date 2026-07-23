@@ -84,7 +84,7 @@ import { todayColumnIndex } from "@/lib/now-anchor";
 import { getDayBlocks, minuteOfDay } from "@/lib/schedule-data";
 import { lessonTime, dateForWeekDay } from "@/lib/mock";
 import { LessonEditor } from "@/components/lesson-editor";
-import { Button, EmptyState, Tooltip } from "@/components/ui";
+import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
 import { RichTextEditor } from "@/components/rich-text";
 import { PaneSplitter } from "./PaneSplitter";
 import dvStyles from "./DailyView.module.css";
@@ -581,9 +581,13 @@ export function DayEditSplit({
           </div>
         ) : (
           /* Empty day — a real empty-state CARD (house primitive), never a
-             blank div. The add row on the left is the way in. */
+             blank div. The add row on the left is the way in. This branch is
+             the day-empty case: selection auto-defaults to a lesson whenever
+             the day has any, so `sel && subj` is effectively false when the day
+             has no lessons. PlannerEmpty so it reads as "loading" during the
+             Supabase hydrate rather than a false "no lessons". */
           <div className={styles.deEmpty}>
-            <EmptyState
+            <PlannerEmpty
               heading="No lessons for this day yet"
               body="Add a lesson with the dashed row on the left — it opens here ready to fill in."
             />

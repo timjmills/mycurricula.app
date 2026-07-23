@@ -54,7 +54,11 @@
   border-radius: var(--r-2xl, 32px);
   /* Frosted, not flat: mix from --panel-bg (per-theme, per-tone) toward
      transparent + a heavy blur so the photo/wash behind reads through. */
-  background: color-mix(in srgb, var(--panel-bg, var(--surface)) 86%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--panel-bg, var(--surface)) 86%,
+    transparent
+  );
   -webkit-backdrop-filter: blur(22px) saturate(1.5);
   backdrop-filter: blur(22px) saturate(1.5);
   color: var(--ink, #1c1b2e);
@@ -349,34 +353,9 @@
   color: var(--ink, #1c1b2e);
 }
 
-/* ── Empty state ─────────────────────────────────────────────────────────── */
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 48px 24px;
-  text-align: center;
-}
-.emptyIcon {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-pill, 999px);
-  background: color-mix(in srgb, var(--done) 16%, transparent);
-  color: var(--done);
-}
-.emptyIcon svg {
-  width: 24px;
-  height: 24px;
-}
-.emptyText {
-  font-size: var(--t-14, 14px);
-  font-weight: 700;
-  color: var(--ink-700, #3a3950);
-}
+/* The all-caught-up empty state now renders through the shared EmptyState
+   primitive (via PlannerEmpty), so the local .empty/.emptyIcon/.emptyText
+   rules were removed with the bespoke markup. */
 
 /* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
 @media (pointer: coarse), (max-width: 900px) {

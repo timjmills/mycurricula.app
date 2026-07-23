@@ -2042,11 +2042,18 @@ export function usePlanner(): PlannerValue {
 // no-op there and cannot regress the prototype path.
 export type PlannerDataState = "pending" | "error" | "settled";
 
-export function usePlannerDataState(): PlannerDataState {
-  const { hydration } = usePlanner();
+/** Pure hydration → data-state mapping. Exported so it can be unit-tested
+ *  without a provider; the hook is a one-line wrapper over it. */
+export function plannerDataStateFromHydration(
+  hydration: PlannerHydration,
+): PlannerDataState {
   if (hydration === "idle" || hydration === "loading") return "pending";
   if (hydration === "error") return "error";
   return "settled"; // "ready" | "empty"
+}
+
+export function usePlannerDataState(): PlannerDataState {
+  return plannerDataStateFromHydration(usePlanner().hydration);
 }
 
 // ── Provider-optional catalog hook ─────────────────────────────────────────
@@ -2488,7 +2495,12 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const moveLesson = useCallback(
     (
       id: string,
-      patch: { day?: number; subject?: SubjectId; week?: number; time?: string },
+      patch: {
+        day?: number;
+        subject?: SubjectId;
+        week?: number;
+        time?: string;
+      },
     ) => {
       dispatchRef.current({ type: "moveLesson", id, patch });
       // W3.8c — a `time` relabel applies REDUCER-LOCALLY ONLY (the dispatch

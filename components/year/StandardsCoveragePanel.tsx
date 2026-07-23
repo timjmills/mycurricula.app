@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePlanner } from "@/lib/planner-store";
 import { WEEK_DAYS } from "@/lib/mock";
-import { StandardPill } from "@/components/ui";
+import { PlannerEmpty, StandardPill } from "@/components/ui";
 import type { StandardsCoverage } from "@/lib/year-standards-coverage";
 import styles from "./standards-coverage-panel.module.css";
 
@@ -37,17 +37,48 @@ export interface StandardsCoveragePanelProps {
 
 // ── Inline icons ─────────────────────────────────────────────────────────────
 
-function Svg({ children, sw = 2 }: { children: ReactNode; sw?: number }): ReactNode {
+function Svg({
+  children,
+  sw = 2,
+}: {
+  children: ReactNode;
+  sw?: number;
+}): ReactNode {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={sw}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       {children}
     </svg>
   );
 }
-const IcX = () => <Svg><path d="M6 6l12 12M18 6 6 18" /></Svg>;
-const IcCheck = () => <Svg sw={3}><path d="M20 6 9 17l-5-5" /></Svg>;
-const IcGap = () => <Svg><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></Svg>;
-const IcChevR = () => <Svg><path d="m9 6 6 6-6 6" /></Svg>;
+const IcX = () => (
+  <Svg>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Svg>
+);
+const IcCheck = () => (
+  <Svg sw={3}>
+    <path d="M20 6 9 17l-5-5" />
+  </Svg>
+);
+const IcGap = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 8v4M12 16h.01" />
+  </Svg>
+);
+const IcChevR = () => (
+  <Svg>
+    <path d="m9 6 6 6-6 6" />
+  </Svg>
+);
 
 type FilterTab = "all" | "taught" | "gap";
 
@@ -135,7 +166,11 @@ export function StandardsCoveragePanel({
         </div>
 
         {/* Filter tabs */}
-        <div className={styles.tabs} role="tablist" aria-label="Coverage filter">
+        <div
+          className={styles.tabs}
+          role="tablist"
+          aria-label="Coverage filter"
+        >
           {(
             [
               { id: "all", label: `All (${coverage.total})` },
@@ -168,13 +203,24 @@ export function StandardsCoveragePanel({
         {/* List */}
         <div className={styles.list}>
           {rows.length === 0 ? (
-            <p className={styles.empty}>
-              {coverage.total === 0
-                ? "No standards are tagged on any lesson in this scope yet."
-                : tab === "gap"
+            coverage.total === 0 ? (
+              // Data-zero: nothing tagged anywhere in scope. Gate through
+              // PlannerEmpty so a still-hydrating (or failed) planner shows a
+              // skeleton / load-error instead of a false "nothing tagged yet".
+              <PlannerEmpty
+                size="sm"
+                heading="No standards are tagged on any lesson in this scope yet."
+              />
+            ) : (
+              // coverage.total > 0 but the active tab filtered every row out —
+              // a filter result over a non-empty scope, not a loading state, so
+              // it stays a plain message (never a skeleton).
+              <p className={styles.empty}>
+                {tab === "gap"
                   ? "Every standard in this scope has been taught at least once. 🎉"
                   : "No standards taught yet in this scope."}
-            </p>
+              </p>
+            )
           ) : (
             rows.map((s) => {
               const active = activeStandards.includes(s.code);
@@ -217,7 +263,10 @@ export function StandardsCoveragePanel({
                       aria-label={`${s.lessonsCovering.length} lessons cover ${s.code}`}
                     >
                       {s.lessonsCovering.length}
-                      <span className={`${styles.chev} ${open ? styles.chevOn : ""}`} aria-hidden="true">
+                      <span
+                        className={`${styles.chev} ${open ? styles.chevOn : ""}`}
+                        aria-hidden="true"
+                      >
                         <IcChevR />
                       </span>
                     </button>
@@ -237,9 +286,12 @@ export function StandardsCoveragePanel({
                               className={`${styles.lessonDot} ${l.status === "done" ? styles.dotDone : ""}`}
                               aria-hidden="true"
                             />
-                            <span className={styles.lessonTitle}>{l.title}</span>
+                            <span className={styles.lessonTitle}>
+                              {l.title}
+                            </span>
                             <span className={styles.lessonMeta}>
-                              {WEEK_DAYS[l.day] ?? `Day ${l.day + 1}`} · Wk {l.week}
+                              {WEEK_DAYS[l.day] ?? `Day ${l.day + 1}`} · Wk{" "}
+                              {l.week}
                             </span>
                           </button>
                         </li>

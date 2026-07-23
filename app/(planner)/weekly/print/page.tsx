@@ -21,6 +21,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PlannerEmpty } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
 import { useLabels } from "@/lib/labels";
 import { usePlanner } from "@/lib/planner-store";
@@ -220,20 +221,20 @@ export default function WeeklyPrintPage(): ReactNode {
                 );
               },
             )}
-            {/* If no subjects have lessons this week, show an empty-state row */}
+            {/* If no subjects have lessons this week, show an empty-state row.
+                colSpan keeps it spanning the whole matrix. PlannerEmpty (in
+                place of the italic text node) so an empty week mid-hydrate
+                shows a skeleton and a failed load shows an error affordance,
+                instead of a false "No lessons" line. This page renders inside
+                the (planner) PlannerProvider (it already reads usePlanner()),
+                so PlannerEmpty is safe here. */}
             {lessonsBySubjectDay.size === 0 && (
               <tr>
-                <td
-                  colSpan={dayCount + 1}
-                  style={{
-                    textAlign: "center",
-                    padding: "24px 8px",
-                    color: "var(--ink-400)",
-                    fontStyle: "italic",
-                    fontSize: "var(--t-13)",
-                  }}
-                >
-                  No lessons for {labels.week} {week}.
+                <td colSpan={dayCount + 1} style={{ padding: "24px 8px" }}>
+                  <PlannerEmpty
+                    size="sm"
+                    heading={`No lessons for ${labels.week} ${week}.`}
+                  />
                 </td>
               </tr>
             )}

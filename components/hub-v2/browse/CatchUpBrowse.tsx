@@ -8,11 +8,12 @@
 // fabricated pace metric; no dead bulk button.
 
 import { useMemo, type ReactNode } from "react";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { deriveCatchupItems, coverageSummary } from "@/lib/catchup-data";
 import type { CatchupItem } from "@/lib/catchup-data";
 import { stripHtml } from "@/lib/html-text";
+import { PlannerEmpty } from "@/components/ui";
 import type { LessonStatus, SubjectId } from "@/lib/types";
 import type { HubBrowseProps } from "./browse-data";
 import { queryMatches } from "./browse-data";
@@ -20,6 +21,7 @@ import styles from "./browse.module.css";
 
 export function CatchUpBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
   const { lessons, subjects, subjectById } = usePlanner();
+  const dataState = usePlannerDataState();
   const { week } = useAppState();
 
   const summary = useMemo(
@@ -46,18 +48,27 @@ export function CatchUpBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
         <div className={styles.crumb}>Planner</div>
         <h1 className={styles.title}>Catch-up</h1>
         <p className={styles.sub}>
-          {summary.uncovered === 0
-            ? "You're all caught up — every lesson through this week is covered."
-            : `${summary.uncovered} of ${summary.total} lessons through week ${week} still need attention (${summary.pct}% covered).`}
+          {dataState === "pending"
+            ? "Checking your plan…"
+            : dataState === "error"
+              ? "Couldn’t load your plan."
+              : summary.uncovered === 0
+                ? "You're all caught up — every lesson through this week is covered."
+                : `${summary.uncovered} of ${summary.total} lessons through week ${week} still need attention (${summary.pct}% covered).`}
         </p>
       </div>
 
       {groups.length === 0 ? (
-        <p className={styles.empty}>
-          {query.trim()
-            ? `Nothing to catch up matches “${query.trim()}”.`
-            : "Nothing to catch up — nicely done."}
-        </p>
+        query.trim() ? (
+          <p className={styles.empty}>
+            {`Nothing to catch up matches “${query.trim()}”.`}
+          </p>
+        ) : (
+          <PlannerEmpty
+            size="sm"
+            heading="Nothing to catch up — nicely done."
+          />
+        )
       ) : (
         groups.map(({ subject, items }) => (
           <div key={subject.id} className={styles.group}>

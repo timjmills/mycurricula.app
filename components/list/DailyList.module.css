@@ -70,30 +70,13 @@
 }
 
 /* ── Empty-day state ────────────────────────────────────────────────────── */
-
-.empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 48px 24px;
-  text-align: center;
-}
+/* The empty-day layout + heading now come from the shared EmptyState primitive
+   (via PlannerEmpty); only the illustration and CTA keep local styling. */
 
 .emptyIllustration {
   /* Rendered at 64×64 — no additional sizing needed. */
   display: block;
   flex: 0 0 auto;
-}
-
-.emptyHeading {
-  margin: 0;
-  font-family: var(--font-display-sm);
-  font-size: var(--t-16);
-  font-weight: 800;
-  color: var(--ink-soft);
 }
 
 /* Primary "+ Add a lesson" button (v1.3 primary: brand fill, white, glow, pill) */

@@ -33,7 +33,10 @@ export interface PlannerEmptyProps extends EmptyStateProps {
   skeletonLines?: number;
 }
 
-export function PlannerEmpty({ skeletonLines, ...emptyProps }: PlannerEmptyProps) {
+export function PlannerEmpty({
+  skeletonLines,
+  ...emptyProps
+}: PlannerEmptyProps) {
   const state = usePlannerDataState();
 
   if (state === "pending") {

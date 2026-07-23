@@ -71,11 +71,11 @@ import {
   standardGaps,
   type CatchupScopeV2,
 } from "@/lib/catchup-scope";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { todayColumnIndex } from "@/lib/now-anchor";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { stripHtml } from "@/lib/html-text";
-import { Tooltip } from "@/components/ui";
+import { PlannerEmpty, Tooltip } from "@/components/ui";
 import {
   closeCatchupModal,
   toggleCatchupModal,
@@ -131,14 +131,30 @@ const SCOPE_CHIPS: ReadonlyArray<{
 
 function IconCheck() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M5 13l4 4L19 7" />
     </svg>
   );
 }
 function IconCalendar() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M3 9h18M8 3v4M16 3v4" />
     </svg>
@@ -146,14 +162,30 @@ function IconCalendar() {
 }
 function IconBump() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M12 5v14M6 13l6 6 6-6" />
     </svg>
   );
 }
 function IconPlan() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
     </svg>
@@ -161,7 +193,15 @@ function IconPlan() {
 }
 function IconTeach() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <rect x="3" y="4" width="18" height="12" rx="2" />
       <path d="M8 20h8M12 16v4" />
     </svg>
@@ -169,7 +209,14 @@ function IconTeach() {
 }
 function IconClose() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
       <path d="M6 6l12 12M18 6L6 18" />
     </svg>
   );
@@ -292,19 +339,6 @@ function LessonRow({
   );
 }
 
-// ── Empty state ──────────────────────────────────────────────────────────────
-
-function EmptyState() {
-  return (
-    <div className={styles.empty}>
-      <span className={styles.emptyIcon}>
-        <IconCheck />
-      </span>
-      <span className={styles.emptyText}>All caught up for this scope 🎉</span>
-    </div>
-  );
-}
-
 // ── Controlled modal (INTERNAL — only the Host renders it) ───────────────────
 //
 // NOT exported: the single-modal invariant (Codex W10 gate) relies on the Host
@@ -342,6 +376,7 @@ function CatchUpModalBody({
     relocateLesson,
     bumpLesson,
   } = usePlanner();
+  const dataState = usePlannerDataState();
   const { week } = useAppState();
   const { actions } = useCatchup();
   const { days } = useSchoolWeek();
@@ -378,10 +413,7 @@ function CatchUpModalBody({
     () => planScope(scope, allItems, week, todayCol),
     [scope, allItems, week, todayCol],
   );
-  const groups = useMemo(
-    () => groupItems(plan.items, plan.groupBy),
-    [plan],
-  );
+  const groups = useMemo(() => groupItems(plan.items, plan.groupBy), [plan]);
   const gaps = useMemo(
     () =>
       scope === "standards"
@@ -510,15 +542,21 @@ function CatchUpModalBody({
               <span id={titleId} className={styles.title}>
                 Catch-Up
               </span>
-              <span
-                className={styles.badge}
-                aria-label={`${allItems.length} uncovered`}
-              >
-                {allItems.length}
-              </span>
+              {dataState === "settled" && (
+                <span
+                  className={styles.badge}
+                  aria-label={`${allItems.length} uncovered`}
+                >
+                  {allItems.length}
+                </span>
+              )}
             </div>
             <div className={styles.subline}>
-              {coverage.covered} of {coverage.total} covered
+              {dataState === "pending"
+                ? "Checking your plan…"
+                : dataState === "error"
+                  ? "Couldn’t load your plan."
+                  : `${coverage.covered} of ${coverage.total} covered`}
             </div>
           </div>
           <button
@@ -559,7 +597,7 @@ function CatchUpModalBody({
         {/* ── Body ──────────────────────────────────────────────────────── */}
         <div className={styles.body}>
           {showEmpty ? (
-            <EmptyState />
+            <PlannerEmpty size="sm" heading="All caught up for this scope 🎉" />
           ) : isGaps ? (
             gaps.map((g, i) => {
               const subj = g.subject ? subjectById[g.subject] : null;
@@ -650,7 +688,8 @@ export function CatchUpModalHost(): ReactNode {
     if (!isRenderer) return;
     const onToggle = (): void => toggleCatchupModal();
     window.addEventListener(CATCHUP_MODAL_TOGGLE_EVENT, onToggle);
-    return () => window.removeEventListener(CATCHUP_MODAL_TOGGLE_EVENT, onToggle);
+    return () =>
+      window.removeEventListener(CATCHUP_MODAL_TOGGLE_EVENT, onToggle);
   }, [isRenderer]);
 
   if (!isRenderer) return null;

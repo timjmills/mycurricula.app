@@ -10,6 +10,7 @@ import { useMemo, type ReactNode } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { unitLessons, unitProgress } from "@/lib/year-v2-data";
 import { SubjGlyph } from "@/components/planner-v2";
+import { PlannerEmpty } from "@/components/ui";
 import type { Subject, Unit } from "@/lib/types";
 import type { HubBrowseProps } from "./browse-data";
 import { queryMatches, unitStartWeek, stripUnitPrefix } from "./browse-data";
@@ -46,9 +47,11 @@ export function UnitBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
     return (
       <>
         <Head />
-        <p className={styles.empty}>
-          {query.trim() ? `No units match “${query.trim()}”.` : "No units yet."}
-        </p>
+        {query.trim() ? (
+          <p className={styles.empty}>{`No units match “${query.trim()}”.`}</p>
+        ) : (
+          <PlannerEmpty size="sm" heading="No units yet." />
+        )}
       </>
     );
   }
@@ -57,7 +60,10 @@ export function UnitBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
     <>
       <Head />
       {sections.map(({ subject, units: subjectUnits }) => (
-        <div key={subject.id} className={`cp-subj ${subject.cls} ${styles.section}`}>
+        <div
+          key={subject.id}
+          className={`cp-subj ${subject.cls} ${styles.section}`}
+        >
           <div className={styles.sectionHead}>
             <SubjGlyph subject={subject} size={26} radius={8} />
             <span className={styles.sectionName}>{subject.name}</span>
@@ -92,7 +98,9 @@ function Head(): ReactNode {
     <div className={styles.head}>
       <div className={styles.crumb}>Planner</div>
       <h1 className={styles.title}>Units</h1>
-      <p className={styles.sub}>Open a unit to see its lessons, standards, and resources.</p>
+      <p className={styles.sub}>
+        Open a unit to see its lessons, standards, and resources.
+      </p>
     </div>
   );
 }
@@ -120,7 +128,8 @@ function UnitCard({
     >
       <div className={styles.unitName}>{stripUnitPrefix(unit.name)}</div>
       <div className={styles.unitMeta}>
-        {unit.weeks} · {total === 0 ? "no lessons yet" : `${taught}/${total} taught`}
+        {unit.weeks} ·{" "}
+        {total === 0 ? "no lessons yet" : `${taught}/${total} taught`}
       </div>
       <div className={styles.unitBar}>
         <div className={styles.unitBarFill} style={{ width: `${pct}%` }} />

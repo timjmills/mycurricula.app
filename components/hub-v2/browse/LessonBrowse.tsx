@@ -11,6 +11,7 @@ import { usePlanner } from "@/lib/planner-store";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { stripHtml } from "@/lib/html-text";
 import { StatusDot } from "@/components/planner-v2";
+import { PlannerEmpty } from "@/components/ui";
 import { deriveDayStatus } from "@/lib/day-status";
 import type { Lesson, SubjectId } from "@/lib/types";
 import type { HubBrowseProps } from "./browse-data";
@@ -57,11 +58,13 @@ export function LessonBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
     return (
       <>
         <Head />
-        <p className={styles.empty}>
-          {query.trim()
-            ? `No lessons match “${query.trim()}”.`
-            : "No lessons yet."}
-        </p>
+        {query.trim() ? (
+          <p className={styles.empty}>
+            {`No lessons match “${query.trim()}”.`}
+          </p>
+        ) : (
+          <PlannerEmpty size="sm" heading="No lessons yet." />
+        )}
       </>
     );
   }

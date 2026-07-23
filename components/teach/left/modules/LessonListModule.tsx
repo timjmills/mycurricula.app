@@ -13,6 +13,7 @@ import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { useSubjectColor } from "@/lib/palette";
 import { SUBJECT_BY_ID, WEEK_DAYS_SHORT } from "@/lib/mock";
+import { PlannerEmpty } from "@/components/ui";
 import type { Lesson } from "@/lib/types";
 import type { TeachWorkspaceAction } from "@/components/teach/TeachWorkspace";
 import styles from "../TeachLeft.module.css";
@@ -97,10 +98,15 @@ export function LessonListModule({
   }
 
   if (dayLessons.length === 0) {
+    // dayLessons derives from the planner store's `lessons`; during the
+    // 11–16s Supabase hydrate that array is legitimately empty, so gate the
+    // empty message through PlannerEmpty (skeleton while pending, load-error on
+    // failure) rather than falsely claiming the week has nothing planned.
     return (
-      <p className={styles.muted}>
-        No lessons planned for week {week}. Add one in Daily or Weekly.
-      </p>
+      <PlannerEmpty
+        size="sm"
+        heading={`No lessons planned for week ${week}. Add one in Daily or Weekly.`}
+      />
     );
   }
 

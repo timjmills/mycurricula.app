@@ -82,7 +82,7 @@ import {
 } from "@/lib/teach/boardToResource";
 import { useUndoToastOptional } from "@/lib/undo-toast";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
-import { Button, Tooltip } from "@/components/ui";
+import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
 import {
   ResourceComposer,
@@ -1085,7 +1085,10 @@ function BoardTileFace({
         aria-label={`Open board ${label}`}
         title={`BOARD — ${label}. Open it in the board editor.`}
       >
-        <span className={`${styles.thumb} ${styles.thLink ?? ""}`} aria-hidden="true">
+        <span
+          className={`${styles.thumb} ${styles.thLink ?? ""}`}
+          aria-hidden="true"
+        >
           <BoardGlyphIcon />
         </span>
         <span className={styles.tileFoot}>
@@ -1121,7 +1124,10 @@ function BoardListRow({
         aria-label={`Open board ${label}`}
         title={`BOARD — ${label}. Open it in the board editor.`}
       >
-        <span className={`${styles.rowIc} ${styles.thLink ?? ""}`} aria-hidden="true">
+        <span
+          className={`${styles.rowIc} ${styles.thLink ?? ""}`}
+          aria-hidden="true"
+        >
           <BoardGlyphIcon />
         </span>
         <span className={styles.rowLabel}>{label}</span>
@@ -1620,7 +1626,13 @@ export function ResourcesPanel({
       onEditNote: openNoteEditor,
       onRemove: removeResource,
     }),
-    [activateResource, openResource, openInBoard, openNoteEditor, removeResource],
+    [
+      activateResource,
+      openResource,
+      openInBoard,
+      openNoteEditor,
+      removeResource,
+    ],
   );
 
   // ── Collapse animation (reduced-motion safe) ───────────────────────────
@@ -1698,7 +1710,17 @@ export function ResourcesPanel({
       {/* Body — grid, list, or an empty-state line. */}
       <div className={styles.scroll}>
         {!hasContext ? (
-          <p className={styles.empty}>{emptyContextCopy}</p>
+          isWeek ? (
+            // Week context with zero lessons is the false-empty-during-hydrate
+            // case (the plan is still loading), NOT a settled empty week —
+            // PlannerEmpty shows a skeleton while it loads, an error affordance
+            // if it failed, and this copy only once the store has settled.
+            <PlannerEmpty size="sm" heading={emptyContextCopy} />
+          ) : (
+            // Lesson mode: "Select a lesson…" is a selection prompt downstream
+            // of a resolved lesson object, not a data-loading state — leave it.
+            <p className={styles.empty}>{emptyContextCopy}</p>
+          )
         ) : totalCount === 0 ? (
           <p className={styles.empty}>{emptyAllCopy}</p>
         ) : visibleCount === 0 ? (
@@ -1733,11 +1755,7 @@ export function ResourcesPanel({
           <ul className={styles.list}>
             {visibleResources.map((agg) =>
               agg.resource.boardId != null ? (
-                <BoardListRow
-                  key={agg.key}
-                  agg={agg}
-                  onOpenBoard={openBoard}
-                />
+                <BoardListRow key={agg.key} agg={agg} onOpenBoard={openBoard} />
               ) : (
                 <ResourceListRow
                   key={agg.key}

@@ -34,7 +34,7 @@ import { useLabels } from "@/lib/labels";
 import { WEEK_DAYS } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
-import { Tooltip } from "@/components/ui";
+import { PlannerEmpty, Tooltip } from "@/components/ui";
 import type { Holiday } from "@/lib/use-holidays";
 import { ListRow } from "./ListRow";
 import styles from "./WeeklyList.module.css";
@@ -118,10 +118,15 @@ function DaySection({
             />
           ))}
         </div>
+      ) : holiday ? (
+        // A holiday genuinely has no lessons — a real settled-empty, not a
+        // hydrate artifact — so keep the plain hint.
+        <p className={styles.emptyDay}>Holiday — no lessons planned</p>
       ) : (
-        <p className={styles.emptyDay}>
-          {holiday ? "Holiday — no lessons planned" : "No lessons planned"}
-        </p>
+        // Non-holiday empty column is gated on the day's lessons (count === 0),
+        // which is also true mid-hydrate — PlannerEmpty shows a skeleton while
+        // the plan loads instead of a false "No lessons planned".
+        <PlannerEmpty size="sm" heading="No lessons planned" />
       )}
     </section>
   );

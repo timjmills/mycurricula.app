@@ -136,7 +136,13 @@ import {
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
 import { DockLayout, useDockLayout, type DockPanelDef } from "./dock";
-import { Button, EmptyState, ToggleGroup, Tooltip } from "@/components/ui";
+import {
+  Button,
+  EmptyState,
+  PlannerEmpty,
+  ToggleGroup,
+  Tooltip,
+} from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
@@ -1389,8 +1395,10 @@ export function DailyViewV1({
             <div className={styles.emptyList}>
               {/* W3-C11 — canonical EmptyState replaces the prior flat
                     "No lessons planned for X." copy. Size=sm because this
-                    region sits inside an already-narrow scroll column. */}
-              <EmptyState
+                    region sits inside an already-narrow scroll column.
+                    PlannerEmpty (not EmptyState) so an empty day during the
+                    Supabase hydrate reads as "loading", not "no lessons". */}
+              <PlannerEmpty
                 size="sm"
                 heading="No lessons for this day yet"
                 body="Add a lesson with the + button above, or check a different day on the week strip."
