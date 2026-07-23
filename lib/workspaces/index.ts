@@ -22,23 +22,31 @@ export {
 export {
   canCreateWorkspace,
   canSwitchToWorkspace,
+  canListWorkspaceRoster,
   WORKSPACE_CREATION_SAFETY_CAP,
   type CreateWorkspaceContext,
   type SwitchWorkspaceContext,
+  type ListRosterContext,
   type CreateWorkspaceDenyReason,
   type SwitchWorkspaceDenyReason,
+  type ListRosterDenyReason,
   type Decision,
 } from "./authz";
 
 export {
   mapWorkspaceRow,
   mapWorkspaceRows,
+  mapRosterRow,
+  mapRosterRows,
   resolveWorkspaceRole,
   pickActiveWorkspace,
   isWorkspaceAdminRole,
   WORKSPACE_ROW_COLUMNS,
+  WORKSPACE_ROSTER_ROW_COLUMNS,
   type WorkspaceRole,
   type WorkspaceRow,
   type WorkspaceSummary,
+  type WorkspaceRosterRow,
+  type WorkspaceRosterEntry,
   type CreatedWorkspace,
 } from "./row";
