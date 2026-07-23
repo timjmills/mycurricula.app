@@ -1,0 +1,331 @@
+/* workspace-switcher.module.css — the "Your workspaces" picker card on
+ * Settings → Workspace & Team (Wave 12b-2).
+ *
+ * Mirrors the roster-list idiom of the sibling settings cards
+ * (workspace-settings.module.css notebook list, course-sharing-manager row):
+ * a hairline-divided list inside a bordered panel, name+meta | control per row.
+ *
+ * Tokens only — no hex, no rgba. Every value flips with the DERIVED
+ * `data-tone` through the token tier (--ink / --surface / --brand-* / --border
+ * are all tone-aware), so the card holds WCAG AA in BOTH light and dark tone
+ * across all six themes WITHOUT branching on any specific theme. The active
+ * row is signalled by a --brand-50 background tint, never a colored side-stripe
+ * (BUILD_STANDARD / impeccable: side-stripe accents are banned). Every
+ * interactive control is the <Button> primitive, so the `.cp-root button` reset
+ * (tokens.css) never reaches a raw styled button here; the one raw <input> uses
+ * a doubled class to survive the `.cp-root input` reset. Spacing on the
+ * 4-8-12-16-24 scale; touch targets ≥44px (BUILD_STANDARD §8). */
+
+/* ── Centered column (matches workspace-settings so the two blocks align) ──── */
+
+.page {
+  padding: 24px 24px 0;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ── List + rows ──────────────────────────────────────────────────────────── */
+
+.list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  min-height: 60px;
+  border-top: 1px solid var(--hairline);
+  transition: background 120ms ease;
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.row:hover:not(.rowActive),
+.row:focus-within:not(.rowActive) {
+  background: var(--surface-warm);
+}
+
+/* Active workspace — a soft brand tint marks it (no side-stripe). */
+.rowActive {
+  background: var(--brand-50);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: none;
+  }
+}
+
+/* Phone: name/meta on the first line, the control cluster wrapping to a full-
+   width second line aligned under the name. */
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+  .control {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    margin-top: 8px;
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Role pill — quiet metadata (Owner / Admin / Member). Same recipe as the
+   sibling archived-count chip: neutral warm fill, hairline, muted ink. */
+.rolePill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.status {
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Inline per-row RPC error. --ink text on the danger tint holds AA in both
+   tones; the red-tinted pill carries the "something failed" signal. */
+.rowError {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--danger-tint);
+  border-radius: var(--r-sm);
+  text-wrap: pretty;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Active marker — brand-tinted, non-interactive. Sits where the Switch button
+   would be on the other rows. --ink text on --brand-50 stays AA in both tones. */
+.currentPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-400);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.checkGlyph {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--brand-500);
+}
+
+/* ── Loading / empty / error states ──────────────────────────────────────────── */
+
+.loading {
+  padding: 8px 4px;
+}
+
+.empty {
+  padding: 20px 16px;
+  text-align: center;
+}
+
+.emptyHeading {
+  margin: 0;
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.emptyBody {
+  margin: 6px auto 0;
+  max-width: 52ch;
+  font-size: var(--t-13);
+  color: var(--muted);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  background: var(--danger-tint);
+  border-radius: var(--r-md);
+}
+
+.errorText {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--ink);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* ── "+ New workspace" creation form ──────────────────────────────────────────
+   Mirrors the sibling new-notebook form (workspace-settings.module.css). */
+
+.newForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.newRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+/* Doubled: `.cp-root input` (0,1,1) resets font/color on raw inputs — a single
+   module class (0,1,0) silently loses those declarations. */
+.textInput.textInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 360px;
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.textInput:hover:not(:disabled) {
+  border-color: var(--brand-300);
+}
+
+.textInput:focus-visible {
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
+}
+
+.textInput:disabled {
+  color: var(--faint);
+  background: var(--surface);
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .textInput {
+    transition: none;
+  }
+}
+
+/* Phone — stack the input over the button; both span the card. */
+@media (max-width: 540px) {
+  .page {
+    padding: 16px 16px 0;
+  }
+  .newRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .textInput.textInput {
+    max-width: 100%;
+  }
+}
+
+.fieldHint {
+  margin: 4px 0 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.55;
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+/* Inline create error — replaces the hint when a create fails. AA in both
+   tones (--ink on --danger-tint). */
+.formError {
+  margin: 4px 0 0;
+  align-self: flex-start;
+  padding: 4px 8px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--danger-tint);
+  border-radius: var(--r-sm);
+  text-wrap: pretty;
+}
