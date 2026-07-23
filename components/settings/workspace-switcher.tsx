@@ -530,7 +530,7 @@ function CreateWorkspaceForm({
     ? `You’ve reached the maximum of ${WORKSPACE_CREATION_SAFETY_CAP} workspaces you can create.`
     : "Name your new workspace — usually your school or class, like “Al-Noor School”.";
   const buttonTip = atCap
-    ? `You’ve reached the maximum of ${WORKSPACE_CREATION_SAFETY_CAP} workspaces you can create — archive or leave one before creating another.`
+    ? `You’ve created the maximum of ${WORKSPACE_CREATION_SAFETY_CAP} workspaces — this is a safety limit, not a plan limit. Contact support if you genuinely need more.`
     : name.trim() === ""
       ? "Type a name first — then a new, empty workspace is created and you’re switched into it."
       : "Create a brand-new workspace and switch into it — a fresh curriculum only you can see until you invite teammates.";

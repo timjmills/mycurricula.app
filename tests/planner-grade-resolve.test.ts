@@ -41,3 +41,28 @@ describe("resolveGrade", () => {
     await expect(resolveGrade("owner")).rejects.toThrow("backend down");
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// MULTI_WORKSPACE resolver behavior — needs a live Postgres with the
+// 20260724120000 + 20260725120000 migrations applied + an auth context
+// (auth.uid()); the supabase-source ON path resolves the active workspace via
+// the auth_teacher_school_id() RPC. NOT runnable here (no DB harness);
+// enumerated so the intended coverage is on the record.
+// ───────────────────────────────────────────────────────────────────────────
+describe("getActiveGradeLevelId under MULTI_WORKSPACE (needs a DB harness)", () => {
+  it.todo(
+    "a default_grade_level_id belonging to a FOREIGN (non-active) workspace is ignored, not returned",
+  );
+  it.todo(
+    "the TGA fallback only considers assignments whose grade belongs to the ACTIVE workspace",
+  );
+  it.todo(
+    "switching the active workspace switches the resolved grade (planner hydrates workspace B's content in workspace B)",
+  );
+  it.todo(
+    "a member with NO grade in the active workspace resolves null (store settles to 'empty', never home content)",
+  );
+  it.todo(
+    "resolveSchoolWeek reads the ACTIVE workspace's school_week, not the home school's",
+  );
+});

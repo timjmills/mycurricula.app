@@ -35,6 +35,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
 } from "react";
 import type { ReactNode } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -72,9 +73,11 @@ import {
 } from "@/lib/mock";
 import { useAppState } from "@/lib/app-state";
 import { snapshotRestorePatch } from "@/lib/fork-diff";
+import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { plannerClient } from "@/lib/planner/client";
 import { resolveGrade } from "@/lib/planner/grade";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
+import { WORKSPACE_CHANGED_EVENT } from "@/lib/workspaces";
 import {
   LESSON_TEMPLATE_BY_ID,
   DEFAULT_LESSON_TEMPLATE_ID,
@@ -2200,6 +2203,24 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   // hydrated the same way so the history baseline is the empty doc, not stale
   // mock content.
   const ownerId = currentUser.id;
+  // Multi-workspace re-hydrate trigger (flag-gated; OFF path inert). The epoch
+  // bumps when the workspace switcher broadcasts WORKSPACE_CHANGED_EVENT, so
+  // the hydrate effect below re-runs against the NEW active workspace's grade
+  // (getActiveGradeLevelId resolves via auth_teacher_school_id under the flag).
+  // The useState itself is always present (inert OFF — the notebook-state
+  // precedent), but OFF the listener never mounts (the flag-gated
+  // <PlannerWorkspaceSync/> in the return below), so the epoch is frozen at 0
+  // and the dep array behaves exactly like the old `[ownerId]`. NOTE the
+  // load-bearing mechanism is remount-on-navigation + the workspace-scoped
+  // resolver — both switch surfaces live outside the (planner)/(teach) provider
+  // trees, so this provider is normally unmounted when a switch commits; the
+  // event completes the contract if a switch surface ever lands inside planner
+  // chrome. Accepted limitation: cross-tab switches don't propagate (window
+  // events — same as notebook-state's WorkspaceIdentitySync).
+  const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
+  const onWorkspaceChanged = useCallback(() => {
+    setWorkspaceEpoch((e) => e + 1);
+  }, []);
   useEffect(() => {
     if (!isPlannerSupabaseConfigured()) return; // flag OFF → keep mock, no-op
 
@@ -2300,7 +2321,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     return () => {
       alive = false;
     };
-  }, [ownerId]);
+    // workspaceEpoch: not read inside — it exists to RE-RUN this hydrate when
+    // the active workspace changes (frozen at 0 with the flag OFF). The effect
+    // already handles a re-run safely: it resets to EMPTY_DOC + "loading"
+    // synchronously before awaiting, and `alive` cancels superseded fetches.
+  }, [ownerId, workspaceEpoch]);
 
   const { history, lastChange } = state;
   const { past, present, future } = history;
@@ -3157,8 +3182,34 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   );
 
   return (
-    <PlannerContext.Provider value={value}>{children}</PlannerContext.Provider>
+    <PlannerContext.Provider value={value}>
+      {/* Multi-workspace ON-path listener. `MULTI_WORKSPACE` is a build-inlined
+          `false` when the flag is off, so this renders `null` and the sync
+          component — and its effect — never mount: the OFF build's render is
+          unchanged (the notebook-state WorkspaceIdentitySync precedent). */}
+      {MULTI_WORKSPACE ? (
+        <PlannerWorkspaceSync onChanged={onWorkspaceChanged} />
+      ) : null}
+      {children}
+    </PlannerContext.Provider>
   );
+}
+
+/**
+ * Null-rendering listener for the workspace switcher's WORKSPACE_CHANGED_EVENT
+ * (mirrors notebook-state's WorkspaceIdentitySync). Mounted ONLY on the
+ * MULTI_WORKSPACE ON path; its sole job is to bump the provider's
+ * workspaceEpoch so the hydrate effect re-runs against the NEW active
+ * workspace. The existing hydrate machinery does the rest: reset-before-await
+ * (no stale-workspace flash) + `alive` cancellation (superseded fetches can't
+ * land).
+ */
+function PlannerWorkspaceSync({ onChanged }: { onChanged: () => void }): null {
+  useEffect(() => {
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(WORKSPACE_CHANGED_EVENT, onChanged);
+  }, [onChanged]);
+  return null;
 }
 
 // ── Scroll helper ──────────────────────────────────────────────────────────

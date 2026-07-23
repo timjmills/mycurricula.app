@@ -52,6 +52,18 @@ export interface SwitchWorkspaceContext {
   isMember: boolean;
 }
 
+/** Inputs the LIST-ROSTER decision depends on (list_workspace_members RPC,
+ *  20260725120000_workspace_roster.sql). */
+export interface ListRosterContext {
+  /** The authenticated caller (auth.uid()). Empty ⇒ not authenticated. */
+  callerId: string;
+  /** The workspace whose roster is requested (schools.id). Empty ⇒ none. */
+  schoolId: string;
+  /** is_workspace_member(schoolId) for the caller — the RPC's fail-closed gate.
+   *  ANY member may read their workspace's roster; a non-member NEVER can. */
+  isMember: boolean;
+}
+
 /** Why a create/switch is not permitted (stable codes for tests + UI copy). */
 export type CreateWorkspaceDenyReason =
   | "not-authenticated"
@@ -61,6 +73,11 @@ export type CreateWorkspaceDenyReason =
 export type SwitchWorkspaceDenyReason =
   | "not-authenticated"
   | "no-target"
+  | "not-a-member";
+
+export type ListRosterDenyReason =
+  | "not-authenticated"
+  | "no-workspace"
   | "not-a-member";
 
 export type Decision<R> = { allowed: true } | { allowed: false; reason: R };
@@ -102,5 +119,22 @@ export function canSwitchToWorkspace(
     return deny<SwitchWorkspaceDenyReason>("no-target");
   // The RPC's crown-jewel gate: only a genuine membership may be activated.
   if (!ctx.isMember) return deny<SwitchWorkspaceDenyReason>("not-a-member");
+  return ALLOW;
+}
+
+/**
+ * Mirror of list_workspace_members' preconditions
+ * (20260725120000_workspace_roster.sql). Order matches the SQL's guard order so
+ * the first-failing reason is identical to the RPC's raised error:
+ * authenticated → workspace-present → membership re-check (fail closed).
+ * Visibility is ANY member (DECIDED) — no admin requirement.
+ */
+export function canListWorkspaceRoster(
+  ctx: ListRosterContext,
+): Decision<ListRosterDenyReason> {
+  if (!ctx.callerId) return deny<ListRosterDenyReason>("not-authenticated");
+  if (!ctx.schoolId) return deny<ListRosterDenyReason>("no-workspace");
+  // The RPC's gate: only a genuine member may enumerate the roster.
+  if (!ctx.isMember) return deny<ListRosterDenyReason>("not-a-member");
   return ALLOW;
 }

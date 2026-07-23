@@ -63,14 +63,27 @@ export interface PendingInvite {
   createdAt: string;
 }
 
-export async function listPendingInvites(): Promise<PendingInvite[]> {
+/**
+ * `schoolId` (OPTIONAL, backward-compatible — omitted on the flag-OFF path)
+ * pins the teams read to ONE workspace. Without the pin, a teacher in ≥2 teams
+ * (multi-workspace) makes the bare `.maybeSingle()` THROW (teams_read is
+ * is_team_member → multiple rows), silently collapsing the Team section.
+ *
+ * SECURITY: `schoolId` is attacker-controllable (this is an exported server
+ * action) but safe by construction — the teams read is RLS-filtered
+ * (is_team_member), so a hostile id yields NO rows → an empty invite list,
+ * never foreign data. UI gating is cosmetic; RLS is the gate.
+ */
+export async function listPendingInvites(
+  schoolId?: string,
+): Promise<PendingInvite[]> {
   const supabase = await createClient();
 
-  // Get the caller's team id first (Strategy A: 1:1 school→team).
-  const { data: teamRow, error: teamError } = await supabase
-    .from("teams")
-    .select("id")
-    .maybeSingle();
+  // Get the caller's team id first (Strategy A: 1:1 school→team), pinned to
+  // the active workspace when the multi-workspace path provides one.
+  let teamQuery = supabase.from("teams").select("id");
+  if (schoolId) teamQuery = teamQuery.eq("school_id", schoolId);
+  const { data: teamRow, error: teamError } = await teamQuery.maybeSingle();
   if (teamError) throw teamError;
   if (!teamRow) return [];
 
@@ -444,7 +457,21 @@ export interface CallerInfo {
   teamId: string | null;
 }
 
-export async function getCallerInfo(): Promise<CallerInfo | null> {
+/**
+ * `schoolId` (OPTIONAL, backward-compatible — omitted on the flag-OFF path)
+ * scopes BOTH reads to ONE workspace: "workspace admin" then means admin of
+ * the ACTIVE workspace (an unscoped read counts a school_admins row in ANY
+ * school as admin here), and the pinned teams read restores the one-row
+ * `.maybeSingle()` invariant for a teacher in ≥2 teams.
+ *
+ * SECURITY: `schoolId` is attacker-controllable (this is an exported server
+ * action) but safe by construction — both reads are RLS-filtered, so a hostile
+ * id yields empty rows (isWorkspaceAdmin=false, teamId=null), never foreign
+ * data. UI gating is cosmetic; RLS is the gate.
+ */
+export async function getCallerInfo(
+  schoolId?: string,
+): Promise<CallerInfo | null> {
   try {
     const supabase = await createClient();
 
@@ -454,18 +481,19 @@ export async function getCallerInfo(): Promise<CallerInfo | null> {
     } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // Is this teacher a workspace admin?
-    const { data: adminRows } = await supabase
+    // Is this teacher a workspace admin (of the ACTIVE workspace, when pinned)?
+    let adminQuery = supabase
       .from("school_admins")
       .select("teacher_id")
       .eq("teacher_id", user.id);
+    if (schoolId) adminQuery = adminQuery.eq("school_id", schoolId);
+    const { data: adminRows } = await adminQuery;
     const isWorkspaceAdmin = Array.isArray(adminRows) && adminRows.length > 0;
 
-    // team id (for invite)
-    const { data: teamRow } = await supabase
-      .from("teams")
-      .select("id")
-      .maybeSingle();
+    // team id (for invite), pinned to the active workspace when provided
+    let teamQuery = supabase.from("teams").select("id");
+    if (schoolId) teamQuery = teamQuery.eq("school_id", schoolId);
+    const { data: teamRow } = await teamQuery.maybeSingle();
 
     return {
       teacherId: user.id,

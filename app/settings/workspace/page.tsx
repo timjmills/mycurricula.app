@@ -61,17 +61,28 @@ function TeamLoadingSkeleton(): ReactNode {
 
 // ── Data-fetching inner component (relocated from app/settings/team/page.tsx) ─
 
-async function TeamData(): Promise<ReactNode> {
+async function TeamData({
+  activeSchoolId,
+}: {
+  /** The ACTIVE workspace id on the MULTI_WORKSPACE path (hoisted by the page
+   *  below), or null. Null ⇒ every read runs its verbatim flag-OFF/ambient
+   *  body. Non-null ⇒ the reads pin to that workspace: the roster comes from
+   *  the workspace_members RPC (joined-in members included), "workspace admin"
+   *  means admin of the ACTIVE workspace, and the teams `.maybeSingle()` reads
+   *  are one-row again for a teacher in ≥2 teams. */
+  activeSchoolId: string | null;
+}): Promise<ReactNode> {
+  const schoolId = activeSchoolId ?? undefined;
   // Fetch in parallel — no data dependency between them.
   const [membersResult, notebooks, pendingInvites, callerInfo] =
     await Promise.all([
-      listWorkspaceMembers().catch(() => ({
+      listWorkspaceMembers(schoolId).catch(() => ({
         members: [],
         seats: { used: 0, cap: 5 },
       })),
-      listWorkspaceNotebooks().catch(() => []),
-      listPendingInvites().catch(() => []),
-      getCallerInfo().catch(() => null),
+      listWorkspaceNotebooks(schoolId).catch(() => []),
+      listPendingInvites(schoolId).catch(() => []),
+      getCallerInfo(schoolId).catch(() => null),
     ]);
 
   // Derive which notebooks the caller leads (grade_role 'lead' or 'grade_admin').
@@ -120,10 +131,15 @@ export default async function WorkspaceSettingsPage(): Promise<ReactNode> {
   // rather than silently retaining the prior tenant (Codex §4a). Flag OFF: the
   // ternary short-circuits (no fetch), the key stays undefined, and the page is
   // byte-identical to today.
+  // The fetch is HOISTED (one read serves both consumers): the re-key below AND
+  // the <TeamData activeSchoolId> pin — so the key and the pinned reads can
+  // never disagree about which workspace is active within one render.
   const WS_KEY_UNRESOLVED = "__ws-unresolved__";
+  const activeWorkspace = MULTI_WORKSPACE
+    ? await getActiveWorkspace().catch(() => null)
+    : null;
   const activeWorkspaceKey = MULTI_WORKSPACE
-    ? ((await getActiveWorkspace().catch(() => null))?.schoolId ??
-      WS_KEY_UNRESOLVED)
+    ? (activeWorkspace?.schoolId ?? WS_KEY_UNRESOLVED)
     : undefined;
 
   return (
@@ -144,7 +160,7 @@ export default async function WorkspaceSettingsPage(): Promise<ReactNode> {
           gives the settings search a scroll target for "team" queries. */}
       <section id="team-members" data-settings-anchor>
         <Suspense fallback={<TeamLoadingSkeleton />}>
-          <TeamData />
+          <TeamData activeSchoolId={activeWorkspace?.schoolId ?? null} />
         </Suspense>
       </section>
     </>

@@ -114,3 +114,75 @@ export function pickActiveWorkspace(
 export function isWorkspaceAdminRole(role: WorkspaceRole): boolean {
   return role === "owner" || role === "admin";
 }
+
+// ── Workspace ROSTER (list_workspace_members RPC) ────────────────────────────
+// The roster rows come from the list_workspace_members(p_school_id) RPC
+// (supabase/migrations/20260725120000_workspace_roster.sql): SECURITY DEFINER,
+// membership re-checked server-side (any MEMBER of the workspace may read its
+// roster). Unlike list_my_workspaces, this projection DOES carry per-teammate
+// identity (display_name + email) — a DECIDED parity with the home roster,
+// which already shows fellow members' emails (components/team/TeamPage.tsx).
+// It still never carries active_school_id (the leak-guard test pins this).
+
+/** A raw `list_workspace_members()` RPC result row (snake_case, DB-shaped). */
+export interface WorkspaceRosterRow {
+  teacher_id: string;
+  display_name: string;
+  email: string;
+  is_owner: boolean;
+  is_admin: boolean;
+  joined_at: string;
+}
+
+/** One roster member as the admin/queries layer consumes it (camelCase). */
+export interface WorkspaceRosterEntry {
+  teacherId: string;
+  displayName: string;
+  email: string;
+  /** workspace_members.is_owner — the founding/creating teacher. */
+  isOwner: boolean;
+  /** True when this teacher holds a school_admins row IN THIS workspace. */
+  isWorkspaceAdmin: boolean;
+  /** workspace_members.created_at — when they joined this workspace. */
+  joinedAt: string;
+}
+
+/** The exact columns list_workspace_members() projects — documented for parity
+ *  with the RPC's RETURNS TABLE + the leak-guard test (never active_school_id). */
+export const WORKSPACE_ROSTER_ROW_COLUMNS =
+  "teacher_id, display_name, email, is_owner, is_admin, joined_at";
+
+/** Map one list_workspace_members() row to a WorkspaceRosterEntry. Pure. */
+export function mapRosterRow(row: WorkspaceRosterRow): WorkspaceRosterEntry {
+  return {
+    teacherId: row.teacher_id,
+    displayName: row.display_name ?? "",
+    email: row.email ?? "",
+    isOwner: Boolean(row.is_owner),
+    isWorkspaceAdmin: Boolean(row.is_admin),
+    joinedAt: row.joined_at,
+  };
+}
+
+/** Map + DEDUPE roster rows by teacher_id (first occurrence wins) and sort by
+ *  display name then email (mirrors the RPC's ORDER BY, re-asserted here so the
+ *  UI order is deterministic even if a future RPC edit drops it). The RPC
+ *  returns one row per membership and workspace_members is unique per (school,
+ *  teacher), so duplicates should never occur — dedupe is defense in depth,
+ *  same posture as mapWorkspaceRows above. Pure. */
+export function mapRosterRows(
+  rows: readonly WorkspaceRosterRow[],
+): WorkspaceRosterEntry[] {
+  const seen = new Set<string>();
+  const out: WorkspaceRosterEntry[] = [];
+  for (const row of rows) {
+    if (seen.has(row.teacher_id)) continue;
+    seen.add(row.teacher_id);
+    out.push(mapRosterRow(row));
+  }
+  return out.sort(
+    (a, b) =>
+      a.displayName.localeCompare(b.displayName) ||
+      a.email.localeCompare(b.email),
+  );
+}
