@@ -21,6 +21,17 @@
   flex-direction: column;
 }
 
+/* ── Lazy-load fallback (rich-text-editor.lazy.tsx) ───────────────────────────
+   Neutral stand-in painted while the code-split editor chunk loads. Mirrors
+   the empty editable region's box (one line tall — see .editable's
+   min-height) so swapping in the real editor causes no layout shift in
+   single-line contexts; the parent shell (card border, .rteShell, field
+   frame) supplies any visible chrome, exactly as it does for the editor. */
+.lazyFallback {
+  width: 100%;
+  min-height: 1.4em;
+}
+
 /* ── Toolbar (floating or docked) ─────────────────────────────────────────── */
 .toolbar {
   position: fixed; /* fixed so it floats above all stacking contexts */

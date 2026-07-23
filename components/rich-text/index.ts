@@ -1,5 +1,11 @@
 // components/rich-text — public surface
-export { RichTextEditor } from "./rich-text-editor";
+//
+// `RichTextEditor` resolves to the LAZY wrapper (rich-text-editor.lazy.tsx):
+// the ~1,800-line editor module + DOMPurify load as their own chunk on first
+// editor mount instead of riding in every consumer route's first-load JS.
+// The props type still comes from the eager module (type-only — erased at
+// compile time, so it does not re-add the editor to the static graph).
+export { RichTextEditor } from "./rich-text-editor.lazy";
 export type { RichTextEditorProps } from "./rich-text-editor";
 
 // Shared focused-editor registry for external toolbars (6.11.26 /daily
