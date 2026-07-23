@@ -1,18 +1,19 @@
-// tests/standards-catalog.test.ts — the standards menu's data layer.
+// tests/standards-catalog.test.ts — the standards seed source + bundled sets.
 //
-// Locks in: catalog JSON integrity (the same file seeds Supabase), the
-// picker's filter semantics (pinned-first, subject/grade narrowing, item-code
-// search), the bundled item sets, and the deterministic id bridge the seed
-// generator + Supabase source share (scripts/gen-standards-catalog-sql.mjs).
+// Locks in: catalog JSON integrity (frameworks-catalog.json is the source the
+// committed supabase/seed-standards-catalog.sql is generated from — see
+// scripts/gen-standards-catalog-sql.mjs), the licence gates the 2026-06-12
+// research verified, the bundled item sets (lib/standards/items.ts), and the
+// deterministic id bridge the seed generator + Supabase source share.
+//
+// The old picker-filter suites (filterFrameworks / filterItems) went with
+// lib/standards/catalog.ts — the client-side catalog query layer deleted
+// alongside its only consumer, the superseded StandardsPicker. The live
+// standards path (StandardsTaggingPicker + app/api/standards/*) queries
+// Supabase via lib/standards/queries.ts instead.
 
 import { describe, expect, it } from "vitest";
-import {
-  allFrameworks,
-  filterFrameworks,
-  filterItems,
-  getFramework,
-  REGION_LABELS,
-} from "@/lib/standards/catalog";
+import catalogJson from "@/lib/standards/frameworks-catalog.json";
 import {
   availableGrades,
   bundledDescriptions,
@@ -20,25 +21,50 @@ import {
 } from "@/lib/standards/items";
 import { slugToUuid, uuidV5 } from "@/lib/planner/id-bridge";
 
+// Minimal shape for the fields these tests assert — the JSON's full column
+// mirror lives in the generated seed, not in app code.
+interface CatalogFramework {
+  short_code: string;
+  name: string;
+  region: string;
+  parent_short_code?: string;
+  subdivision_code?: string;
+  commercial_use: string;
+}
+
+const FRAMEWORKS = (catalogJson as { frameworks: CatalogFramework[] })
+  .frameworks;
+const BY_CODE = new Map(FRAMEWORKS.map((f) => [f.short_code, f]));
+
+/** The seed's region vocabulary (was REGION_LABELS in the deleted catalog.ts). */
+const REGIONS = new Set([
+  "north_america",
+  "europe",
+  "mena",
+  "asia_pacific",
+  "africa",
+  "latin_america",
+  "global",
+]);
+
 describe("frameworks catalog (JSON integrity)", () => {
   it("loads every framework with unique short_codes and resolvable parents", () => {
-    const all = allFrameworks();
-    expect(all.length).toBeGreaterThanOrEqual(174);
+    expect(FRAMEWORKS.length).toBeGreaterThanOrEqual(174);
     const codes = new Set<string>();
-    for (const f of all) {
+    for (const f of FRAMEWORKS) {
       expect(f.short_code).toBeTruthy();
       expect(f.name).toBeTruthy();
       expect(codes.has(f.short_code)).toBe(false);
       codes.add(f.short_code);
-      expect(REGION_LABELS[f.region]).toBeTruthy();
+      expect(REGIONS.has(f.region)).toBe(true);
       if (f.parent_short_code) {
-        expect(getFramework(f.parent_short_code)).toBeDefined();
+        expect(BY_CODE.get(f.parent_short_code)).toBeDefined();
       }
     }
   });
 
   it("carries every US state + DC as subdivision entries", () => {
-    const states = allFrameworks().filter((f) =>
+    const states = FRAMEWORKS.filter((f) =>
       f.subdivision_code?.startsWith("US-"),
     );
     expect(states.length).toBe(51);
@@ -47,68 +73,12 @@ describe("frameworks catalog (JSON integrity)", () => {
   it("gates the frameworks that must not be ingested without a licence", () => {
     // The product decision the research verified 3/3: IB content requires a
     // written IBO licence; Cambridge requires written permission.
-    expect(getFramework("IB-PYP")?.commercial_use).toBe("permission_required");
-    expect(getFramework("IB-ATL")?.commercial_use).toBe("permission_required");
-    expect(getFramework("CAM-PRI")?.commercial_use).toBe("permission_required");
+    expect(BY_CODE.get("IB-PYP")?.commercial_use).toBe("permission_required");
+    expect(BY_CODE.get("IB-ATL")?.commercial_use).toBe("permission_required");
+    expect(BY_CODE.get("CAM-PRI")?.commercial_use).toBe("permission_required");
     // And the open anchors stay open.
-    expect(getFramework("AU-AC9")?.commercial_use).toBe("open_attribution");
-    expect(getFramework("SE-LGR22")?.commercial_use).toBe("open");
-  });
-});
-
-describe("filterFrameworks", () => {
-  it("returns pinned frameworks first, in pin order, never duplicated", () => {
-    const { pinned, rest } = filterFrameworks({}, ["NGSS", "CCSS-MATH"]);
-    expect(pinned.map((f) => f.short_code)).toEqual(["NGSS", "CCSS-MATH"]);
-    expect(rest.some((f) => f.short_code === "NGSS")).toBe(false);
-  });
-
-  it("narrows by app subject through the slug bridge", () => {
-    const { rest } = filterFrameworks({ subject: "math" }, []);
-    const codes = new Set(rest.map((f) => f.short_code));
-    expect(codes.has("CCSS-MATH")).toBe(true);
-    expect(codes.has("CCSS-SMP")).toBe(true);
-    expect(codes.has("NGSS")).toBe(false); // science-only
-    expect(codes.has("AU-AC9")).toBe(true); // all_subjects passes every subject
-  });
-
-  it("surfaces a framework when the query matches one of its ITEM codes", () => {
-    const { pinned, rest } = filterFrameworks({ query: "5-PS1" }, ["NGSS"]);
-    const codes = new Set([...pinned, ...rest].map((f) => f.short_code));
-    expect(codes.has("NGSS")).toBe(true);
-  });
-
-  it("does NOT hide partially-bundled frameworks on a grade filter (review M-1)", () => {
-    const { pinned } = filterFrameworks({ grade: "1" }, [
-      "CCSS-ELA",
-      "CCSS-MATH",
-      "CCSS-SMP",
-      "NGSS",
-    ]);
-    // Grade-5 sample sets have no grade-1 items, but the frameworks must stay
-    // visible (the catalog covers K-12; only the bundled SAMPLE is grade-5).
-    expect(pinned.length).toBe(4);
-  });
-
-  it("keeps no-item catalog frameworks browsable under any grade filter", () => {
-    const { rest } = filterFrameworks({ grade: "7" }, []);
-    expect(rest.some((f) => f.short_code === "ENG-NC")).toBe(true);
-  });
-});
-
-describe("filterItems", () => {
-  it("filters by grade band and passes grade-independent items", () => {
-    const g3 = filterItems("NGSS", { grade: "3" });
-    expect(g3.some((i) => i.code === "3-5-ETS1-1")).toBe(true);
-    expect(g3.some((i) => i.code === "5-PS1-1")).toBe(false);
-    expect(filterItems("CCSS-SMP", { grade: "2" })).toHaveLength(8);
-  });
-
-  it("maps the explorers subject onto science + social studies", () => {
-    expect(
-      filterItems("NGSS", { subject: "explorers" }).length,
-    ).toBeGreaterThan(0);
-    expect(filterItems("NGSS", { subject: "math" })).toHaveLength(0);
+    expect(BY_CODE.get("AU-AC9")?.commercial_use).toBe("open_attribution");
+    expect(BY_CODE.get("SE-LGR22")?.commercial_use).toBe("open");
   });
 });
 
