@@ -23,6 +23,8 @@
 // Handlers / Server Actions (the same posture as lib/teach's Supabase source).
 
 import { createClient } from "@/lib/supabase/server";
+import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
+import { mapRosterRows, type WorkspaceRosterRow } from "@/lib/workspaces/row";
 
 // ── DB-accurate enum mirrors ────────────────────────────────────────────────
 // The grade_role Postgres enum (M1) has THREE values — distinct from the mock
@@ -85,9 +87,29 @@ export interface WorkspaceNotebook {
  *
  * Returns members sorted by display name, each member's notebookRoles sorted by
  * the notebook's display_order then name.
+ *
+ * `schoolId` (OPTIONAL, backward-compatible — omitting it preserves the original
+ * ambient-RLS read) pins the roster to ONE workspace via the multi-workspace
+ * path below. SECURITY: `schoolId` is attacker-controllable (this function is
+ * re-exported through exported server actions) but safe by construction — the
+ * list_workspace_members RPC re-checks is_workspace_member(schoolId)
+ * server-side and RAISES for a non-member, and the TGA/teams reads are
+ * RLS-filtered (a hostile id yields empty rows, never foreign data). UI gating
+ * is cosmetic; the RPC/RLS are the gates.
  */
-export async function listWorkspaceMembers(): Promise<WorkspaceMembersResult> {
+export async function listWorkspaceMembers(
+  schoolId?: string,
+): Promise<WorkspaceMembersResult> {
   const supabase = await createClient();
+
+  // Multi-workspace path (flag-gated; OFF falls through to the verbatim body
+  // below — no caller passes schoolId while the flag is off). The home-roster
+  // read below cannot see JOINED-IN members (their teachers.school_id stays
+  // home under the MOVE→ADD join model), so the pinned path reads the
+  // workspace_members ledger via its sanctioned RPC instead.
+  if (MULTI_WORKSPACE && schoolId) {
+    return listWorkspaceMembersForWorkspace(supabase, schoolId);
+  }
 
   // Teammates (RLS → same workspace). Explicit columns; never `select *`.
   const { data: teacherRows, error: teachersError } = await supabase
@@ -170,6 +192,117 @@ export async function listWorkspaceMembers(): Promise<WorkspaceMembersResult> {
   const { data: teamRow, error: teamError } = await supabase
     .from("teams")
     .select("id, seat_cap")
+    .maybeSingle();
+  if (teamError) throw teamError;
+
+  let seats: SeatUsage = { used: members.length, cap: 5 };
+  if (teamRow) {
+    const { count, error: countError } = await supabase
+      .from("team_memberships")
+      .select("id", { count: "exact", head: true })
+      .eq("team_id", teamRow.id as string);
+    if (countError) throw countError;
+    seats = { used: count ?? 0, cap: (teamRow.seat_cap as number) ?? 5 };
+  }
+
+  return { members, seats };
+}
+
+/**
+ * The MULTI_WORKSPACE roster read, pinned to ONE workspace (the caller's active
+ * workspace, resolved by the caller). Three deltas from the ambient read above:
+ *
+ *   1. Roster (who) — the list_workspace_members SECURITY DEFINER RPC
+ *      (20260725120000_workspace_roster.sql), because workspace_members RLS is
+ *      self-only and the `teachers` read misses joined-in members entirely
+ *      (their teachers.school_id stays HOME under the MOVE→ADD join). The RPC
+ *      re-checks is_workspace_member server-side; is_admin comes back per-row,
+ *      so the separate school_admins query is dropped on this path.
+ *   2. Notebook roles — the TGA read is WORKSPACE-PINNED via the embedded
+ *      grade_levels !inner join. Without the pin, the caller's HOME TGAs would
+ *      inject home notebook chips into workspace B's roster.
+ *   3. Seats — the teams read is pinned with .eq("school_id", schoolId). The
+ *      ambient `.maybeSingle()` above THROWS for a teacher in ≥2 teams (the
+ *      teams_read policy is is_team_member, so multiple rows return); the pin
+ *      restores the one-row invariant (teams.school_id is UNIQUE).
+ */
+async function listWorkspaceMembersForWorkspace(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  schoolId: string,
+): Promise<WorkspaceMembersResult> {
+  // 1. Roster via the sanctioned RPC (membership re-checked server-side; a
+  //    non-member's call raises → surfaces through the caller's .catch).
+  const { data: rosterRows, error: rosterError } = await supabase.rpc(
+    "list_workspace_members",
+    { p_school_id: schoolId },
+  );
+  if (rosterError) throw rosterError;
+  const roster = mapRosterRows((rosterRows ?? []) as WorkspaceRosterRow[]);
+
+  // 2. Per-notebook roles: TGA rows joined to their grade, PINNED to this
+  //    workspace (`!inner` so the embedded school filter constrains the parent
+  //    TGA rows, not just the embed).
+  const { data: tgaRows, error: tgaError } = await supabase
+    .from("teacher_grade_assignments")
+    .select(
+      "teacher_id, role, grade_level_id, grade_levels!inner(name, display_order, school_id)",
+    )
+    .eq("grade_levels.school_id", schoolId);
+  if (tgaError) throw tgaError;
+
+  type TgaJoin = {
+    teacher_id: string;
+    role: GradeRole;
+    grade_level_id: string;
+    grade_levels: { name: string | null; display_order: number | null } | null;
+  };
+  const rolesByTeacher = new Map<
+    string,
+    Array<NotebookRole & { displayOrder: number }>
+  >();
+  for (const raw of (tgaRows ?? []) as unknown as TgaJoin[]) {
+    const list = rolesByTeacher.get(raw.teacher_id) ?? [];
+    list.push({
+      gradeLevelId: raw.grade_level_id,
+      notebookName: raw.grade_levels?.name ?? "",
+      role: raw.role,
+      displayOrder: raw.grade_levels?.display_order ?? 0,
+    });
+    rolesByTeacher.set(raw.teacher_id, list);
+  }
+
+  // The RPC rows drive the member list (mapRosterRows dedupes + name-sorts);
+  // notebookRoles attach per teacher, sorted like the ambient path.
+  const members: WorkspaceMember[] = roster.map((r) => {
+    const roles = (rolesByTeacher.get(r.teacherId) ?? [])
+      .slice()
+      .sort(
+        (a, b) =>
+          a.displayOrder - b.displayOrder ||
+          a.notebookName.localeCompare(b.notebookName),
+      )
+      .map(({ gradeLevelId, notebookName, role }) => ({
+        gradeLevelId,
+        notebookName,
+        role,
+      }));
+    return {
+      teacherId: r.teacherId,
+      displayName: r.displayName,
+      email: r.email,
+      isWorkspaceAdmin: r.isWorkspaceAdmin,
+      notebookRoles: roles,
+    };
+  });
+
+  // 3. Seat usage from THIS workspace's single team row (teams.school_id is
+  //    UNIQUE, so the pinned maybeSingle is genuinely 0-or-1 — this fixes the
+  //    multi-team throw). Seats stay on team_memberships (the ledger
+  //    redeem_invite's seat check enforces); the roster (who) is the RPC.
+  const { data: teamRow, error: teamError } = await supabase
+    .from("teams")
+    .select("id, seat_cap")
+    .eq("school_id", schoolId)
     .maybeSingle();
   if (teamError) throw teamError;
 
