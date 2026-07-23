@@ -77,7 +77,11 @@ import {
   type WorkspaceNotebookOverride,
 } from "@/lib/use-workspace-settings";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
-import { workspacesClient, isWorkspaceAdminRole } from "@/lib/workspaces";
+import {
+  workspacesClient,
+  isWorkspaceAdminRole,
+  WORKSPACE_CHANGED_EVENT,
+} from "@/lib/workspaces";
 
 // ── Mock notebook definitions ────────────────────────────────────────────────
 // Beta school has a single active notebook ("Grade 5 — My Class").
@@ -186,46 +190,92 @@ interface RemoteIdentity {
  * (isWorkspaceAdmin=false) rather than a mock-fallback identity that could wrongly
  * confer admin.
  *
- * RE-SOURCING AFTER A SWITCH/CREATE is intentionally OUT OF SCOPE here: this unit
- * ships no switcher/create UI (a separate unit), so nothing calls
- * setActiveWorkspace/createWorkspace yet and there is no live workspace change to
- * invalidate. When that UI lands it owns triggering a re-source after its
- * mutation — the standard pattern is `router.refresh()` (or remounting this
- * provider), which re-runs this mount fetch. The fetch runs once per mount by
- * design.
+ * RE-SOURCING AFTER A SWITCH/CREATE: the switcher (components/settings/
+ * workspace-switcher.tsx) moves the SERVER-side active-workspace pointer, then
+ * broadcasts WORKSPACE_CHANGED_EVENT. This component listens for it and re-runs
+ * the fetch, so the persistent settings-LAYOUT provider (and the /settings
+ * overview tile it feeds) re-source WITHOUT a full reload — router.refresh()
+ * alone re-runs Server Components but NOT this client mount effect, so the
+ * identity would otherwise linger on the prior workspace. A monotonic sequence
+ * guard keeps the LATEST-DISPATCHED resolve authoritative, so a slow initial
+ * fetch can't clobber a newer re-source (last-write-wins). Still ON path only —
+ * this component mounts only when MULTI_WORKSPACE is on.
  */
 function WorkspaceIdentitySync({
   onResolved,
 }: {
-  onResolved: (identity: RemoteIdentity) => void;
+  // Reports the resolved identity, or NULL to FAIL CLOSED (see below). Null is
+  // load-bearing on the RE-SOURCE path: after a switch `remote` already holds the
+  // PRIOR workspace, so a failed/empty re-source must actively CLEAR it (not just
+  // "leave it") or the UI would keep flashing the prior workspace's admin
+  // affordances against a server that has already moved on.
+  onResolved: (identity: RemoteIdentity | null) => void;
 }): null {
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
+    // Monotonic sequence: each resolve claims a ticket up-front; only the ticket
+    // that equals `latest` when it settles is allowed to report. This makes the
+    // most-recently-DISPATCHED fetch win regardless of network completion order,
+    // so a re-source (from the change event) can't be overwritten by an older
+    // in-flight initial fetch.
+    let latest = 0;
+    let active = true;
+    const resolve = async (): Promise<void> => {
+      const seq = ++latest;
       try {
         const { workspace, notebooks } =
           await workspacesClient.getActiveWorkspaceContext();
-        // No active workspace → don't report; `remote` stays null and the
-        // provider FAILS CLOSED (empty identity, isWorkspaceAdmin=false).
-        if (cancelled || !workspace) return;
-        onResolved({
-          name: workspace.name,
-          isAdmin: isWorkspaceAdminRole(workspace.role),
-          notebooks: notebooks.map((nb) => ({
-            gradeLevelId: nb.gradeLevelId,
-            name: nb.name,
-            isActive: nb.isActive,
-          })),
-        });
+        // Unmounted or superseded by a newer resolve → the newer one owns the
+        // outcome; don't touch state.
+        if (!active || seq !== latest) return;
+        // Report authoritatively. A real workspace → its identity. NO active
+        // workspace (seam off at runtime / no membership) → NULL: the provider
+        // FAILS CLOSED (empty identity, isWorkspaceAdmin=false). On a re-source
+        // this CLEARS a stale prior-workspace identity rather than retaining it.
+        onResolved(
+          workspace
+            ? {
+                name: workspace.name,
+                isAdmin: isWorkspaceAdminRole(workspace.role),
+                notebooks: notebooks.map((nb) => ({
+                  gradeLevelId: nb.gradeLevelId,
+                  name: nb.name,
+                  isActive: nb.isActive,
+                })),
+              }
+            : null,
+        );
       } catch {
-        // Seam error → leave `remote` null; the provider fails closed (never
-        // reports a mock identity on an ON build).
+        // Seam/network error. Same fail-closed rule: CLEAR any stale identity
+        // (guard against clobbering a newer resolve) so the provider shows
+        // empty/loading — never the mock, never the prior workspace on a
+        // re-source.
+        if (!active || seq !== latest) return;
+        onResolved(null);
       }
-    })();
-    return () => {
-      cancelled = true;
     };
-    // onResolved is the stable useState setter; runs once on mount.
+    void resolve(); // initial mount fetch (remote already starts null — no
+    // eager clear needed here, unlike the re-source path below)
+
+    // Re-source when the switcher/create moves the active-workspace pointer.
+    // The event carries no payload — it's a "re-read the active workspace now"
+    // signal. window exists here (effects only run client-side).
+    const onChanged = (): void => {
+      // FAIL CLOSED IMMEDIATELY: drop the prior workspace's identity (name,
+      // notebooks, AND admin affordances) the instant the pointer moves — BEFORE
+      // the re-fetch tells us the new identity — then repopulate from resolve().
+      // Otherwise a live consumer could briefly show the prior workspace's admin
+      // UI against the NEW tenant during the fetch window (server RPCs are the
+      // real gate, but fail-closed is the house rule). resolve()'s sequence
+      // guard keeps the eventual repopulate authoritative over this eager clear.
+      onResolved(null);
+      void resolve();
+    };
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, onChanged);
+    return () => {
+      active = false;
+      window.removeEventListener(WORKSPACE_CHANGED_EVENT, onChanged);
+    };
+    // onResolved is the stable useState setter; the listener re-runs the fetch.
   }, [onResolved]);
   return null;
 }

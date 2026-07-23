@@ -329,3 +329,19 @@
   border-radius: var(--r-sm);
   text-wrap: pretty;
 }
+
+/* ── Touch-target height — phone / tablet (≤900px) ──────────────────────────
+   Applied to the Switch (sm), Create (md), and Try-again (sm) action buttons.
+   The Button primitive already inflates the HIT AREA to ≥44px on ≤900px via a
+   transparent ::before overlay, but the VISIBLE pill stays 32px (sm) / 40px
+   (md). Raise the visible floor to 44px so the control reads as a full tap
+   size on touch — not a small pill floating in an invisible 44px zone
+   (CLAUDE.md §4 / WCAG 2.5.5). Desktop (>900px) keeps the compact 32/40px
+   density (the query doesn't apply). Doubled class = (0,2,0): clears the
+   `.cp-root button` reset (0,1,1); `min-height` (never `height`) leaves the
+   primitive's size rule intact and only raises the lower bound. */
+@media (max-width: 900px) {
+  .actionBtn.actionBtn {
+    min-height: 44px;
+  }
+}

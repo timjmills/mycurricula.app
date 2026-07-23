@@ -14,6 +14,7 @@ export {
   getActiveWorkspaceContext,
   setActiveWorkspace,
   createWorkspace,
+  WORKSPACE_CHANGED_EVENT,
   type ActiveWorkspaceNotebook,
   type ActiveWorkspaceContext,
 } from "./client";

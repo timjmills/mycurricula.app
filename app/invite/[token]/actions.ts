@@ -21,8 +21,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-// All statuses redeem_invite can return (SQL §A2 comment, lines 302–319),
-// plus 'existing_workspace' which the W-A convergence migration adds:
+// All statuses redeem_invite can return (SQL §A2 comment, lines 302–319).
+// NOTE: the W-A convergence `existing_workspace` status was REMOVED by the
+// multi-workspace migration (20260724120000) — redeeming is now a non-
+// destructive ADD (you belong to both workspaces), so the RPC never returns
+// `existing_workspace` again. The return SHAPE (redeem_status, team_id,
+// grade_level_id) is unchanged, so this is a pure status-set removal.
 export type RedeemStatus =
   | "accepted"
   | "already_member"
@@ -31,8 +35,7 @@ export type RedeemStatus =
   | "expired"
   | "revoked"
   | "seat_full"
-  | "invalid"
-  | "existing_workspace"; // W-A convergence: caller already has real workspace content
+  | "invalid";
 
 export interface RedeemResult {
   status: RedeemStatus;

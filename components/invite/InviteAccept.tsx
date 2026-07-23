@@ -6,7 +6,7 @@
 // the invite on mount (no extra button click) and renders the result status
 // with appropriate copy and CTAs for every case.
 //
-// Status matrix (SQL §A2 return contract + W-A 'existing_workspace'):
+// Status matrix (SQL §A2 return contract):
 //   accepted         → success → route into the app (team notebook)
 //   already_member   → success (idempotent) → same CTA
 //   already_accepted → friendly notice (invite already used)
@@ -15,8 +15,9 @@
 //   revoked          → invite cancelled + fallback
 //   seat_full        → team at capacity + fallback
 //   invalid          → bad/unknown token + fallback
-//   existing_workspace → user has real content; joining multiple workspaces
-//                        is coming soon → fallback
+// (The W-A 'existing_workspace' case is gone — the multi-workspace migration
+// made redeeming a non-destructive ADD, so joining multiple workspaces just
+// works; there is no "coming soon" dead-end to render anymore.)
 //
 // The "Join this team" primary button (shown in the interim loading/ready state
 // before auto-redeem completes) is consequential (joins the teacher to a team)
@@ -81,11 +82,6 @@ const STATUS_COPY: Record<
   invalid: {
     heading: "Link not recognised",
     body: "This invite link isn't valid or has already been fully used. Double-check the link in your email, or ask your team lead to send a new one.",
-    isSuccess: false,
-  },
-  existing_workspace: {
-    heading: "You already have a workspace",
-    body: "Joining additional workspaces is coming soon — we're building this now. For the moment, continue with your existing workspace. You can be invited again once multi-workspace support ships.",
     isSuccess: false,
   },
   error: {

@@ -26,6 +26,19 @@ import type { CreatedWorkspace, WorkspaceSummary } from "./row";
  *  importing the 'use server' actions module directly. */
 export type { ActiveWorkspaceNotebook, ActiveWorkspaceContext } from "./actions";
 
+/**
+ * Window event broadcast by the workspace switcher after a SUCCESSFUL
+ * switch/create (see the invalidation contract below). Client providers that
+ * source the active-workspace identity ONCE at mount — notably the settings-
+ * LAYOUT NotebookProvider that feeds the /settings overview tile — listen for it
+ * and re-fetch. router.refresh() re-runs Server Components but NOT a client
+ * provider's mount effect, so without this signal the overview tile would keep
+ * showing the prior workspace until a full reload. Fired + listened for ONLY on
+ * the MULTI_WORKSPACE ON path (both the switcher and WorkspaceIdentitySync mount
+ * only when the flag is on), so the OFF path never sees it.
+ */
+export const WORKSPACE_CHANGED_EVENT = "mycurricula:workspace-changed";
+
 /** List every workspace the caller belongs to (empty when the seam is off). */
 export async function listMyWorkspaces(): Promise<WorkspaceSummary[]> {
   const res = await listMyWorkspacesAction();

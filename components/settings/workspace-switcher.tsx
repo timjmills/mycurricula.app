@@ -49,9 +49,12 @@
 // the card stack, and its provider re-sources the new workspace (Codex §4a).
 // We deliberately do NOT hard-reload (it would destroy the Undo toast and is
 // heavier than the contract requires) and do NOT reach into notebook-state.tsx.
-// The settings-LAYOUT provider stays as-is: nothing ON THIS PAGE consumes it
-// (only the /settings overview + planner shell do, and those remount on their
-// own next mount when the teacher navigates there).
+// The settings-LAYOUT provider is NOT re-keyed by this page, yet it feeds the
+// /settings overview tile ("Workspace & Team" summary) — so a bare
+// router.refresh() would leave that tile on the prior workspace until a full
+// reload. We close that gap by broadcasting WORKSPACE_CHANGED_EVENT after each
+// successful mutation (see invalidate()); its WorkspaceIdentitySync listens and
+// re-fetches. That is a decoupled signal, not a reach INTO notebook-state.
 //
 // SSR-safe: the first render is always the "loading" branch (no reads that
 // differ between server and client), and every tooltip is `required` (dismissal
@@ -76,6 +79,7 @@ import {
   listMyWorkspaces,
   pickActiveWorkspace,
   setActiveWorkspace,
+  WORKSPACE_CHANGED_EVENT,
   WORKSPACE_CREATION_SAFETY_CAP,
   type WorkspaceRole,
   type WorkspaceSummary,
@@ -196,10 +200,21 @@ export function WorkspaceSwitcher(): ReactNode {
     }
   };
 
-  // Re-source both the RSC route data (Team section) and this card's own list.
+  // Re-source everything that reflects the active workspace after a mutation:
+  //   1. the RSC route data — the Team section AND the WorkspaceSettings re-key
+  //      (router.refresh re-runs this route's Server Components);
+  //   2. this card's own list (the background reconcile);
+  //   3. client providers that sample the active-workspace identity ONCE at
+  //      mount — notably the settings-LAYOUT NotebookProvider feeding the
+  //      /settings overview tile. router.refresh() re-runs Server Components but
+  //      NOT a client provider's mount effect, so we broadcast a window event
+  //      that WorkspaceIdentitySync (ON path only) listens for and re-fetches.
   const invalidate = (): void => {
     router.refresh();
     void reconcile();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(WORKSPACE_CHANGED_EVENT));
+    }
   };
 
   // ── Switch ──────────────────────────────────────────────────────────────────
@@ -344,6 +359,7 @@ export function WorkspaceSwitcher(): ReactNode {
               <Button
                 variant="secondary"
                 size="sm"
+                className={styles.actionBtn}
                 onClick={() => setReloadKey((k) => k + 1)}
                 tooltip="Try loading your workspaces again."
               >
@@ -466,6 +482,7 @@ function WorkspaceRow({
             <Button
               variant="secondary"
               size="sm"
+              className={styles.actionBtn}
               loading={switching}
               disabled={disabled}
               onClick={onSwitch}
@@ -546,6 +563,7 @@ function CreateWorkspaceForm({
             type="submit"
             variant="primary"
             size="md"
+            className={styles.actionBtn}
             loading={creating}
             disabled={!canSubmit}
           >
