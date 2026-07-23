@@ -17,6 +17,14 @@
 //   4. Archived         — team subjects archived from section 1, collapsed
 //                         by default, each restorable. TEAM-scoped.
 //
+// Plus "Course sharing" (U-SHARE), rendered between §3 and §4: publish a
+// personal course to the whole team or reclaim a shared one back to personal.
+// Unlike the four sections above (localStorage-backed today), it is wired to
+// the LIVE per-course sharing seam (lib/subjects/client → SECURITY DEFINER
+// RPCs) and owns its own async load + pending/error feedback. Self-contained
+// in components/settings/course-sharing-manager.tsx. TEAM-scoped +
+// consequential.
+//
 // Scope doctrine follows /settings/curriculum: team cards fire a
 // ConsequenceToast naming the team-wide blast radius (with Undo); personal
 // cards persist quietly. Every card bumps `savedTick` after each persist
@@ -59,6 +67,10 @@ import {
   type EffectiveSubject,
 } from "@/lib/use-visible-subjects";
 import { SECTION_ICONS } from "@/components/settings/section-icons";
+// Deep import by design — the settings barrel is owned by the settings-hub
+// orchestrator; this page imports the client section directly (mirrors how
+// app/settings/workspace/page.tsx deep-imports WorkspaceSettings).
+import { CourseSharingManager } from "@/components/settings/course-sharing-manager";
 import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
@@ -77,6 +89,10 @@ export default function SubjectsSettingsPage(): ReactNode {
         <TeamSubjectsSection />
         <VisibilitySection />
         <PersonalSubjectsSection />
+        {/* Course sharing (U-SHARE) — personal ⇄ team publishing, wired to the
+            live per-course sharing seam (lib/subjects/client). Self-contained:
+            resolves its own grade + state. TEAM-scoped + consequential. */}
+        <CourseSharingManager />
         <ArchivedSection />
       </div>
     </div>
