@@ -58,6 +58,7 @@ import {
   useWorkspaceName,
 } from "@/lib/use-workspace-settings";
 import { useConsequenceToast } from "@/lib/consequence-toast";
+import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "@/components/appearance/settings-card";
 import { useRovingRadio } from "@/components/appearance/use-roving-radio";
@@ -101,6 +102,14 @@ function WorkspaceNameCard(): ReactNode {
   const { showConsequence } = useConsequenceToast();
   const [savedTick, setSavedTick] = useState(0);
 
+  // ON path (MULTI_WORKSPACE): the workspace name is DB-sourced and there is no
+  // rename RPC this wave, so the legacy localStorage-override editor would flash
+  // a "Saved" toast while nothing persists — the provider IGNORES the override
+  // on the ON path (lib/notebook-state.tsx). Present the real name read-only with
+  // an honest note instead of a control that lies. OFF path (dbManaged=false):
+  // the editable localStorage card, byte-for-byte as today.
+  const dbManaged = MULTI_WORKSPACE;
+
   // Local draft — independent while typing; re-syncs whenever the resolved
   // name changes (cross-tab edit, undo, overlay arrival post-mount).
   const [draft, setDraft] = useState<string>(workspaceName);
@@ -109,6 +118,7 @@ function WorkspaceNameCard(): ReactNode {
   }, [workspaceName]);
 
   const commit = (): void => {
+    if (dbManaged) return; // ON path: read-only field; never write the override
     const trimmed = draft.trim();
     if (trimmed === workspaceName) return; // untouched blur — no-op
     if (trimmed === "") {
@@ -138,9 +148,11 @@ function WorkspaceNameCard(): ReactNode {
   };
 
   // Disabled controls explain WHY they're disabled (CLAUDE.md §4).
-  const tip = isWorkspaceAdmin
-    ? "Renames the workspace for every teacher — the new name appears in the sidebar for your whole team. Saves when you press Enter or click out of the field."
-    : "Only a workspace admin can rename the workspace — ask your admin to change it.";
+  const tip = dbManaged
+    ? "Your workspace's name comes from your workspace — renaming it here isn't available yet."
+    : isWorkspaceAdmin
+      ? "Renames the workspace for every teacher — the new name appears in the sidebar for your whole team. Saves when you press Enter or click out of the field."
+      : "Only a workspace admin can rename the workspace — ask your admin to change it.";
 
   return (
     <SettingsCard
@@ -174,7 +186,7 @@ function WorkspaceNameCard(): ReactNode {
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={onKeyDown}
-            disabled={!isWorkspaceAdmin}
+            disabled={dbManaged || !isWorkspaceAdmin}
             placeholder="e.g. Al-Noor School"
             autoComplete="off"
             spellCheck={false}
@@ -184,8 +196,9 @@ function WorkspaceNameCard(): ReactNode {
           />
         </Tooltip>
         <p className={styles.fieldHint}>
-          Saves when you press Enter or click out of the field. Every teacher in
-          the workspace sees the new name.
+          {dbManaged
+            ? "Your workspace's name is managed by your workspace."
+            : "Saves when you press Enter or click out of the field. Every teacher in the workspace sees the new name."}
         </p>
       </div>
     </SettingsCard>
@@ -202,6 +215,14 @@ function NotebooksCard(): ReactNode {
   const { showConsequence } = useConsequenceToast();
   const [savedTick, setSavedTick] = useState(0);
   const bump = (): void => setSavedTick((t) => t + 1);
+
+  // ON path (MULTI_WORKSPACE): the notebook list is DB-sourced and there is no
+  // notebook-write RPC this wave, so the legacy localStorage-overlay editors
+  // (rename / archive / restore / create) would toast success while the provider
+  // IGNORES the overlay. Show the list read-only with an honest note instead of
+  // controls that lie. OFF path (dbManaged=false): the editable localStorage
+  // cards, byte-for-byte as today.
+  const dbManaged = MULTI_WORKSPACE;
 
   const archived = allNotebooks.filter((nb) => !nb.isActive);
   // The app always needs ≥1 active notebook (the planner views render the
@@ -290,6 +311,14 @@ function NotebooksCard(): ReactNode {
       }
       hint="Each notebook is one grade level's curriculum. Changes here update the notebook switcher for every teacher."
     >
+      {/* ON path: honest note — the list below is read-only (see dbManaged). */}
+      {dbManaged ? (
+        <p className={styles.emptyHint}>
+          Your notebooks are managed by your workspace — adding, renaming, and
+          archiving them here isn&rsquo;t available yet.
+        </p>
+      ) : null}
+
       {/* ── Active notebooks ─────────────────────────────────────────── */}
       {activeNotebooks.length === 0 ? (
         <p className={styles.emptyHint}>
@@ -303,6 +332,7 @@ function NotebooksCard(): ReactNode {
               notebook={nb}
               isAdmin={isWorkspaceAdmin}
               canArchive={canArchive}
+              readOnly={dbManaged}
               onRename={handleRename}
               onArchive={handleArchive}
             />
@@ -310,8 +340,10 @@ function NotebooksCard(): ReactNode {
         </ul>
       )}
 
-      {/* ── "+ New notebook" creation row ────────────────────────────── */}
-      <NewNotebookForm isAdmin={isWorkspaceAdmin} onCreate={handleCreate} />
+      {/* ── "+ New notebook" creation row (hidden on the read-only ON path) ── */}
+      {dbManaged ? null : (
+        <NewNotebookForm isAdmin={isWorkspaceAdmin} onCreate={handleCreate} />
+      )}
 
       {/* ── Archived disclosure — only when something is archived ─────── */}
       {archived.length > 0 && (
@@ -339,20 +371,23 @@ function NotebooksCard(): ReactNode {
                   <span className={`${styles.nbName} ${styles.nbNameArchived}`}>
                     {nb.name}
                   </span>
-                  <div className={styles.nbActions}>
-                    {/* required: restoring is a team-wide action. */}
-                    <Tooltip content={restoreTip} side="top" required>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={!isWorkspaceAdmin}
-                        onClick={() => handleRestore(nb)}
-                        aria-label={`Restore notebook ${nb.name}`}
-                      >
-                        Restore
-                      </Button>
-                    </Tooltip>
-                  </div>
+                  {/* Restore hidden on the read-only ON path (overlay ignored). */}
+                  {dbManaged ? null : (
+                    <div className={styles.nbActions}>
+                      {/* required: restoring is a team-wide action. */}
+                      <Tooltip content={restoreTip} side="top" required>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={!isWorkspaceAdmin}
+                          onClick={() => handleRestore(nb)}
+                          aria-label={`Restore notebook ${nb.name}`}
+                        >
+                          Restore
+                        </Button>
+                      </Tooltip>
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -370,17 +405,34 @@ function ActiveNotebookRow({
   notebook,
   isAdmin,
   canArchive,
+  readOnly = false,
   onRename,
   onArchive,
 }: {
   notebook: NotebookEntry;
   isAdmin: boolean;
   canArchive: boolean;
+  /** ON path (MULTI_WORKSPACE): render just the name — the overlay-backed
+   *  rename/archive don't persist, so no controls that would toast without
+   *  effect. Defaults false so the OFF-path render is unchanged. */
+  readOnly?: boolean;
   onRename: (nb: NotebookEntry, newName: string) => void;
   onArchive: (nb: NotebookEntry) => void;
 }): ReactNode {
+  // Hooks run unconditionally (readOnly is a build-constant per mount, so this
+  // never changes hook order across renders) — the early return below is after
+  // them, keeping the Rules of Hooks intact.
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(notebook.name);
+
+  // ON path: name only, no rename/archive affordances.
+  if (readOnly) {
+    return (
+      <li className={styles.nbRow}>
+        <span className={styles.nbName}>{notebook.name}</span>
+      </li>
+    );
+  }
 
   const startEdit = (): void => {
     setDraft(notebook.name);

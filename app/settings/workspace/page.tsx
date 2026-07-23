@@ -35,8 +35,11 @@ import {
 } from "../team/actions";
 import { TeamPage } from "@/components/team";
 // Deep import by design — the settings barrel is owned by the settings-hub
-// orchestrator; this page imports the client component directly for now.
+// orchestrator; this page imports the client components directly for now.
 import { WorkspaceSettings } from "@/components/settings/workspace-settings";
+import { WorkspaceSwitcher } from "@/components/settings/workspace-switcher";
+import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
+import { getActiveWorkspace } from "@/lib/workspaces";
 
 // ── Suspense fallback (relocated from app/settings/team/page.tsx) ─────────────
 
@@ -73,7 +76,10 @@ async function TeamData(): Promise<ReactNode> {
 
   // Derive which notebooks the caller leads (grade_role 'lead' or 'grade_admin').
   // Used by the client to gate notebook-lead controls per notebook.
-  const callerNotebookRoles: Record<string, "teacher" | "lead" | "grade_admin"> = {};
+  const callerNotebookRoles: Record<
+    string,
+    "teacher" | "lead" | "grade_admin"
+  > = {};
   if (callerInfo) {
     const callerMember = membersResult.members.find(
       (m) => m.teacherId === callerInfo.teacherId,
@@ -99,11 +105,40 @@ async function TeamData(): Promise<ReactNode> {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function WorkspaceSettingsPage(): ReactNode {
+export default async function WorkspaceSettingsPage(): Promise<ReactNode> {
+  // When the multi-workspace seam is ON, re-key the workspace-management cards
+  // on the active workspace id. A switch/create in <WorkspaceSwitcher> calls
+  // router.refresh(), which re-runs this Server Component; a CHANGED key then
+  // remounts <WorkspaceSettings> so its client NotebookProvider (which fetches
+  // its identity once at mount) re-sources the NEW workspace's name/notebooks —
+  // otherwise those cards would keep showing the prior workspace until the
+  // teacher left Settings (Codex §4a High). When the read is unavailable (seam
+  // off at runtime, no active workspace, or a transient error) we fall back to a
+  // sentinel that is DISTINCT from any real schoolId — so a card stack that WAS
+  // keyed on a real workspace and then hits a failed read still sees a changed
+  // key and remounts (its provider then re-sources, fail-closing to empty)
+  // rather than silently retaining the prior tenant (Codex §4a). Flag OFF: the
+  // ternary short-circuits (no fetch), the key stays undefined, and the page is
+  // byte-identical to today.
+  const WS_KEY_UNRESOLVED = "__ws-unresolved__";
+  const activeWorkspaceKey = MULTI_WORKSPACE
+    ? ((await getActiveWorkspace().catch(() => null))?.schoolId ??
+      WS_KEY_UNRESOLVED)
+    : undefined;
+
   return (
     <>
-      {/* (a) Workspace / notebooks / default-notebook management cards. */}
-      <WorkspaceSettings />
+      {/* Multi-workspace picker (Wave 12b-2). Flag-gated: MULTI_WORKSPACE is a
+          build-inlined constant, so when the flag is OFF this ternary collapses
+          to `null` and dead-code-eliminates — the page renders byte-identically
+          to today. Only when the flag is ON (and the backing migration applied)
+          does the switcher mount above the workspace-management cards. */}
+      {MULTI_WORKSPACE ? <WorkspaceSwitcher /> : null}
+
+      {/* (a) Workspace / notebooks / default-notebook management cards. Keyed on
+          the active workspace (ON path only) so a switch/create remounts + re-
+          sources them — see the comment above. */}
+      <WorkspaceSettings key={activeWorkspaceKey} />
 
       {/* (b) Team members — the live Supabase-backed flow. The anchor id
           gives the settings search a scroll target for "team" queries. */}

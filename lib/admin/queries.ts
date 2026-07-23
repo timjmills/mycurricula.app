@@ -194,13 +194,25 @@ export async function listWorkspaceMembers(): Promise<WorkspaceMembersResult> {
  * Sorted by display_order then name (the order create_notebook assigns:
  * appended after existing notebooks). The `isActive=false` rows are the archived
  * notebooks (archive_notebook soft-archives; nothing is ever deleted).
+ *
+ * `schoolId` (OPTIONAL, backward-compatible — omitting it preserves the original
+ * ambient-RLS read) pins the read to ONE workspace. The multi-workspace seam
+ * passes the just-resolved active workspace id so a concurrent set_active_
+ * workspace committing between the identity read and this read can never return
+ * ANOTHER workspace's notebooks (the explicit filter excludes them regardless of
+ * where the active pointer moved) — it degrades at worst to an empty list, never
+ * a cross-tenant tear. See lib/workspaces/actions.ts getActiveWorkspaceContext.
  */
-export async function listWorkspaceNotebooks(): Promise<WorkspaceNotebook[]> {
+export async function listWorkspaceNotebooks(
+  schoolId?: string,
+): Promise<WorkspaceNotebook[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("grade_levels")
-    .select("id, name, display_order, is_active")
+    .select("id, name, display_order, is_active");
+  if (schoolId) query = query.eq("school_id", schoolId);
+  const { data, error } = await query
     .order("display_order", { ascending: true })
     .order("name", { ascending: true });
   if (error) throw error;
