@@ -1,0 +1,143 @@
+/* ============================================================
+   CURRICULA DESIGN SYSTEM  ·  colors_and_type.css
+   The mycurricula.app brand foundation, v1.3.
+   A curriculum-planning language: a dense, color-navigated
+   dashboard fused with a warm, rounded creative site.
+
+   Import this file, then build on the tokens below.
+   Fonts are delivered via Google Fonts (Bricolage Grotesque +
+   Plus Jakarta Sans) — loaded by the @import below.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=DM+Sans:opsz,wght@9..40,500;9..40,600;9..40,700;9..40,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root{
+  /* ---------------------------------------------------------
+     1 · BASE COLOR TOKENS  (raw values — the palette)
+     --------------------------------------------------------- */
+
+  /* Brand / Indigo — functional primary: actions, links, focus, "in progress" */
+  --brand-50:#EEF3FF;  --brand-100:#DCE6FF; --brand-200:#BACCFF;
+  --brand-300:#8FA8FF; --brand-400:#6383FB; --brand-500:#3B6CF6;
+  --brand-600:#2E55DB; --brand-700:#2543B0;
+
+  /* Honey / Amber — warm accent: marketing CTA, highlights, "needs review" */
+  --honey-50:#FFF8E7;  --honey-100:#FFEFC2; --honey-200:#FCE095;
+  --honey-300:#F8CC5C; --honey-400:#F4B740; --honey-500:#E9A526;
+  --honey-600:#C9871A;
+
+  /* Subject scale — 15 muted hues (White Rose register).
+     solid = headers/icons/accents · tint = fills/lanes · ink = text on tint */
+  --subj-1:#DCC674;  --subj-1-tint:#F4EFDF;  --subj-1-ink:#7A671F;   /* gold       */
+  --subj-2:#DCA574;  --subj-2-tint:#F4E9DF;  --subj-2-ink:#7A491F;   /* apricot    */
+  --subj-3:#DC8274;  --subj-3-tint:#F4E2DF;  --subj-3-ink:#7A2B1F;   /* coral      */
+  --subj-4:#CF778D;  --subj-4-tint:#F2E1E5;  --subj-4-ink:#7A1F36;   /* rose       */
+  --subj-5:#CF77AF;  --subj-5-tint:#F2E1EC;  --subj-5-ink:#7A1F59;   /* pink       */
+  --subj-6:#C77AC7;  --subj-6-tint:#F0E2F0;  --subj-6-ink:#752475;   /* magenta    */
+  --subj-7:#AB7AC7;  --subj-7-tint:#EBE2F0;  --subj-7-ink:#572475;   /* purple     */
+  --subj-8:#917AC7;  --subj-8-tint:#E6E2F0;  --subj-8-ink:#3C2475;   /* violet     */
+  --subj-9:#7A7FC7;  --subj-9-tint:#E2E3F0;  --subj-9-ink:#242975;   /* periwinkle */
+  --subj-10:#7A9EC7; --subj-10-tint:#E2E9F0; --subj-10-ink:#244A75;  /* blue       */
+  --subj-11:#7AB8C7; --subj-11-tint:#E2EEF0; --subj-11-ink:#246575;  /* cyan       */
+  --subj-12:#7AC7B8; --subj-12-tint:#E2F0EE; --subj-12-ink:#247565;  /* teal       */
+  --subj-13:#7AC79B; --subj-13-tint:#E2F0E8; --subj-13-ink:#247547;  /* green      */
+  --subj-14:#7AC77A; --subj-14-tint:#E2F0E2; --subj-14-ink:#257425;  /* leaf       */
+  --subj-15:#9AC77A; --subj-15-tint:#E8F0E2; --subj-15-ink:#467524;  /* lime       */
+
+  /* Bright chip accents — outlines, icon tiles and dots in the cascade only */
+  --subj-1-bright:#E8BB17; --subj-2-bright:#E87917; --subj-3-bright:#E83317;
+  --subj-4-bright:#E8174B; --subj-5-bright:#E8179B; --subj-6-bright:#D147D1;
+  --subj-7-bright:#9F47D1; --subj-8-bright:#7147D1; --subj-9-bright:#4751D1;
+  --subj-10-bright:#4788D1; --subj-11-bright:#47B6D1; --subj-12-bright:#47D1B6;
+  --subj-13-bright:#47D183; --subj-14-bright:#47D147; --subj-15-bright:#81D147;
+
+  /* Subject aliases — map onto the scale; repoint in one line */
+  --math:var(--subj-1);     --math-tint:var(--subj-1-tint);     --math-ink:var(--subj-1-ink);     --math-bright:var(--subj-1-bright);
+  --reading:var(--subj-10); --reading-tint:var(--subj-10-tint); --reading-ink:var(--subj-10-ink); --reading-bright:var(--subj-10-bright);
+  --science:var(--subj-13); --science-tint:var(--subj-13-tint); --science-ink:var(--subj-13-ink); --science-bright:var(--subj-13-bright);
+  --social:var(--subj-7);   --social-tint:var(--subj-7-tint);   --social-ink:var(--subj-7-ink);   --social-bright:var(--subj-7-bright);
+
+  /* Grade bands — White Rose years (grade-level tagging, NOT subjects) */
+  --gK:#F6C96A; --gK-tint:#FFF1C9;
+  --g1:#E86A5C; --g1-tint:#FADBD5;
+  --g2:#9AB88B; --g2-tint:#DDE8D3;
+  --g3:#7A9AC2; --g3-tint:#D5E1EF;
+  --g4:#C291B8; --g4-tint:#ECD7E7;
+  --g5:#8B7FC0; --g5-tint:#DCD7EE;
+
+  /* Status — semantic, deliberately more saturated than subjects */
+  --done:#16A06B;     --done-tint:#E4F6EE;
+  --progress:#3B6CF6; --progress-tint:#EEF3FF;
+  --idle:#B6B5C6;     --idle-tint:#F1F0F4;
+  --warn:#E9A526;     --warn-tint:#FFF8E7;
+  --danger:#EF5A5A;   --danger-tint:#FDECEC;
+
+  /* Neutrals — warm. White surfaces sit on a cream canvas. */
+  --canvas:#FCFAF6; --surface:#FFFFFF; --surface-warm:#FFFDF8;
+  --ink:#1C1B2E; --ink-soft:#3A3950; --body:#57566B;
+  --muted:#908FA3; --faint:#BFBED0;
+  --border:#ECEAE3; --border-cool:#E8EAF2; --hairline:#F4F2EC;
+
+  /* Gradients — atmosphere, not every surface */
+  --grad-hero:linear-gradient(118deg,#FFE7C2 0%,#FDEAD9 26%,#F4E7FF 62%,#DCF5EC 100%); /* @kind color */
+  --grad-brand:linear-gradient(135deg,#EEF3FF 0%,#F4E7FF 100%); /* @kind color */
+  --grad-honey:linear-gradient(135deg,#F8CC5C 0%,#F4B740 100%); /* @kind color */
+  --grad-dawn:linear-gradient(135deg,#FFD8A8 0%,#FFB3C7 50%,#C9B6FF 100%); /* @kind color */
+  --grad-mint:linear-gradient(135deg,#BFF0DC 0%,#A8E3FF 100%); /* @kind color */
+
+  /* ---------------------------------------------------------
+     2 · SPACE · RADIUS · ELEVATION
+     --------------------------------------------------------- */
+
+  /* Space — 4px base scale */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px;
+  --s6:24px; --s8:32px; --s10:40px; --s12:48px; --s16:64px;
+
+  /* Radius — generous, to carry the soft feel */
+  --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:18px;
+  --r-xl:24px; --r-2xl:32px; --r-pill:999px;
+
+  /* Elevation — soft, low-contrast, cool over the warm canvas */
+  --sh-xs:0 1px 2px rgba(28,27,46,.05);
+  --sh-sm:0 2px 6px rgba(28,27,46,.06);
+  --sh-md:0 10px 24px -10px rgba(28,27,46,.14);
+  --sh-lg:0 22px 48px -16px rgba(28,27,46,.20);
+  --sh-honey:0 12px 26px -10px rgba(233,165,38,.55);
+  --sh-brand:0 12px 26px -10px rgba(59,108,246,.45);
+
+  /* ---------------------------------------------------------
+     3 · TYPE — base families + role tokens
+     Large display/headings: Poppins (geometric, friendly)
+     Smaller headings + logo: DM Sans (neutral, modern)
+     UI/body/data:           Plus Jakarta Sans (clean, professional)
+     --------------------------------------------------------- */
+  --font-display:'Poppins',ui-sans-serif,system-ui,sans-serif;     /* large display + H1 */
+  --font-display-sm:'DM Sans',ui-sans-serif,system-ui,sans-serif;  /* smaller headings */
+  --font-logo:'DM Sans',ui-sans-serif,system-ui,sans-serif;        /* wordmark */
+  --font-sans:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  /* Role tokens — family / weight / size / line-height / tracking */
+  --display-font:var(--font-display); --display-weight:700; --display-size:44px; --display-line:1.02 /* @kind font */; --display-track:-.02em /* @kind font */;
+  --h1-font:var(--font-display);      --h1-weight:700;      --h1-size:28px;      --h1-line:1.1 /* @kind font */;       --h1-track:-.02em /* @kind font */;
+  --h2-font:var(--font-display-sm);   --h2-weight:700;      --h2-size:22px;      --h2-line:1.2 /* @kind font */;       --h2-track:-.02em /* @kind font */;
+  --h3-font:var(--font-display-sm);   --h3-weight:700;      --h3-size:18px;      --h3-line:1.3 /* @kind font */;       --h3-track:-.01em /* @kind font */;
+  --bodyL-font:var(--font-sans);      --bodyL-weight:400;   --bodyL-size:16px;   --bodyL-line:1.6 /* @kind font */;    --bodyL-track:0 /* @kind font */;
+  --body-font:var(--font-sans);       --body-weight:400;    --body-size:14px;    --body-line:1.5 /* @kind font */;     --body-track:0 /* @kind font */;
+  --small-font:var(--font-sans);      --small-weight:500;   --small-size:13px;   --small-line:1.4 /* @kind font */;    --small-track:0 /* @kind font */;
+  --label-font:var(--font-sans);      --label-weight:700;   --label-size:11px;   --label-line:1.2 /* @kind font */;    --label-track:.09em /* @kind font */;
+}
+
+/* ============================================================
+   4 · SEMANTIC TYPE CLASSES
+   Use these directly, or copy the declarations onto your own
+   elements. Headings default to ink; body to --body.
+   ============================================================ */
+.ds-display{font-family:var(--display-font);font-weight:var(--display-weight);font-size:var(--display-size);line-height:var(--display-line);letter-spacing:var(--display-track);color:var(--ink);}
+.ds-h1{font-family:var(--h1-font);font-weight:var(--h1-weight);font-size:var(--h1-size);line-height:var(--h1-line);letter-spacing:var(--h1-track);color:var(--ink);}
+.ds-h2{font-family:var(--h2-font);font-weight:var(--h2-weight);font-size:var(--h2-size);line-height:var(--h2-line);letter-spacing:var(--h2-track);color:var(--ink);}
+.ds-h3{font-family:var(--h3-font);font-weight:var(--h3-weight);font-size:var(--h3-size);line-height:var(--h3-line);letter-spacing:var(--h3-track);color:var(--ink);}
+.ds-body-l{font-family:var(--bodyL-font);font-weight:var(--bodyL-weight);font-size:var(--bodyL-size);line-height:var(--bodyL-line);color:var(--body);}
+.ds-body{font-family:var(--body-font);font-weight:var(--body-weight);font-size:var(--body-size);line-height:var(--body-line);color:var(--body);}
+.ds-small{font-family:var(--small-font);font-weight:var(--small-weight);font-size:var(--small-size);line-height:var(--small-line);color:var(--body);}
+.ds-label{font-family:var(--label-font);font-weight:var(--label-weight);font-size:var(--label-size);line-height:var(--label-line);letter-spacing:var(--label-track);text-transform:uppercase;color:var(--muted);}

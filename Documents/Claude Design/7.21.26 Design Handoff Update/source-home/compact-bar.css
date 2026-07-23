@@ -1,0 +1,55 @@
+/* Compact top bar — Teach · Plan · Post (tweak: compactBar; brand via compactBrand; barAutoHide) */
+.cbar{position:relative;z-index:40;display:grid;grid-template-columns:minmax(170px,1fr) minmax(0,auto) minmax(170px,1fr);align-items:center;gap:10px;margin:10px 14px 6px;padding:5px 10px;border-radius:999px;min-height:54px;background:rgba(20,19,32,.42);border:1px solid rgba(255,255,255,.16);-webkit-backdrop-filter:blur(22px) saturate(1.25);backdrop-filter:blur(22px) saturate(1.25);box-shadow:0 12px 34px -18px rgba(8,8,18,.6);transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .3s,margin-top .35s cubic-bezier(.2,.8,.2,1)}
+.home[data-tone="light"] .cbar{background:rgba(255,255,255,.58);border-color:rgba(255,255,255,.75)}
+/* light tone + Pastel: the bar goes near-white — flip the dark-glass text/icons to ink so nothing vanishes */
+:is(.home[data-tone="light"],.home[data-version="C"]) .cbar{color:var(--ink)}
+:is(.home[data-tone="light"],.home[data-version="C"]) .cbar :is(.nav-item,.navback,.cb-wm,.view-title,.modesw-ib,.view-titlebar,.nc-bell){color:var(--ink) !important}
+:is(.home[data-tone="light"],.home[data-version="C"]) .cbar .nav-item.active{background:var(--ink);color:#fff !important}
+:is(.home[data-tone="light"],.home[data-version="C"]) .cbar :is(.navback,.modesw-icon){background:rgba(255,255,255,.72);border:1px solid rgba(28,27,46,.15)}
+:is(.home[data-tone="light"],.home[data-version="C"]) .cbar .modesw-ib.active{background:var(--accent);color:#fff !important}
+:is(.home[data-tone="light"],.home[data-version="C"]) .cbar .cb-div{background:var(--ink)}
+.cbar .nc-bell svg{width:18px;height:18px}
+.cbar .iconbtn{color:inherit}
+/* hide = transform+opacity only — animating margin-top (layout) relayouts the whole
+   page every frame under the views' backdrop-filter stacks and can wedge the tab */
+.cbar.hidden{transform:translateY(-150%);opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.cbar{transition:none}}
+.cb-left{display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden}
+.cb-glyph{width:38px;height:38px;border-radius:13px;border:0;background:var(--honey-400);display:grid;place-items:center;cursor:pointer;flex:0 0 auto;padding:0}
+.cb-glyph svg{width:20px;height:20px}
+.cb-wm{cursor:pointer;white-space:nowrap;flex:0 0 auto;font-size:15px !important;font-weight:800;letter-spacing:-.01em}
+.cb-div{width:1px;height:22px;background:currentColor;opacity:.22;flex:0 0 auto}
+.cbar .view-titlebar{display:flex;align-items:center;gap:6px;min-width:60px;flex:1 1 auto;justify-content:flex-start;margin:0;padding:0}
+.cbar .view-title{font-size:15.5px !important;line-height:1.2;margin:0 !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+.cbar .view-titlebar .vt-cog{flex:0 0 auto}
+.cb-center{display:flex;align-items:center;gap:8px;justify-content:center;min-width:0;overflow:visible}
+.cbar .views.nav{border-radius:999px}
+.cbar .views.nav .nav-item{border-radius:999px}
+@media (max-width:1100px){
+  .cb-wm{display:none !important}
+  .cbar{gap:7px}
+  .cb-center .nav-item{padding:8px 10px;font-size:12px}
+}
+@media (max-width:860px){
+  .cb-center .nav-item{padding:7px 7px;font-size:11px}
+  .cb-center .navback{display:none}
+  .cbar{grid-template-columns:minmax(150px,1fr) minmax(0,auto) minmax(96px,auto)}
+}
+.cb-center .navback{width:34px;height:34px;flex:0 0 auto}
+.cb-right{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.cb-menuwrap{position:relative}
+.cb-dots{width:38px;height:38px;border-radius:99px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:inherit;display:grid;place-items:center;cursor:pointer;padding:0}
+.cb-dots svg{width:17px;height:17px}
+.home[data-tone="light"] .cb-dots{background:rgba(255,255,255,.7);border-color:rgba(28,27,46,.14)}
+.cb-menu{position:absolute;right:0;top:calc(100% + 10px);z-index:90;width:248px;border-radius:18px;padding:10px;background:rgba(255,255,255,.97);color:var(--ink);border:1px solid rgba(255,255,255,.9);box-shadow:0 26px 60px -22px rgba(12,11,20,.5);display:flex;flex-direction:column;gap:3px}
+.cb-mh{font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 8px 2px}
+.cb-mi{display:flex;align-items:center;gap:9px;border:0;background:none;border-radius:10px;padding:9px 10px;font:600 12.5px var(--font-sans);color:var(--ink);cursor:pointer;text-align:left;min-height:38px;width:100%}
+.cb-mi:hover{background:var(--brand-50)}
+.cb-mi svg{width:15px;height:15px;flex:0 0 auto}
+.cb-mtools{display:flex;flex-wrap:wrap;gap:4px;padding:2px 6px 6px}
+/* touch: visible peek tab when the bar is hidden (mouse users get the top-edge hotzone) */
+.cb-peek{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:80;display:none;place-items:center;width:88px;height:44px;border:1px solid rgba(255,255,255,.28);border-top:0;border-radius:0 0 16px 16px;background:rgba(20,19,32,.5);color:#fff;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);cursor:pointer;padding:0}
+.cb-peek svg{width:18px;height:18px;opacity:.9}
+.home[data-tone="light"] .cb-peek{background:rgba(255,255,255,.6);color:var(--ink);border-color:rgba(28,27,46,.16)}
+@media (hover:none){.cb-peek{display:grid}}
+@media (max-width:640px){.cb-peek{display:none}}
