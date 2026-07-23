@@ -689,6 +689,14 @@
   color: var(--muted);
   font-weight: 600;
 }
+/* Coming-soon tier: the "price" is a status, not a committed amount — render it
+   smaller and muted so it never reads as a locked-in dollar figure. Tokens only,
+   so it re-themes with the rest of the page. */
+.priceSoon b {
+  font-size: var(--t-20);
+  color: var(--muted);
+  letter-spacing: normal;
+}
 .pdesc {
   font-size: var(--t-13);
   color: var(--body);

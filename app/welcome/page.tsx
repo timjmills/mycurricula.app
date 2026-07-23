@@ -18,10 +18,11 @@
 // teacher testimonial (real portrait) · pricing · dark CTA band · footer.
 //
 // CTA destinations (per the build brief):
-//   Get started / Start planning free / Start a team / Sign in / Contact us
+//   Get started / Start planning free / Start planning / Sign in
 //     / See teach mode → /login
 //   See a sample plan → /weekly
 //   Nav anchor links   → #features / #how / #teach / #pricing
+//   The Plus (AI) pricing CTA is a disabled "Coming soon" button — no link.
 
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
@@ -373,49 +374,65 @@ const STEPS = [
 ];
 
 // ── Pricing tiers ───────────────────────────────────────────────────────────
-const PLANS = [
+// Honest to what's live TODAY. Full year/unit/lesson planning is built, so the
+// Free and Basic tiers are real, purchasable planning plans. AI is NOT built
+// yet, so the Plus (AI) tier is flagged "Coming soon" with no committed price.
+// There is deliberately NO school / district tier: the customer is an
+// individual teacher and school accounts are out of phase (CLAUDE.md §1). No
+// specific unit / seat / AI quotas are encoded — the packaging is still open.
+interface Plan {
+  name: string;
+  price: string;
+  unit?: string;
+  desc: string;
+  features: string[];
+  cta: string;
+  ctaVariant: "secondary" | "honey";
+  featured?: boolean;
+  /** Not purchasable yet — renders a muted price + a disabled CTA. */
+  soon?: boolean;
+}
+
+const PLANS: Plan[] = [
   {
-    name: "Teacher",
-    price: "Free",
-    unit: undefined as string | undefined,
-    desc: "Everything you need to plan one class.",
+    name: "Free",
+    price: "$0",
+    desc: "Everything you need to plan and teach one class.",
     features: [
-      "One class & full year planning",
+      "Full year, unit & lesson planning",
       "Color cascade & catch-up",
       "Teach mode",
     ],
     cta: "Get started",
-    ctaVariant: "secondary" as const,
-    featured: false,
+    ctaVariant: "secondary",
   },
   {
-    name: "Team",
-    price: "$6",
-    unit: "/teacher · mo",
-    desc: "Plan a shared curriculum across a grade team.",
+    name: "Basic",
+    price: "$2.99",
+    unit: "/mo",
+    desc: "Premium planning, sharing, and collaboration across your plan.",
     features: [
-      "Everything in Teacher",
-      "Shared team curriculum",
-      "Personal vs. team plans",
-      "Standards & reports",
+      "Everything in Free",
+      "Unlimited units & lessons",
+      "Share & collaborate on plans",
+      "Standards, print & export",
     ],
-    cta: "Start a team",
-    ctaVariant: "honey" as const,
+    cta: "Start planning",
+    ctaVariant: "honey",
     featured: true,
   },
   {
-    name: "School",
-    price: "Let's talk",
-    unit: undefined,
-    desc: "Roll out across grades with admin support.",
+    name: "Plus",
+    price: "Coming soon",
+    desc: "AI-assisted planning — draft a card, a lesson, or a whole unit.",
     features: [
-      "Everything in Team",
-      "School-wide rollout",
-      "Admin & onboarding",
+      "Everything in Basic",
+      "AI card & lesson drafts",
+      "Generate a whole unit",
     ],
-    cta: "Contact us",
-    ctaVariant: "secondary" as const,
-    featured: false,
+    cta: "Coming soon",
+    ctaVariant: "secondary",
+    soon: true,
   },
 ];
 
@@ -711,7 +728,11 @@ export default function WelcomePage(): ReactNode {
             >
               {plan.featured && <span className={styles.ptag}>Most popular</span>}
               <h3>{plan.name}</h3>
-              <div className={styles.price}>
+              <div
+                className={[styles.price, plan.soon ? styles.priceSoon : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 <b>{plan.price}</b>
                 {plan.unit && <span>{plan.unit}</span>}
               </div>
@@ -721,15 +742,34 @@ export default function WelcomePage(): ReactNode {
                   <li key={f}>{f}</li>
                 ))}
               </ul>
-              <Link href="/login" className={styles.planCta}>
+              {plan.soon ? (
+                // Coming-soon tier: a disabled CTA with no destination. We set
+                // the native `title=` directly (NOT the <Tooltip> wrapper) so
+                // the button stays a direct child of the card and keeps its
+                // full-width `.planCta` sizing — the Tooltip primitive wraps a
+                // disabled trigger in an inline-flex span that would shrink the
+                // button to its label width. CLAUDE.md §4: the title explains
+                // WHY it's disabled (surfaces on hover + touch long-press).
                 <Button
                   variant={plan.ctaVariant}
                   size="md"
                   className={styles.planCta}
+                  disabled
+                  title="AI-assisted planning is in development — it isn't available to add yet."
                 >
                   {plan.cta}
                 </Button>
-              </Link>
+              ) : (
+                <Link href="/login" className={styles.planCta}>
+                  <Button
+                    variant={plan.ctaVariant}
+                    size="md"
+                    className={styles.planCta}
+                  >
+                    {plan.cta}
+                  </Button>
+                </Link>
+              )}
             </article>
           ))}
         </div>
