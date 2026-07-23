@@ -55,7 +55,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button, Tooltip } from "@/components/ui";
+import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
 import { useLabels, pluralize } from "@/lib/labels";
 import {
   DndContext,
@@ -906,9 +906,19 @@ export function WeeklyGrid(): ReactNode {
             )}
 
             {/* ── Subject rows ── */}
+            {/* Empty-week fallback — the wrapper keeps the grid-column:1/-1
+                span so the state fills the board; PlannerEmpty makes an empty
+                week mid-hydrate read as "loading" (skeleton) — and a failed
+                hydrate as a load error — rather than a false "no lessons".
+                Flag OFF the store hydration is permanently "ready", so the
+                honest empty message still paints synchronously. role="status"
+                lives on the EmptyState/Skeleton primitives, not the wrapper. */}
             {!weekHasLessons && (
-              <div className={styles.emptyWeek} role="status">
-                {`No ${pluralize(labels.lesson).toLowerCase()} planned for ${labels.week.toLowerCase()} ${week} yet.`}
+              <div className={styles.emptyWeek}>
+                <PlannerEmpty
+                  size="sm"
+                  heading={`No ${pluralize(labels.lesson).toLowerCase()} planned for ${labels.week.toLowerCase()} ${week} yet.`}
+                />
               </div>
             )}
             {orderedSubjects.map((subject, rowIdx) => (
