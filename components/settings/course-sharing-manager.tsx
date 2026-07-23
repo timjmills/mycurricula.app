@@ -56,10 +56,16 @@ import {
   unshareCourse,
 } from "@/lib/subjects/client";
 import type { CourseSharingState } from "@/lib/subjects/row";
-// CourseScope is authz.ts' shared scope union — imported so a row's scope stays
-// type-locked to the same source the (server-mirrored) canShare/canUnshare gate
-// is derived from. authz.ts is READ-ONLY here (never modified).
-import type { CourseScope } from "@/lib/subjects/authz";
+// Pure, unit-tested view transforms (§4a follow-up): the display-row join, the
+// optimistic flip, and the Undo inverse all live in lib/subjects/sharing-view —
+// this component only wires them to state.
+import {
+  applyOptimisticFlip,
+  inverseDirection,
+  joinSharingRows,
+  type CourseMeta,
+  type SharingDirection,
+} from "@/lib/subjects/sharing-view";
 import type { SubjectId } from "@/lib/types";
 import styles from "./course-sharing-manager.module.css";
 
@@ -78,13 +84,6 @@ function errorMessage(e: unknown): string {
 }
 
 type LoadStatus = "loading" | "ready" | "error";
-
-/** A course's display identity (name + color slug), resolved from the ordinary
- *  grade course list and joined onto the gated sharing state by subjects-row id. */
-interface CourseMeta {
-  name: string;
-  slug: SubjectId;
-}
 
 /** The manage-sharing card. Self-contained: resolves its own grade, loads its
  *  own state, and owns its pending/success/error feedback (these are
@@ -195,28 +194,11 @@ export function CourseSharingManager(): ReactNode {
   // feedback, then re-fetch the sharing state to reconcile. A failed reconcile
   // keeps the optimistic row (the write already succeeded); the next full load
   // corrects any drift.
-  const applyOptimistic = (id: string, dir: "share" | "unshare"): void => {
+  const applyOptimistic = (id: string, dir: SharingDirection): void => {
     setSharing((prev) =>
-      prev.map((s) => {
-        if (s.subjectId !== id) return s;
-        if (dir === "share") {
-          return {
-            ...s,
-            scope: "team" as CourseScope,
-            sharedFromPersonal: true,
-            sharedByTeacherId: ownerId,
-            sharedByName: currentUser.name,
-            canShare: false,
-            canUnshare: true,
-          };
-        }
-        return {
-          ...s,
-          scope: "personal" as CourseScope,
-          sharedByName: null,
-          canShare: true,
-          canUnshare: false,
-        };
+      applyOptimisticFlip(prev, id, dir, {
+        id: ownerId,
+        name: currentUser.name,
       }),
     );
   };
@@ -243,7 +225,7 @@ export function CourseSharingManager(): ReactNode {
   const runAction = async (
     id: string,
     name: string,
-    dir: "share" | "unshare",
+    dir: SharingDirection,
   ): Promise<void> => {
     setRowError(null);
     startPending(id);
@@ -265,7 +247,7 @@ export function CourseSharingManager(): ReactNode {
             ? `“${name}” is now shared with your whole team — every teacher can see it and plan lessons in it.`
             : `“${name}” is personal again — it left every teammate’s planner.`,
         onUndo: () => {
-          void runAction(id, name, dir === "share" ? "unshare" : "share");
+          void runAction(id, name, inverseDirection(dir));
         },
       });
       void reconcile();
@@ -275,19 +257,7 @@ export function CourseSharingManager(): ReactNode {
 
   // ── Display rows: join sharing state ⇄ course meta (name + color) ────────────
   const rows = useMemo(
-    () =>
-      sharing.map((s) => {
-        const meta = metaById.get(s.subjectId);
-        return {
-          state: s,
-          // Fallback keeps an admin-managed course the caller can't SEE via the
-          // ordinary (RLS-scoped) list from rendering a bare uuid.
-          name:
-            meta?.name ??
-            (s.scope === "team" ? "Shared course" : "Personal course"),
-          slug: meta?.slug ?? null,
-        };
-      }),
+    () => joinSharingRows(sharing, metaById),
     [sharing, metaById],
   );
 

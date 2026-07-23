@@ -37,3 +37,12 @@ export {
   type CourseSharingRow,
   type CourseSharingState,
 } from "./row";
+
+export {
+  joinSharingRows,
+  applyOptimisticFlip,
+  inverseDirection,
+  type CourseMeta,
+  type SharingDisplayRow,
+  type SharingDirection,
+} from "./sharing-view";
