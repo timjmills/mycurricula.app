@@ -42,7 +42,7 @@
 // differ between server and client), and every tooltip is `required` (dismissal
 // state is never read), so there is no hydration mismatch.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Skeleton, Tooltip } from "@/components/ui";
 import { SettingsCard } from "@/components/appearance/settings-card";
 import { SECTION_ICONS } from "@/components/settings/section-icons";
@@ -221,10 +221,16 @@ export function CourseSharingManager(): ReactNode {
     );
   };
 
+  // Monotonic guard (§4a Finding 2): a slower reconcile issued before a newer
+  // action committed must not clobber the newer optimistic/server state. Each
+  // call claims a token; a resolution that is no longer the latest is dropped.
+  const reconcileToken = useRef(0);
   const reconcile = async (): Promise<void> => {
     if (!gradeLevelId) return;
+    const token = ++reconcileToken.current;
     try {
       const next = await listCourseSharing(gradeLevelId);
+      if (token !== reconcileToken.current) return; // superseded by a newer reconcile
       setSharing(next);
     } catch {
       // Keep the optimistic state — the mutation itself already committed.
@@ -257,7 +263,7 @@ export function CourseSharingManager(): ReactNode {
         message:
           dir === "share"
             ? `“${name}” is now shared with your whole team — every teacher can see it and plan lessons in it.`
-            : `“${name}” is personal again — it left every teammate’s planner and only you can see it now.`,
+            : `“${name}” is personal again — it left every teammate’s planner.`,
         onUndo: () => {
           void runAction(id, name, dir === "share" ? "unshare" : "share");
         },
@@ -403,7 +409,7 @@ function CourseRow({
               "Shared with the whole team"
             )
           ) : (
-            "Personal — only you can see it"
+            "Personal — not shared with the team"
           )}
         </span>
         {error && (
