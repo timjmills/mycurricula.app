@@ -117,6 +117,13 @@
   --ink-50: #fcfaf6; /* cream canvas */
   --paper: #ffffff;
 
+  /* Loading skeleton — the resting fill + the moving sheen. Aliased to the
+     already-themed neutral tier so a single :root definition re-hues across all
+     six themes for free (both --ink-100 and --paper are redefined per theme).
+     Matches the proven BoardCanvasResource skeleton recipe. */
+  --skeleton-base: var(--ink-100);
+  --skeleton-sheen: var(--paper);
+
   /* v1.3 semantic neutral aliases — the brand vocabulary. Use these in new
      work; they sit alongside the --ink-* scale above (same warm values). */
   --canvas: #fcfaf6; /* app background — warm cream */

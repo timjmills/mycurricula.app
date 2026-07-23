@@ -1,0 +1,85 @@
+/* Skeleton — themed shimmer placeholder. Tokens only. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  flex: 1;
+  padding: 16px 4px;
+}
+.root.sm {
+  gap: 8px;
+  padding: 10px 2px;
+}
+
+.bar {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 16px;
+  border-radius: var(--r-sm, 10px);
+  background: var(--skeleton-base);
+  overflow: hidden;
+}
+.sm .bar {
+  height: 11px;
+  border-radius: var(--r-sm, 8px);
+}
+
+/* Every bar after the first is a little shorter, so the stack reads as text
+   rather than a solid block. The last one shortest. */
+.bar:nth-child(3) {
+  width: 92%;
+}
+.bar:nth-child(4) {
+  width: 78%;
+}
+.bar:nth-child(5) {
+  width: 85%;
+}
+.bar:last-child {
+  width: 64%;
+}
+
+.sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    var(--skeleton-sheen) 50%,
+    transparent 80%
+  );
+  opacity: 0.5;
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Reduced motion: no sweep, a calm static fill. */
+@media (prefers-reduced-motion: reduce) {
+  .sheen {
+    animation: none;
+    opacity: 0.28;
+    transform: none;
+  }
+}
+
+/* Visually-hidden but screen-reader-audible label. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

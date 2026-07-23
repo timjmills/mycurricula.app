@@ -2025,6 +2025,30 @@ export function usePlanner(): PlannerValue {
   return ctx;
 }
 
+// ── Data-readiness (the honesty signal for empty states) ────────────────────
+// Collapses the five-state `hydration` into the three cases an empty-state
+// renderer actually needs to tell apart. The whole point is that "the document
+// is empty" and "the document has not loaded yet" are DIFFERENT — conflating
+// them is what makes a still-loading planner render "No lessons this week" (and,
+// worse, "All caught up!") for the 11–16s the Supabase hydrate chain takes.
+//
+//   pending → hydrate in flight; show a skeleton, never an empty message.
+//   error   → the hydrate threw; the store keeps an empty document mounted, so
+//             WITHOUT this branch a backend failure reads as "nothing planned".
+//             This gets its own copy, not the empty state.
+//   settled → "ready" or a genuinely-empty "empty"; render the real empty state.
+//
+// Flag OFF (mock/v1) is permanently "ready" via effectiveHydration, so this is a
+// no-op there and cannot regress the prototype path.
+export type PlannerDataState = "pending" | "error" | "settled";
+
+export function usePlannerDataState(): PlannerDataState {
+  const { hydration } = usePlanner();
+  if (hydration === "idle" || hydration === "loading") return "pending";
+  if (hydration === "error") return "error";
+  return "settled"; // "ready" | "empty"
+}
+
 // ── Provider-optional catalog hook ─────────────────────────────────────────
 // The reference-data slice (subjects/units/standards/grade + lookups), readable
 // WITHOUT a <PlannerProvider> in scope. The strict usePlanner() throws when no
