@@ -1,0 +1,423 @@
+/* ============================================================
+   THEMES — Normal · Night · Honey · Blossom · Mint · Sky
+   A theme washes over the whole app: the ambient background palette,
+   a gentle soft-light tint over everything (incl. buttons), and the
+   accent/glow color. Tone is global (Night = dark, else light) so every
+   page matches the home screen. Loaded after home.css / views.css.
+   ============================================================ */
+
+/* ---- accent per theme (drives primary buttons, glows, active states) ---- */
+.home{ --accent:var(--brand-500); --accent-600:var(--brand-600); --accent-50:var(--brand-50); }
+.home[data-theme="normal"]  { --accent:#3B6CF6; --accent-600:#2E55DB; --accent-50:#EEF3FF; }
+.home[data-theme="night"]   { --accent:#8FA8FF; --accent-600:#6383FB; --accent-50:rgba(143,168,255,.16); }
+.home[data-theme="honey"]   { --accent:#E59A12; --accent-600:#C9890C; --accent-50:#FFF4DC; }
+.home[data-theme="blossom"] { --accent:#E8629C; --accent-600:#C53F7B; --accent-50:#FDEAF2; }
+.home[data-theme="mint"]    { --accent:#1FA06B; --accent-600:#157A50; --accent-50:#E3F6EC; }
+.home[data-theme="sky"]     { --accent:#2E86D8; --accent-600:#1F77C9; --accent-50:#E6F4FF; }
+.home[data-theme="hero"]    { --accent:#9C6BDE; --accent-600:#8352C7; --accent-50:#F5EEFF; }
+
+/* grading hues derived from the active accent (deep = shadows, light = highlights) */
+.home{ --accent-deep:color-mix(in oklab, var(--accent) 64%, #140f22);
+       --accent-light:color-mix(in oklab, var(--accent) 72%, #ffffff); }
+
+/* Normal + photo: cycle slowly through the four LIGHT theme hues (sky-blue lightness)
+   instead of the dark default blue. Animating the registered --accent updates the
+   grade, glass tint, outlines and text together. */
+@property --accent{ syntax:'<color>'; inherits:true; initial-value:#3B6CF6; }
+@keyframes accentcycle{
+  0%,100%{--accent:#5BA8FF}   /* sky      */
+  25%    {--accent:#5AD0A6}   /* mint     */
+  50%    {--accent:#F4C460}   /* honey    */
+  75%    {--accent:#FF8FC0}   /* blossom  */
+}
+/* NOTE: --accent used to cycle here via an `accentcycle` keyframe animation.
+   Animating a custom property re-resolves every var(--accent) in the app on
+   every frame — a full-app style-recalc storm that saturated the main thread
+   the moment a dense view (Day/Teach/Post) mounted. Static accent instead. */
+.home[data-theme="normal"][data-bg="photo"]{--accent:#5BA8FF}
+@media (prefers-reduced-motion:reduce){.home[data-theme="normal"][data-bg="photo"]{animation:none}}
+
+/* ---- ambient wash palettes (light) ---- */
+.ambient.t-normal{background-color:#F6F5F3;background-image:
+  radial-gradient(60% 60% at 20% 12%, rgba(255,255,255,.55), transparent 62%),
+  linear-gradient(150deg,#F7F5F2,#F1F1F4 55%,#EEF1F0)}
+.ambient.t-honey{background-color:#FFF8EC;background-image:
+  radial-gradient(54% 58% at 10% 8%, rgba(252,210,70,.66), transparent 62%),
+  radial-gradient(50% 54% at 90% 8%, rgba(255,132,70,.5), transparent 60%),
+  radial-gradient(50% 54% at 86% 90%, rgba(244,96,110,.46), transparent 62%),
+  radial-gradient(48% 52% at 18% 94%, rgba(255,230,110,.66), transparent 64%),
+  radial-gradient(44% 46% at 54% 48%, rgba(255,170,72,.46), transparent 64%),
+  radial-gradient(40% 42% at 70% 30%, rgba(248,86,86,.32), transparent 62%),
+  linear-gradient(160deg,#FFF0C8,#FFEAD2 60%,#FFF2DE)}
+.ambient.t-blossom{background-color:#FBEEF6;background-image:
+  radial-gradient(56% 60% at 8% 6%, rgba(255,138,190,.68), transparent 60%),
+  radial-gradient(50% 56% at 92% 8%, rgba(184,150,255,.64), transparent 60%),
+  radial-gradient(46% 52% at 84% 88%, rgba(255,150,128,.48), transparent 62%),
+  radial-gradient(48% 54% at 14% 96%, rgba(255,176,214,.58), transparent 62%),
+  radial-gradient(40% 44% at 60% 46%, rgba(206,128,255,.44), transparent 64%),
+  radial-gradient(34% 38% at 38% 28%, rgba(255,108,166,.42), transparent 66%),
+  radial-gradient(30% 34% at 74% 66%, rgba(150,120,230,.36), transparent 68%),
+  radial-gradient(64% 74% at 50% 122%, rgba(118,66,138,.34), transparent 70%),
+  linear-gradient(160deg,#FBDCEE,#F0DCF8 60%,#FBE2F0)}
+.ambient.t-mint{background-color:#F0FBF4;background-image:
+  radial-gradient(54% 58% at 10% 10%, rgba(150,212,255,.5), transparent 64%),
+  radial-gradient(52% 56% at 88% 8%, rgba(150,234,194,.62), transparent 62%),
+  radial-gradient(48% 52% at 84% 92%, rgba(216,240,150,.5), transparent 64%),
+  radial-gradient(46% 50% at 16% 92%, rgba(180,238,206,.5), transparent 64%),
+  radial-gradient(42% 44% at 58% 52%, rgba(236,244,168,.36), transparent 66%),
+  linear-gradient(160deg,#E8F8F1,#EEF9EA 60%,#EAFBF2)}
+.ambient.t-sky{background-color:#EEF5FF;background-image:
+  radial-gradient(54% 58% at 10% 10%, rgba(96,166,255,.66), transparent 62%),
+  radial-gradient(50% 54% at 90% 8%, rgba(150,210,255,.56), transparent 60%),
+  radial-gradient(50% 54% at 88% 90%, rgba(70,120,235,.5), transparent 62%),
+  radial-gradient(48% 52% at 16% 92%, rgba(140,224,255,.56), transparent 64%),
+  radial-gradient(44% 46% at 56% 50%, rgba(120,150,250,.4), transparent 64%),
+  radial-gradient(40% 42% at 70% 32%, rgba(180,232,255,.5), transparent 62%),
+  linear-gradient(160deg,#E2EEFF,#EAF3FF 52%,#EDF6FF)}
+.ambient.t-hero{background-color:#FBF0E2;background-image:
+  radial-gradient(56% 60% at 8% 6%, rgba(255,178,84,.85), transparent 62%),
+  radial-gradient(50% 56% at 92% 10%, rgba(196,136,255,.8), transparent 64%),
+  radial-gradient(50% 56% at 86% 90%, rgba(96,214,164,.8), transparent 64%),
+  radial-gradient(46% 52% at 12% 92%, rgba(255,146,190,.7), transparent 62%),
+  radial-gradient(40% 44% at 58% 46%, rgba(238,214,255,.6), transparent 66%),
+  linear-gradient(118deg,#FFDFAE 0%,#FCDFC8 26%,#EDD8FF 62%,#C9F0DE 100%)}
+/* Night — deep slate-navy wash (also used for normal-cycle's dark? no: night only) */
+.ambient:not(.t-normal):not(.t-night){filter:saturate(1.34) contrast(1.07) brightness(1.02)}
+.ambient.t-night{background-color:#0E111A;background-image:
+  radial-gradient(56% 60% at 12% 10%, rgba(96,118,200,.5), transparent 66%),
+  radial-gradient(52% 56% at 90% 8%, rgba(150,96,200,.44), transparent 64%),
+  radial-gradient(54% 58% at 88% 92%, rgba(60,130,190,.46), transparent 66%),
+  radial-gradient(48% 52% at 14% 92%, rgba(190,90,150,.34), transparent 64%),
+  radial-gradient(44% 46% at 56% 50%, rgba(70,140,130,.32), transparent 64%),
+  linear-gradient(135deg,#10131D,#161B28 55%,#0C0F16)}
+
+/* ---- gentle theme tint over the whole app (incl. buttons) ---- */
+.theme-tint{position:absolute;inset:0;z-index:90;pointer-events:none;mix-blend-mode:soft-light;opacity:0;transition:opacity .5s ease}
+.home[data-theme="honey"]   .theme-tint{opacity:.4;background:radial-gradient(140% 150% at 10% -10%, #F4B740 0%, #FFB35E 32%, #FF9E5C 56%, #FFC274 80%, #FFE2A4 100%)}
+.home[data-theme="blossom"] .theme-tint{opacity:.32;background:radial-gradient(140% 150% at 10% -10%, #FF8FC0 0%, #E6A6DC 26%, #C9A8F0 48%, #AEB6F2 68%, #D7BEE0 86%, #FFC8AE 100%)}
+.home[data-theme="mint"]    .theme-tint{opacity:.36;background:radial-gradient(140% 150% at 10% -10%, #5BC8FF 0%, #54D7BE 30%, #4FD7A6 54%, #92E7C4 78%, #D2F2E0 100%)}
+.home[data-theme="sky"]     .theme-tint{opacity:.38;background:radial-gradient(140% 150% at 10% -10%, #5BA8FF 0%, #7DBFFF 32%, #8FCBFF 56%, #B2DBFF 80%, #D8EDFF 100%)}
+.home[data-theme="hero"]    .theme-tint{opacity:.44;background:radial-gradient(140% 150% at 10% -10%, #FFB35E 0%, #FFC894 26%, #D8A6F2 52%, #BE96EE 68%, #86DDB4 86%, #C9F0DE 100%)}
+.home[data-theme="night"]   .theme-tint{opacity:.3; background:radial-gradient(130% 130% at 12% 0%, #46557E, #1A2238 70%)}
+.home[data-theme="normal"]  .theme-tint{opacity:0}
+
+/* Photo background: photo stays prominent but with a clear color wash on top */
+.home[data-bg="photo"][data-theme="honey"]   .theme-tint{opacity:.26}
+.home[data-bg="photo"][data-theme="blossom"] .theme-tint{opacity:.24}
+.home[data-bg="photo"][data-theme="mint"]    .theme-tint{opacity:.22}
+.home[data-bg="photo"][data-theme="sky"]     .theme-tint{opacity:.24}
+.home[data-bg="photo"][data-theme="hero"]    .theme-tint{opacity:.22}
+.home[data-bg="photo"][data-theme="night"]   .theme-tint{opacity:.18}
+
+/* ============================================================
+   SURFACE THEMING CONTRACT — overlays carry the active theme
+   Modals, panels and popovers sit ABOVE .theme-tint (z-index 90), so the
+   whole-app wash never reaches them. Give every overlay surface its own faint
+   accent wash so it reads as part of the active theme (tone + accent already
+   flow through var(--accent) and [data-tone]). Normal & Photo themes = no wash.
+   Any NEW surface must either use one of these container classes or add itself
+   to this list. (Mirrored in design/V2 Design System.html → "Surface theming".)
+   ============================================================ */
+.home[data-theme]:not([data-theme="normal"]):not([data-theme="off"]) :is(
+  .hub-modal, .cfg-modal, .cu-modal, .ue-modal, .set-panel,
+  .ll-dlg, .ll-overlay .ll-root, .td-dock,
+  .lnav-presetpop, .ll-menu, .ll-addpop, .lesson-menu, .toolspop, .wb-respop,
+  .rw-respop, .hub-detailpane, .qpop, .ue-rowmenu
+){
+  background-image:radial-gradient(135% 130% at 100% 0%,
+    color-mix(in oklab, var(--accent) 14%, transparent), transparent 62%) !important;
+}
+/* scrims behind overlays pick up a whisper of the accent so the dim reads themed */
+.home[data-theme]:not([data-theme="normal"]):not([data-theme="off"]) :is(
+  .hub-scrim, .cfg-scrim, .cu-scrim, .ue-scrim, .set-scrim, .ll-dlgscrim, .qpop-scrim
+){
+  background-image:radial-gradient(120% 100% at 50% 0%,
+    color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%);
+}
+
+/* Photo mode: chrome stays neutral white/black — only the icons keep a subtle
+   accent tint. (Nav words, segmented bar and glass are NOT color-tinted.) */
+.home[data-bg="photo"] .lesson-menu button svg,
+.home[data-bg="photo"] .toolspop .tool svg{color:var(--accent)}
+
+/* ============================================================
+   PHOTO MODE — premium theme grading (4 layers)
+   1) duotone color-grade of the photo   (.frame::before, blend:color)
+   2) drifting directional light + vignette (.scrim)
+   3) contrast/saturation pop            (.photo filter)
+   4) theme-tinted glass + accent glow    (chrome)
+   ============================================================ */
+
+/* 1 · duotone gradient-map: recolors the photo by hue, keeps its luminance */
+.home[data-bg="photo"] .frame::before{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;border-radius:inherit;
+  mix-blend-mode:color;opacity:.2;background-size:200% 200%;
+  background-image:linear-gradient(125deg, var(--accent-deep) 0%, var(--accent) 46%, var(--accent-light) 100%);}
+.home[data-theme="off"] .frame::before{opacity:0}          /* Off = true original photo, no grade */
+.home[data-bg="photo"][data-zoom="1"] .frame::before{animation:gradedrift 34s ease-in-out infinite}
+@keyframes gradedrift{
+  0%{background-position:0% 30%}25%{background-position:70% 8%}
+  50%{background-position:100% 70%}75%{background-position:34% 100%}100%{background-position:0% 30%}}
+@media (prefers-reduced-motion:reduce){.home[data-bg="photo"][data-zoom="1"] .frame::before{animation:none}}
+
+/* 2 · directional light + vignette (neutral white/black shading) */
+.home[data-bg="photo"] .scrim.min{background:
+  radial-gradient(62% 58% at 16% 10%, rgba(255,255,255,.34), transparent 58%),
+  radial-gradient(70% 64% at 88% 96%, rgba(10,8,18,.32), transparent 60%),
+  radial-gradient(135% 130% at 50% 46%, transparent 52%, rgba(10,8,18,.5) 100%),
+  linear-gradient(180deg, rgba(10,8,18,.20) 0%, transparent 30%, rgba(10,8,18,.30) 100%);
+  background-size:160% 160%, 160% 160%, 100% 100%, 100% 100%;}
+.home[data-theme="off"] .scrim.min{background:
+  radial-gradient(130% 125% at 50% 46%, transparent 56%, rgba(10,8,18,.42) 100%),
+  linear-gradient(180deg, rgba(10,8,18,.18) 0%, transparent 28%, rgba(10,8,18,.30) 100%)}
+.home[data-bg="photo"][data-zoom="1"] .scrim.min{animation:lightdrift 30s ease-in-out infinite}
+@keyframes lightdrift{0%{background-position:0% 0%,100% 100%,0 0,0 0}50%{background-position:60% 40%,40% 60%,0 0,0 0}100%{background-position:0% 0%,100% 100%,0 0,0 0}}
+@media (prefers-reduced-motion:reduce){.home[data-bg="photo"][data-zoom="1"] .scrim.min{animation:none}}
+
+/* 3 · grade the photo itself — richer color, gentle contrast */
+.home[data-bg="photo"] .photo{filter:saturate(1.18) contrast(1.05) brightness(1.01)}
+.home[data-theme="off"] .photo{filter:none}
+
+/* 4 · chrome stays neutral on photo (subtle white inner highlight only) */
+.home[data-bg="photo"] .glass,
+.home[data-bg="photo"] .clock,
+.home[data-bg="photo"] .ctx,
+.home[data-bg="photo"] .brand,
+.home[data-bg="photo"] .modesw,
+.home[data-bg="photo"] .vcard,
+.home[data-bg="photo"] .pl-card{
+  box-shadow:0 16px 40px -22px rgba(10,8,18,.7),
+             inset 0 1px 0 rgba(255,255,255,.28);}
+.home[data-theme="off"] .glass,
+.home[data-theme="off"] .clock,
+.home[data-theme="off"] .ctx,
+.home[data-theme="off"] .brand,
+.home[data-theme="off"] .modesw,
+.home[data-theme="off"] .vcard,
+.home[data-theme="off"] .pl-card{background-image:none}
+
+/* ===== Light canvas needs dark text (even when a photo forces dark tone) ===== */
+.home[data-canvas="glass-light"] .greeting{color:var(--ink)}
+.home[data-canvas="glass-light"] .eyebrow{color:var(--ink-soft)}
+.home[data-canvas="glass-light"] .views.console{background:rgba(255,255,255,.6);border-color:rgba(255,255,255,.85)}
+.home[data-canvas="glass-light"] .views.console .view{color:var(--ink)}
+.home[data-canvas="glass-light"] .views.console .view .vw-sub{opacity:.78}
+.home[data-canvas="glass-light"] .views.light .view{color:var(--ink)}
+.home[data-canvas="glass-light"] .views.light .view .vw-sub{color:var(--body)}
+
+/* Normal theme: keep hero text neutral black/white (no accent tint) */
+.home[data-theme="normal"][data-canvas="glass-light"] .eyebrow{color:var(--ink-soft)}
+.home[data-theme="normal"][data-canvas="glass-light"] .views.console .view{color:var(--ink)}
+
+/* ===== BRIGHT (themed photo) — soft frosted photo behind prominent white cards ===== */
+/* home: gentle light wash so the centered hero's dark text reads over the photo */
+.home[data-bg="photo"] .scrim.frost{background:
+  radial-gradient(70% 62% at 50% 40%, rgba(255,255,255,.5), rgba(255,255,255,.26) 60%, transparent 84%),
+  linear-gradient(180deg, rgba(255,255,255,.34) 0%, rgba(255,255,255,.14) 38%, rgba(255,255,255,.32) 100%)}
+/* data views: frost the photo so it sits soft & dreamy behind the white content cards */
+.home[data-bg="photo"] .frame[data-veil="photo-frost"] .veil{opacity:1;
+  background:rgba(248,248,250,.46);-webkit-backdrop-filter:blur(16px) saturate(1.1);backdrop-filter:blur(16px) saturate(1.1)}
+/* keep the duotone grade very light in bright so the photo reads natural */
+.home[data-bg="photo"][data-dim="bright"] .frame::before{opacity:.1}
+/* bright = a touch brighter photo */
+.home[data-bg="photo"][data-dim="bright"] .photo{filter:saturate(1.14) contrast(1.02) brightness(1.08)}
+/* light "chip" subject glyphs in bright (soft pastel tile, like the SEL chip) */
+.home[data-bg="photo"][data-dim="bright"] .subjglyph{background:color-mix(in oklab, var(--sc) 55%, white) !important}
+
+/* Light canvas: visible dividers + clearer hover on the segmented switcher */
+.home[data-canvas="glass-light"] .views.console .view{border-right-color:rgba(28,27,46,.16)}
+.home[data-canvas="glass-light"] .views.console .view:last-child{border-right:0}
+.home[data-canvas="glass-light"] .views.console .view:hover{background:rgba(28,27,46,.10)}
+/* Light canvas: more pronounced + add button */
+.home[data-canvas="glass-light"] .vc-add,
+.home[data-bg="ambient"] .vc-add{opacity:.6;border-color:rgba(28,27,46,.3);color:var(--ink-soft)}
+.home[data-canvas="glass-light"] .vc-wcell.empty:hover .vc-add,
+.home[data-bg="ambient"] .vc-wcell.empty:hover .vc-add{opacity:1}
+.home[data-canvas="glass-light"] .vc-add:hover,
+.home[data-bg="ambient"] .vc-add:hover{background:var(--accent);border-color:transparent;color:#fff;transform:scale(1.12)}
+
+/* ===== Photo mode: on-photo list text (B rail / C agenda) goes light ===== */
+.home[data-bg="photo"] .vc-aitem .an{color:#fff}
+.home[data-bg="photo"] .vc-aitem .au,
+.home[data-bg="photo"] .vc-aitem .at{color:rgba(255,255,255,.72)}
+.home[data-bg="photo"] .vc-aitem:hover{background:rgba(255,255,255,.12)}
+.home[data-bg="photo"] .vc-aitem.sel{background:rgba(255,255,255,.16)}
+.home[data-bg="photo"] .vc-aitem .ad{border-color:rgba(255,255,255,.5)}
+.home[data-bg="photo"] .vb-railitem .rt{color:#fff}
+.home[data-bg="photo"] .vb-railitem .rs{color:rgba(255,255,255,.72)}
+.home[data-bg="photo"] .vb-railitem:hover{background:rgba(255,255,255,.1)}
+.home[data-bg="photo"] .vb-railitem.sel{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.24)}
+/* day-view header sublabel on photo */
+.home[data-bg="photo"] .vhead .vsub{color:rgba(255,255,255,.8)}
+
+/* all on-photo headers / lane labels go light (Week + Day, every frame) */
+.home[data-bg="photo"] .vc-wh,
+.home[data-bg="photo"] .vc-llabel .nm,
+.home[data-bg="photo"] .vb-colh .cd,
+.home[data-bg="photo"] .va-gh .d{color:#fff}
+.home[data-bg="photo"] .vc-wh .wt,
+.home[data-bg="photo"] .vb-colh .ct,
+.home[data-bg="photo"] .va-gh .dt,
+.home[data-bg="photo"] .va-ph{color:rgba(255,255,255,.72)}
+/* subtle shadow so light text holds over any photo */
+.home[data-bg="photo"] .vhead h2,
+.home[data-bg="photo"] .vc-aitem .an,
+.home[data-bg="photo"] .vc-llabel .nm,
+.home[data-bg="photo"] .vc-wh,
+.home[data-bg="photo"] .vb-colh .cd,
+.home[data-bg="photo"] .va-gh .d{text-shadow:0 1px 10px rgba(0,0,0,.4)}
+
+/* BRIGHT override — light tone, so list/header text is dark again (wash tints it) */
+.home[data-bg="photo"][data-dim="bright"] .vc-aitem .an,
+.home[data-bg="photo"][data-dim="bright"] .vb-railitem .rt,
+.home[data-bg="photo"][data-dim="bright"] .vc-wh,
+.home[data-bg="photo"][data-dim="bright"] .vc-llabel .nm,
+.home[data-bg="photo"][data-dim="bright"] .vb-colh .cd,
+.home[data-bg="photo"][data-dim="bright"] .va-gh .d,
+.home[data-bg="photo"][data-dim="bright"] .vhead h2{color:var(--ink);text-shadow:none}
+.home[data-bg="photo"][data-dim="bright"] .vc-aitem .au,
+.home[data-bg="photo"][data-dim="bright"] .vc-aitem .at,
+.home[data-bg="photo"][data-dim="bright"] .vb-railitem .rs,
+.home[data-bg="photo"][data-dim="bright"] .vc-wh .wt,
+.home[data-bg="photo"][data-dim="bright"] .vb-colh .ct,
+.home[data-bg="photo"][data-dim="bright"] .va-gh .dt,
+.home[data-bg="photo"][data-dim="bright"] .va-ph,
+.home[data-bg="photo"][data-dim="bright"] .vhead .vsub{color:var(--muted)}
+.home[data-bg="photo"][data-dim="bright"] .vc-aitem:hover,
+.home[data-bg="photo"][data-dim="bright"] .vb-railitem:hover{background:rgba(28,27,46,.05)}
+.home[data-bg="photo"][data-dim="bright"] .vc-aitem.sel{background:rgba(28,27,46,.07)}
+.home[data-bg="photo"][data-dim="bright"] .vc-nolesson{color:var(--muted)}
+.home[data-bg="photo"][data-dim="bright"] .vc-add{border-color:rgba(28,27,46,.3);color:var(--ink-soft)}
+
+/* ===== Week-cell readability (all backgrounds, esp. light subject colors) ===== */
+/* deepen the gradient floor so white text holds even on honey/yellow */
+.vc-wcell:not(.empty){background-image:linear-gradient(150deg,
+  color-mix(in oklab, var(--cellc, #888) 92%, #15131f),
+  color-mix(in oklab, var(--cellc, #888) 58%, #15131f)) !important}
+.vc-wcell .ct,.vc-wcell .cm{text-shadow:0 1px 6px rgba(10,8,18,.45)}
+.vc-wcell .cm{opacity:.95}
+/* A-frame period labels + day sublabels stay legible in Bright (light tone) */
+.home[data-bg="photo"][data-dim="bright"] .va-ph,
+.home[data-bg="photo"][data-dim="bright"] .va-gh .dt{color:var(--ink-soft);opacity:.92;text-shadow:0 1px 8px rgba(255,255,255,.7)}
+.home[data-bg="photo"][data-dim="bright"] .va-gh .d{color:var(--ink);text-shadow:0 1px 8px rgba(255,255,255,.7)}
+/* A-frame tinted cells: firmer base + shadow so they read as crisp cards on the photo */
+.home[data-bg="photo"][data-dim="bright"] .va-cell{box-shadow:0 8px 22px -14px rgba(10,8,18,.45)}
+
+/* empty week cells = quiet "no lesson" slot with a hover + to add one */
+.home .vc-wcell.empty{background:transparent !important;border:0;box-shadow:none;
+  display:flex;align-items:center;justify-content:center;gap:8px;position:relative;min-height:52px}
+.vc-nolesson{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--muted);opacity:.55;transition:opacity .15s}
+.home[data-bg="photo"] .vc-nolesson{color:rgba(255,255,255,.6)}
+.vc-add{width:26px;height:26px;border-radius:50%;border:1px dashed var(--border);background:none;cursor:pointer;
+  color:var(--muted);font-size:17px;font-weight:600;line-height:1;display:grid;place-items:center;
+  opacity:0;transition:opacity .15s, background .15s, color .15s, border-color .15s}
+.home[data-bg="photo"] .vc-add{border-color:rgba(255,255,255,.34);color:rgba(255,255,255,.8)}
+.vc-wcell.empty:hover .vc-nolesson{opacity:.3}
+.vc-wcell.empty:hover .vc-add{opacity:1}
+.vc-add:hover{border-style:solid;border-color:var(--accent);color:var(--accent);background:var(--accent-50)}
+.home[data-bg="photo"] .vc-add:hover{background:rgba(255,255,255,.16);border-color:#fff;color:#fff}
+
+/* ===== Photo brightness — Dim / Normal / Bright (Normal = base scrim) ===== */
+/* DIM — heavier darkening for maximum text contrast */
+.home[data-bg="photo"][data-dim="dim"] .scrim.min{background:
+  radial-gradient(72% 64% at 50% 42%, rgba(10,8,18,.34), transparent 72%),
+  linear-gradient(180deg, rgba(10,8,18,.44) 0%, rgba(10,8,18,.24) 40%, rgba(10,8,18,.5) 100%) !important}
+.home[data-bg="photo"][data-dim="dim"] .frame[data-veil="photo-soft"] .veil{
+  background:linear-gradient(180deg, rgba(10,8,18,.44), rgba(10,8,18,.3) 40%, rgba(10,8,18,.5)) !important}
+
+/* BRIGHT is handled above (light tone + frosted photo). No dark-glass overrides. */
+
+/* ---- accent remaps: primary actions/glows follow the theme ---- */
+.home .vb-btn.pri,.home .pl-btn.pri{background:var(--accent);border-color:transparent}
+.home .pl-btn.pri{box-shadow:0 8px 20px -10px var(--accent)}
+.home .vb-btn.pri{box-shadow:0 12px 26px -12px var(--accent)}
+.home .slide-fab{background:var(--accent);box-shadow:0 14px 28px -10px var(--accent)}
+.home .slide-thumb.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent), var(--sh-sm)}
+.home .wb-btn.on{background:var(--accent-50);color:var(--accent-600)}
+.home[data-tone="dark"] .wb-btn.on{background:rgba(255,255,255,.26);color:#fff}
+.home .va-row.now{box-shadow:0 0 0 1.5px var(--accent), 0 18px 44px -20px color-mix(in oklab, var(--accent) 60%, transparent)}
+.home .va-cell.now,.home .vc-wcell.now{box-shadow:0 0 0 1.5px var(--accent)}
+.home .pl-edit:focus{background:color-mix(in oklab, var(--accent) 8%, transparent)}
+.home[data-tone="dark"] .pl-edit:focus{background:rgba(255,255,255,.1)}
+
+/* light tone should never show the dim-glass (white-text) hero panel */
+.home[data-tone="light"] .canvas.glass-dim{background:rgba(255,255,255,.58);border:1px solid rgba(255,255,255,.8);
+  -webkit-backdrop-filter:blur(28px) saturate(1.3);backdrop-filter:blur(28px) saturate(1.3);
+  box-shadow:0 40px 90px -42px rgba(28,27,46,.45), inset 0 1px 0 rgba(255,255,255,.7)}
+.home[data-tone="light"] .canvas.glass-dim .eyebrow{color:var(--brand-600)}
+.home[data-tone="light"] .canvas.glass-dim .greeting{color:var(--ink)}
+
+/* ============================================================
+   NIGHT — dark surfaces for the Bright/Color frames + popovers
+   (Calm Glass, Teach & Plan already adapt via [data-tone="dark"]).
+   ============================================================ */
+.home[data-theme="night"] .vb-focus,
+.home[data-theme="night"] .vb-mini,
+.home[data-theme="night"] .vb-srow,
+.home[data-theme="night"] .vc-cluster,
+.home[data-theme="night"] .lesson-menu,
+.home[data-theme="night"] .toolspop,
+.home[data-theme="night"] .wb-respop{
+  background:rgba(28,30,44,.92);border-color:rgba(255,255,255,.14);color:#fff}
+.home[data-theme="night"] .vb-focus h3,
+.home[data-theme="night"] .vb-srow .nm,
+.home[data-theme="night"] .vc-cluster .nm,
+.home[data-theme="night"] .vb-mini .mt,
+.home[data-theme="night"] .vc-aitem .an,
+.home[data-theme="night"] .vc-wh,
+.home[data-theme="night"] .vc-llabel .nm,
+.home[data-theme="night"] .vb-colh .cd,
+.home[data-theme="night"] .vb-srow .pct{color:#fff}
+.home[data-theme="night"] .vb-focus .un,
+.home[data-theme="night"] .vb-mini .mm .tm,
+.home[data-theme="night"] .vb-srow .cu,
+.home[data-theme="night"] .vc-aitem .au,
+.home[data-theme="night"] .vb-meta .mk,
+.home[data-theme="night"] .vb-meta .mv,
+.home[data-theme="night"] .vb-colh .ct,
+.home[data-theme="night"] .vc-wh .wt{color:rgba(255,255,255,.68)}
+.home[data-theme="night"] .vc-aitem.sel,
+.home[data-theme="night"] .vb-railitem:hover,
+.home[data-theme="night"] .vc-aitem:hover{background:rgba(255,255,255,.08)}
+.home[data-theme="night"] .vb-railitem.sel{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
+.home[data-theme="night"] .vb-upill,
+.home[data-theme="night"] .vb-track2{background:rgba(255,255,255,.12);color:rgba(255,255,255,.82)}
+.home[data-theme="night"] .vb-btn:not(.pri),
+.home[data-theme="night"] .pl-btn:not(.pri){background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#fff}
+.home[data-theme="night"] .lesson-menu button,
+.home[data-theme="night"] .wb-resrow{color:rgba(255,255,255,.86)}
+.home[data-theme="night"] .lesson-menu button:hover,
+.home[data-theme="night"] .wb-resrow:hover{background:rgba(255,255,255,.1)}
+.home[data-theme="night"] .vc-aitem .ad{border-color:#222538}
+.home[data-theme="night"] .slide-add{border-color:rgba(255,255,255,.3)}
+
+/* ============================================================
+   CALM GLASS — Liquid v5 depth cues (finalized glass design)
+   Subject-agnostic glass polish layered via box-shadow so it never
+   fights the per-cell inline subject tint/border. Sharp bright top
+   edge + deep float shadow = the "liquid glass" read on either bg.
+   ============================================================ */
+.home[data-version="A"] .va-cell,
+.home[data-version="A"] .vcard.va-row,
+.home[data-version="A"] .vcard.va-lane{
+  border-radius:16px;
+  box-shadow:0 2px 4px rgba(22,26,42,.10), 0 22px 44px -22px rgba(22,26,42,.42),
+             inset 0 2px 0 rgba(255,255,255,.85), inset 0 -1px 0 rgba(22,26,42,.10) !important;
+}
+/* glowing subject rail — picks up the inline left-border colour */
+.home[data-version="A"] .va-cell{border-left-width:5px !important;}
+.home[data-version="A"] .vcard.va-row{border-left:5px solid var(--accent);}
+/* dark frosted register: deepen float + lit rim over the dark glass */
+.home[data-version="A"][data-tone="dark"] .va-cell,
+.home[data-version="A"][data-tone="dark"] .vcard.va-row,
+.home[data-version="A"][data-tone="dark"] .vcard.va-lane{
+  box-shadow:0 2px 6px rgba(8,10,22,.4), 0 24px 50px -22px rgba(8,10,22,.6),
+             inset 0 2px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(0,0,0,.22) !important;
+}
+/* hover: float a touch higher */
+.home[data-version="A"] .va-cell:hover,
+.home[data-version="A"] .vcard.va-row:hover{transform:translateY(-3px);}
+@media (prefers-reduced-motion:reduce){
+  .home[data-version="A"] .va-cell:hover,
+  .home[data-version="A"] .vcard.va-row:hover{transform:none;}
+}

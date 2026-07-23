@@ -1,0 +1,61 @@
+/* ════ PASTEL frame (data-version="C") — Common Planner style ════
+   Cool light-gray canvas (#f1f5f9), white cards, near-black text (#09090b),
+   one teal primary (#007595), subject colors softened to pastel tints of
+   themselves, Source Sans 3 throughout (current weights), pill buttons,
+   hairline borders, feather shadows. Same subject-led layouts as Bright —
+   this file is the skin. Pastel is self-colored: theme washes are ignored. */
+.home[data-version="C"][data-version]{--accent:#007595;--accent-600:#005f7a;--accent-50:#d2eff4;
+  --font-sans:"Source Sans 3",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --font-display:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+  --font-display-sm:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+  --head-font:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+  font-family:var(--font-sans);
+  /* the normal+photo accent-cycle animates --accent and would defeat the teal lock */
+  animation:none !important}
+/* headline/nav/title channels that carry literal font stacks or inline head-font vars */
+.home[data-version="C"] :is(.vhead h2,.view-title,.nav-item,.greeting,.wm,.eyebrow,h1,h2,h3,.cstack .ctop){font-family:"Source Sans 3",ui-sans-serif,system-ui,sans-serif !important}
+/* canvas: calm slate with faint pastel corners — theme wash + tint neutralized */
+.home[data-version="C"] .ambient{background-color:#f1f5f9 !important;filter:none !important;background-image:
+  radial-gradient(50% 54% at 10% 8%, rgba(210,239,244,.95), transparent 62%),
+  radial-gradient(48% 52% at 90% 10%, rgba(255,237,217,.9), transparent 62%),
+  radial-gradient(46% 50% at 86% 92%, rgba(210,242,226,.9), transparent 62%),
+  radial-gradient(44% 48% at 12% 92%, rgba(252,211,226,.75), transparent 62%),
+  linear-gradient(160deg,#f1f5f9,#eef3f8) !important}
+.home[data-version="C"] .theme-tint{opacity:0 !important}
+/* photo background ghosts to a pale backdrop so the gray canvas stays the story */
+.home[data-version="C"] .photo{filter:saturate(.35) brightness(1.28) contrast(.92) !important;opacity:.38}
+/* ── cards: white on gray, hairline border, feather shadow ── */
+.home[data-version="C"] :is(.vc-agenda,.vc-cluster){background:#fff;border:1px solid #e4e4e7;box-shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04)}
+.home[data-version="C"] .vc-wcell{background:color-mix(in oklab, var(--cellc,#d2eff4) 13%, #fff);border:1px solid #e4e4e7;box-shadow:0 1px 3px rgba(0,0,0,.06);color:#09090b}
+.home[data-version="C"] .vc-wcell .cm{color:#52525c}
+.home[data-version="C"] .vc-wh{color:#314158}
+.home[data-version="C"] .vc-llabel .nm{color:#09090b}
+.home[data-version="C"] .vc-aitem .an{color:#09090b}
+.home[data-version="C"] .vc-aitem .at{color:#9f9fa9}
+/* subject glyphs soften to tints of their locked hue */
+.home[data-version="C"] .subjglyph{background:color-mix(in oklab, var(--sc) 22%, white) !important;color:color-mix(in oklab, var(--sc) 80%, #09090b) !important}
+/* the day panel: pastel tint of the subject (overrides the saturated inline gradient) */
+.home[data-version="C"] .vc-detail{background:linear-gradient(150deg, color-mix(in oklab, var(--dc,#d2eff4) 24%, #fff), color-mix(in oklab, var(--dc,#d2eff4) 8%, #fafafa)) !important;
+  border:1px solid #e4e4e7;color:#09090b;box-shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04)}
+.home[data-version="C"] .vc-detail :is(.dlab,.dc-tl,.dun){color:#52525c}
+.home[data-version="C"] .vc-detail .dobj{color:#09090b}
+.home[data-version="C"] .vc-detail .dchip{background:rgba(255,255,255,.8);color:#314158;border:1px solid #e4e4e7}
+.home[data-version="C"] .vc-detail .dc-step{background:rgba(255,255,255,.75);color:#314158}
+.home[data-version="C"] .vc-detail .dc-step b{background:#007595;color:#fff}
+/* ── buttons: pills; teal owns primary CTAs, subject colors keep lesson meaning ── */
+.home[data-version="C"] .vb-btn{border-radius:9999px;font-weight:600}
+.home[data-version="C"] .vb-btn.pri{background:var(--accent);box-shadow:0 8px 18px -10px rgba(0,117,149,.55)}
+.home[data-version="C"] .vc-add:hover{background:var(--accent)}
+.home[data-version="C"] .vc-clhead .nm{color:#09090b}
+.home[data-version="C"] .vc-clhead .pc{color:#52525c}
+/* ── whole-app chrome: topbar, compact bar, panels, popovers ── */
+.home[data-version="C"] :is(.cbar,.cb-menu){background:rgba(255,255,255,.88);border-color:#e4e4e7;color:#09090b}
+.home[data-version="C"] .cb-dots{background:#fff;border-color:#e4e4e7;color:#09090b}
+.home[data-version="C"] :is(.toolspop,.set-panel,.homecog-pop){background:rgba(255,255,255,.96);border-color:#e4e4e7;color:#09090b}
+/* Teach board on paper */
+.home[data-version="C"] .board-stage{background:#fff;border-color:#e4e4e7}
+.home[data-version="C"] .teach-lesson{background:#fff;border:1px solid #e4e4e7;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.home[data-version="C"] .teach-rail{background:#fff;border-color:#e4e4e7}
+/* Resource wall sections: white cards, pastel-tinted when a subject color is set */
+.home[data-version="C"] .rw-sec:not(.has-bg){background:#fff;border:1px solid #e4e4e7;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04)}
+.home[data-version="C"] .rw-card{background:#fff;border:1px solid #e4e4e7;box-shadow:0 1px 3px rgba(0,0,0,.06)}

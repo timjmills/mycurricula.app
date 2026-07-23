@@ -1,0 +1,4 @@
+/* styles.css — single entry point for the Curricula design system.
+   Consumers link THIS file; it pulls in the tokens, type roles and
+   style-guide component styles. */
+@import "colors_and_type.css";

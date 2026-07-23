@@ -1,0 +1,376 @@
+/* ============================================================
+   CURRICULA DESIGN SYSTEM · modes.css   (v1.3 — The Three Frames)
+   Calm · Light · Alive
+   ------------------------------------------------------------
+   The frame engine. Four INDEPENDENT axes set as attributes on
+   the app root (or any surface container):
+
+     data-frame ∈ glass | paper | color   → material + emphasis
+     data-bg    ∈ photo | wash             → what lives behind
+     data-theme ∈ normal | honey | blossom | mint | sky
+                                            → accent + ambient bloom hue
+     data-tone  ∈ light | dark             → light or Night
+
+   A frame changes LAYOUT, MATERIAL and EMPHASIS — never the
+   global tone and never the meaning of subject colour. Markup is
+   identical across frames; only CSS responds to the attributes.
+
+   Per-row subject colour is set inline on each card/lane:
+     style="--sc:var(--subj-2);--sct:var(--subj-2-tint);--sci:var(--subj-2-ink)"
+
+   Depends on colors_and_type.css (tokens + type roles + fonts).
+   Photo asset: assets/classroom-photo.png
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   0 · ACCENT + AMBIENT PALETTE per theme (independent of frame)
+   ------------------------------------------------------------ */
+:root,[data-theme="normal"]{
+  --accent:var(--brand-500); --accent-soft:var(--brand-50); --accent-ink:var(--brand-600);
+  --amb-1:#FFE7C2; --amb-2:#E7ECFF; --amb-3:#DCF5EC; --amb-4:#F4E7FF;   /* wash blooms */
+  --duo-warm:#FFD9A6; --duo-cool:#A8C9F0; --duo-sage:#9FE3C9; --duo-mauve:#E7B6E0; /* photo grade */
+}
+[data-theme="honey"]{
+  --accent:var(--honey-500); --accent-soft:var(--honey-50); --accent-ink:var(--honey-600);
+  --amb-1:#FFE7C2; --amb-2:#FFF1C9; --amb-3:#FFE0B0; --amb-4:#FBEBD0;
+  --duo-warm:#FFD79A; --duo-cool:#F8CC5C; --duo-sage:#F4B740; --duo-mauve:#FFE7C2;
+}
+[data-theme="blossom"]{
+  --accent:#D8568E; --accent-soft:#FCE7F0; --accent-ink:#A33368;
+  --amb-1:#FFE1EE; --amb-2:#F4E7FF; --amb-3:#FFE7C2; --amb-4:#FCD9E8;
+  --duo-warm:#F7B6CE; --duo-cool:#E7B6E0; --duo-sage:#FFD9A6; --duo-mauve:#F49AC0;
+}
+[data-theme="mint"]{
+  --accent:#1FA07A; --accent-soft:#E2F0EE; --accent-ink:#177A5D;
+  --amb-1:#DCF5EC; --amb-2:#CFF0E4; --amb-3:#E7ECFF; --amb-4:#D9F4EA;
+  --duo-warm:#9FE3C9; --duo-cool:#A8C9F0; --duo-sage:#7AC7B8; --duo-mauve:#BFF0DC;
+}
+[data-theme="sky"]{
+  --accent:#2E7FD6; --accent-soft:#E2EEF7; --accent-ink:#1F5EA8;
+  --amb-1:#E2EEF7; --amb-2:#E7ECFF; --amb-3:#DCF5EC; --amb-4:#EAF6FF;
+  --duo-warm:#A8C9F0; --duo-cool:#7A9EC7; --duo-sage:#9FE3C9; --duo-mauve:#C9D6F0;
+}
+
+/* ============================================================
+   1 · STAGE — living background, swapped by [data-bg]
+   Put one <div class="stage" aria-hidden="true"></div> behind
+   the app; it reads data-frame/data-bg/data-theme/data-tone
+   from any ancestor.
+   ============================================================ */
+.stage{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none;}
+.stage::before{content:"";position:absolute;inset:-12%;z-index:-2;}
+.stage::after{content:"";position:absolute;inset:0;z-index:-1;}
+
+/* PHOTO — real classroom photo, colour-graded with a per-theme duotone wash */
+[data-bg="photo"] .stage::before{
+  background-image:
+    radial-gradient(42% 55% at 18% 22%, color-mix(in srgb,var(--duo-warm) 70%,transparent) 0%, transparent 60%),
+    radial-gradient(40% 50% at 82% 18%, color-mix(in srgb,var(--duo-cool) 60%,transparent) 0%, transparent 62%),
+    radial-gradient(55% 60% at 72% 82%, color-mix(in srgb,var(--duo-sage) 55%,transparent) 0%, transparent 60%),
+    radial-gradient(50% 55% at 25% 85%, color-mix(in srgb,var(--duo-mauve) 55%,transparent) 0%, transparent 60%),
+    url('assets/classroom-photo.png');
+  background-size:cover,cover,cover,cover,cover;
+  background-position:center;
+  background-blend-mode:soft-light,soft-light,soft-light,soft-light,normal;
+  filter:saturate(1.08);
+  animation:drift 40s ease-in-out infinite alternate;
+}
+/* WASH — brand-mesh ambient blooms over the warm canvas */
+[data-bg="wash"] .stage::before{
+  background:
+    radial-gradient(46% 50% at 14% 12%, var(--amb-1) 0%, transparent 64%),
+    radial-gradient(44% 48% at 88% 8%,  var(--amb-2) 0%, transparent 64%),
+    radial-gradient(52% 54% at 86% 92%, var(--amb-3) 0%, transparent 62%),
+    radial-gradient(48% 52% at 8% 90%,  var(--amb-4) 0%, transparent 62%),
+    var(--canvas);
+  filter:saturate(1.03);
+  animation:drift 54s ease-in-out infinite alternate;
+}
+
+/* SCRIM/VEIL — tuned per frame so each reads on either background */
+[data-frame="glass"][data-bg="photo"] .stage::after{
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(12,16,26,0) 30%, rgba(12,16,26,.44) 100%),
+    linear-gradient(180deg, rgba(12,16,26,.12) 0%, rgba(12,16,26,.32) 100%);
+}
+[data-frame="glass"][data-bg="wash"] .stage::after{background:rgba(255,255,255,.10);}
+[data-frame="paper"][data-bg="photo"] .stage::after{background:rgba(252,250,246,.82);}
+[data-frame="paper"][data-bg="wash"]  .stage::after{background:rgba(252,250,246,.55);}
+[data-frame="color"][data-bg="photo"] .stage::after{background:rgba(255,253,248,.58);}
+[data-frame="color"][data-bg="wash"]  .stage::after{background:rgba(255,253,248,.28);}
+
+@keyframes drift{from{transform:translate3d(0,0,0) scale(1.02);}to{transform:translate3d(-2.2%,1.6%,0) scale(1.08);}}
+
+/* ============================================================
+   2 · FRAME-AWARE PRIMITIVES
+   These are the canonical classes every surface uses. A frame
+   only restyles them — never the markup.
+     .fr-chrome  generic chrome (top bar / nav / pill / iconbtn)
+     .card       a content card  (set --sc/--sct/--sci inline)
+     .lane       a horizontal row (set --sc/--sct/--sci inline)
+     .chip / .chip.now / .chip.done
+     .bar > i    progress track + fill
+     .badge      subject square
+   ============================================================ */
+.card,.lane,.fr-chrome,.tabs a,.seg button,.iconbtn,.metapill{
+  transition:transform .28s cubic-bezier(.4,0,.2,1),box-shadow .28s cubic-bezier(.4,0,.2,1),
+             background .28s cubic-bezier(.4,0,.2,1),border-color .28s cubic-bezier(.4,0,.2,1);
+}
+
+/* =========================  A · CALM GLASS  ========================= */
+[data-frame="glass"] .card,
+[data-frame="glass"] .lane,
+[data-frame="glass"] .fr-chrome{-webkit-backdrop-filter:blur(22px) saturate(1.25);backdrop-filter:blur(22px) saturate(1.25);}
+
+/* — glass on PHOTO · DARK frosted (default material) — cinematic & legible (image-1 register) — */
+[data-frame="glass"][data-bg="photo"]{color:#F4F6FB;}
+[data-frame="glass"][data-bg="photo"] .fr-chrome{background:rgba(20,24,36,.50);border:1px solid rgba(255,255,255,.18);color:#F4F6FB;}
+[data-frame="glass"][data-bg="photo"] .card,
+[data-frame="glass"][data-bg="photo"] .lane{
+  background:linear-gradient(180deg, rgba(24,28,42,.62) 0%, rgba(15,18,28,.52) 100%);
+  border:1px solid rgba(255,255,255,.15);
+  box-shadow:0 18px 40px -20px rgba(8,12,22,.6), inset 0 1px 0 rgba(255,255,255,.14);color:#F4F6FB;}
+[data-frame="glass"][data-bg="photo"] .card{border-left:3px solid var(--sc);}
+/* current / selected → saturated subject colour */
+[data-frame="glass"][data-bg="photo"] .badge{background:color-mix(in srgb,var(--sc) 62%, rgba(18,22,34,.5));
+  border:1px solid color-mix(in srgb,var(--sc) 55%, rgba(255,255,255,.4));
+  box-shadow:0 6px 16px -8px color-mix(in srgb,var(--sc) 75%,transparent);color:#fff;}
+[data-frame="glass"][data-bg="photo"] .chip{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.9);}
+[data-frame="glass"][data-bg="photo"] .chip.now{background:var(--sc);border-color:color-mix(in srgb,var(--sc) 55%,#fff);color:#fff;
+  box-shadow:0 5px 16px -4px color-mix(in srgb,var(--sc) 80%,transparent);}
+[data-frame="glass"][data-bg="photo"] .chip.done{opacity:.6;}
+[data-frame="glass"][data-bg="photo"] .bar{background:rgba(255,255,255,.16);}
+[data-frame="glass"][data-bg="photo"] .bar i{background:color-mix(in srgb,var(--sc) 90%,#fff);box-shadow:0 0 14px color-mix(in srgb,var(--sc) 72%,transparent);}
+[data-frame="glass"][data-bg="photo"] .metapill{background:rgba(20,24,36,.5);border:1px solid rgba(255,255,255,.2);color:#fff;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);}
+
+/* — WHITE-frosted ACCENT (.glass-light) — opt-in for heroes / feature panels, NOT the main material — */
+[data-frame="glass"][data-bg="photo"] .glass-light{
+  background:linear-gradient(180deg, rgba(255,255,255,.60) 0%, rgba(255,255,255,.42) 100%);
+  -webkit-backdrop-filter:blur(34px) saturate(1.7);backdrop-filter:blur(34px) saturate(1.7);
+  border:1px solid rgba(255,255,255,.72);
+  box-shadow:0 26px 60px -24px rgba(8,12,22,.55), inset 0 1px 0 rgba(255,255,255,.95);color:var(--ink);}
+[data-frame="glass"][data-bg="photo"] .glass-light .fr-title{color:var(--ink);text-shadow:none;}
+[data-frame="glass"][data-bg="photo"] .glass-light .fr-eyebrow,
+[data-frame="glass"][data-bg="photo"] .glass-light .sub{color:var(--body);}
+[data-frame="glass"][data-bg="photo"] .glass-light .metapill{background:rgba(255,255,255,.6);border-color:rgba(255,255,255,.85);color:var(--ink-soft);}
+
+/* — dark frosted header strip (.fr-strip) — section headings / list headers (image-1 register) — */
+[data-frame="glass"][data-bg="photo"] .fr-strip{background:rgba(18,22,34,.56);
+  -webkit-backdrop-filter:blur(22px) saturate(1.3);backdrop-filter:blur(22px) saturate(1.3);
+  border:1px solid rgba(255,255,255,.14);color:#F4F6FB;}
+
+/* — glass·photo · LIGHT-frosted MAIN material (data-glass="light") — bright/airy alternative — */
+[data-frame="glass"][data-bg="photo"][data-glass="light"]{color:var(--ink);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-chrome{background:rgba(255,255,255,.66);border:1px solid rgba(255,255,255,.85);color:var(--ink-soft);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .card,
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .lane,
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-strip{
+  background:linear-gradient(180deg, rgba(255,255,255,.76) 0%, rgba(255,255,255,.58) 100%);
+  border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 22px 50px -22px rgba(8,12,22,.5), inset 0 1px 0 rgba(255,255,255,.95);color:var(--ink);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .badge{background:var(--sc);border:none;color:#fff;box-shadow:var(--sh-sm);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .chip{background:rgba(255,255,255,.7);border:1px solid var(--border);color:var(--body);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .chip.now{background:var(--sc);border-color:transparent;color:#fff;box-shadow:0 4px 14px -4px color-mix(in srgb,var(--sc) 70%,transparent);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .chip.done{opacity:.6;background:rgba(255,255,255,.5);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .bar{background:var(--idle-tint);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .bar i{background:var(--sc);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .metapill{background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.85);color:var(--ink-soft);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-title{color:var(--ink);text-shadow:none;}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-eyebrow{color:var(--muted);}
+
+/* — glass on WASH — LIQUID v5 (finalized, both registers) — flat liquid body,
+   sharp bright top edge, deep drop shadow, glowing subject rail — */
+[data-frame="glass"][data-bg="wash"]{color:var(--ink);}
+[data-frame="glass"][data-bg="wash"] .fr-chrome{background:rgba(255,255,255,.74);border:1px solid rgba(255,255,255,.95);color:var(--ink-soft);box-shadow:var(--sh-md);}
+
+/* WHITE frosted — the default wash register */
+[data-frame="glass"][data-bg="wash"] .card,
+[data-frame="glass"][data-bg="wash"] .lane{
+  position:relative;overflow:hidden;border-radius:var(--r-xl);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,.55) 4%, rgba(255,255,255,.08) 13%, rgba(255,255,255,0) 26%),
+    radial-gradient(80% 38% at 26% 0%, rgba(255,255,255,.92) 0%, rgba(255,255,255,0) 38%),
+    linear-gradient(180deg, color-mix(in srgb,var(--sc) 8%, rgba(255,255,255,.9)) 0%, color-mix(in srgb,var(--sc) 19%, rgba(255,255,255,.58)) 100%);
+  -webkit-backdrop-filter:blur(24px) saturate(2.4) brightness(1.05);backdrop-filter:blur(24px) saturate(2.4) brightness(1.05);
+  border:1px solid rgba(255,255,255,1);
+  box-shadow:
+    -8px 0 22px -8px color-mix(in srgb,var(--sc) 58%,transparent),
+    0 2px 5px rgba(22,26,42,.18),
+    0 30px 58px -22px rgba(22,26,42,.52),
+    inset 0 2px 0 rgba(255,255,255,1),
+    inset 0 -1px 0 rgba(22,26,42,.12);
+  color:var(--ink);
+}
+/* glowing subject rail (both registers) */
+[data-frame="glass"][data-bg="wash"] .card::before,
+[data-frame="glass"][data-bg="wash"] .lane::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:7px;z-index:1;border-radius:var(--r-xl) 0 0 var(--r-xl);
+  background:linear-gradient(180deg, color-mix(in srgb,var(--sc) 55%,#fff) 0%, var(--sc) 44%, color-mix(in srgb,var(--sc) 86%,#000 10%) 100%);
+  box-shadow:0 0 16px 1px color-mix(in srgb,var(--sc) 60%,transparent), 1px 0 3px color-mix(in srgb,var(--sc) 75%,transparent), inset 0 1px 0 rgba(255,255,255,.9);}
+[data-frame="glass"][data-bg="wash"] .badge{color:#fff;background:var(--sc);box-shadow:var(--sh-sm);}
+[data-frame="glass"][data-bg="wash"] .chip{background:rgba(255,255,255,.7);border:1px solid var(--border);color:var(--body);}
+[data-frame="glass"][data-bg="wash"] .chip.now{background:var(--sc);border-color:transparent;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 3px 12px -3px color-mix(in srgb,var(--sc) 65%,transparent);}
+[data-frame="glass"][data-bg="wash"] .chip.done{opacity:.7;}
+[data-frame="glass"][data-bg="wash"] .bar{background:var(--idle-tint);}
+[data-frame="glass"][data-bg="wash"] .bar i{background:linear-gradient(180deg, color-mix(in srgb,var(--sc) 84%,#fff) 0%, var(--sc) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 1px 5px -1px color-mix(in srgb,var(--sc) 60%,transparent);}
+[data-frame="glass"][data-bg="wash"] .metapill{background:rgba(255,255,255,.78);border:1px solid rgba(255,255,255,.95);color:var(--ink-soft);box-shadow:var(--sh-sm);}
+[data-frame="glass"][data-bg="wash"] .card:hover,
+[data-frame="glass"][data-bg="wash"] .lane:hover{transform:translateY(-3px);}
+
+/* DARK frosted register (data-glass="dark") — same Liquid v5, dark body */
+[data-frame="glass"][data-bg="wash"][data-glass="dark"]{color:#F4F6FB;}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .fr-chrome{background:rgba(22,26,40,.62);border:1px solid rgba(255,255,255,.16);color:#F4F6FB;}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .card,
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .lane{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.66) 0%, rgba(255,255,255,.22) 4%, rgba(255,255,255,.04) 13%, rgba(255,255,255,0) 26%),
+    radial-gradient(80% 38% at 26% 0%, rgba(255,255,255,.34) 0%, rgba(255,255,255,0) 38%),
+    linear-gradient(180deg, color-mix(in srgb,var(--sc) 17%, rgba(32,36,52,.87)) 0%, color-mix(in srgb,var(--sc) 8%, rgba(16,19,30,.78)) 100%);
+  -webkit-backdrop-filter:blur(24px) saturate(2.2) brightness(1.06);backdrop-filter:blur(24px) saturate(2.2) brightness(1.06);
+  border:1px solid rgba(255,255,255,.4);
+  box-shadow:
+    -8px 0 24px -8px color-mix(in srgb,var(--sc) 70%,transparent),
+    0 2px 6px rgba(8,10,22,.4),
+    0 30px 60px -22px rgba(8,10,22,.7),
+    inset 0 2px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(0,0,0,.25);
+  color:#F4F6FB;}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .badge{background:color-mix(in srgb,var(--sc) 62%, rgba(18,22,34,.5));border:1px solid color-mix(in srgb,var(--sc) 55%, rgba(255,255,255,.4));color:#fff;}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .chip{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.9);}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .chip.now{background:var(--sc);border-color:color-mix(in srgb,var(--sc) 55%,#fff);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 3px 12px -3px color-mix(in srgb,var(--sc) 70%,transparent);}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .chip.done{opacity:.6;}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .bar{background:rgba(255,255,255,.16);}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .metapill{background:rgba(22,26,40,.6);border:1px solid rgba(255,255,255,.18);color:#fff;}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .fr-title{color:#fff;}
+[data-frame="glass"][data-bg="wash"][data-glass="dark"] .fr-eyebrow{color:rgba(255,255,255,.8);}
+
+/* — per-panel ACCENT modifiers — opt a single panel into the OPPOSITE register anywhere in Glass — */
+[data-frame="glass"] .glass-dark{
+  background:linear-gradient(180deg, rgba(24,28,42,.62) 0%, rgba(15,18,28,.52) 100%) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.3);backdrop-filter:blur(24px) saturate(1.3);
+  border:1px solid rgba(255,255,255,.15) !important;
+  box-shadow:0 18px 40px -20px rgba(8,12,22,.6), inset 0 1px 0 rgba(255,255,255,.14) !important;color:#F4F6FB !important;}
+[data-frame="glass"] .glass-dark .fr-title{color:#fff;text-shadow:none;}
+[data-frame="glass"] .glass-dark .fr-eyebrow,[data-frame="glass"] .glass-dark .sub{color:rgba(255,255,255,.82);}
+[data-frame="glass"] .glass-light{
+  background:linear-gradient(180deg, rgba(255,255,255,.74) 0%, rgba(255,255,255,.56) 100%) !important;
+  -webkit-backdrop-filter:blur(32px) saturate(1.7);backdrop-filter:blur(32px) saturate(1.7);
+  border:1px solid rgba(255,255,255,.8) !important;
+  box-shadow:0 24px 56px -24px rgba(8,12,22,.5), inset 0 1px 0 rgba(255,255,255,.95) !important;color:var(--ink) !important;}
+[data-frame="glass"] .glass-light .fr-title{color:var(--ink) !important;text-shadow:none !important;}
+[data-frame="glass"] .glass-light .fr-eyebrow,[data-frame="glass"] .glass-light .sub{color:var(--body) !important;}
+[data-frame="glass"] .glass-light .metapill{background:rgba(255,255,255,.6) !important;border-color:rgba(255,255,255,.85) !important;color:var(--ink-soft) !important;}
+
+/* glass headings */
+[data-frame="glass"][data-bg="photo"] .fr-title{color:#fff;text-shadow:0 2px 20px rgba(8,12,22,.45);}
+[data-frame="glass"][data-bg="wash"]  .fr-title{color:var(--ink);}
+[data-frame="glass"] .fr-eyebrow{color:rgba(255,255,255,.86);}
+[data-frame="glass"][data-bg="wash"] .fr-eyebrow{color:var(--muted);}
+
+/* subject-colour left rail on glass cards + lanes — PHOTO (wash uses the glossy ::before rail above) */
+[data-frame="glass"][data-bg="photo"] .card{border-left:4px solid var(--sc);}
+[data-frame="glass"][data-bg="photo"] .lane{border-left:5px solid var(--sc);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .card{border-left:4px solid var(--sc);}
+[data-frame="glass"][data-bg="photo"][data-glass="light"] .lane{border-left:5px solid var(--sc);}
+
+/* =========================  B · BRIGHT WORKSPACE  ========================= */
+[data-frame="paper"]{color:var(--ink);}
+[data-frame="paper"] .fr-chrome{background:var(--surface);border:1px solid var(--border);box-shadow:var(--sh-sm);color:var(--ink-soft);}
+[data-frame="paper"] .card,
+[data-frame="paper"] .lane{background:var(--surface);border:1px solid var(--border);box-shadow:var(--sh-sm);color:var(--ink);}
+[data-frame="paper"] .card{border-top:3px solid var(--sc);}
+[data-frame="paper"] .badge{background:var(--sc);color:#fff;}
+[data-frame="paper"] .chip{background:var(--idle-tint);color:var(--body);}
+[data-frame="paper"] .chip.done{background:var(--surface);border:1px solid var(--border);color:var(--muted);}
+[data-frame="paper"] .chip.now{background:var(--sc);color:#fff;}
+[data-frame="paper"] .bar{background:var(--idle-tint);}
+[data-frame="paper"] .bar i{background:var(--sc);}
+[data-frame="paper"] .metapill{background:var(--surface);border:1px solid var(--border);color:var(--ink-soft);box-shadow:var(--sh-xs);}
+/* paper heading — signature 84px brand underline */
+[data-frame="paper"] .fr-eyebrow{color:var(--muted);}
+[data-frame="paper"] .fr-title{color:var(--ink);position:relative;display:inline-flex;padding-bottom:var(--s3);}
+[data-frame="paper"] .fr-title::after{content:"";position:absolute;left:0;bottom:0;width:84px;height:4px;border-radius:var(--r-pill);background:var(--accent);}
+/* paper on WASH → flat document: crisp corners, hairline rows, tight, no float */
+[data-frame="paper"][data-bg="wash"] .card,
+[data-frame="paper"][data-bg="wash"] .lane{border-radius:var(--r-sm);box-shadow:var(--sh-xs);background:rgba(255,255,255,.95);}
+[data-frame="paper"][data-bg="wash"] .card:hover,
+[data-frame="paper"][data-bg="wash"] .lane:hover{transform:none;border-color:var(--brand-300);box-shadow:var(--sh-xs);}
+
+/* =========================  C · COLOR-FORWARD  ========================= */
+[data-frame="color"]{color:var(--ink);}
+[data-frame="color"] .fr-chrome{background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.8);box-shadow:var(--sh-sm);color:var(--ink-soft);}
+[data-frame="color"] .card{
+  background:linear-gradient(135deg, color-mix(in srgb,var(--sc) 26%,#fff) 0%, var(--sct) 100%);
+  border:1px solid color-mix(in srgb,var(--sc) 30%,#fff);box-shadow:var(--sh-sm);color:var(--sci);
+}
+[data-frame="color"] .lane{background:rgba(255,255,255,.74);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.85);box-shadow:var(--sh-sm);border-left:5px solid var(--sc);}
+[data-frame="color"] .badge{background:var(--sc);color:#fff;}
+[data-frame="color"] .chip{background:var(--sct);color:var(--sci);}
+[data-frame="color"] .chip.now{background:var(--sc);color:#fff;}
+[data-frame="color"] .chip.done{opacity:.7;}
+[data-frame="color"] .bar{background:var(--sct);}
+[data-frame="color"] .bar i{background:var(--sc);}
+[data-frame="color"] .metapill{background:rgba(255,255,255,.66);border:1px solid rgba(255,255,255,.8);color:var(--ink-soft);box-shadow:var(--sh-xs);}
+/* color heading — signature gradient text clip (sanctioned only here) */
+[data-frame="color"] .fr-eyebrow{color:var(--ink-soft);}
+[data-frame="color"] .fr-title{background:linear-gradient(110deg,var(--subj-6) 0%,var(--subj-3) 34%,var(--brand-500) 70%,var(--subj-12) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;}
+/* color on WASH → chroma: subject-tinted lanes, bolder fills, thick rails */
+[data-frame="color"][data-bg="wash"] .lane{
+  background:linear-gradient(100deg, var(--sct) 0%, color-mix(in srgb,var(--sct) 55%,#fff) 100%);
+  border:1px solid color-mix(in srgb,var(--sc) 26%,#fff);border-left:6px solid var(--sc);box-shadow:var(--sh-sm);
+}
+[data-frame="color"][data-bg="wash"] .card{
+  background:linear-gradient(135deg, color-mix(in srgb,var(--sc) 44%,#fff) 0%, var(--sct) 100%);
+  border:1px solid color-mix(in srgb,var(--sc) 36%,#fff);
+}
+[data-frame="color"][data-bg="wash"] .chip{background:rgba(255,255,255,.7);color:var(--sci);}
+
+/* ============================================================
+   3 · NIGHT TONE  (data-tone="dark") — frame identity persists
+   ============================================================ */
+[data-tone="dark"]{
+  --canvas:#14131F; --surface:#1E1D2C; --surface-warm:#23222F;
+  --ink:#F3F2FA; --ink-soft:#D7D6E4; --body:#A9A8BC; --muted:#7E7D92; --faint:#56556A;
+  --border:#2E2D3F; --border-cool:#33324A; --hairline:#272636; --idle-tint:#2A2940;
+}
+[data-tone="dark"][data-bg="wash"] .stage::after{background:rgba(12,11,20,.45);}
+[data-tone="dark"][data-bg="photo"][data-frame="paper"] .stage::after{background:rgba(20,19,31,.86);}
+[data-tone="dark"][data-bg="photo"][data-frame="color"] .stage::after{background:rgba(20,19,31,.55);}
+
+/* glass · Night → dark frosted panels */
+[data-tone="dark"][data-frame="glass"][data-bg="wash"] .card,
+[data-tone="dark"][data-frame="glass"][data-bg="wash"] .lane{
+  background:linear-gradient(180deg, rgba(40,40,58,.78) 0%, rgba(34,34,50,.6) 100%);
+  border:1px solid rgba(255,255,255,.14);color:var(--ink);
+  box-shadow:0 24px 50px -22px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.12);
+}
+[data-tone="dark"][data-frame="glass"][data-bg="wash"] .fr-chrome{background:rgba(40,40,58,.7);border:1px solid rgba(255,255,255,.14);color:var(--ink-soft);}
+[data-tone="dark"][data-frame="glass"][data-bg="wash"] .fr-title{color:var(--ink);}
+[data-tone="dark"][data-frame="glass"][data-bg="wash"] .chip{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14);color:var(--ink-soft);}
+
+/* paper · Night → dark surface, raised contrast */
+[data-tone="dark"][data-frame="paper"] .card,
+[data-tone="dark"][data-frame="paper"] .lane,
+[data-tone="dark"][data-frame="paper"] .fr-chrome{background:var(--surface);border-color:var(--border);color:var(--ink);}
+[data-tone="dark"][data-frame="paper"] .chip{background:var(--idle-tint);color:var(--ink-soft);}
+[data-tone="dark"][data-frame="paper"] .chip.done{background:transparent;border-color:var(--border);color:var(--muted);}
+
+/* color · Night → tints darken, hue preserved */
+[data-tone="dark"][data-frame="color"] .card{
+  background:linear-gradient(135deg, color-mix(in srgb,var(--sc) 40%,#1E1D2C) 0%, color-mix(in srgb,var(--sc) 22%,#14131F) 100%);
+  border:1px solid color-mix(in srgb,var(--sc) 30%,#1E1D2C);color:#fff;
+}
+[data-tone="dark"][data-frame="color"] .lane{background:rgba(40,40,58,.7);border-color:rgba(255,255,255,.12);}
+[data-tone="dark"][data-frame="color"] .lane .nm .t{color:var(--ink);}
+
+/* ============================================================
+   4 · MOTION + responsive
+   ============================================================ */
+.card:hover,.lane:hover{transform:translateY(-2px);}
+.tabs a:hover{opacity:.85;}
+@media (prefers-reduced-motion:reduce){
+  .stage::before{animation:none !important;}
+  *{transition:none !important;}
+}
