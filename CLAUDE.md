@@ -730,6 +730,19 @@ planning_document.md` has a screen-by-screen section (§5) and the data model (�
   See §4 for the full responsive rule.
 - **Track multi-step work with the task tools** and, for parallelizable work, split it
   across agents with clear, non-overlapping file ownership.
+- **Use agent teams by default.** This is a standing user directive: reach for
+  parallel subagents (the Agent tool) as the normal way of working, not the
+  exception. Fan work out across a team whenever a task has independent tracks —
+  a wide investigation, a recon sweep before a build, a set of file edits that
+  don't overlap, or adversarial verification of a high-consequence claim. Give
+  each agent a precise brief, non-overlapping file ownership, and the exact ref
+  to read (never the stale working tree — see the branch-freshness rule above).
+  Keep the pieces that are genuinely indivisible — a single central primitive
+  everything else depends on, or one small careful edit — in the main agent, and
+  parallelize everything around them. Don't force a team onto trivially small or
+  strictly-sequential work where the coordination overhead exceeds the task; when
+  in doubt on anything non-trivial, prefer the team. Send concurrent agents in a
+  single message so they run at once, and reconcile their findings yourself.
 
 ## 6. How we work — DO NOT
 
