@@ -23,7 +23,28 @@
 //     uploaded framework (provenance = school_uploaded).
 
 import { STANDARDS } from "@/lib/mock/standards";
-import type { CatalogSubjectSlug } from "./catalog";
+
+/** Subject-coverage slugs used by the standards catalog (broader than the
+ *  app's eight subjects — a framework can cover domains the app doesn't
+ *  teach). Matches the `subject_scope` vocabulary in
+ *  frameworks-catalog.json and the seed generator
+ *  (scripts/gen-standards-catalog-sql.mjs). Formerly exported by
+ *  lib/standards/catalog.ts — the client-side catalog query layer removed
+ *  with its only consumer, the superseded StandardsPicker. */
+export type CatalogSubjectSlug =
+  | "ela"
+  | "math"
+  | "science"
+  | "social_studies"
+  | "arts"
+  | "pe_health"
+  | "languages"
+  | "computing"
+  | "religious_values"
+  | "sel"
+  | "vocational"
+  | "cross_curricular"
+  | "all_subjects";
 
 /** One taggable standard item. `code` is the value stored in
  *  `lesson.standards` (and later the `standards.code` DB column). */
