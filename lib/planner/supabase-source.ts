@@ -80,6 +80,7 @@ import {
   type SaveTarget,
 } from "./source";
 import { buildReverseIndex, slugToUuid } from "./id-bridge";
+import { MULTI_WORKSPACE } from "../multi-workspace-flag";
 import {
   makeUnwrap,
   makeUnwrapMaybe,
@@ -218,14 +219,27 @@ async function resolveSchoolWeek(
   if (cached) return cached;
   const promise = (async (): Promise<WeekMap> => {
     try {
-      const teacherRes = await client
-        .from("teachers")
-        .select("school_id")
-        .eq("id", ownerId)
-        .maybeSingle();
-      if (teacherRes.error) throw new Error(teacherRes.error.message);
-      const schoolId = (teacherRes.data as { school_id: string } | null)
-        ?.school_id;
+      // Resolve the teacher's school. Multi-workspace ON: the ACTIVE workspace
+      // via the same membership-validated funnel the RLS policies read (the
+      // teachers.school_id read below is the HOME school — a joined workspace
+      // would silently render home's week shape). OFF branch verbatim. The
+      // per-request schoolWeekCache is keyed by client, so no cross-request
+      // (or cross-workspace) pollution.
+      let schoolId: string | null | undefined;
+      if (MULTI_WORKSPACE) {
+        const schoolRes = await client.rpc("auth_teacher_school_id");
+        if (schoolRes.error) throw new Error(schoolRes.error.message);
+        schoolId = schoolRes.data as string | null;
+      } else {
+        const teacherRes = await client
+          .from("teachers")
+          .select("school_id")
+          .eq("id", ownerId)
+          .maybeSingle();
+        if (teacherRes.error) throw new Error(teacherRes.error.message);
+        schoolId = (teacherRes.data as { school_id: string } | null)
+          ?.school_id;
+      }
       if (!schoolId) {
         console.warn(
           `[planner] school_week unavailable (no school for teacher ${ownerId}); using Sun-first fallback order.`,
@@ -856,6 +870,72 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   async getActiveGradeLevelId(ownerId) {
     const client = await sb();
+
+    // ── Multi-workspace path (flag-gated; the OFF body below is verbatim) ────
+    // Both OFF branches are workspace-AGNOSTIC: a teacher whose ACTIVE
+    // workspace is B would still resolve their home default/TGA grade, so the
+    // planner would hydrate HOME content inside workspace B. Scope both steps
+    // to the active workspace instead.
+    if (MULTI_WORKSPACE) {
+      // The same membership-validated funnel every RLS policy reads (SECTION 6
+      // of 20260724120000_multi_workspace.sql). One scalar RPC round-trip; the
+      // M1-posture helpers keep default PUBLIC execute, so the authenticated
+      // server client can call it via PostgREST. Do NOT re-implement the
+      // membership logic client-side — this RPC is the single source of truth.
+      const schoolRes = await client.rpc("auth_teacher_school_id");
+      const activeSchoolId = unwrapMaybe(
+        schoolRes,
+        "get active grade (school)",
+      ) as string | null;
+      if (!activeSchoolId) return null;
+
+      // 1. The teacher's explicit default grade — honored ONLY if it belongs
+      //    to the ACTIVE workspace (a home default must not leak into a joined
+      //    workspace's planner).
+      const teacherRes = await client
+        .from("teachers")
+        .select("default_grade_level_id")
+        .eq("id", ownerId)
+        .maybeSingle();
+      const def =
+        (
+          unwrapMaybe(teacherRes, "get active grade (teacher)") as {
+            default_grade_level_id: string | null;
+          } | null
+        )?.default_grade_level_id ?? null;
+      if (def) {
+        const inWs = await client
+          .from("grade_levels")
+          .select("id")
+          .eq("id", def)
+          .eq("school_id", activeSchoolId)
+          .maybeSingle();
+        if (unwrapMaybe(inWs, "get active grade (default in workspace)")) {
+          return def;
+        }
+      }
+
+      // 2. Fallback: the first TGA whose grade belongs to the ACTIVE workspace
+      //    (`!inner` REQUIRED so the embedded school filter constrains the
+      //    parent TGA rows; stable created_at order for determinism — parity
+      //    with the OFF branch, incl. no is_active filtering).
+      const assignRes = await client
+        .from("teacher_grade_assignments")
+        .select("grade_level_id, created_at, grade_levels!inner(school_id)")
+        .eq("teacher_id", ownerId)
+        .eq("grade_levels.school_id", activeSchoolId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      return (
+        (
+          unwrapMaybe(assignRes, "get active grade (assignment)") as {
+            grade_level_id: string;
+          } | null
+        )?.grade_level_id ?? null
+      );
+    }
+
     // 1. The teacher's explicit default grade, if set.
     const teacherRes = await client
       .from("teachers")
