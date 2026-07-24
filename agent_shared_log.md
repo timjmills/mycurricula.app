@@ -3099,3 +3099,51 @@ commit. Gating BEFORE commit caught it — nothing bad reached prod.
 **NEXT:** B1.7 fixes → gate → commit → B2 build (spec locked, decisions ruled)
 → B1.7/B2 shared §4c preview gate → promote → B3 (rulings sent; Option B for
 prep, Refine excluded, tabs→drawer). Prod-QA-sweep report + B3 recon received.
+
+---
+
+## [Main/orchestrator 7.24 pt6] ⏸ B1.7 UNCOMMITTED + MID-EDIT (RESUME HERE) — agents hit session limits
+
+Session-limit wall hit ~14:29 (reset 16:50 Europe/London): build-b17-unit-edit
+AND fix-teach-qa both died mid-work. State for whoever resumes:
+
+**MASTER IS CLEAN + FULLY PUSHED** at `cc0d617` (0/0 vs origin), prod hydrate
+gate GREEN. ~47 commits shipped today. Nothing broken is committed.
+
+**B1.7 (editable Unit Plan) — UNCOMMITTED in the working tree, and BROKEN
+mid-edit.** `npx tsc --noEmit` fails at `lib/planner/unit-write-queue.ts:131`
+(TS2554 expected 2 args got 1) — the agent was PART-WAY through the round-6
+field-wise `clearFailed` change when it died. Files (all uncommitted, on disk):
+lib/planner/unit-write-queue.ts, lib/planner-store.tsx, lib/planner/{source,
+mock-source,supabase-source}.ts, components/year-v2/unit-tabs/{UnitPlanFields
+(NEW),OverviewTab}.tsx, components/year-v2/{UnitExplorer.tsx,UnitExplorer.
+module.css}, tests/{unit-write-queue(NEW),planner-unit-fields(NEW),planner-
+store,track-b-workspace-fields}.test.ts.
+
+**The MODEL is settled + sound** (confirm-only catalog; Codex verified rounds
+1-5). DO NOT reopen the catalog design. **Round-6 open findings to FINISH:**
+- H1-B (UnitPlanFields ~228): reseed the draft from confirmed `unit` on
+  canEdit→false UNCONDITIONALLY (currently gated on `hadPending`; after a
+  flush() with no buffer + an in-flight RPC that then fails, read-only shows the
+  unsaved draft).
+- H2-B (unit-write-queue ~128): `clearFailed(unitId)` clears the WHOLE retained
+  patch on any confirmed write → a later single-field success drops an
+  unconfirmed other-field retry. Make it FIELD-WISE (this is the half-applied
+  edit that broke tsc:131 — finish the 2-arg clearFailed(unitId, coveredFields)
+  signature + all callers).
+- M-C (planner-store ~2842 failedUnitWrites Map): add eviction when a unit
+  leaves the catalog/hydration scope (no unbounded growth).
+Then: tsc/lint/vitest, re-gate via Codex (round 6), commit path-scoped, push.
+**B2 (Lessons editor, task #34, spec locked in recon-b2-lessons' report) is
+BLOCKED on B1.7 landing** (shared planner-store/source seam).
+
+**Also pending (both flag-ON, orchestrator+user-gated):** B1.7's UNIT_COLS read
+wiring + the eventual B2 lesson-COLS both ride migration 20260728120000, which
+is ALREADY APPLIED on prod (unauthorized-but-benign, pt5) — so their ship needs
+only a §4b/§4c preview gate before promote, NO further DDL.
+
+**fix-teach-qa (dead) left NO code on disk** — only its QA report
+(docs/screenshots/teach-qa/QA-REPORT-teach.md). The teach phone-toolbar Major
+(Text tool unreachable @375, editor.module.css) + 3 a11y minors are UNBUILT —
+re-run when convenient. Board canvas confirmed rendering on prod (the §6
+"unverified" gap is closed).
