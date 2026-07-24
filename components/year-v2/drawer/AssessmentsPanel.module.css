@@ -586,9 +586,23 @@
 /* The ToggleGroup tray is inline-flex and cannot wrap. A contained,
    scrollbar-less overflow keeps all three chips reachable if the drawer is ever
    narrower than they are — the document itself never scrolls sideways. */
+/* THE PADDING IS LOAD-BEARING — it is what keeps the Kind chips tappable.
+   `overflow-x: auto` with a visible `overflow-y` COMPUTES overflow-y to `auto`
+   as well (CSS Overflow §3: a non-visible value on one axis forces the other to
+   `auto`). That makes this row a scroll container in BOTH directions, so it
+   clipped ToggleGroup's transparent 44px `::before` hit-area overlay to its own
+   36px box — measured 36.6px of vertical hit extent at 375, against the ≥44px
+   contract (CLAUDE.md §4). The chips LOOKED fine; only a hit test showed it.
+   4px top and bottom takes the box to 44px so the overlay fits uncut.
+
+   Keep this in step with `--tg-sm-hit` if the primitive's inflation changes.
+   Note this stylesheet is shared by BOTH halves of the pane
+   (`AssessmentsPanel.tsx` and `UnitAssessments.tsx`), so this single rule
+   governs the lesson-level and unit-level Kind toggles alike. */
 .kindRow {
   min-width: 0;
   overflow-x: auto;
+  padding-block: 4px;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
