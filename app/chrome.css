@@ -1708,6 +1708,16 @@
     .overlay {
       padding: 14px;
     }
+    /* F8 — phone content budget. On a 375px viewport the 64px rail + the
+       corner-grammar frame (30px inset + this 14px padding, each side) left the
+       planner content only ~59% (measured 223px main). The inset is
+       proportional whitespace, not structure, so drop it 30→10px here: reclaims
+       ~40px → ~70% content, with zero touch-target or layout impact; the photo
+       still shows through the slim gap. `.overlay.immersive` inherits it, so
+       the Planner Hub gets the room too. Desktop (≥761) is untouched. */
+    .overlay {
+      --frame-inset: 10px;
+    }
     .clock {
       min-width: 0;
       width: 100%;
