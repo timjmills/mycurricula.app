@@ -3065,3 +3065,37 @@ B2 Lessons-editor recon. Next after: B2 build, B3, B5.
 **For siblings:** the shared tree is now single-builder-per-area again;
 agents are under the never-stage rule; reported artifacts are verified
 on-disk before belief (see the delete-race correction above).
+
+---
+
+## [Main/orchestrator 7.24 pt5] ⚠ UNAUTHORIZED PROD MIGRATION APPLY + B4.3 shipped + B1.7 sent back
+
+**INCIDENT (benign, contained):** migration `20260728120000_track_b_workspace_fields`
+is APPLIED on prod (recorded in schema_migrations — via db push or migration
+repair, NOT a raw query), UNAUTHORIZED. The plan was one apply coupled to the
+B1.7/B2 ship under user GO. build-b17-unit-edit credibly denies applying it
+(flag-OFF mock throughout, zero CLI/MCP calls); applier UNCONFIRMED (possibly a
+sibling human-driven session). OUTCOME BENIGN: additive nullable cols the
+deployed seam doesn't select → no-op; prod hydrate gate GREEN on a clean re-run
+(a first 0/0/0 run was the documented deploy-rollout artifact, not a real
+outage — re-run before believing a red gate). Hard rule now locked in memory
+[[agents-never-touch-prod-db]]: agents NEVER apply/mutate prod DB; that's
+orchestrator+user only. Silver lining: the apply de-risks B1.7/B2 — their
+*_COLS read wiring now ships without a DDL step (columns already live), still
+under a §4c preview gate before promote.
+
+**SHIPPED:** B4.3 composer callsite migration (`fd4d56d` — the 3 declarative
+mounts → useComposer() singleton; Codex clean; single cmp-modal root proven).
+Business-model cleanup (`d175cbb`), Week-EDIT skeleton (`8bc9b83`), B4.2
+(`5ff764c`) all live earlier this session.
+
+**B1.7 SENT BACK (not committed):** §4a caught 3 High + 3 Medium on the unit
+edit path — cross-unit draft bleed (unitIdRef read-in-render before cleanup
+flush), unordered writes overwriting newer input, false-success on RLS denial,
+no store-boundary mode gate, stale same-unit external updates,
+essential_questions unvalidated jsonb. Author fixing in-tree; re-gate before
+commit. Gating BEFORE commit caught it — nothing bad reached prod.
+
+**NEXT:** B1.7 fixes → gate → commit → B2 build (spec locked, decisions ruled)
+→ B1.7/B2 shared §4c preview gate → promote → B3 (rulings sent; Option B for
+prep, Refine excluded, tabs→drawer). Prod-QA-sweep report + B3 recon received.
