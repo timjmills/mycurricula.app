@@ -20,6 +20,9 @@
 
 /* ── Scrim ──────────────────────────────────────────────────────────────── */
 .scrim {
+  /* One gutter token drives both the scrim padding AND the modal's width cap
+     below, so they can never drift out of sync (change it in one place). */
+  --cu-gutter: 24px;
   position: fixed;
   inset: 0;
   z-index: 160;
@@ -28,7 +31,7 @@
   backdrop-filter: blur(8px);
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: var(--cu-gutter);
   animation: cuFade 0.18s ease;
 }
 @keyframes cuFade {
@@ -42,12 +45,17 @@
 
 /* ── Modal card — frosted, tone-aware ───────────────────────────────────── */
 .modal {
-  width: min(720px, 96vw);
-  /* 100% resolves to the padded scrim cell (viewport − 2×24px) so the modal
-     never overflows the scrim margin on phones. */
+  /* Width is bounded to what the scrim cell can actually hold: 720px on wide
+     screens, else the viewport minus BOTH gutters. Expressing the phone cap as
+     `100vw − 2×gutter` (a length, not a percentage) is what makes it reliable —
+     inside `place-items:center` grid, `max-width:100%` resolves against the auto
+     track that has already grown to the item, so it fails to cap the box and the
+     modal used to overflow the right gutter on phones (360/375). Bounding the
+     width itself sidesteps that entirely; max-width:100% stays only as a belt. */
+  width: min(720px, calc(100vw - 2 * var(--cu-gutter, 24px)));
   max-width: 100%;
   max-height: 88vh;
-  min-width: min(340px, calc(100vw - 48px));
+  min-width: min(340px, calc(100vw - 2 * var(--cu-gutter, 24px)));
   display: flex;
   flex-direction: column;
   overflow: hidden;
