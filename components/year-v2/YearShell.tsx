@@ -26,13 +26,7 @@
 // swap is now unreachable dead logic. It is intentionally NOT edited (not this
 // builder's file) — flagged for a follow-up cleanup.
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { TimelineYear } from "@/components/year";
 import { unitLessons, unitProgress } from "@/lib/year-v2-data";
@@ -161,23 +155,18 @@ export function YearShell(): ReactNode {
   );
   const closeUnitExplorer = useCallback(() => setOpenUnit(null), []);
 
-  // Dismiss the Explorer on ANY frame change (Codex M1 / reviewer L1).
+  // FRAME-SURVIVAL (user-locked decision, 2026-07-24): the open workspace
+  // SURVIVES an appearance/frame change instead of being dismissed. An earlier
+  // effect here cleared `openUnit` on every `frame` change — that is gone.
   //
-  // The bug: switching to `paper` takes the early-return below, which unmounts
-  // the modal HOST without clearing `openUnit`. Switching back re-mounted the
-  // host and the dialog silently re-opened — against possibly-changed planner
-  // data, with no user action. Reachable in practice because cross-device
-  // theme-sync can flip `frame` while the dialog is up.
-  //
-  // We clear on EVERY frame change, not just the paper transition (the stricter
-  // read): the Explorer is opened BY a chip/node that belongs to the outgoing
-  // frame's surface, and a frame switch replaces that whole surface — so a
-  // glass→color flip should dismiss it too, and focus-restore has no valid
-  // target either way. One invariant beats a special case. Clearing an
-  // already-null state on mount is a no-op (React bails on an identical value).
-  useEffect(() => {
-    setOpenUnit(null);
-  }, [frame]);
+  // Why it's safe now: the glass + color frames BOTH mount this host, so a
+  // glass⇄color flip just re-renders the open workspace, which re-skins through
+  // the shared token cascade (no remount, no data loss). A flip to `paper` takes
+  // the early-return below and unmounts the host, but `openUnit` is preserved,
+  // so flipping back to glass/color re-opens the same unit — the workspace is
+  // read-only until B1.7, so there is nothing to lose by keeping it open, and
+  // "survive the frame change" is the intended behavior. Cross-device theme-sync
+  // flipping the frame no longer yanks a teacher's open unit out from under them.
 
   // Lanes are only consumed by YearA/YearC; deriving them on the paper path is
   // harmless (memoized, cheap) and keeps the branch below simple.
@@ -204,6 +193,7 @@ export function YearShell(): ReactNode {
           subjectId={openUnit.subjectId}
           unit={openUnit.unit}
           onClose={closeUnitExplorer}
+          onUnitChange={openUnitExplorer}
         />
       ) : null}
     </>

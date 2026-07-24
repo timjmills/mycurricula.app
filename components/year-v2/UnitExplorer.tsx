@@ -39,13 +39,22 @@ import { useRouter } from "next/navigation";
 import type { SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import { unitResources, unitStandards } from "@/lib/year-unit-aggregate";
+import {
+  subjectUnitGroups,
+  unitProgressByKey,
+  type SubjectUnitGroup,
+} from "@/lib/unit-workspace-derive";
+import { useWorkspacePresentation } from "@/lib/workspace-prefs";
+import type { UnitProgress } from "@/lib/year-v2-data";
 import { PlanPage } from "@/components/lesson-plan-v2";
+import { Tooltip } from "@/components/ui";
 import {
   unitLessons,
   unitProgress,
   resolveUnitHeader,
 } from "@/lib/year-v2-data";
 import { ExplorerShell, type ExplorerMode } from "./ExplorerShell";
+import { UnitWorkspaceRail } from "./UnitWorkspaceRail";
 import {
   ProgressRing,
   OverviewTab,
@@ -56,6 +65,11 @@ import {
 } from "./unit-tabs";
 import styles from "./UnitExplorer.module.css";
 
+// Stable empty singletons for the non-workspace path (the Planner Hub) so the
+// rail-only derivations never allocate — and never re-run downstream memos.
+const EMPTY_GROUPS: SubjectUnitGroup[] = [];
+const EMPTY_PROGRESS: ReadonlyMap<string, UnitProgress> = new Map();
+
 // ── Props ─────────────────────────────────────────────────────────────────
 
 export interface UnitExplorerProps {
@@ -63,6 +77,18 @@ export interface UnitExplorerProps {
   /** The unit identifier as it appears on `Lesson.unit` (a slug, e.g. "u-m3"). */
   unit: string;
   onClose: () => void;
+  /**
+   * When provided, the modal becomes the full Unified Workspace (B1.4): a
+   * Units | Lessons left rail plus an ⤢ expand toggle (modal ⇄ full). Because
+   * the HOST owns which unit is open, rail navigation reports the new unit here
+   * rather than mutating local state — the host re-renders this component with
+   * the new `subjectId` / `unit` (no remount; nothing keys on them).
+   *
+   * Absent — the Planner Hub, which keys its doc tab on the opened unit and
+   * would lie if the rail could switch units — renders the classic scrim-only
+   * modal: no rail, no expand toggle, byte-identical to before B1.4.
+   */
+  onUnitChange?: (subjectId: SubjectId, unit: string) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -78,15 +104,46 @@ function splitUnitName(name: string): { prefix: string; rest: string } {
   };
 }
 
-/** The five tabs — locked scope (no Catch-Up / Pacing / Assessment / Stats). */
+/** The five tabs — locked scope (no Assessments / Refine / Insights until B2/B3;
+ *  no dead tabs). B1.5 relabels the first "Unit Plan"; the key stays `overview`
+ *  (the body switch + tab CSS key off it — a label-only change keeps the churn
+ *  minimal). */
 type TabKey = "overview" | "lessons" | "standards" | "resources" | "notes";
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
-  { key: "overview", label: "Overview" },
+  { key: "overview", label: "Unit Plan" },
   { key: "lessons", label: "Lessons" },
   { key: "standards", label: "Standards" },
   { key: "resources", label: "Resources" },
   { key: "notes", label: "Notes" },
 ];
+
+/** ⤢ expand / collapse glyphs for the presentation toggle (maximize-2 /
+ *  minimize-2). Drawn white on the gradient header via `.expandBtn`. */
+function ExpandGlyph({ full }: { full: boolean }): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {full ? (
+        <>
+          <path d="M4 14h6v6M20 10h-6V4" />
+          <path d="M14 10l7-7M10 14l-7 7" />
+        </>
+      ) : (
+        <>
+          <path d="M15 3h6v6M9 21H3v-6" />
+          <path d="M21 3l-7 7M3 21l7-7" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -94,9 +151,11 @@ export function UnitExplorer({
   subjectId,
   unit,
   onClose,
+  onUnitChange,
 }: UnitExplorerProps): ReactNode {
   const {
     lessons: allLessons,
+    subjects,
     subjectById,
     units,
     setLessonStatus,
@@ -106,6 +165,24 @@ export function UnitExplorer({
   const [tab, setTab] = useState<TabKey>("overview");
   const [mode, setMode] = useState<ExplorerMode>("unit");
   const [planLessonId, setPlanLessonId] = useState<string | null>(null);
+
+  // Workspace mode (B1.4): a rail + ⤢ expand toggle, enabled only when the host
+  // owns unit navigation (`onUnitChange`). The presentation preference is always
+  // read (hooks are unconditional); it only drives the UI when workspaceEnabled.
+  const workspaceEnabled = onUnitChange !== undefined;
+  const { presentation, toggle: togglePresentation } =
+    useWorkspacePresentation();
+
+  // Rail data — the grouped unit list + a one-pass taught/total map. Gated on
+  // workspaceEnabled so the Planner Hub path never runs the O(lessons) sweep.
+  const railGroups = useMemo(
+    () => (workspaceEnabled ? subjectUnitGroups(subjects, units) : EMPTY_GROUPS),
+    [workspaceEnabled, subjects, units],
+  );
+  const railProgress = useMemo(
+    () => (workspaceEnabled ? unitProgressByKey(allLessons) : EMPTY_PROGRESS),
+    [workspaceEnabled, allLessons],
+  );
 
   // A mode switch REMOUNTS the shell (a different component owns it per mode).
   // Once the dialog has been opened, no later mount is a real open, so the
@@ -224,12 +301,39 @@ export function UnitExplorer({
         </>
       }
       headerRight={
-        <ProgressRing
-          pct={pct}
-          trackClass={styles.ringTrackOnHead}
-          valueClass={styles.ringValueOnHead}
-          label={`${progress.taught} of ${progress.total} lessons taught`}
-        />
+        <div className={styles.headerCluster}>
+          {workspaceEnabled ? (
+            <Tooltip
+              content={
+                presentation === "full"
+                  ? "Collapse back to the compact dialog."
+                  : "Expand to the full workspace — with the unit & lesson rail."
+              }
+              tooltipId="ue-expand"
+              side="bottom"
+            >
+              <button
+                type="button"
+                className={styles.expandBtn}
+                aria-pressed={presentation === "full"}
+                aria-label={
+                  presentation === "full"
+                    ? "Collapse to a dialog"
+                    : "Expand to the full workspace"
+                }
+                onClick={togglePresentation}
+              >
+                <ExpandGlyph full={presentation === "full"} />
+              </button>
+            </Tooltip>
+          ) : null}
+          <ProgressRing
+            pct={pct}
+            trackClass={styles.ringTrackOnHead}
+            valueClass={styles.ringValueOnHead}
+            label={`${progress.taught} of ${progress.total} lessons taught`}
+          />
+        </div>
       }
       tabs={TABS}
       activeTab={tab}
@@ -237,6 +341,21 @@ export function UnitExplorer({
       tablistLabel="Unit details"
       mode={fallbackLessonId ? "unit" : undefined}
       onModeChange={fallbackLessonId ? onModeChange : undefined}
+      presentation={workspaceEnabled ? presentation : undefined}
+      closeOnScrimClick={!(workspaceEnabled && presentation === "full")}
+      rail={
+        workspaceEnabled && onUnitChange ? (
+          <UnitWorkspaceRail
+            groups={railGroups}
+            progressByKey={railProgress}
+            activeSubjectId={subjectId}
+            activeUnitId={unit}
+            onUnitChange={onUnitChange}
+            lessons={lessons}
+            onPlanLesson={openPlan}
+          />
+        ) : undefined
+      }
       onClose={onClose}
       body={
         <>
@@ -246,6 +365,8 @@ export function UnitExplorer({
               progress={progress}
               pct={pct}
               subjectName={subject.name}
+              resourceCount={resources.length}
+              standardCount={standards.length}
             />
           )}
           {tab === "lessons" && (

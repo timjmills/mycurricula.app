@@ -13,6 +13,54 @@
  * the modal re-tints on Night → dark instead of blowing out. Tokens only — no
  * hex literals, no px font sizes outside the token scale. */
 
+/* ── Header right cluster (⤢ expand toggle + progress ring) ──────────────── */
+.headerCluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+/* The ⤢ toggle sits on the subject gradient beside the ✕, so it mirrors
+   ExplorerShell's `.close` treatment (white-on-gradient). Doubled (`.expandBtn.
+   expandBtn`, 0,2,0) to outgun the `.cp-root button` reset the portal inherits. */
+.expandBtn.expandBtn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill, 999px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.expandBtn.expandBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.expandBtn.expandBtn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+.expandBtn svg {
+  width: 17px;
+  height: 17px;
+}
+@media (pointer: coarse), (max-width: 900px) {
+  /* Doubled to match the doubled base (a single-class @media override would
+     lose to `.expandBtn.expandBtn`). */
+  .expandBtn.expandBtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .expandBtn.expandBtn {
+    transition: none;
+  }
+}
+
 /* ── Progress rings ─────────────────────────────────────────────────────── */
 /* On the gradient header — white track + value. */
 .ringTrackOnHead {
@@ -76,6 +124,128 @@
   font-size: var(--t-12, 12px);
   font-weight: 600;
   color: var(--ink-700, #4a4960);
+}
+
+/* ── Honest stat strip (B1.6) ───────────────────────────────────────────── */
+.statCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--r-lg, 14px);
+  border: 1px solid var(--ue-hairline);
+  background: var(--ue-tint-soft);
+}
+/* Semantic accents: warn for planning gaps, done for a fully-taught unit. Both
+   tints re-tint on Night (tokens.css @media). */
+.statCardWarn {
+  border-color: color-mix(in srgb, var(--warn) 42%, transparent);
+  background: var(--warn-tint);
+}
+.statCardDone {
+  border-color: color-mix(in srgb, var(--done) 42%, transparent);
+  background: var(--done-tint);
+}
+.statValue {
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: var(--t-20, 20px);
+  line-height: 1.1;
+  color: var(--cd, var(--ink, #1c1b2e));
+  overflow-wrap: anywhere;
+}
+.statValueWarn {
+  color: var(--warn);
+}
+.statValueDone {
+  color: var(--done);
+}
+.statLabel {
+  font-size: var(--t-11, 11px);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-500, #6e6c82);
+}
+
+/* ── Learning arc (B1.6) ────────────────────────────────────────────────── */
+.arc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.arcHead {
+  font-size: var(--t-13, 13px);
+  font-weight: 700;
+  color: var(--ink-700, #4a4960);
+}
+.arcTrack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.arcPhase {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 8px 11px;
+  border-radius: var(--r-lg, 14px);
+  border: 1px solid var(--ue-hairline);
+  background: var(--surface, #fff);
+}
+.arcPhaseOn {
+  border-color: var(--ue-accent-border);
+  background: var(--ue-tint-soft);
+}
+.arcDot {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill, 999px);
+  border: 2px solid var(--ue-accent-border);
+  background: var(--surface, #fff);
+  color: #fff;
+  font-size: var(--t-11, 11px);
+  font-weight: 800;
+}
+.arcDot svg {
+  width: 13px;
+  height: 13px;
+}
+.arcDotOn {
+  background: var(--c);
+  border-color: var(--c);
+}
+.arcLabel {
+  font-size: var(--t-12, 12px);
+  font-weight: 600;
+  color: var(--ink-700, #4a4960);
+  overflow-wrap: anywhere;
+}
+.arcPhaseOn .arcLabel {
+  color: var(--ink, #1c1b2e);
+  font-weight: 700;
+}
+.arcCaption {
+  font-size: var(--t-11, 11px);
+  font-weight: 600;
+  color: var(--ink-500, #6e6c82);
+}
+
+/* Two stat columns on phone so long values ("In progress") don't crush. */
+@media (max-width: 560px) {
+  .statCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Progress bar under the stat. */

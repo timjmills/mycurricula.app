@@ -1,0 +1,251 @@
+/* UnitWorkspaceRail.module.css — the workspace's Units | Lessons left rail (B1.4).
+ *
+ * Rendered inside ExplorerShell's `.rail` slot (which owns the 260px column width,
+ * border, and background); this file lays out the rail's own content — search,
+ * the Units|Lessons segmented toggle, and the scrolling grouped list.
+ *
+ * Subject color: each unit group wraps in `cp-subj <subject>` so its dot +
+ * active-row accent use THAT subject's --c (the rail lists many subjects, so it
+ * cannot lean on the modal root's single-subject cascade). Everything else
+ * (search, seg, the Lessons list) inherits the open unit's --c/--cd/--ue-* from
+ * the shell's `.modal` root. Tokens only — no hex, no px font sizes off-scale.
+ *
+ * Button-class rules are DOUBLED (`.foo.foo`, 0,2,0) so they outgun the
+ * `.cp-root button` reset (0,1,1) — the shell portals into `.cp-root`, whose
+ * reset would otherwise strip padding / border / background. */
+
+/* Root fills the shell's `.rail` wrapper; search + seg pin at top, list scrolls. */
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  gap: 8px;
+  padding: 12px 10px;
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+.search {
+  flex: 0 0 auto;
+}
+.searchInput {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--ue-accent-border);
+  background: var(--surface, #fff);
+  color: var(--ink, #1c1b2e);
+  border-radius: var(--r-lg, 14px);
+  padding: 9px 12px;
+  font-size: var(--t-12, 12px);
+  font-weight: 600;
+}
+.searchInput::placeholder {
+  color: var(--ink-500, #6e6c82);
+}
+.searchInput:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: 1px;
+}
+
+/* ── Units | Lessons segmented toggle ───────────────────────────────────── */
+.seg {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 100%;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ue-accent-border);
+  border-radius: var(--r-pill, 999px);
+  background: var(--ue-tint-soft);
+}
+.segBtn.segBtn {
+  flex: 1;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-500, #6e6c82);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: var(--t-11, 11px);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 7px 9px;
+  border-radius: var(--r-pill, 999px);
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s;
+}
+.segBtnOn.segBtnOn {
+  background: var(--surface, #fff);
+  color: var(--cd, var(--ink, #1c1b2e));
+  box-shadow: 0 1px 2px rgba(8, 8, 18, 0.12);
+}
+.segBtn.segBtn:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: 2px;
+}
+
+/* ── Scrolling list ─────────────────────────────────────────────────────── */
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 8px 4px;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: var(--t-11, 11px);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-500, #6e6c82);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--c);
+  flex: 0 0 auto;
+}
+
+.unitRow.unitRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: none;
+  border-left: 3px solid transparent;
+  background: none;
+  padding: 8px 10px;
+  border-radius: var(--r-8, 8px);
+  cursor: pointer;
+  color: var(--ink-700, #4a4960);
+  transition: background 0.14s;
+}
+.unitRow.unitRow:hover {
+  background: var(--ue-tint-soft);
+}
+.unitRowOn.unitRowOn {
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  border-left-color: var(--c);
+  color: var(--ink, #1c1b2e);
+}
+.unitRow.unitRow:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: -2px;
+}
+.ud {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--c);
+  flex: 0 0 auto;
+}
+.unitName {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-13, 13px);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.count {
+  flex: 0 0 auto;
+  font-size: var(--t-11, 11px);
+  font-weight: 700;
+  color: var(--ink-500, #6e6c82);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Lessons list ───────────────────────────────────────────────────────── */
+.lessons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lessonRow.lessonRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 8px 10px;
+  border-radius: var(--r-8, 8px);
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.lessonRow.lessonRow:hover {
+  background: var(--ue-tint-soft);
+}
+.lessonRow.lessonRow:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: -2px;
+}
+.lessonText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.lessonTitle {
+  font-size: var(--t-13, 13px);
+  font-weight: 700;
+  color: var(--ink, #1c1b2e);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lessonMeta {
+  font-size: var(--t-11, 11px);
+  font-weight: 600;
+  color: var(--ink-500, #6e6c82);
+}
+
+.empty {
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--ink-500, #6e6c82);
+  font-size: var(--t-12, 12px);
+  font-weight: 600;
+}
+
+/* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
+@media (pointer: coarse), (max-width: 900px) {
+  /* Doubled to match the doubled bases (a single-class @media override would
+     lose to `.unitRow.unitRow` / `.lessonRow.lessonRow` / `.segBtn.segBtn`). */
+  .unitRow.unitRow,
+  .lessonRow.lessonRow {
+    min-height: 44px;
+  }
+  .segBtn.segBtn {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segBtn.segBtn,
+  .unitRow.unitRow,
+  .lessonRow.lessonRow {
+    transition: none;
+  }
+}

@@ -17,6 +17,8 @@ export { YearA } from "./YearA";
 export { YearC } from "./YearC";
 export { UnitExplorer } from "./UnitExplorer";
 export type { UnitExplorerProps } from "./UnitExplorer";
+export { UnitWorkspaceRail } from "./UnitWorkspaceRail";
+export type { UnitWorkspaceRailProps } from "./UnitWorkspaceRail";
 export { ExplorerShell } from "./ExplorerShell";
 export type {
   ExplorerShellProps,

@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 
 import {
   subjectUnitGroups,
+  unitProgressByKey,
+  unitProgressKey,
   unitPace,
   unitGaps,
   arcPhasesReached,
@@ -32,6 +34,8 @@ function res(type: LessonResource["type"], label: string): LessonResource {
 
 function lesson(partial: {
   id: string;
+  subject?: SubjectId;
+  unit?: string;
   week?: number;
   day?: number;
   status?: Lesson["status"];
@@ -215,5 +219,56 @@ describe("arcPhasesReached + ARC_PHASES", () => {
     expect(arcPhasesReached({ total: 4, taught: 4 }, 4)).toBe(4);
     // non-positive phase count → 0
     expect(arcPhasesReached({ total: 4, taught: 2 }, 0)).toBe(0);
+  });
+});
+
+describe("unitProgressByKey — one-pass per-unit taught/total map", () => {
+  it("counts total + taught (status done) per subject+unit key", () => {
+    const map = unitProgressByKey([
+      lesson({ id: "a", status: "done" }), // math / u-m3
+      lesson({ id: "b", status: "not_done" }), // math / u-m3
+      lesson({ id: "c", subject: "reading", unit: "r-u1", status: "done" }),
+    ]);
+    expect(map.get(unitProgressKey("math", "u-m3"))).toEqual({
+      total: 2,
+      taught: 1,
+    });
+    expect(map.get(unitProgressKey("reading", "r-u1"))).toEqual({
+      total: 1,
+      taught: 1,
+    });
+  });
+
+  it("excludes archived lessons, matching unitLessons/unitProgress", () => {
+    const map = unitProgressByKey([
+      lesson({ id: "a", status: "done" }),
+      { ...lesson({ id: "b", status: "done" }), archived: true } as Lesson,
+    ]);
+    // Only the non-archived lesson is counted.
+    expect(map.get(unitProgressKey("math", "u-m3"))).toEqual({
+      total: 1,
+      taught: 1,
+    });
+  });
+
+  it("keys on subject AND unit — same slug across subjects never merges", () => {
+    const map = unitProgressByKey([
+      lesson({ id: "a", subject: "math", unit: "shared", status: "done" }),
+      lesson({ id: "b", subject: "reading", unit: "shared", status: "not_done" }),
+    ]);
+    expect(map.get(unitProgressKey("math", "shared"))).toEqual({
+      total: 1,
+      taught: 1,
+    });
+    expect(map.get(unitProgressKey("reading", "shared"))).toEqual({
+      total: 1,
+      taught: 0,
+    });
+  });
+
+  it("returns an empty map for no lessons; misses read as undefined", () => {
+    const map = unitProgressByKey([]);
+    expect(map.size).toBe(0);
+    expect(map.get(unitProgressKey("math", "nope"))).toBeUndefined();
   });
 });

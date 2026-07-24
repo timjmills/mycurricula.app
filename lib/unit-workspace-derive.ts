@@ -20,7 +20,7 @@
 //   • the arc is a completion-fraction visualization, not independent per-phase
 //     tracking (no such data exists).
 
-import type { Lesson, Subject, Unit } from "@/lib/types";
+import type { Lesson, Subject, SubjectId, Unit } from "@/lib/types";
 import { unitProgress, type UnitProgress } from "@/lib/year-v2-data";
 
 // ── Subject → units grouping (the workspace rail's grouped list) ────────────
@@ -55,6 +55,50 @@ export function subjectUnitGroups(
     if (own.length > 0) groups.push({ subject, units: own });
   }
   return groups;
+}
+
+// ── Per-unit progress map (the rail's taught/total badges) ──────────────────
+
+/**
+ * The separator between a subject id and a unit id in a progress-map key. A
+ * newline can't appear in either slug, so `${subject}\n${unit}` can never
+ * collide the way a naive `${subject}:${unit}` might if a slug contained ":".
+ */
+const UNIT_KEY_SEP = "\n";
+
+/** Build the map key for one subject+unit — pair with `unitProgressByKey`. */
+export function unitProgressKey(subjectId: SubjectId, unitId: string): string {
+  return `${subjectId}${UNIT_KEY_SEP}${unitId}`;
+}
+
+/**
+ * Taught/total for EVERY unit in one pass, keyed by `unitProgressKey`.
+ *
+ * The workspace rail shows a taught/total badge on every unit row, so a
+ * per-row `unitProgress(unitLessons(...))` would rescan the whole lesson list
+ * once per unit. This single O(lessons) sweep replaces that. Its counting
+ * contract matches `unitLessons` + `unitProgress` exactly: archived lessons are
+ * excluded, and `taught` counts only `status === "done"` (the store's
+ * never-forking completion truth). Units keyed on subject AND unit — unit slugs
+ * are unique only within a subject, so a bare-slug key would merge two subjects'
+ * same-slug units.
+ */
+export function unitProgressByKey(
+  lessons: readonly Lesson[],
+): Map<string, UnitProgress> {
+  const map = new Map<string, UnitProgress>();
+  for (const l of lessons) {
+    if (l.archived === true) continue;
+    const key = unitProgressKey(l.subject, l.unit);
+    const entry = map.get(key);
+    if (entry) {
+      entry.total += 1;
+      if (l.status === "done") entry.taught += 1;
+    } else {
+      map.set(key, { total: 1, taught: l.status === "done" ? 1 : 0 });
+    }
+  }
+  return map;
 }
 
 // ── Unit pacing (honest completion summary) ─────────────────────────────────

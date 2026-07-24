@@ -297,11 +297,13 @@
   }
 }
 
-/* ── B1.4 seam — full-bleed workspace presentation + left rail ────────────── */
-/* Dormant until a caller passes `presentation="full"` / a `rail` slot (no caller
-   does in B1.0–B1.3). Declared AFTER `.modal` so, at equal specificity, `.full`
-   wins the size/radius it overrides. B1.4 (the ⤢ expand toggle + UnitWorkspace
-   Rail) turns these on and refines them. */
+/* ── B1.4 — full-bleed workspace presentation + left rail ──────────────────── */
+/* The ⤢ expand toggle (UnitExplorer) flips `presentation` between "modal" and
+   "full" as a PLAIN PROP on the same mounted shell — never a remount (a remount
+   would replay the focus grab, scroll lock, and entry animation). Declared AFTER
+   `.modal` so, at equal specificity, `.full` wins the size/radius it overrides —
+   including over the phone `@media (max-width: 560px)` `.modal` rules above,
+   which it also follows in source order. */
 .scrimFull {
   padding: 0;
 }
@@ -319,15 +321,40 @@
   min-height: 0;
   overflow: hidden;
 }
+/* The rail is MOUNTED whenever the workspace supplies one, but SHOWN only in the
+   full-bleed presentation. The ⤢ toggle therefore reveals/hides it as a pure CSS
+   `display` change on the same subtree — the body never remounts, so its scroll
+   position and any focused field survive the expand/collapse. Its own scroll is
+   owned by the inner rail's list (UnitWorkspaceRail `.list`), not this wrapper. */
 .rail {
+  display: none;
   flex: 0 0 auto;
   width: 260px;
-  overflow-y: auto;
+  min-height: 0;
   border-right: 1px solid var(--ue-hairline);
   background: var(--ue-tint-soft);
+}
+.full .rail {
+  display: flex;
+  flex-direction: column;
 }
 /* The body only needs `min-width: 0` when it shares a flex ROW with the rail;
    scoping it here leaves the standalone (no-rail) body rule untouched. */
 .railLayout .body {
   min-width: 0;
+}
+
+/* Phone (full only): stack the rail above the body as a capped, self-scrolling
+   band so a 260px column never forces horizontal scroll on a narrow screen. The
+   modal presentation keeps the rail hidden, so this only bites when expanded. */
+@media (max-width: 700px) {
+  .full .railLayout {
+    flex-direction: column;
+  }
+  .full .rail {
+    width: 100%;
+    max-height: 34vh;
+    border-right: none;
+    border-bottom: 1px solid var(--ue-hairline);
+  }
 }
