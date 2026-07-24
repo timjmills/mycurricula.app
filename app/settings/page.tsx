@@ -122,13 +122,15 @@ export default function SettingsOverviewPage(): ReactNode {
 
 function OverviewBody(): ReactNode {
   // ── Live values ───────────────────────────────────────────────────────
-  const { currentUser } = useAppState();
+  const { currentUser, accountDefaultName } = useAppState();
   const { theme, style, palette } = useTheme();
   const { enabled: catchupEnabled } = useCatchup();
   const { workspaceName, activeNotebooks } = useNotebookState();
   const { days } = useSchoolWeek();
   const { holidays } = useHolidays();
-  const { displayName } = useDisplayName();
+  // Account-tile summary prefers the real auth-profile name when the
+  // teacher has no stored display name (same seam as Settings → Account).
+  const { displayName } = useDisplayName(accountDefaultName);
   const { defaultView } = useDefaultView();
 
   // Sibling-page state, summarized straight from the stable storage keys.

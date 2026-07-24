@@ -18,6 +18,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -263,6 +264,18 @@ export interface AppStateValue {
   currentUser: CurrentUser;
 
   /**
+   * The account-default display name — what the Settings → Account name
+   * field falls back to when the teacher has no stored display name (and
+   * what clearing the field reverts to). When a real Supabase session has
+   * resolved this is the auth-profile name (Google full name / email);
+   * until then — and on the backend-less mock path, where no session ever
+   * resolves — it is the mock ME teacher, matching FALLBACK_USER. Kept
+   * separate from `currentUser.name`, which the stored display name
+   * overlays and therefore cannot serve as the "cleared" fallback.
+   */
+  accountDefaultName: string;
+
+  /**
    * Update the teacher's curriculum label (the wordmark suffix). Persists to
    * localStorage under `mycurricula:curriculum-label` so the value survives
    * reloads in the prototype; the real Supabase column will pick this up
@@ -311,6 +324,20 @@ export function AppStateProvider({
   // in sync via onAuthStateChange (sign-in, sign-out, token refresh).
   const [currentUser, setCurrentUser] = useState<CurrentUser>(FALLBACK_USER);
 
+  // Auth-default identity — the PRE-overlay name/initials from the Supabase
+  // session, or null while unresolved / signed out. This is what a cleared
+  // display name falls back to, so a signed-in teacher never regresses to
+  // the mock ME teacher ("Lena Haddad") after clearing their custom name.
+  // State drives the context value; the ref mirrors it for the storage /
+  // PROFILE_EVENT listener below, which subscribes once with [] deps.
+  const [authIdentity, setAuthIdentity] = useState<{
+    name: string;
+    initials: string;
+  } | null>(null);
+  const authIdentityRef = useRef<{ name: string; initials: string } | null>(
+    null,
+  );
+
   // Post-mount: overlay any teacher-edited curriculum label from
   // localStorage so the wordmark reflects what the teacher last typed in
   // Settings → Curriculum. Done in a layout-effect-equivalent post-mount
@@ -343,6 +370,14 @@ export function AppStateProvider({
     const apply = (user: User | null): void => {
       if (active) {
         const next = user ? toCurrentUser(user) : FALLBACK_USER;
+        // Record the pre-overlay auth identity (or its absence) BEFORE the
+        // stored-name overlay below mutates `next` — this is the fallback a
+        // cleared display name reverts to.
+        const identity = user
+          ? { name: next.name, initials: next.initials }
+          : null;
+        authIdentityRef.current = identity;
+        setAuthIdentity(identity);
         // Preserve any teacher-edited curriculum label from localStorage
         // when the Supabase session resolves — the auth user shape does
         // not carry a curriculumLabel yet (no DB column), so without this
@@ -396,16 +431,21 @@ export function AppStateProvider({
   //     fires on the writing tab; lib/use-account-settings dispatches the
   //     custom event after each write so the avatar updates live).
   // Both re-read storage so there is a single source of truth. Clearing
-  // falls back to the mock ME name — when real Supabase profiles land
-  // (Phase 1B) the fallback becomes the auth-profile name instead.
+  // falls back to the auth-profile identity when a session has resolved
+  // (via authIdentityRef — this listener subscribes once), and to the mock
+  // ME teacher only on the backend-less path where no session exists.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const applyStoredName = (): void => {
       const stored = readStoredDisplayName();
+      const fallback = authIdentityRef.current ?? {
+        name: ME.name,
+        initials: ME.initials,
+      };
       setCurrentUser((prev) => ({
         ...prev,
-        name: stored ?? ME.name,
-        initials: stored != null ? deriveInitials(stored) : ME.initials,
+        name: stored ?? fallback.name,
+        initials: stored != null ? deriveInitials(stored) : fallback.initials,
       }));
     };
     const onStorage = (e: StorageEvent): void => {
@@ -496,6 +536,7 @@ export function AppStateProvider({
       search,
       setSearch,
       currentUser,
+      accountDefaultName: authIdentity?.name ?? ME.name,
       updateCurriculumLabel,
     }),
     [
@@ -519,6 +560,7 @@ export function AppStateProvider({
       selectedLessonId,
       search,
       currentUser,
+      authIdentity,
       updateCurriculumLabel,
     ],
   );

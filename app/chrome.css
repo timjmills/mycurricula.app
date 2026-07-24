@@ -1278,11 +1278,18 @@
       width: 44px;
       height: 44px;
     }
-    /* With the 44px trigger the cluster (fork 94 + search 44 + more 44 +
-       bell 44) ran 378px at gap:10 — 3px past a 375 viewport. gap:8 lands it
-       at 372; controls themselves stay ≥44. */
+    /* With the 44px trigger the cluster (fork ~98 + search 44 + more 44 +
+       bell 44 + 3 gaps) plus the brand region can't shrink with the viewport,
+       so it dictates the `.overlay` grid track's width. The earlier gap:8
+       "lands it at 372" math was wrong — live-measured (2026-07-24, prod) the
+       document still ran scrollWidth 378 at a 375 viewport, a 3px page-level
+       horizontal scroll on every route (§4 hard rule; bisected: hiding the
+       rightmost `.tools` control, the NotificationBell at right=378, restored
+       375 — `min-width: 0` up the topbar/overlay chain does NOT fix it).
+       gap:6 clears it (scrollWidth 375, live-verified); the controls
+       themselves stay ≥44px — only the spacing between them shrinks. */
     .tools {
-      gap: 8px;
+      gap: 6px;
     }
   }
 

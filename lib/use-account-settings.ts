@@ -56,10 +56,11 @@ export const PROFILE_EVENT = "mycurricula:profile-updated";
 // ── Display name ───────────────────────────────────────────────────────────
 
 /**
- * Fallback display name when no profile is stored — the mock lead
- * teacher, matching the FALLBACK_USER in lib/app-state.tsx. Exported so
- * the Account settings page can preview the "cleared" state without
- * importing lib/mock directly.
+ * Default fallback display name when no profile is stored AND no caller-
+ * supplied fallback is given — the mock lead teacher, matching the
+ * FALLBACK_USER in lib/app-state.tsx. Callers under an <AppStateProvider>
+ * should pass `useAppState().accountDefaultName` to useDisplayName instead,
+ * so a signed-in teacher's real auth-profile name wins over this mock.
  */
 export const FALLBACK_DISPLAY_NAME: string = ME.name;
 
@@ -116,29 +117,34 @@ export function readStoredDisplayName(): string | null {
  * The teacher's display name plus a setter.
  *
  * The state is always a usable name — when no profile is stored it is
- * FALLBACK_DISPLAY_NAME, never the empty string. The setter accepts any
+ * `fallbackName`, never the empty string. The setter accepts any
  * string; empty/whitespace input CLEARS the stored profile so the name
  * falls back to the account default.
+ *
+ * `fallbackName` defaults to the mock ME teacher (the backend-less
+ * prototype default). Pages rendered under an <AppStateProvider> should
+ * pass `useAppState().accountDefaultName` instead, so a signed-in
+ * teacher with no stored display name sees their real auth-profile name
+ * rather than a fabricated mock person. The returned name is DERIVED
+ * (`stored ?? fallbackName`), so a fallback that resolves after mount
+ * (the Supabase session arriving) propagates without extra effects.
  *
  * Cross-tab sync via the `storage` event; same-tab sync (other hook
  * instances, the app-state avatar overlay) via PROFILE_EVENT.
  */
-export function useDisplayName(): {
+export function useDisplayName(fallbackName: string = FALLBACK_DISPLAY_NAME): {
   displayName: string;
   setDisplayName: (name: string) => void;
 } {
-  // Start with the SSR-safe default. We intentionally do NOT read
-  // localStorage during the initial render — that would diverge the
-  // server-rendered HTML from the first client render and produce a
-  // hydration mismatch.
-  const [displayName, setDisplayNameState] = useState<string>(
-    FALLBACK_DISPLAY_NAME,
-  );
+  // The STORED name only — null when unset. The initial state is null so
+  // server-rendered HTML (which sees `fallbackName`'s SSR value) matches
+  // the first client render; the real stored value arrives in the
+  // post-mount effect below (the usual no-hydration-mismatch pattern).
+  const [stored, setStored] = useState<string | null>(null);
 
   // Post-mount: sync from localStorage if a profile is stored.
   useEffect(() => {
-    const stored = readStoredDisplayName();
-    if (stored != null) setDisplayNameState(stored);
+    setStored(readStoredDisplayName());
   }, []);
 
   // Cross-tab (`storage`) + same-tab (PROFILE_EVENT) sync. Both paths
@@ -147,7 +153,7 @@ export function useDisplayName(): {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const sync = (): void => {
-      setDisplayNameState(readStoredDisplayName() ?? FALLBACK_DISPLAY_NAME);
+      setStored(readStoredDisplayName());
     };
     const onStorage = (e: StorageEvent): void => {
       if (e.key !== PROFILE_STORAGE_KEY) return;
@@ -166,7 +172,7 @@ export function useDisplayName(): {
   // through props / deps without forcing re-renders.
   const setDisplayName = useCallback((name: string): void => {
     const normalized = normalizeDisplayName(name);
-    setDisplayNameState(normalized ?? FALLBACK_DISPLAY_NAME);
+    setStored(normalized);
     if (typeof window === "undefined") return;
     try {
       if (normalized == null) {
@@ -189,7 +195,7 @@ export function useDisplayName(): {
     }
   }, []);
 
-  return { displayName, setDisplayName };
+  return { displayName: stored ?? fallbackName, setDisplayName };
 }
 
 // ── Default view ───────────────────────────────────────────────────────────
