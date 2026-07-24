@@ -12,7 +12,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isAssessmentKind, type LessonAssessment } from "@/lib/types";
+import {
+  isAssessmentKind,
+  type Lesson,
+  type LessonAssessment,
+  type Unit,
+  type UnitKud,
+  type UnitVocabItem,
+} from "@/lib/types";
 
 const MIGRATION = join(
   __dirname,
@@ -320,4 +327,120 @@ describe("migration — review-extension invariants", () => {
     expect(code).toMatch(/add column if not exists\s+assessment_kind\s+text/i);
     expect(code).not.toMatch(/check\s*\([^)]*assessment_kind/i);
   });
+});
+
+// Review extension 2 (§4a follow-up, 2026-07-24): the nullable + advisory-lock
+// negatives, full-field type construction (real B2 regression value), and the
+// intended DB-harness coverage as it.todo.
+describe("migration — nullable adds + no advisory lock", () => {
+  it("adds NO NOT NULL column (a NOT NULL add would fail on a populated table)", () => {
+    // Every Track-B column is nullable; `standards uuid[] default '{}'` carries a
+    // CONSTANT default but is still nullable. (planner_settings.updated_at NOT NULL
+    // DEFAULT now() is a CREATE TABLE column def on an empty table, not an add.)
+    expect(code).not.toMatch(/add column if not exists[^;]*not null/i);
+  });
+
+  it("takes NO advisory lock (no backfill → no pg_advisory CALL)", () => {
+    // Match the CALL form so it never trips on prose; `code` is comment-stripped too.
+    expect(code).not.toMatch(/pg_advisory\w*\s*\(/i);
+  });
+});
+
+describe("seam types — full Unit + Lesson literals exercise every Track-B field", () => {
+  it("a full Unit constructs with all 13 editable workspace fields", () => {
+    const vocab: UnitVocabItem[] = [
+      { term: "numerator" },
+      { term: "denominator", definition: "the number below the line" },
+    ];
+    const kud: UnitKud = {
+      know: ["fraction vocabulary"],
+      understand: ["fractions represent parts of a whole"],
+      doGoal: ["add fractions with unlike denominators"],
+    };
+    const unit: Unit = {
+      id: "u-m3",
+      subject: "math",
+      name: "Fractions",
+      weeks: "Wk 9–14",
+      shade: 2,
+      notes: "Front-load vocabulary in week 9.",
+      bigIdea: "Fractions describe equal parts of a whole.",
+      essentialQuestions: ["How do we compare unlike fractions?"],
+      vocab,
+      kud,
+      standardIds: ["00000000-0000-0000-0000-000000000001"],
+      framework: "aero",
+      frameworkData: { central_idea: "Part–whole relationships" },
+      customFields: { pacing_notes: "extend if needed" },
+      carried: {},
+      defaultFlow: "Gradual release",
+      defaultDuration: 45,
+      archived: false,
+    };
+    expect(unit.vocab?.[1]?.definition).toBe("the number below the line");
+    expect(unit.kud?.doGoal).toHaveLength(1);
+    expect(unit.defaultFlow).toBe("Gradual release");
+    expect(unit.defaultDuration).toBe(45);
+    expect(unit.archived).toBe(false);
+  });
+
+  it("a full Lesson constructs with every Track-B rich field", () => {
+    const lesson: Lesson = {
+      id: "l-m3-01",
+      subject: "math",
+      unit: "u-m3",
+      title: "Compare unlike fractions",
+      objective: "I can compare fractions with unlike denominators.",
+      preview: "Warm-up + guided practice.",
+      directions: "Work through the number-line model.",
+      notes: "Watch for denominator confusion.",
+      resources: [],
+      standards: ["4.NF.A.2"],
+      week: 11,
+      day: 2,
+      isPersonal: false,
+      pendingMaster: false,
+      reasonNotDone: "",
+      modified: false,
+      moved: null,
+      status: "not_done",
+      commentCount: 0,
+      unreadComments: 0,
+      tasks: [],
+      // ── Track-B fields — every one exercised ──
+      taughtAt: "2026-07-24T09:00:00.000Z",
+      assessment: {
+        kind: "formative",
+        title: "Exit ticket",
+        purpose: "fluency check",
+        notes: "3 problems",
+      },
+      frameworkData: { line_of_inquiry: "equivalence" },
+      frameworkId: "pyp",
+      durationMinutes: 45,
+      builds: "Unit assessment — Fractions",
+      prep: "Print number-line strips.",
+      carried: { legacy_field: "kept across a framework switch" },
+    };
+    expect(lesson.taughtAt).toContain("2026-07-24");
+    expect(lesson.assessment?.kind).toBe("formative");
+    expect(isAssessmentKind(lesson.assessment?.kind)).toBe(true);
+    expect(lesson.frameworkId).toBe("pyp");
+    expect(lesson.durationMinutes).toBe(45);
+    expect(lesson.builds).toContain("Fractions");
+    expect(lesson.prep).toContain("number-line");
+    expect(lesson.carried).toBeDefined();
+  });
+});
+
+describe("planner_settings / units runtime behavior (needs a DB harness)", () => {
+  it.todo("a teacher reads/writes ONLY their own planner_settings row (owner RLS)");
+  it.todo("anon cannot select or write planner_settings (grant revoked)");
+  it.todo("a scalar write to units.vocab / kud / fw_data is rejected by the shape CHECK");
+  it.todo("a scalar write to a fork table's fw_data / carried is rejected");
+  it.todo("a NULL write to every new Track-B column is accepted (all nullable)");
+  it.todo("editing units.big_idea updates only that unit and forks no lesson");
+  it.todo(
+    "writing a personal copy's taught_at leaves the master row's taught_at untouched",
+  );
 });
