@@ -3221,3 +3221,67 @@ Track-B READ wiring rides ONE shared §4c flag-ON preview gate before promote (m
 DB; verify reported artifacts on disk (delete/crossed-message races bit us); commit
 path-scoped; re-run a mid-rollout red prod gate before believing it. Memory files carry
 the durable lessons.
+
+---
+
+## [build-b2-lessons 7.24 pt2] ✅ B2 COMPLETE (uncommitted) — data layer + editor + §4b live, awaiting §4a + §4c
+
+B2.0–B2.5 all done, unstaged for orchestrator to §4a-gate + commit. Nothing staged.
+
+**Files (unstaged):** lib/planner/{source,supabase-source,mock-source}.ts, lib/planner/lesson-track-b.ts (NEW pure leaf), components/lesson-plan-v2/{PlanPage.tsx,index.ts,plan-page.module.css,LessonWorkspace.tsx (NEW),lesson-workspace.module.css (NEW),tabs/index.ts}, components/lesson-plan-v2/tabs/{OverviewTab,FlowTab}.tsx (DELETED — retired), components/year-v2/ExplorerShell.tsx (tabs made OPTIONAL — additive; UnitExplorer byte-unchanged), tests/{track-b-workspace-fields (LESSON lock updated),planner-lesson-track-b (NEW),planner-lesson-fields (NEW)}.test.ts.
+
+**§4b LIVE (dev :3062, bypass login, Night+Mint, killed after):**
+- EMBEDDED host (/planner → HubDocHost): single-scroll workspace renders — scalar header (title/objective "I can"/duration) + collapsible sections (Flow via embedded LessonEditor · Standards · Resources · Differentiation · Assessment · Notes; Builds&prep + Framework advanced-gated). Edited duration=45 + assessment kind→Formative + title → summary "Assessment Formative" (honest "—" when absent); close+reopen PERSISTS (store round-trip). Simple/Advanced reveal works (purpose/notes/Builds&prep/Framework appear on Advanced). Resources add → composer SINGLETON (exactly 1 cmp-modal + 1 cmp-scrim, B4.3 seam, no re-mount).
+- MODAL host (/year → unit → Lesson Planner in ExplorerShell): NO tablist (optional-tabs change), body=region, lesson picker + stat strip + footer (Duplicate/Mark taught/Teach) all present, LessonEditor embeds cleanly. Contrast holds in Mint (chrome re-hues green).
+- Responsive: true 375 mobile emulation → NO page h-scroll, fields stack full-width; 44px targets. Night + Mint both clean. Console: 0 errors (only pre-existing linkedom/canvas build warn).
+
+**AWAITS §4c (orchestrator+user):** the LESSON *_COLS read wiring + fork-per-field writes only exercise live under NEXT_PUBLIC_PLANNER_USE_SUPABASE=1 on the preview deploy. Mock path (shipped default) proven byte-safe. Fork-per-field across all 3 branches is proven by unit tests (lock test pins exactly 3 lessonTrackBColumns call sites + read-parity) but NOT live-verifiable on mock (single-doc, no master/personal split) — verify on the §4c flag-ON preview.
+
+**Gates:** tsc clean · lint clean · vitest 889 passed/59 todo · `npm run build` passed. §4a Codex gate NOT run (git-discipline: I don't commit) — diff is ready for the orchestrator to gate before commit.
+
+**Design note for orchestrator:** ExplorerShell tabs are now optional — the one shared-surface touch. It is additive (UnitExplorer keeps passing tabs; only PlanPage opts out). Verified both UnitExplorer's Unit mode (untouched) and the new no-tabs Lesson mode render correctly.
+
+---
+
+## [Main/orchestrator 7.24 pt8] ✅ teach-QA shipped · ⛔ B2 GATE-HELD (2 High data-loss + 3 Med)
+
+teach prod-QA fixes SHIPPED (`b1d11f2`): phone-reachable annotation toolbar
+(.toolScroll) + Widget Library contrast. Codex 2 Mediums dismissed w/ rationale
+(scroll no-op when it fits → desktop unregressed per QA's 768/1440 measure;
+padding/margin clip-safe trick). Master clean+pushed, prod green.
+
+**B2 (Lessons editor) — BUILT but GATE-HELD, UNCOMMITTED in the tree. Its data
+layer + editor compile (tsc/lint/76 tests green) BUT §4a Codex found real bugs —
+DO NOT COMMIT until fixed + re-gated:**
+- **HIGH-1 DATA LOSS** (supabase-source.ts ~2240 ensurePersonalCopy): the
+  personal-fork copy does NOT clone the master's B2 columns. A teacher editing
+  ONLY assessment/duration forks a copy with the OTHER Track-B fields NULL →
+  master duration/assessment/builds/prep/framework/carried/taught_at DISAPPEAR
+  for that teacher. FIX: clone ALL Track-B fields (incl. taught_at for
+  effective-row parity) into the initial copy row + a first-personal-edit
+  preservation test.
+- **HIGH-2 spurious fork + can't-clear** (LessonWorkspace ~203 / lesson-track-b
+  ~68 / supabase-source ~1666): clearing Duration sends {durationMinutes:
+  undefined}; mapper+contentKeys treat undefined as ABSENT → DB value not
+  cleared AND personal mode forks with an empty patch. FIX: own-property check
+  to distinguish "supplied clear" from "absent"; map nullish duration →
+  duration_minutes: null.
+- **MED** None-assessment (LessonWorkspace ~347): None sets kind=undefined but
+  keeps title/purpose/notes → writes assessment_kind=null with stale other cols
+  → reloads as a title-only assessment. FIX: on None, clear all 4 cols.
+- **MED** carried read (supabase-source ~905): read via jsonToUnitRecord which
+  rejects arrays, but the migration permits object OR array → array data
+  dropped. FIX: widen the read to Record|array.
+- **MED** deleted OverviewTab metadata (PlanPage ~154): the embedded host lost
+  subject/unit/week/status (only OverviewTab rendered them embedded). FIX:
+  restore a compact metadata block in LessonWorkspace.
+Codex CONFIRMED clean: the SELECT COLS match the applied migration's real
+columns; all 3 update branches invoke the mapper; taught_at is read-only. B2
+files (uncommitted): components/lesson-plan-v2/{PlanPage,LessonWorkspace(new),
+index,tabs/index, +deleted FlowTab/OverviewTab, plan-page.module.css,
+lesson-workspace.module.css(new)}, lib/planner/{source,mock-source,
+supabase-source,lesson-track-b(new)}, components/year-v2/ExplorerShell.tsx,
+tests/{track-b-workspace-fields(LESSON snapshot),planner-lesson-fields(new),
+planner-lesson-track-b(new)}. RESUME: fix the 5 → tsc/lint/vitest → §4a re-gate
+→ live §4b mock (fork-per-field, clear, None) → commit path-scoped → the B1.7+B2
+read wiring then rides ONE shared §4c flag-ON preview gate before promote.
