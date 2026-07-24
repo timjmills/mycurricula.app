@@ -2954,3 +2954,34 @@ mc-wave12-settings** (wave12 still hosts live dev servers on 3020/3021).
 If your session notes reference any removed worktree (e.g. "mc-wave3 holds
 soft state") — that state was verified landed or worthless before deletion;
 docs/v2-rebuild soft-state files were landed to master 7.24 (`2c25ff9`).
+
+---
+
+## [Main/orchestrator 7.24] 📋 SIDENAV RETIREMENT — spec complete, USER decisions locked
+
+USER asked "when are we taking the v1 left rail out?" — recon answer: it was a
+DELIBERATE Wave-3 interim (mounted OUTSIDE PlannerChrome at layout.tsx:183,
+renders on BOTH flag paths); six destinations have no other visible home, so
+retirement = re-home first (R1), then gate the mount v2-path-only (R2), QA (R3).
+Full spec in the recon report (parity table, couplings, risks). Load-bearing
+facts: layout is pure flex (nothing hard-codes the 224px rail width — removal
+just widens content; verify WeeklyGrid overlay math at 1280/768, PR #61
+precedent); Archive + Teach currently have NO entry besides the rail; the
+CatchUpModalHost is designed for ChromeShell but never mounted (the known
+sibling-handoff item); v1 rollback build MUST keep the rail (keep SideNav
+files, gate only the mount).
+
+**USER DECISIONS locked 7.24 (all recommended options):**
+1. Schedule → Tools menu entry in the top bar (+ palette + kbd 4); /schedule
+   route stays.
+2. Archive → Tools menu entry (+ palette); /archive route stays.
+3. Account → NEW top-bar avatar menu (Account settings + Sign out).
+4. Workspace switcher → the botbar CONTEXT CHIP becomes interactive and opens
+   the switcher (handoff-faithful; multi-workspace is live so this matters).
+
+**Sequencing:** R1 build starts AFTER B1 tranche 2 + the teach-contrast scoped
+fix land (ImmersiveBar/ChromeShell overlap). R1a Catch-up host+affordance,
+R1b full six-tab console (Post/Teach — routes exist, Console's 404 comment is
+stale), R1c Settings on all routes, R1d avatar menu, R1e switcher→ctx chip,
+R1f Schedule/Archive→Tools. Then R2 mount-gate, R3 QA incl. a flag-OFF v1
+build check.
