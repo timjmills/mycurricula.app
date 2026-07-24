@@ -52,6 +52,9 @@ import styles from "./ExplorerShell.module.css";
 /** The Explorer's two modes: the unit roll-up, or one lesson's plan. */
 export type ExplorerMode = "unit" | "lesson";
 
+/** How the shell presents: a centered modal dialog, or the full-bleed workspace. */
+export type ExplorerPresentation = "modal" | "full";
+
 export interface ExplorerShellTab<K extends string = string> {
   key: K;
   label: string;
@@ -90,6 +93,28 @@ export interface ExplorerShellProps<K extends string = string> {
   onModeChange?: (mode: ExplorerMode) => void;
   /** False on a mode-switch remount — suppresses the open animation. */
   animateIn?: boolean;
+  /**
+   * How the shell presents. "modal" (default) is the centered frosted dialog;
+   * "full" is the full-bleed workspace surface. Changing this on the SAME
+   * mounted shell must never remount it (a remount would replay the focus grab,
+   * scroll lock, and entry animation) — it only swaps a class. No caller passes
+   * it yet; B1.4 wires the ⤢ expand toggle.
+   */
+  presentation?: ExplorerPresentation;
+  /**
+   * When false, a scrim click does NOT close the dialog. Default true — the
+   * current behavior. The full-bleed workspace opts out so an accidental
+   * background click can't discard an editing session. No caller passes it yet.
+   */
+  closeOnScrimClick?: boolean;
+  /**
+   * Optional left-rail slot rendered beside the body (the workspace's unit /
+   * lesson navigator). Absent — every caller today — renders the body exactly as
+   * before, with no wrapping element. No caller passes it yet; B1.4 fills it
+   * with the UnitWorkspaceRail. Its focusable controls join the shell's existing
+   * focus trap automatically (the trap query already spans the whole panel).
+   */
+  rail?: ReactNode;
   onClose: () => void;
 }
 
@@ -136,6 +161,9 @@ export function ExplorerShell<K extends string = string>({
   mode,
   onModeChange,
   animateIn = true,
+  presentation = "modal",
+  closeOnScrimClick = true,
+  rail,
   onClose,
 }: ExplorerShellProps<K>): ReactNode {
   const titleId = useId();
@@ -235,14 +263,35 @@ export function ExplorerShell<K extends string = string>({
   if (typeof document === "undefined") return null;
 
   const showModeSwitch = mode !== undefined && onModeChange !== undefined;
+  const isFull = presentation === "full";
+
+  // One tabpanel serves every tab (only the active tab's body is mounted), so it
+  // is named by the ACTIVE tab's id — the canonical single-panel WAI-ARIA tabs
+  // relationship — rather than a free-text aria-label a screen reader can't tie
+  // back to a tab (Codex W7 gate). Factored out so the with-rail and no-rail
+  // branches below render the SAME element, byte-for-byte, in the no-rail path.
+  const bodyRegion = (
+    <div
+      className={styles.body}
+      role="tabpanel"
+      id="ue-tabpanel"
+      aria-labelledby={`ue-tab-${activeTab}`}
+    >
+      {body}
+    </div>
+  );
 
   return createPortal(
     <div
-      className={`${styles.scrim} ue-scrim ${animateIn ? "" : styles.noAnim}`}
+      className={`${styles.scrim} ue-scrim ${isFull ? styles.scrimFull : ""} ${
+        animateIn ? "" : styles.noAnim
+      }`}
       onClick={(e) => {
         // Scrim click closes — but only a click that both starts and lands on
-        // the scrim itself (never a click that bubbled up from the panel).
-        if (e.target === e.currentTarget) onClose();
+        // the scrim itself (never a click that bubbled up from the panel), and
+        // only when the caller allows it (the workspace opts out via
+        // closeOnScrimClick={false} so a stray click can't discard an edit).
+        if (closeOnScrimClick && e.target === e.currentTarget) onClose();
       }}
     >
       <div
@@ -254,8 +303,8 @@ export function ExplorerShell<K extends string = string>({
           : { "aria-labelledby": titleId })}
         title={dialogTitle}
         className={`${styles.modal} ue-modal cp-subj ${subject.cls} ${
-          animateIn ? "" : styles.noAnim
-        }`}
+          isFull ? styles.full : ""
+        } ${animateIn ? "" : styles.noAnim}`}
         onKeyDown={handleKeyDown}
       >
         {/* ── Mode switch — Unit Planner | Lesson Planner ─────────────────── */}
@@ -362,19 +411,18 @@ export function ExplorerShell<K extends string = string>({
           })}
         </div>
 
-        {/* ── Body ───────────────────────────────────────────────────────── */}
-        {/* One panel serves every tab (only the active tab's body is mounted),
-            so it is named by the ACTIVE tab's id — the canonical single-panel
-            WAI-ARIA tabs relationship — rather than a free-text aria-label a
-            screen reader can't tie back to a tab (Codex W7 gate). */}
-        <div
-          className={styles.body}
-          role="tabpanel"
-          id="ue-tabpanel"
-          aria-labelledby={`ue-tab-${activeTab}`}
-        >
-          {body}
-        </div>
+        {/* ── Body (with optional left rail) ─────────────────────────────── */}
+        {/* No rail — every caller today — renders `bodyRegion` alone, exactly as
+            before. A rail (B1.4) wraps the rail + the SAME bodyRegion in a row so
+            the workspace navigator sits beside the tab content. */}
+        {rail ? (
+          <div className={styles.railLayout}>
+            <div className={styles.rail}>{rail}</div>
+            {bodyRegion}
+          </div>
+        ) : (
+          bodyRegion
+        )}
 
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         {footer ? <div className={styles.foot}>{footer}</div> : null}

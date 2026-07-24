@@ -296,3 +296,38 @@
     justify-content: stretch;
   }
 }
+
+/* ── B1.4 seam — full-bleed workspace presentation + left rail ────────────── */
+/* Dormant until a caller passes `presentation="full"` / a `rail` slot (no caller
+   does in B1.0–B1.3). Declared AFTER `.modal` so, at equal specificity, `.full`
+   wins the size/radius it overrides. B1.4 (the ⤢ expand toggle + UnitWorkspace
+   Rail) turns these on and refines them. */
+.scrimFull {
+  padding: 0;
+}
+.full {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: 100vh;
+  border-radius: 0;
+}
+.railLayout {
+  display: flex;
+  flex: 1 1 auto;
+  /* Let both columns own their internal scroll instead of stretching the card. */
+  min-height: 0;
+  overflow: hidden;
+}
+.rail {
+  flex: 0 0 auto;
+  width: 260px;
+  overflow-y: auto;
+  border-right: 1px solid var(--ue-hairline);
+  background: var(--ue-tint-soft);
+}
+/* The body only needs `min-width: 0` when it shares a flex ROW with the rail;
+   scoping it here leaves the standalone (no-rail) body rule untouched. */
+.railLayout .body {
+  min-width: 0;
+}

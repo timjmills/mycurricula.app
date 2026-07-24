@@ -18,6 +18,11 @@
 // lesson's plan is an IN-MODAL mode switch, not the old cross-route bounce to
 // `/daily?lesson=…` (that deep link still works from everywhere else).
 //
+// B1.0: the five tab bodies + the ProgressRing moved to ./unit-tabs (a pure
+// move — byte-identical render) so the B1 workspace can reuse them. Their shared
+// CSS still lives in UnitExplorer.module.css; the tab files import it from the
+// parent folder, so the hashed class names — and the render — are unchanged.
+//
 // DATA IDENTITY: `unit` is the unit-id SLUG as it sits on `Lesson.unit`
 // (e.g. "u-m3"). The display name / week span / "Unit n of N" resolve from the
 // catalog (usePlanner().unitById + .units) via lib/year-v2-data helpers.
@@ -25,20 +30,15 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import type { Lesson, SubjectId } from "@/lib/types";
-import type { DayStatus } from "@/lib/day-status";
+import type { SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import { unitResources, unitStandards } from "@/lib/year-unit-aggregate";
-import { useUnitNote, useSetUnitNote } from "@/lib/unit-notes";
-import { StatusDot, ForkCues, FinishPill } from "@/components/planner-v2";
-import { StandardPill, Tooltip } from "@/components/ui";
 import { PlanPage } from "@/components/lesson-plan-v2";
 import {
   unitLessons,
@@ -46,6 +46,14 @@ import {
   resolveUnitHeader,
 } from "@/lib/year-v2-data";
 import { ExplorerShell, type ExplorerMode } from "./ExplorerShell";
+import {
+  ProgressRing,
+  OverviewTab,
+  LessonsTab,
+  StandardsTab,
+  ResourcesTab,
+  NotesTab,
+} from "./unit-tabs";
 import styles from "./UnitExplorer.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -59,13 +67,6 @@ export interface UnitExplorerProps {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Weekday short labels keyed by `Lesson.day` (0 = Sunday); out-of-range → "Day N".
- *  Self-contained (mirrors UnitDrawer) so the modal needs no week-config import. */
-const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-function dayShort(day: number): string {
-  return DAY_SHORT[day] ?? `Day ${day + 1}`;
-}
-
 /** Strip a "Unit N · " / "List N · " lead-in so the header can bold the prefix
  *  and lighten the remainder (mirrors TimelineYear/UnitDrawer's splitUnitName). */
 function splitUnitName(name: string): { prefix: string; rest: string } {
@@ -77,25 +78,6 @@ function splitUnitName(name: string): { prefix: string; rest: string } {
   };
 }
 
-/** Safe href guard — a resource URL can come from free text / imported rows, so
- *  an unsafe scheme (javascript:, data:, …) yields plain text, not a live link.
- *  Allows http(s)/blob: and same-origin root-relative paths; rejects
- *  protocol-relative and backslash tricks. (Copied from UnitDrawer.safeHref,
- *  which mirrors the canonical isSafeUrl.) */
-function safeHref(url: string | undefined): string | undefined {
-  if (!url) return undefined;
-  if (/^(https?|blob):/i.test(url)) return url;
-  return /^\/(?![/\\])/.test(url) ? url : undefined;
-}
-
-/** The Explorer's completion status for a lesson. The modal is NOT the live
- *  day, so the wall clock must never paint a false "now"/"upcoming" on a unit
- *  lesson that happens to bracket the current time (the day-status isToday
- *  gate): a lesson reads "done" from store truth, else "idle" ("Planned"). */
-function explorerStatus(lesson: Lesson): DayStatus {
-  return lesson.status === "done" ? "done" : "idle";
-}
-
 /** The five tabs — locked scope (no Catch-Up / Pacing / Assessment / Stats). */
 type TabKey = "overview" | "lessons" | "standards" | "resources" | "notes";
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
@@ -105,64 +87,6 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: "resources", label: "Resources" },
   { key: "notes", label: "Notes" },
 ];
-
-// ── Progress ring ─────────────────────────────────────────────────────────
-
-/** Small SVG progress ring. `pct` is 0–1. The track + value both use
- *  currentColor-adjacent tokens so the ring re-tints per host (white on the
- *  gradient header, subject color in the Overview body). */
-function ProgressRing({
-  pct,
-  size = 44,
-  stroke = 5,
-  className,
-  trackClass,
-  valueClass,
-  label,
-}: {
-  pct: number;
-  size?: number;
-  stroke?: number;
-  className?: string;
-  trackClass: string;
-  valueClass: string;
-  label: string;
-}): ReactNode {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const clamped = Math.max(0, Math.min(1, pct));
-  return (
-    <svg
-      className={className}
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      role="img"
-      aria-label={label}
-    >
-      <circle
-        className={trackClass}
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        strokeWidth={stroke}
-      />
-      <circle
-        className={valueClass}
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - clamped)}
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-    </svg>
-  );
-}
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -338,300 +262,5 @@ export function UnitExplorer({
         </>
       }
     />
-  );
-}
-
-// ── Overview tab ────────────────────────────────────────────────────────────
-
-function OverviewTab({
-  lessons,
-  progress,
-  pct,
-  subjectName,
-}: {
-  lessons: Lesson[];
-  progress: { total: number; taught: number };
-  pct: number;
-  subjectName: string;
-}): ReactNode {
-  return (
-    <div className={styles.overview}>
-      <div className={styles.ovHead}>
-        <ProgressRing
-          pct={pct}
-          size={64}
-          stroke={7}
-          trackClass={styles.ringTrack}
-          valueClass={styles.ringValue}
-          label={`${progress.taught} of ${progress.total} lessons taught`}
-        />
-        <div className={styles.ovStat}>
-          <div className={styles.ovBig}>
-            {progress.taught}
-            <span className={styles.ovSlash}>/{progress.total}</span>
-          </div>
-          <div className={styles.ovLabel}>
-            {subjectName} lessons taught
-            {progress.total > 0 ? (
-              <> · {Math.round(pct * 100)}% complete</>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      {lessons.length === 0 ? (
-        <div className={styles.empty}>
-          No lessons planned for this unit yet.
-        </div>
-      ) : (
-        <>
-          <div className={styles.progressBar} aria-hidden="true">
-            <span
-              className={styles.progressFill}
-              style={{ width: `${Math.round(pct * 100)}%` }}
-            />
-          </div>
-          {/* Horizontal lesson-node timeline — done nodes fill with the subject
-              color + ✓; the rest read as hollow track dots. */}
-          <div
-            className={styles.timeline}
-            role="list"
-            aria-label="Unit lesson timeline"
-          >
-            {lessons.map((l) => {
-              const done = l.status === "done";
-              return (
-                <Tooltip
-                  key={l.id}
-                  content={`Wk ${l.week} · ${dayShort(l.day)} — ${l.title}${
-                    done ? " (taught)" : ""
-                  }`}
-                  side="top"
-                >
-                  <span
-                    role="listitem"
-                    className={`${styles.node} ${done ? styles.nodeDone : ""}`}
-                    aria-label={`Week ${l.week} ${dayShort(l.day)}: ${l.title}${
-                      done ? ", taught" : ""
-                    }`}
-                    tabIndex={0}
-                  >
-                    {done ? (
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M5 12l5 5L20 6" />
-                      </svg>
-                    ) : null}
-                  </span>
-                </Tooltip>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ── Lessons tab ─────────────────────────────────────────────────────────────
-
-function LessonsTab({
-  lessons,
-  setLessonStatus,
-  onPlan,
-  onTeach,
-}: {
-  lessons: Lesson[];
-  setLessonStatus: (id: string, status: Lesson["status"]) => void;
-  onPlan: (id: string) => void;
-  onTeach: (id: string) => void;
-}): ReactNode {
-  if (lessons.length === 0) {
-    return (
-      <div className={styles.empty}>No lessons planned for this unit yet.</div>
-    );
-  }
-  return (
-    <ul className={styles.lessonList}>
-      {lessons.map((l) => {
-        const status = explorerStatus(l);
-        const isDone = l.status === "done";
-        return (
-          <li key={l.id} className={styles.lessonRow}>
-            <StatusDot status={status} />
-            <div className={styles.lessonMain}>
-              <div className={styles.lessonTitleRow}>
-                {/* Title styled like SelectTitle but non-interactive — the
-                    modal has no lesson-selection concept; the row's actions
-                    (Plan / Teach / Finish) carry every affordance. */}
-                <span className={styles.lessonTitle}>{l.title}</span>
-                <ForkCues lesson={l} />
-              </div>
-              <div className={styles.lessonMeta}>
-                Wk {l.week} · {dayShort(l.day)}
-              </div>
-            </div>
-            <div className={styles.lessonActions}>
-              <FinishPill
-                status={status}
-                isDone={isDone}
-                onToggle={() =>
-                  setLessonStatus(l.id, isDone ? "not_done" : "done")
-                }
-              />
-              <Tooltip
-                content="Open this lesson in the Lesson Planner to build it out."
-                tooltipId="ue-lesson-plan"
-                side="top"
-              >
-                <button
-                  type="button"
-                  className={styles.rowBtn}
-                  onClick={() => onPlan(l.id)}
-                >
-                  Plan
-                </button>
-              </Tooltip>
-              <Tooltip
-                content="Open this lesson on the teaching board for live class use."
-                tooltipId="ue-lesson-teach"
-                side="top"
-              >
-                <button
-                  type="button"
-                  className={styles.rowBtn}
-                  onClick={() => onTeach(l.id)}
-                >
-                  Teach
-                </button>
-              </Tooltip>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-// ── Standards tab ────────────────────────────────────────────────────────────
-
-function StandardsTab({
-  standards,
-}: {
-  standards: ReturnType<typeof unitStandards>;
-}): ReactNode {
-  if (standards.length === 0) {
-    return (
-      <div className={styles.empty}>
-        No standards tagged on this unit&apos;s lessons yet.
-      </div>
-    );
-  }
-  // The aggregate does NOT distinguish covered vs gap, so this is a plain list
-  // — no invented coverage. StandardPill surfaces each code's full description
-  // on hover / long-press (the canonical standards presentation; descriptions
-  // are never printed inline per the StandardPill contract).
-  return (
-    <ul className={styles.aggList}>
-      {standards.map((ref) => (
-        <li key={ref.code} className={styles.aggRow}>
-          <StandardPill code={ref.code} />
-          <span className={styles.aggMeta}>
-            in {ref.lessonCount} {ref.lessonCount === 1 ? "lesson" : "lessons"}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// ── Resources tab ─────────────────────────────────────────────────────────────
-
-function ResourcesTab({
-  resources,
-}: {
-  resources: ReturnType<typeof unitResources>;
-}): ReactNode {
-  if (resources.length === 0) {
-    return (
-      <div className={styles.empty}>
-        No resources attached to this unit&apos;s lessons yet.
-      </div>
-    );
-  }
-  return (
-    <ul className={styles.aggList}>
-      {resources.map((ref, i) => {
-        const isNote = ref.resource.type === "notecard";
-        const href = isNote ? undefined : safeHref(ref.resource.url);
-        // Resources are NOT de-duplicated across lessons (a recurring anchor
-        // chart legitimately repeats), so a composite key keeps each row stable.
-        return (
-          <li key={`${ref.lessonId}-${i}`} className={styles.aggRow}>
-            <span className={styles.aggGlyph} aria-hidden="true">
-              {isNote ? "✎" : "🔗"}
-            </span>
-            <span className={styles.aggBody}>
-              <span className={styles.aggLabel}>
-                {href ? (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.aggLink}
-                  >
-                    {ref.resource.label}
-                  </a>
-                ) : (
-                  ref.resource.label
-                )}
-              </span>
-              <span className={styles.aggMeta}>
-                Wk {ref.week} · {dayShort(ref.day)}
-              </span>
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-// ── Notes tab ─────────────────────────────────────────────────────────────────
-
-function NotesTab({
-  subjectId,
-  unitId,
-}: {
-  subjectId: SubjectId;
-  unitId: string;
-}): ReactNode {
-  // Notes key on subject + unit — unit slugs are unique only within a
-  // subject, so a bare-slug key would share one note across two subjects'
-  // same-named units (see lib/unit-notes.tsx "Keying").
-  const note = useUnitNote(subjectId, unitId);
-  const setNote = useSetUnitNote();
-  const fieldId = useId();
-  return (
-    <div className={styles.notes}>
-      <label htmlFor={fieldId} className={styles.notesLabel}>
-        Unit note — a shared reminder for the team
-      </label>
-      <textarea
-        id={fieldId}
-        className={styles.notesArea}
-        value={note}
-        placeholder="The one move not to forget in this unit…"
-        onChange={(e) => setNote(subjectId, unitId, e.target.value)}
-        rows={5}
-      />
-    </div>
   );
 }
