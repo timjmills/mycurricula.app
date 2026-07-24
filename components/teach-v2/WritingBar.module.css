@@ -18,6 +18,24 @@
   scrollbar-width: thin;
 }
 
+/* TEACH-SCOPED AA fix (2026-07-24 live audit): the ToggleGroup primitive's
+   unselected tool labels (Interact / Pen / Highlighter / Eraser / Text) render
+   var(--muted) on the tray's var(--hairline) fill — 2.82:1 on Paper and 4.43:1
+   on Night at 12px/700, below the 4.5:1 WCAG AA floor for text this size.
+   Darken ONLY this toolbar's unselected labels to --ink-500 (6.36:1 Paper /
+   7.07:1 Night on --hairline); hover keeps the primitive's --ink-soft step
+   (9.97:1 / 9.85:1). Scoped here rather than in the shared ToggleGroup so no
+   other surface re-colors; keyed off aria-checked so the ACTIVE chip's accent
+   styling is untouched. The doubled .toolScroll + attribute pair (0,4,0)
+   outguns the primitive's `.prominent .inactive` (0,2,0), its `:hover`
+   (0,3,0), and the `.cp-root button` reset (0,1,1). */
+.toolScroll.toolScroll [role="radio"][aria-checked="false"] {
+  color: var(--ink-500);
+}
+.toolScroll.toolScroll [role="radio"][aria-checked="false"]:hover {
+  color: var(--ink-soft);
+}
+
 .divider {
   width: 1px;
   align-self: stretch;

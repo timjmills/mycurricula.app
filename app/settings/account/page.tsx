@@ -30,13 +30,13 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   type ChangeEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
 import {
-  FALLBACK_DISPLAY_NAME,
   deriveInitials,
   useCompletionPrivacy,
   useDefaultView,
@@ -44,6 +44,7 @@ import {
   type CompletionPrivacy,
   type DefaultViewRoute,
 } from "@/lib/use-account-settings";
+import { useAppState } from "@/lib/app-state";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "@/components/appearance/settings-card";
 import { SECTION_ICONS } from "@/components/settings/section-icons";
@@ -138,17 +139,30 @@ function ChoiceGrid<T extends string>({
 // field falls back to the account default name.
 
 function ProfileSection(): ReactNode {
-  const { displayName, setDisplayName } = useDisplayName();
+  // The account-default name — the signed-in teacher's auth-profile name
+  // once the session resolves, or the mock ME teacher on the backend-less
+  // path. Passing it into useDisplayName means a teacher with no stored
+  // display name sees THEIR name here, not a fabricated mock person.
+  const { accountDefaultName } = useAppState();
+  const { displayName, setDisplayName } = useDisplayName(accountDefaultName);
   const [savedTick, setSavedTick] = useState(0);
 
   // Local draft — independent during typing; re-syncs whenever the hook
-  // value updates (cross-tab rename, post-mount storage sync, etc.).
+  // value updates (cross-tab rename, post-mount storage sync, the auth
+  // session resolving into a new accountDefaultName) — but NEVER while the
+  // teacher is mid-edit. Without the dirty guard, the Supabase session
+  // resolving a second or two after load would swap the fallback name under
+  // an in-progress keystroke and silently discard the unsaved edit (§4a
+  // review finding). The guard clears on commit (blur/Enter), so external
+  // updates resume flowing once the edit lands.
   const [draft, setDraft] = useState<string>(displayName);
+  const draftDirty = useRef(false);
   useEffect(() => {
-    setDraft(displayName);
+    if (!draftDirty.current) setDraft(displayName);
   }, [displayName]);
 
   const onChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    draftDirty.current = true;
     setDraft(e.target.value);
   };
 
@@ -156,9 +170,11 @@ function ProfileSection(): ReactNode {
   // one, so blurring without edits never flashes a phantom "Saved".
   // Clearing an already-default field is also a no-op.
   const onBlur = (): void => {
+    // The edit is over either way — resume syncing external updates.
+    draftDirty.current = false;
     const trimmed = draft.trim();
     if (trimmed === displayName) return;
-    if (trimmed === "" && displayName === FALLBACK_DISPLAY_NAME) return;
+    if (trimmed === "" && displayName === accountDefaultName) return;
     setDisplayName(trimmed);
     setSavedTick((t) => t + 1);
   };
@@ -173,7 +189,7 @@ function ProfileSection(): ReactNode {
   // teacher sees the initials change keystroke by keystroke. An empty
   // draft previews the fallback — exactly what clearing would produce.
   const effectiveName =
-    draft.trim() === "" ? FALLBACK_DISPLAY_NAME : draft.trim();
+    draft.trim() === "" ? accountDefaultName : draft.trim();
   const initials = deriveInitials(effectiveName);
 
   const inputTip =
@@ -211,7 +227,7 @@ function ProfileSection(): ReactNode {
               onChange={onChange}
               onBlur={onBlur}
               onKeyDown={onKeyDown}
-              placeholder={FALLBACK_DISPLAY_NAME}
+              placeholder={accountDefaultName}
               autoComplete="off"
               spellCheck={false}
               maxLength={60}
