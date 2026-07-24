@@ -80,7 +80,7 @@ import { stripHtml, escapeHtml } from "@/lib/html-text";
 import type { StandardsMap } from "@/lib/types";
 import { Button, Tooltip } from "@/components/ui";
 import { StandardsTaggingPicker } from "@/components/standards/StandardsTaggingPicker";
-import { ResourceComposer } from "@/components/daily/ResourceComposer";
+import { useComposer } from "@/components/composer";
 import { FloatingBar } from "./FloatingBar";
 import { SectionBlock, isResourcesLabel } from "./SectionBlock";
 import type { AddResourceRequest } from "./AddResourceMenu";
@@ -438,11 +438,13 @@ export function LessonEditor({
     ],
   );
 
-  // ── Add resource (menu → shared ResourceComposer) ──────────────────────
+  // ── Add resource (menu → shared composer singleton) ────────────────────
   // The menu-open state is host-owned so the FloatingBar's resource button
-  // can open a section's menu too (B's onAddResource contract).
+  // can open a section's menu too (B's onAddResource contract). The composer
+  // itself renders once in the (planner) layout via <ComposerHost> (B4.3);
+  // handleOpenComposer opens it imperatively, section-scoped + locked.
   const [resourceMenuFor, setResourceMenuFor] = useState<string | null>(null);
-  const [composer, setComposer] = useState<AddResourceRequest | null>(null);
+  const { openComposer: openSharedComposer } = useComposer();
 
   const handleToggleResourceMenu = useCallback((sectionId: string) => {
     setResourceMenuFor((cur) => (cur === sectionId ? null : sectionId));
@@ -450,9 +452,21 @@ export function LessonEditor({
   const handleCloseResourceMenu = useCallback(() => {
     setResourceMenuFor(null);
   }, []);
-  const handleOpenComposer = useCallback((request: AddResourceRequest) => {
-    setComposer(request);
-  }, []);
+  const handleOpenComposer = useCallback(
+    (request: AddResourceRequest) => {
+      // Guard on the resolved lesson (the old render was `{lesson && …}`): the
+      // composer reads lesson fields before its own `open` early-return.
+      if (!lesson) return;
+      openSharedComposer({
+        lesson,
+        mode: request.mode,
+        initialSectionId: request.sectionId,
+        initialItems: request.initialItems,
+        lockRouting: true,
+      });
+    },
+    [lesson, openSharedComposer],
+  );
   const handleFloatingBarAddResource = useCallback(
     (sectionId: string) => {
       setResourceMenuFor(sectionId);
@@ -600,18 +614,9 @@ export function LessonEditor({
         />
       )}
 
-      {/* ── Shared ResourceComposer, section-scoped (D1: structured) ───── */}
-      {lesson && composer !== null && (
-        <ResourceComposer
-          open
-          lesson={lesson}
-          mode={composer.mode}
-          initialSectionId={composer.sectionId}
-          initialItems={composer.initialItems}
-          lockRouting
-          onClose={() => setComposer(null)}
-        />
-      )}
+      {/* The section-scoped composer (D1: structured) now renders once in the
+          (planner) layout via <ComposerHost>; handleOpenComposer opens it,
+          locked to the launching section (B4.3). */}
     </div>
   );
 }

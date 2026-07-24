@@ -96,10 +96,11 @@ import { stripHtml, escapeHtml } from "@/lib/html-text";
 import { Button, Tooltip } from "@/components/ui";
 import { RichTextEditor } from "@/components/rich-text";
 import { PhaseResources, ResourceChipGhost } from "./phase-resources";
-// ResourceComposer is the app-wide "Add resource" dialog shared with the
-// Daily right rail. The per-phase "+ add" trigger opens this composer
-// (pre-routed to the launching lesson + phase) — unchanged contract.
-import { ResourceComposer } from "@/components/daily/ResourceComposer";
+// The app-wide "Add resource" dialog is the shared composer singleton
+// (B4.3) — rendered once in the (planner) layout by <ComposerHost>. The
+// per-phase "+ add" trigger opens it via useComposer(), pre-routed to the
+// launching lesson + phase — unchanged contract.
+import { useComposer } from "@/components/composer";
 import type { ResourceComposerEditTarget } from "@/components/daily/ResourceComposer";
 import styles from "./lesson-flow.module.css";
 
@@ -841,26 +842,40 @@ export function LessonFlow({
     [lessonId, removeSectionResource],
   );
 
-  // ── ResourceComposer state ──────────────────────────────────────────
-  const [composerTarget, setComposerTarget] = useState<{
-    sectionId: string;
-    editResource?: ResourceComposerEditTarget;
-  } | null>(null);
+  // ── Shared composer (B4.3) ──────────────────────────────────────────
+  // The composer renders once in the (planner) layout via <ComposerHost>;
+  // these triggers open it imperatively, pre-routed to the launching phase.
+  // `lesson` (resolved above) is snapshotted at open time — the composer is a
+  // modal that closes on commit, so the snapshot can't drift mid-session. Both
+  // guard on the resolved lesson (the old render was `{lesson && …}`): the
+  // composer reads lesson fields before its own `open` early-return, so an
+  // unresolvable lessonId must never reach it.
+  const { openComposer: openSharedComposer } = useComposer();
 
-  const handleOpenComposer = useCallback((sectionId: string): void => {
-    setComposerTarget({ sectionId });
-  }, []);
+  const handleOpenComposer = useCallback(
+    (sectionId: string): void => {
+      if (!lesson) return;
+      openSharedComposer({
+        lesson,
+        mode: "resource",
+        initialSectionId: sectionId,
+      });
+    },
+    [lesson, openSharedComposer],
+  );
 
   const handleOpenNoteEditor = useCallback(
     (sectionId: string, editResource: ResourceComposerEditTarget): void => {
-      setComposerTarget({ sectionId, editResource });
+      if (!lesson) return;
+      openSharedComposer({
+        lesson,
+        mode: "notecard",
+        editResource,
+        initialSectionId: sectionId,
+      });
     },
-    [],
+    [lesson, openSharedComposer],
   );
-
-  const closeComposer = useCallback((): void => {
-    setComposerTarget(null);
-  }, []);
 
   // ── Per-phase collapse toggle + global controls ─────────────────────
   const toggleCollapsed = useCallback((sectionId: string): void => {
@@ -1135,20 +1150,10 @@ export function LessonFlow({
         </button>
       </div>
 
-      {/* ── ResourceComposer — shared "Add resource" / "Add note" dialog ──
-          Render-gated on the resolved lesson: the composer evaluates
-          lesson fields before its own `open` early-return, so an
-          unresolvable lessonId must not reach it at all. */}
-      {lesson && (
-        <ResourceComposer
-          open={composerTarget !== null}
-          lesson={lesson}
-          mode={composerTarget?.editResource ? "notecard" : "resource"}
-          editResource={composerTarget?.editResource}
-          initialSectionId={composerTarget?.sectionId}
-          onClose={closeComposer}
-        />
-      )}
+      {/* The shared "Add resource" / "Add note" dialog now renders once in
+          the (planner) layout via <ComposerHost>; the per-phase "+ add" and
+          note triggers open it through handleOpenComposer / handleOpenNoteEditor
+          above (B4.3). */}
     </div>
   );
 }

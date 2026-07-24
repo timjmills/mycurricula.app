@@ -84,12 +84,8 @@ import { useUndoToastOptional } from "@/lib/undo-toast";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
-import {
-  ResourceComposer,
-  fileToCapturedItem,
-  type CapturedItem,
-  type ResourceComposerEditTarget,
-} from "./ResourceComposer";
+import { fileToCapturedItem } from "./ResourceComposer";
+import { useComposer } from "@/components/composer";
 import { OpenInBoardDialog } from "@/components/boards";
 import styles from "./ResourcesPanel.module.css";
 
@@ -1237,15 +1233,14 @@ export function ResourcesPanel({
     useState<AggregatedResource | null>(null);
 
   // ── Composer + drag-drop state ─────────────────────────────────────────
+  // The composer itself now renders ONCE in the (planner) layout via
+  // <ComposerHost> (B4.3); this panel opens it imperatively through the shared
+  // singleton. `composerOpen` is kept only as a local "did THIS panel open the
+  // composer" flag — it feeds the "+" aria-expanded and the drawer-hide handoff
+  // (onComposerOpenChange) below, NOT the composer render.
+  const { openComposer: openSharedComposer } = useComposer();
   const [composerOpen, setComposerOpen] = useState(false);
-  const [composerMode, setComposerMode] = useState<"resource" | "notecard">(
-    "resource",
-  );
-  const [pendingItems, setPendingItems] = useState<CapturedItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
-  // When set, the composer opens in "add/edit notes on THIS resource" mode.
-  const [editTarget, setEditTarget] =
-    useState<ResourceComposerEditTarget | null>(null);
 
   // Routing default: the selected lesson, else the week's first lesson.
   const composerLesson: Lesson | null = lesson ?? lessons?.[0] ?? null;
@@ -1259,25 +1254,42 @@ export function ResourcesPanel({
     onComposerOpenChange?.(composerOpen);
   }, [composerOpen, onComposerOpenChange]);
 
+  // ── Store wiring ───────────────────────────────────────────────────────
+  const {
+    getSections,
+    getLesson,
+    removeSectionResource,
+    setSections,
+    editLesson,
+  } = usePlanner();
+  const toast = useUndoToastOptional();
+
+  // ── Open the shared composer ────────────────────────────────────────────
+  // Each opener snapshots the launch lesson + routing at call time and hands
+  // it to the singleton. The composer is a modal that closes on commit, so a
+  // snapshot (vs the old declarative live re-render) can't drift mid-session.
+  // The composed onClose clears the local flag so the drawer un-hides on any
+  // dismissal (Escape / scrim / × / commit).
   const openComposer = useCallback((): void => {
-    setEditTarget(null);
-    setComposerMode("resource");
+    if (!composerLesson) return;
     setComposerOpen(true);
-  }, []);
+    openSharedComposer({
+      lesson: composerLesson,
+      mode: "resource",
+      onClose: () => setComposerOpen(false),
+    });
+  }, [composerLesson, openSharedComposer]);
 
   // The "New notecard" entry (P6) — same composer seam, notecard mode.
   const openNotecardComposer = useCallback((): void => {
-    setEditTarget(null);
-    setComposerMode("notecard");
+    if (!composerLesson) return;
     setComposerOpen(true);
-  }, []);
-
-  const closeComposer = useCallback((): void => {
-    setComposerOpen(false);
-    setComposerMode("resource");
-    setPendingItems([]);
-    setEditTarget(null);
-  }, []);
+    openSharedComposer({
+      lesson: composerLesson,
+      mode: "notecard",
+      onClose: () => setComposerOpen(false),
+    });
+  }, [composerLesson, openSharedComposer]);
 
   // KNOWN EDGE (§4a M1 mirror — documented, intentionally not changed):
   // like removal, "Add / edit note" conceptually targets the CONTENT
@@ -1288,18 +1300,29 @@ export function ResourcesPanel({
   // pair un-merges and both rows paint. Cascading edits across seams is a
   // store-level concern, deferred with the split-identity follow-up; the
   // removal cascade in removeResource is the model when it lands.
-  const openNoteEditor = useCallback((agg: AggregatedResource): void => {
-    setPendingItems([]);
-    setComposerMode("notecard");
-    setEditTarget({
-      lessonId: agg.lessonId,
-      sectionId: agg.sectionId,
-      resourceId: agg.key,
-      lessonResourceIndex: agg.lessonResourceIndex,
-      resource: agg.resource,
-    });
-    setComposerOpen(true);
-  }, []);
+  const openNoteEditor = useCallback(
+    (agg: AggregatedResource): void => {
+      // Cross-lesson resource (week mode): resolve the row's own lesson, else
+      // fall back to the panel's routing default — matching the pre-migration
+      // render gate (`getLesson(editTarget.lessonId) ?? composerLesson`).
+      const launchLesson = getLesson(agg.lessonId) ?? composerLesson;
+      if (!launchLesson) return;
+      setComposerOpen(true);
+      openSharedComposer({
+        lesson: launchLesson,
+        mode: "notecard",
+        editResource: {
+          lessonId: agg.lessonId,
+          sectionId: agg.sectionId,
+          resourceId: agg.key,
+          lessonResourceIndex: agg.lessonResourceIndex,
+          resource: agg.resource,
+        },
+        onClose: () => setComposerOpen(false),
+      });
+    },
+    [composerLesson, getLesson, openSharedComposer],
+  );
 
   // ── Multi-file drag-drop onto the panel (drop-to-add) ─────────────────
   const handleDragOver = useCallback((e: ReactDragEvent<HTMLElement>): void => {
@@ -1325,23 +1348,16 @@ export function ResourcesPanel({
       setIsDragOver(false);
       const files = Array.from(e.dataTransfer.files);
       if (files.length === 0 || composerLesson === null) return;
-      setPendingItems(files.map((f) => fileToCapturedItem(f)));
-      setComposerMode("resource");
-      setEditTarget(null);
       setComposerOpen(true);
+      openSharedComposer({
+        lesson: composerLesson,
+        mode: "resource",
+        initialItems: files.map((f) => fileToCapturedItem(f)),
+        onClose: () => setComposerOpen(false),
+      });
     },
-    [composerLesson],
+    [composerLesson, openSharedComposer],
   );
-
-  // ── Store wiring ───────────────────────────────────────────────────────
-  const {
-    getSections,
-    getLesson,
-    removeSectionResource,
-    setSections,
-    editLesson,
-  } = usePlanner();
-  const toast = useUndoToastOptional();
 
   // ── Aggregation — dedupeLessonResources (P1) + provenance ──────────────
   // Day mode: one lesson's two seams merged by content identity, sections
@@ -1970,25 +1986,11 @@ export function ResourcesPanel({
         )}
       </AnimatePresence>
 
-      {/* Shared composer — "+" (resource mode), "New notecard" (notecard
-          mode), a multi-file drop (pre-captured items), or a tile's
-          Add/Edit note (notecard mode + locked edit target). */}
-      {(() => {
-        const launchLesson = editTarget
-          ? (getLesson(editTarget.lessonId) ?? composerLesson)
-          : composerLesson;
-        if (!launchLesson) return null;
-        return (
-          <ResourceComposer
-            open={composerOpen}
-            lesson={launchLesson}
-            mode={composerMode}
-            editResource={editTarget ?? undefined}
-            initialItems={pendingItems.length > 0 ? pendingItems : undefined}
-            onClose={closeComposer}
-          />
-        );
-      })()}
+      {/* The composer itself is rendered once in the (planner) layout by
+          <ComposerHost>; this panel opens it via useComposer() (B4.3). The
+          "+" (resource mode), "New notecard" (notecard mode), a multi-file
+          drop (pre-captured items), and a tile's Add/Edit note (notecard +
+          locked edit target) all route through the openers above. */}
 
       {/* Shared click-to-enlarge modal (notecards route to the fullscreen
           split view inside ResourcePreview). */}
