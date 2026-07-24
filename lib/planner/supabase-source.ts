@@ -375,6 +375,15 @@ function statusFromText(raw: string | null): LessonStatus {
 }
 
 // ── Row shapes (snake_case, as the migration declares them) ───────────────────
+//
+// TRACK-B FIELDS (migration 20260728120000) are declared OPTIONAL on the row
+// shapes below so B2/B1.7 can build the read mapper against them — but they are
+// DELIBERATELY ABSENT from the *_COLS select strings in this tranche, so they are
+// `undefined` at runtime until B2 adds them to the selects (coupled to the
+// migration apply, exactly like the color/tint_scope launch coupling on
+// SECTION_COLS). Reading NULL columns must never break current prod: selecting a
+// column that does not yet exist is the v2-cutover failure mode, so the columns
+// join the selects ONLY when the migration is guaranteed applied.
 
 /** A `master_core_lesson_events` row (the columns this source reads). After the
  *  scale-hardening migration the table carries a local `grade_level_id`. */
@@ -394,6 +403,18 @@ interface MasterEventRow {
   display_order_within_day: number;
   differentiation: unknown; // jsonb: LessonDifferentiation | null
   deleted_at: string | null;
+  // Track-B (20260728120000) — NOT in MASTER_COLS yet (see note above).
+  taught_at?: string | null;
+  duration_minutes?: number | null;
+  assessment_kind?: string | null;
+  assessment_title?: string | null;
+  assessment_purpose?: string | null;
+  assessment_notes?: string | null;
+  builds?: string | null;
+  prep?: string | null;
+  fw_data?: unknown; // jsonb: framework field values | null
+  fw_id?: string | null;
+  carried?: unknown; // jsonb
 }
 
 /** A `personal_core_lesson_event_copies` row (the lazy fork). Carries the
@@ -417,6 +438,18 @@ interface PersonalCopyRow {
   is_diverged_from_master: boolean;
   differentiation: unknown; // jsonb: LessonDifferentiation | null
   archived_at: string | null;
+  // Track-B (20260728120000) — NOT in COPY_COLS yet (see note above).
+  taught_at?: string | null;
+  duration_minutes?: number | null;
+  assessment_kind?: string | null;
+  assessment_title?: string | null;
+  assessment_purpose?: string | null;
+  assessment_notes?: string | null;
+  builds?: string | null;
+  prep?: string | null;
+  fw_data?: unknown; // jsonb: framework field values | null
+  fw_id?: string | null;
+  carried?: unknown; // jsonb
 }
 
 /** A `personal_authored_lessons` row (a teacher's OWN lesson, no master). */
@@ -439,6 +472,18 @@ interface AuthoredLessonRow {
   reason_not_done: string | null;
   differentiation: unknown; // jsonb: LessonDifferentiation | null
   deleted_at: string | null;
+  // Track-B (20260728120000) — NOT in AUTHORED_COLS yet (see note above).
+  taught_at?: string | null;
+  duration_minutes?: number | null;
+  assessment_kind?: string | null;
+  assessment_title?: string | null;
+  assessment_purpose?: string | null;
+  assessment_notes?: string | null;
+  builds?: string | null;
+  prep?: string | null;
+  fw_data?: unknown; // jsonb: framework field values | null
+  fw_id?: string | null;
+  carried?: unknown; // jsonb
 }
 
 interface CompletionRow {
@@ -455,6 +500,20 @@ interface UnitRow {
   start_week: number;
   end_week: number;
   school_year_id: string | null;
+  // Track-B (20260728120000) — NOT in UNIT_COLS yet (see note above).
+  notes?: string | null;
+  big_idea?: string | null;
+  essential_questions?: string[] | null;
+  vocab?: unknown; // jsonb: UnitVocabItem[] | null
+  kud?: unknown; // jsonb: UnitKud | null
+  standards?: string[] | null; // uuid[]
+  default_flow?: string | null;
+  default_dur?: number | null;
+  framework?: string | null;
+  fw_data?: unknown; // jsonb: framework field values | null
+  custom_fields?: unknown; // jsonb
+  carried?: unknown; // jsonb
+  archived_at?: string | null;
 }
 
 interface SubjectRow {

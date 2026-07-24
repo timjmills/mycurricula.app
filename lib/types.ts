@@ -33,6 +33,25 @@ export interface Teacher {
   role: TeacherRole;
 }
 
+/** A single vocabulary entry for a unit. A term commonly carries a companion
+ *  definition, so the persisted shape (units.vocab jsonb, migration
+ *  20260728120000) is an array of these rather than a flat string[]. B1.7 owns
+ *  the editor; `definition` is optional so a terms-only list stays valid. */
+export interface UnitVocabItem {
+  term: string;
+  definition?: string;
+}
+
+/** Know / Understand / Do goals for a unit (units.kud jsonb, migration
+ *  20260728120000). ONE canonical shape that supersedes the two parallel
+ *  prototype models (plain strings vs {k,u,d} arrays — B0 MODEL-GAP). Each is a
+ *  list; all optional so a partially-filled unit stays valid. */
+export interface UnitKud {
+  know?: string[];
+  understand?: string[];
+  doGoal?: string[];
+}
+
 export interface Unit {
   id: string;
   subject: SubjectId;
@@ -41,6 +60,40 @@ export interface Unit {
   weeks: string;
   /** Shade level (1–3) for unit color cycling. */
   shade: number;
+
+  // ── Track-B editable workspace fields (migration 20260728120000) ──────────
+  // All OPTIONAL + populated only once the migration is applied AND the seam
+  // read (lib/planner/supabase-source.ts) adds them to UNIT_COLS + the mapper
+  // (a B1.7 change coupled to the apply). Absent under the mock source and on
+  // every read today, so existing consumers are untouched. See CLAUDE.md §5.2.
+  /** Free-form unit notes (units.notes). */
+  notes?: string;
+  /** The unit's big idea / central idea (units.big_idea). */
+  bigIdea?: string;
+  /** Essential / driving questions (units.essential_questions text[]). */
+  essentialQuestions?: string[];
+  /** Vocabulary terms (+ optional definitions) (units.vocab jsonb). */
+  vocab?: UnitVocabItem[];
+  /** Know / Understand / Do goals (units.kud jsonb). */
+  kud?: UnitKud;
+  /** Real `standards.id` UUIDs this unit covers (units.standards uuid[]).
+   *  Mirrors Lesson.standardIds; whether a UI editor ships is a B1.7 product
+   *  decision (B0 flagged unit↔standards as an open feature). */
+  standardIds?: string[];
+  /** Framework preset id / 'custom' / a user framework id (units.framework). */
+  framework?: string;
+  /** Framework-defined field VALUES for this unit (units.fw_data jsonb). */
+  frameworkData?: Record<string, unknown>;
+  /** Unit-scope custom field definitions/values (units.custom_fields jsonb). */
+  customFields?: Record<string, unknown>;
+  /** Conversion orphans carried across a framework switch (units.carried jsonb). */
+  carried?: Record<string, unknown>;
+  /** Default lesson-flow name for new lessons in this unit (units.default_flow). */
+  defaultFlow?: string;
+  /** Default lesson duration in minutes (units.default_dur). */
+  defaultDuration?: number;
+  /** Soft-archived (derived from units.archived_at IS NOT NULL). */
+  archived?: boolean;
 }
 
 /** A resource attached to a lesson or task.
@@ -146,6 +199,38 @@ export interface LessonDifferentiation {
   support: string;
   onLevel: string;
   extension: string;
+}
+
+/** Assessment attached to a lesson ("a lesson wearing a hat" — B0 MODEL-GAP:
+ *  an assessment is NOT a separate row, it is a lesson patched with these
+ *  fields). Persisted as assessment_kind/_title/_purpose/_notes on all three
+ *  fork tables (migration 20260728120000). Every field optional so a lesson
+ *  without an assessment omits the object entirely. Rich-text fields are
+ *  sanitized before render like every other lesson field.
+ *
+ *  KIND IS THE NARROW UNION — the DB column `assessment_kind` is DELIBERATELY
+ *  open text with NO CHECK constraint (a DB enum is the silent-write trap: a
+ *  value the client accepts but the DB rejects fails the write silently at the
+ *  sync boundary). This union is the single source of validity, and B2's WRITE
+ *  path MUST validate `kind` against it before writing. */
+export interface LessonAssessment {
+  /** Assessment kind — validate against this union before persisting. */
+  kind?: "formative" | "summative";
+  title?: string;
+  /** What the assessment is checking for. */
+  purpose?: string;
+  notes?: string;
+}
+
+/** The write-path validation contract for LessonAssessment.kind (§4a F1): the
+ *  DB column is deliberately un-CHECKed, so THIS guard is the single validity
+ *  gate — B2's persist path must refuse (or drop the field on) any value that
+ *  fails it, or a mistyped kind silently vanishes from the Assessments tab's
+ *  formative/summative filters. */
+export function isAssessmentKind(
+  value: unknown,
+): value is NonNullable<LessonAssessment["kind"]> {
+  return value === "formative" || value === "summative";
 }
 
 /** A sub-event inside a multi-task lesson (e.g. a center rotation). */
@@ -267,6 +352,32 @@ export interface Lesson {
    * JSONB-safe (see LessonMasterSnapshot).
    */
   masterSnapshot?: LessonMasterSnapshot;
+
+  // ── Track-B rich lesson fields (migration 20260728120000) ─────────────────
+  // All OPTIONAL + populated only once the migration is applied AND the seam
+  // read (supabase-source.ts) adds the columns to MASTER/COPY/AUTHORED_COLS +
+  // the mapper (a B2 change coupled to the apply). Absent on every read today.
+  /** When this lesson was ACTUALLY taught (ISO timestamp; lessons.taught_at).
+   *  The one durable "taught" signal — B0: never infer taught from status/slot.
+   *  UNLIKE `time` (which has no column and would spuriously fork on a
+   *  time-only edit), taught_at is a real persisted column, safe to write. */
+  taughtAt?: string;
+  /** Assessment attached to this lesson (assessment_* columns). Absent when the
+   *  lesson has no assessment ("a lesson wearing a hat" — B0). */
+  assessment?: LessonAssessment;
+  /** Framework-defined field VALUES for this lesson (lessons.fw_data jsonb). */
+  frameworkData?: Record<string, unknown>;
+  /** Framework id override for this lesson (lessons.fw_id) — open text; the
+   *  resolution chain is unit.framework → subjectFw → planner_settings.framework. */
+  frameworkId?: string;
+  /** Planned duration in minutes (lessons.duration_minutes). */
+  durationMinutes?: number;
+  /** "Builds on" prior learning — planning prose (lessons.builds). */
+  builds?: string;
+  /** Prep / materials to ready before teaching (lessons.prep). */
+  prep?: string;
+  /** Conversion orphans carried across a framework switch (lessons.carried jsonb). */
+  carried?: Record<string, unknown>;
 }
 
 export type NoteScope = "shared" | "personal";
