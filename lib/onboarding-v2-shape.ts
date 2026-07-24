@@ -194,40 +194,32 @@ export function readFinishedFlag(): boolean {
   return readV2Persist()?.finished ?? false;
 }
 
-/**
- * PHASE SEAM — the server-side "has this teacher onboarded?" check.
- *
- * Schema changes are another builder's lane this wave, so there is no DB
- * column to read yet. This returns `null` = "unknown" today, exactly like the
- * annotations onChange seam returns a no-op until its backend lands. When the
- * onboarding column arrives, resolve it here (or inject it) and the
- * `computeNeedsOnboarding` matrix below already prefers the authoritative
- * server answer over the local flag.
- *
- *   returns true   → the server knows the teacher has onboarded
- *   returns false  → the server knows they have NOT
- *   returns null   → unknown (no server signal) — fall back to the local flag
- */
-export function isOnboardedRemote(): boolean | null {
-  return null;
-}
+// SERVER SEAM — the authoritative "has this teacher onboarded?" read + write
+// live in lib/onboarding-v2-remote.ts (isOnboardedRemote / markOnboardedRemote),
+// NOT here: they touch Supabase, and this leaf must stay React/Supabase-free so
+// the node test gate can exercise it. This module owns only the PURE decision
+// (`computeNeedsOnboarding`) and the per-device `finished` flag; the client
+// wiring (lib/onboarding-v2-state.tsx) composes them with the async remote read.
 
 /**
- * The first-run decision, as a pure function of the two signals so it is
- * unit-testable. The remote (authoritative) answer wins when known; otherwise
- * we fall back to the per-device "finished" flag.
+ * The first-run decision, as a pure function of the signals so it is
+ * unit-testable. The remote (authoritative) answer wins when known:
+ *   • remote === true  → onboarded; never redirect.
+ *   • remote === false → not onboarded; redirect.
+ *   • remote === null  → UNKNOWN. Fail SAFE: on the DEPLOYED path
+ *     (`supabaseConfigured`) we must NOT redirect on a guess — a read hiccup or a
+ *     pre-migration column would otherwise bounce a real teacher into the wizard.
+ *     Only the Supabase-OFF PROTOTYPE path (no server to ask) falls back to the
+ *     per-device `finished` flag.
  */
 export function computeNeedsOnboarding(
   finished: boolean,
   remote: boolean | null,
+  supabaseConfigured: boolean,
 ): boolean {
   if (remote === true) return false;
   if (remote === false) return true;
-  return !finished;
-}
-
-/** True when the current teacher should be sent through onboarding. Combines
- *  the local finished flag with the (currently-unknown) remote check. */
-export function needsOnboarding(): boolean {
-  return computeNeedsOnboarding(readFinishedFlag(), isOnboardedRemote());
+  // remote unknown:
+  if (supabaseConfigured) return false; // deployed path — never redirect on a guess
+  return !finished; // prototype path — the local flag governs
 }

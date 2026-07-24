@@ -8,6 +8,7 @@ import { PlannerProvider } from "@/lib/planner-store";
 import { UndoToastProvider } from "@/lib/undo-toast";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
+  FirstRunRedirect,
   GlobalShortcuts,
   LastRouteRecorder,
   MasterBanner,
@@ -148,6 +149,13 @@ export default function PlannerLayout({
                       {/* Remembers the active planner route so the Settings X /
                     Escape can return the teacher exactly where they left. */}
                       <LastRouteRecorder />
+                      {/* First-run activation gate: bounces a teacher who has not
+                    completed onboarding into the wizard. Render-nothing leaf;
+                    it redirects ONLY on a resolved "needs onboarding" (never on
+                    an unresolved/unknown server read), so it can't flash-bounce
+                    or race the bypass login, and /onboarding lives outside this
+                    group so no loop is possible. */}
+                      <FirstRunRedirect />
                       {/* Roadmap-02 undo-toast bridge: a render-nothing client
                     leaf that watches the planner store's lastChange and fires
                     the undo toast for every undoable gesture (move /

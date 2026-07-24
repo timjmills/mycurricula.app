@@ -26,8 +26,9 @@ import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ONBOARDING_V2_STEPS,
+  computeNeedsOnboarding,
   defaultV2Data,
-  needsOnboarding,
+  readFinishedFlag,
   readV2Persist,
   writeV2Persist,
 } from "@/lib/onboarding-v2-shape";
@@ -35,6 +36,11 @@ import type {
   OnboardingV2Data,
   OnboardingV2StepId,
 } from "@/lib/onboarding-v2-shape";
+import {
+  markOnboardedRemote,
+  readFirstRunState,
+} from "@/lib/onboarding-v2-remote";
+import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
 
 interface OnboardingV2ContextValue {
   /** Current step index into `ONBOARDING_V2_STEPS`. */
@@ -118,7 +124,28 @@ export function OnboardingV2Provider({
     [],
   );
   const back = useCallback(() => setStepIndex((i) => Math.max(i - 1, 0)), []);
-  const finish = useCallback(() => setFinished(true), []);
+  // Finishing the wizard — via EITHER exit ("Take the tour" / "Start planning"),
+  // both of which route through this — persists the per-device flag AND, on the
+  // deployed path, stamps the authoritative server signal (idempotent RPC,
+  // fire-and-forget). It also LATCHES the session gate synchronously so the
+  // post-finish navigation into the planner never bounces back to /onboarding on
+  // a stale `false` read while the fire-and-forget stamp is still in flight
+  // (the finish→navigate race).
+  const finish = useCallback(() => {
+    setFinished(true);
+    // Arm the identity-keyed grace window synchronously (the uid resolves from
+    // the stamp call), then latch permanently once the write CONFIRMS whose
+    // row it stamped (or immediately for the single-identity prototype path).
+    const stampCall = markOnboardedRemote();
+    pendingFinish = {
+      until: Date.now() + FINISH_GRACE_MS,
+      uid: stampCall.then((r) => r.uid).catch(() => null),
+    };
+    void stampCall.then((r) => {
+      if (r.stamped && r.uid) satisfiedForUid = r.uid;
+      else if (!isPlannerSupabaseConfigured()) satisfiedForUid = PROTOTYPE_UID;
+    });
+  }, []);
 
   const value = useMemo<OnboardingV2ContextValue>(
     () => ({
@@ -145,23 +172,49 @@ export function OnboardingV2Provider({
   );
 }
 
+// Session-scoped latch, KEYED BY USER: once first-run is satisfied for a given
+// identity — the wizard was just finished, or a planner navigation resolved to
+// "no redirect needed" — the gate stops re-checking for that identity for the
+// rest of this page's lifetime. Onboarding is monotonic within a session, so a
+// satisfied check never needs re-running; keying by uid (not a bare boolean)
+// matters because Next.js keeps module state across soft navigations — a
+// sign-out/sign-in WITHOUT a full reload must not let a brand-new teacher on a
+// shared device inherit the previous teacher's satisfied state (§4a High).
+// The prototype (Supabase-off) path has no uid and uses a fixed sentinel — it
+// is single-identity by construction (per-device localStorage).
+// A deployed-path UNKNOWN (null uid or null answer) never latches: it also
+// never redirects (fail-safe), so the only cost is a re-read on a later mount.
+let satisfiedForUid: string | null = null;
+const PROTOTYPE_UID = "__prototype__";
+// Closes the finish→navigate race: finish() arms this synchronously so the
+// post-wizard navigation into the planner cannot bounce back to /onboarding on
+// a stale remote `false` read while the fire-and-forget stamp is in flight.
+// Time-bounded AND identity-keyed (§4a round-3): the grace applies only when
+// the CURRENT identity matches the FINISHER's identity (resolved from the
+// stamp call — known even when the write itself fails), so a same-tab account
+// switch inside the window cannot let a different, never-onboarded teacher
+// skip the check. The uid-keyed latch takes over once the stamp confirms.
+let pendingFinish: { until: number; uid: Promise<string | null> } | null = null;
+const FINISH_GRACE_MS = 90_000;
+
 /**
- * FIRST-RUN REDIRECT SEAM (new — nothing detects first-run today).
+ * FIRST-RUN REDIRECT SEAM.
  *
- * Mount this hook ONCE on a planner landing surface to bounce a teacher who
- * has not completed onboarding into the wizard. It is intentionally NOT wired
- * into the (planner) routes here (those files are owned elsewhere this wave) —
- * the orchestrator places the one-liner. The canonical mount is a single call
- * at the top of the landing client component, e.g. in
- * app/(planner)/home/page.tsx (or the planner layout's client shell):
+ * Mounted once inside the (planner) layout via
+ * components/shell/first-run-redirect.tsx (a render-nothing client leaf). It
+ * bounces a teacher who has not completed onboarding into the wizard.
  *
- *     useFirstRunRedirect();
- *
- * Behaviour: after mount it checks `needsOnboarding()` (the shape module's
- * local-flag + remote-check matrix) and, when true, `router.replace`s to
- * /onboarding. It is a no-op on /onboarding itself (so it can never loop) and
- * during SSR. Once the remote onboarding column lands, `isOnboardedRemote()`
- * becomes authoritative and this hook needs no change.
+ * Behaviour: after mount it reads the async authoritative signal
+ * (readFirstRunState) and combines it with the per-device `finished` flag and
+ * the Supabase-configured gate via the pure `computeNeedsOnboarding` matrix. It
+ * redirects ONLY on a RESOLVED decision — never while the answer is unresolved —
+ * so there is no flash-bounce and it never races the bypass login:
+ *   • DEPLOYED path (Supabase configured): redirect only on remote === false
+ *     (row exists, onboarded_at is null). remote === null (pre-migration, no
+ *     session, read error) never redirects.
+ *   • PROTOTYPE path (Supabase off): remote is always null → the local
+ *     `finished` flag governs, exactly as before this gate existed.
+ * No-op on /onboarding itself (so it can never loop) and during SSR.
  */
 export function useFirstRunRedirect(): void {
   const router = useRouter();
@@ -170,6 +223,58 @@ export function useFirstRunRedirect(): void {
     if (typeof window === "undefined") return;
     // Never redirect away from the wizard itself — that would loop.
     if (pathname === "/onboarding") return;
-    if (needsOnboarding()) router.replace("/onboarding");
+
+    const configured = isPlannerSupabaseConfigured();
+    // Prototype path is single-identity per device — its latch can short-circuit
+    // before any read. The deployed path must resolve the CURRENT uid first, so
+    // its latch check happens after the (local-session) read below.
+    if (!configured && satisfiedForUid === PROTOTYPE_UID) return;
+
+    let cancelled = false;
+    void (async () => {
+      const { uid, onboarded } = await readFirstRunState();
+      if (cancelled) return;
+      const identity = configured ? uid : PROTOTYPE_UID;
+      // Already satisfied for THIS identity this session — nothing to do.
+      if (identity !== null && satisfiedForUid === identity) return;
+      // Finish-grace: the wizard was finished moments ago in this tab BY THIS
+      // identity — never bounce the post-finish navigation while the stamp
+      // write is in flight. Identity-checked so a same-tab account switch
+      // inside the window still gets a real check (§4a round-3).
+      if (pendingFinish && Date.now() < pendingFinish.until) {
+        // Bound the identity wait to the window's REMAINING life and re-check
+        // the deadline after — a stalled stamp call must neither grant grace
+        // past the deadline nor block another user's gate check (§4a round-4).
+        const grace = pendingFinish;
+        const finisherUid = await Promise.race([
+          grace.uid,
+          new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), Math.max(0, grace.until - Date.now())),
+          ),
+        ]);
+        if (cancelled) return;
+        if (Date.now() < grace.until) {
+          const finisherIdentity = configured ? finisherUid : PROTOTYPE_UID;
+          if (identity !== null && identity === finisherIdentity) return;
+        }
+      }
+      const needs = computeNeedsOnboarding(
+        readFinishedFlag(),
+        onboarded,
+        configured,
+      );
+      if (needs) {
+        router.replace("/onboarding");
+      } else if (identity !== null && (onboarded === true || !configured)) {
+        // Latch only a POSITIVE resolution keyed to a known identity. A
+        // deployed-path UNKNOWN (null answer) stays unlatched — it never
+        // redirects anyway, and the next mount re-reads (fail-safe both ways).
+        satisfiedForUid = identity;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router, pathname]);
 }

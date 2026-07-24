@@ -7,7 +7,6 @@ import {
   defaultV2Data,
   normalizeV2Persist,
   computeNeedsOnboarding,
-  isOnboardedRemote,
   weekdaysForV2Preset,
   type OnboardingV2Persist,
 } from "@/lib/onboarding-v2-shape";
@@ -132,21 +131,31 @@ describe("onboarding-v2 storage-shape compatibility", () => {
 });
 
 describe("onboarding-v2 first-run matrix", () => {
-  it("remote authority wins over the local flag", () => {
-    // remote says onboarded → never needs it, regardless of the local flag
-    expect(computeNeedsOnboarding(false, true)).toBe(false);
-    expect(computeNeedsOnboarding(true, true)).toBe(false);
-    // remote says NOT onboarded → always needs it
-    expect(computeNeedsOnboarding(true, false)).toBe(true);
-    expect(computeNeedsOnboarding(false, false)).toBe(true);
+  it("remote authority wins over both the local flag and the config gate", () => {
+    // remote says onboarded → never needs it, regardless of the local flag or
+    // which path we're on.
+    expect(computeNeedsOnboarding(false, true, true)).toBe(false);
+    expect(computeNeedsOnboarding(true, true, true)).toBe(false);
+    expect(computeNeedsOnboarding(false, true, false)).toBe(false);
+    // remote says NOT onboarded → always needs it.
+    expect(computeNeedsOnboarding(true, false, true)).toBe(true);
+    expect(computeNeedsOnboarding(false, false, true)).toBe(true);
+    expect(computeNeedsOnboarding(true, false, false)).toBe(true);
   });
 
-  it("falls back to the local finished flag when remote is unknown", () => {
-    expect(computeNeedsOnboarding(false, null)).toBe(true); // not finished → needs
-    expect(computeNeedsOnboarding(true, null)).toBe(false); // finished → done
+  it("DEPLOYED path never redirects on an unknown remote (fail-safe)", () => {
+    // Supabase configured + remote unknown (pre-migration column, no session,
+    // read error) → never redirect, regardless of the local finished flag. This
+    // is the activation-gate safety invariant: shipping the code before the
+    // migration lands is a guaranteed no-op.
+    expect(computeNeedsOnboarding(false, null, true)).toBe(false);
+    expect(computeNeedsOnboarding(true, null, true)).toBe(false);
   });
 
-  it("isOnboardedRemote is the unknown-today Phase seam", () => {
-    expect(isOnboardedRemote()).toBeNull();
+  it("PROTOTYPE path falls back to the local finished flag when remote is unknown", () => {
+    // Supabase OFF → no server to ask → the per-device flag governs, exactly as
+    // before this gate existed.
+    expect(computeNeedsOnboarding(false, null, false)).toBe(true); // not finished → needs
+    expect(computeNeedsOnboarding(true, null, false)).toBe(false); // finished → done
   });
 });

@@ -25,3 +25,4 @@ export {
   readSettingsReturnRoute,
   SETTINGS_RETURN_KEY,
 } from "./last-route-recorder";
+export { FirstRunRedirect } from "./first-run-redirect";
