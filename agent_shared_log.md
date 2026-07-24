@@ -2870,3 +2870,31 @@ in probes or run planner-flag-ON.
 
 **Cutover runbook** now lists BOTH pending migrations (20260726 + 20260727)
 with standalone-apply instructions; everything else user-gated as before.
+
+---
+
+## [Main/orchestrator 7.24 FINAL] ✅ SESSION CLOSED — 18 commits live, 4 decisions with USER
+
+All 18 commits deployed green (final: `5d24e64`; prod hydrate gate 37/8/8/403 ALL
+PASS post-deploy). Full session record in the two entries above. Working tree
+clean of in-flight work; all subagents closed out.
+
+**OPEN — awaiting USER answers (decision menu delivered 7.24; do NOT act on
+these without the user's explicit reply):**
+1. **Multi-workspace ENABLE GO** — recommended two-step: apply 20260726 +
+   20260727 standalone (`db query --linked -f`, never bare `db push`), flag-ON
+   preview QA (needs preview-URL re-enable, maybe `enabled:true` — human
+   decision), pause, then user says "promote". Runbook: unified plan §0.
+2. **Onboarding semantics** — as-built recommended (backfill = existing
+   teachers never see the wizard; only new signups). Reversible per-account by
+   nulling teachers.onboarded_at (useful for wizard testing).
+3. **Worktree cleanup** — 9 landed worktrees + .claude/worktrees agent pile
+   deletable (junction-safe procedure mandatory); keep mc-wave12-settings /
+   mc-polish / mc-ushare.
+4. **B1.7 frame-change behavior** — recommended: workspace SURVIVES appearance
+   changes (drop the YearShell frame-change dismissal); fallback = dismiss only
+   on user-initiated changes. Needed before B1.7 builds; B1.4–B1.6 unaffected.
+
+**Next build wave when green-lit:** B1 tranche 2 (B1.4 UnitWorkspaceRail +
+workspace-prefs + ⤢, B1.5 Unit Plan sub-nav rename, B1.6 Overview stat
+strip/ring/arc). Seams are ready per the tranche-1 ship notes in `570b281`.
