@@ -35,6 +35,7 @@ import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { usePlanner } from "@/lib/planner-store";
+import { useNotebookState } from "@/lib/notebook-state";
 import { CURRENT_WEEK } from "@/lib/mock";
 import { useAcademicYear } from "@/lib/use-academic-year";
 import { weeksInRange } from "@/lib/year-calendar";
@@ -263,6 +264,19 @@ export function TimelineYear(): ReactNode {
   // (subject/unit/week) keep the existing UI on every frame — same seam
   // pattern as WeeklyShell.renderGridPanel (frame is the LAST gate).
   const { frame } = useTheme();
+
+  // Active notebook = the grade level whose curriculum this Year view shows.
+  // The subject-row caption must name it dynamically (never a hard-coded grade —
+  // CLAUDE.md §6). Resolved the same way the SideNav NotebookSwitcher does, from
+  // the shared notebook-state context. On the mock/OFF path this is the single
+  // active notebook ("Grade 5"), so the rendering is unchanged locally; on a
+  // real multi-notebook workspace it tracks the selected grade.
+  const { activeNotebooks, activeNotebookId } = useNotebookState();
+  const gradeLabel =
+    (
+      activeNotebooks.find((nb) => nb.gradeLevelId === activeNotebookId) ??
+      activeNotebooks[0]
+    )?.name ?? "";
 
   // Global standards filter (shared with Weekly via app-state). Active when any
   // code is selected; narrows the lessons SHOWN (timeline units, week cards, day
@@ -588,7 +602,9 @@ export function TimelineYear(): ReactNode {
                   </span>
                   <div>
                     <div className={styles.sn}>{subject.name}</div>
-                    <div className={styles.sg}>Grade 5</div>
+                    {gradeLabel ? (
+                      <div className={styles.sg}>{gradeLabel}</div>
+                    ) : null}
                   </div>
                 </button>
 
@@ -922,6 +938,7 @@ export function TimelineYear(): ReactNode {
       <div className={styles.shell}>
         <YearSubjectsSidebar
           subjects={sidebarSubjects}
+          gradeLabel={gradeLabel}
           scope={scope}
           onPickAll={goAll}
           onPickSubject={goSubject}

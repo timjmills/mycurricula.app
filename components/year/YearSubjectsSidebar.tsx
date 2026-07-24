@@ -34,6 +34,12 @@ export interface YearSidebarSubject {
 
 export interface YearSubjectsSidebarProps {
   subjects: YearSidebarSubject[];
+  /**
+   * The active notebook's grade label (e.g. "Grade 5"), resolved by the caller
+   * from notebook-state — never hard-coded (CLAUDE.md §6). Rendered as each
+   * subject row's caption; omitted when there is no active notebook.
+   */
+  gradeLabel: string;
   scope: YearScope;
   onPickAll: () => void;
   onPickSubject: (id: SubjectId) => void;
@@ -76,6 +82,7 @@ function IconX(): ReactNode {
 
 export function YearSubjectsSidebar({
   subjects,
+  gradeLabel,
   scope,
   onPickAll,
   onPickSubject,
@@ -135,7 +142,9 @@ export function YearSubjectsSidebar({
                 </span>
                 <span className={styles.smeta}>
                   <span className={styles.sn}>{s.name}</span>
-                  <span className={styles.sg}>Grade 5</span>
+                  {gradeLabel ? (
+                    <span className={styles.sg}>{gradeLabel}</span>
+                  ) : null}
                 </span>
                 <span className={styles.dot} aria-hidden="true" />
               </button>

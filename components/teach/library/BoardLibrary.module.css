@@ -663,7 +663,11 @@
   border-top: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--wf-blue-soft);
-  color: var(--ink-soft);
+  /* --wf-blue-soft is a theme-INVARIANT widget-palette color (fixed light blue
+     in all 6 themes), but --ink-soft flips LIGHT in Night/washes → 1.19:1
+     light-on-light (a11y bug). Pin the foreground to the wf family's fixed dark
+     ink so the pair holds AA (~14.6:1) identically across every theme. */
+  color: var(--wf-ink-accent);
 }
 
 .tipsIcon {
@@ -680,7 +684,9 @@
 }
 
 .tipsText strong {
-  color: var(--ink-900);
+  /* Match the base fixed-dark ink (see .tips) so the "Tips:" label stays AA on
+     the theme-invariant blue in every theme; weight 700 carries the emphasis. */
+  color: var(--wf-ink-accent);
   font-weight: 700;
 }
 
@@ -693,17 +699,20 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--ink-400);
+  /* Dismiss X sits on the theme-invariant blue tips surface — pin its colors to
+     fixed wf tokens (not the theme-flipping --ink-* scale) so the glyph stays a
+     muted-yet-AA dark in every theme (~4.75:1 resting, higher on hover). */
+  color: var(--wf-slate-accent);
   cursor: pointer;
 }
 
 .tipsClose:hover {
-  color: var(--ink-900);
-  background: var(--ink-100);
+  color: var(--wf-ink-accent);
+  background: var(--wf-blue-chip);
 }
 
 .tipsClose:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--wf-ink-accent);
   outline-offset: 1px;
 }
 
