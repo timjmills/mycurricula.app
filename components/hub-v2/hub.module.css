@@ -23,6 +23,13 @@
   min-height: 0;
   min-width: 0;
   background: transparent; /* the immersive overlay paints the backdrop */
+  /* Clear the floating chrome ImmersiveBar (position:absolute; top:0; ~78px):
+     without this the hub's own sub-bar (the "Planner" wordmark) sat under the
+     bar and bled through its translucent scrim, colliding with the "Planner
+     hub" view-title at desktop widths (prod chrome sweep MINOR-1). Mirrors the
+     ResourceWall .root + /planner stub clearance so the immersive surfaces
+     agree. */
+  padding-top: clamp(72px, 12vh, 120px);
 }
 
 /* ── Top-bar (hub-local sub-bar) ────────────────────────────────────────── */

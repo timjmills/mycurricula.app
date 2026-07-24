@@ -89,6 +89,7 @@ import {
 import { createPortal } from "react-dom";
 import type { Lesson, LessonResource, SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
+import { unitDisplayName } from "@/lib/unit-name";
 import { useLabels } from "@/lib/labels";
 import { Button, Tooltip } from "@/components/ui";
 import { parseResourceUrl, isSafeImgSrc } from "@/lib/resource-embed";
@@ -527,6 +528,7 @@ export function ResourceComposer({
     editLesson,
     getLesson,
     subjects,
+    units,
   } = usePlanner();
 
   // ── Local UI state — the unified single-screen composer (B4.2) ───────
@@ -784,16 +786,20 @@ export function ResourceComposer({
   /** Subjects: just the canonical eight — fixed order, locked team-wide. */
   const subjectOptions = useMemo(() => subjects, [subjects]);
 
-  /** Unique unit ids present in the planner doc for the chosen subject. */
+  /** Unique unit ids present in the planner doc for the chosen subject, each
+   *  resolved to its catalog NAME (never the raw id — MAJOR-1). */
   const unitOptions = useMemo(() => {
     const seen = new Map<string, { id: string; name: string }>();
     for (const l of lessons) {
       if (l.subject !== subjectId) continue;
       if (seen.has(l.unit)) continue;
-      seen.set(l.unit, { id: l.unit, name: l.unit });
+      seen.set(l.unit, {
+        id: l.unit,
+        name: unitDisplayName(units, subjectId, l.unit) ?? "Untitled unit",
+      });
     }
     return [...seen.values()];
-  }, [lessons, subjectId]);
+  }, [lessons, subjectId, units]);
 
   /** Lessons in the chosen unit. Scoped to the launching lesson's week
    *  when present (the routing spec: "filtered to the current week's

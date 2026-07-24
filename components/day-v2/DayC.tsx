@@ -15,6 +15,7 @@ import {
 } from "@/lib/day-status";
 import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
+import { unitDisplayName } from "@/lib/unit-name";
 import { Tooltip } from "@/components/ui";
 import type { Lesson } from "@/lib/types";
 import {
@@ -193,8 +194,9 @@ function Hero({
   onPlan: (id: string) => void;
   onTeach: (id: string) => void;
 }): ReactNode {
-  const { setLessonStatus } = usePlanner();
+  const { setLessonStatus, units } = usePlanner();
   const isDone = lesson.status === "done";
+  const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
   return (
     <div
       className={`cp-subj ${lesson.subject} ${styles.vcDetail} ${
@@ -209,7 +211,7 @@ function Hero({
           <ForkCues lesson={lesson} />
         </div>
         <h3 className={styles.detailTitle}>{stripHtml(lesson.title)}</h3>
-        <div className={styles.dun}>{lesson.unit}</div>
+        {unitName && <div className={styles.dun}>{unitName}</div>}
       </div>
       <div className={styles.dcTarget}>
         <span className={styles.dcTl}>Learning target</span>

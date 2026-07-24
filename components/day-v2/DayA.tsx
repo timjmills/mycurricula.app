@@ -12,6 +12,7 @@ import { usePlanner } from "@/lib/planner-store";
 import { deriveDayStatus, currentAndNext } from "@/lib/day-status";
 import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
+import { unitDisplayName } from "@/lib/unit-name";
 import { Tooltip } from "@/components/ui";
 import type { Lesson } from "@/lib/types";
 import {
@@ -53,7 +54,7 @@ export function DayA(props: DayViewV2Props): ReactNode {
     onAddEvent,
   } = props;
   const router = useRouter();
-  const { subjectById, setLessonStatus } = usePlanner();
+  const { subjectById, units, setLessonStatus } = usePlanner();
   const nowMin = useNowMin();
 
   const doneCount = dayLessons.filter((l) => l.status === "done").length;
@@ -96,6 +97,7 @@ export function DayA(props: DayViewV2Props): ReactNode {
             const isNow = status === "now" || currentId === lesson.id;
             const [start, end] = timeParts(lesson);
             const title = stripHtml(lesson.title);
+            const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
             return (
               // The row container's onClick is a REDUNDANT pointer convenience
               // (select-on-click anywhere); it is deliberately NOT a
@@ -144,7 +146,8 @@ export function DayA(props: DayViewV2Props): ReactNode {
                     {title}
                   </SelectTitle>
                   <div className={styles.vaUnit}>
-                    {subject.name} · {lesson.unit}
+                    {subject.name}
+                    {unitName ? ` · ${unitName}` : ""}
                   </div>
                   <ForkCues lesson={lesson} />
                 </div>

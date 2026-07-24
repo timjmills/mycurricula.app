@@ -15,6 +15,7 @@ import {
 } from "@/lib/day-status";
 import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
+import { unitDisplayName } from "@/lib/unit-name";
 import { Tooltip } from "@/components/ui";
 import type { Lesson } from "@/lib/types";
 import {
@@ -195,8 +196,9 @@ function FocusPanel({
   onPlan: (id: string) => void;
   onTeach: (id: string) => void;
 }): ReactNode {
-  const { subjectById, setLessonStatus } = usePlanner();
+  const { subjectById, units, setLessonStatus } = usePlanner();
   const isDone = lesson.status === "done";
+  const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
   return (
     <div
       className={styles.vbFocus}
@@ -220,7 +222,7 @@ function FocusPanel({
           <ForkCues lesson={lesson} />
         </div>
         <h3 className={styles.focusTitle}>{stripHtml(lesson.title)}</h3>
-        <div className={styles.un}>{lesson.unit}</div>
+        {unitName && <div className={styles.un}>{unitName}</div>}
         <div className={`cp-subj ${lesson.subject} ${styles.vbObj}`}>
           {stripHtml(lesson.objective)}
         </div>
