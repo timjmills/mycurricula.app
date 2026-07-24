@@ -32,7 +32,8 @@ export async function setSchoolFramework(
     if (!caller.isSchoolAdmin) {
       return {
         ok: false,
-        error: "Only a school admin can change the school's default frameworks.",
+        error:
+          "Only a workspace admin can change the school's default frameworks.",
       };
     }
     if (included) {

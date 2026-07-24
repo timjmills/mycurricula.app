@@ -81,34 +81,51 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 //
 // The app provisions a freshly-authenticated user one of two ways:
 //
-//   • "domain"     — TODAY'S behavior, verbatim: fail-closed enrollment into a
-//                    tenant via the `ALLOWED_TEACHER_EMAIL_DOMAINS` allow-list
-//                    (the school-first model). This is the DEFAULT and the only
-//                    implemented path.
-//   • "individual" — the teacher-first model (ultraplan): every signup gets its
-//                    own private workspace. NOT IMPLEMENTED in Wave 1 — branched
-//                    here as a fail-closed stub so the dispatch wiring exists
-//                    before the real implementation lands (Wave 3).
+//   • "individual" — the teacher-first model (ultraplan Wave 3, now live): every
+//                    signup gets its own private workspace with no domain check.
+//                    This is the DEFAULT — the product is sold to individual
+//                    teachers (CLAUDE.md §1).
+//   • "domain"     — fail-closed enrollment into a shared tenant via the
+//                    `ALLOWED_TEACHER_EMAIL_DOMAINS` allow-list (the legacy
+//                    school-first model). An explicit opt-in, kept for the Qatar
+//                    beta school.
 //
 // The mode is read ONCE through `provisioningMode()` (a typed reader, not
 // scattered `process.env` reads) so the branch point is single + greppable.
-// Unknown / unset / malformed → "domain", so the default deploy is unchanged.
+// Unknown / unset / malformed → "individual" (the individual-teacher default);
+// only an explicit "domain" selects the legacy allow-list model.
 
 export type ProvisioningMode = "domain" | "individual";
 
 /**
  * Resolve the active provisioning mode from `process.env.PROVISIONING_MODE`.
  *
- * Only the exact lowercase token `"individual"` selects the individual model;
- * EVERYTHING else — unset, empty, mixed-case typo, garbage — resolves to
- * `"domain"`. Failing safe to the current behavior guarantees that a missing or
- * fat-fingered env var never silently flips a deploy into the (stubbed,
- * fail-closed) individual path.
+ * The product is sold to INDIVIDUAL teachers (CLAUDE.md §1), so the individual
+ * (teacher-first) model is the DEFAULT for UNSET/EMPTY — a fresh environment
+ * behaves as the open-signup product (an authenticated user gets an ISOLATED
+ * private workspace; that is signup, not exposure).
+ *
+ * Recognized values are matched case-insensitively after trimming. An
+ * UNRECOGNIZED non-empty value FAILS CLOSED to "domain" with a loud error
+ * (§4a): an operator who set the variable at all was almost certainly trying
+ * to configure the allow-list beta mode — a typo ("domian", "Domain ") must
+ * not silently disable the enrollment boundary they intended.
+ *
+ * Prod (and the shared-name preview Worker, `mycurricula-app`) sets
+ * `PROVISIONING_MODE` explicitly as a Cloudflare Worker secret, so the
+ * defaults here are never consulted there. `.env.local` also sets it
+ * explicitly (mirrors prod).
  */
 export function provisioningMode(): ProvisioningMode {
-  return process.env.PROVISIONING_MODE === "individual"
-    ? "individual"
-    : "domain";
+  const raw = (process.env.PROVISIONING_MODE ?? "").trim().toLowerCase();
+  if (raw === "domain") return "domain";
+  if (raw === "" || raw === "individual") return "individual";
+  console.error(
+    `[provisioning] PROVISIONING_MODE has unrecognized value ${JSON.stringify(
+      process.env.PROVISIONING_MODE,
+    )} — failing CLOSED to "domain" (allow-list). Set "individual" or "domain" explicitly.`,
+  );
+  return "domain";
 }
 
 /**
@@ -187,10 +204,11 @@ export interface EnsureTeacherResult {
  * NOT provision). Branch the provisioning STRATEGY here, behind
  * `provisioningMode()`, so the dispatch lives in exactly one place.
  *
- *   • "domain" (default)  → `ensureTeacherDomain` — the existing allow-list
- *                           behavior, byte-for-byte unchanged.
- *   • "individual"        → `ensureIndividualWorkspace` — Wave 3; a fail-closed
- *                           stub for now.
+ *   • "individual" (default) → `ensureIndividualWorkspace` — every fresh signup
+ *                           gets its own private workspace (the teacher-first
+ *                           model; CLAUDE.md §1).
+ *   • "domain"            → `ensureTeacherDomain` — the legacy allow-list model,
+ *                           an explicit `PROVISIONING_MODE=domain` opt-in.
  *
  * Never throws — returns `{ ok: false, reason }` on any failure so the auth
  * flow that calls it can continue (a failed provision must not block login;
@@ -208,11 +226,12 @@ export async function ensureTeacherRecord(
 }
 
 /**
- * Domain-allow-list provisioning — the school-first model and the DEFAULT.
+ * Domain-allow-list provisioning — the legacy school-first model, now an
+ * explicit `PROVISIONING_MODE=domain` opt-in (no longer the default).
  *
  * This is the original `ensureTeacherRecord` body, moved verbatim behind the
  * `provisioningMode()` dispatch above with ZERO logic change. In `"domain"`
- * mode (the default) the call path is identical to before Wave 1.
+ * mode the call path is identical to before Wave 1.
  *
  * Idempotently ensures the `teachers` + `teacher_grade_assignments` rows exist
  * for an authenticated auth user. Uses the service-role admin client.

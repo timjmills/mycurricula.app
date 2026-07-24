@@ -40,6 +40,7 @@ import { WorkspaceSettings } from "@/components/settings/workspace-settings";
 import { WorkspaceSwitcher } from "@/components/settings/workspace-switcher";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { getActiveWorkspace } from "@/lib/workspaces";
+import { DEFAULT_SEAT_CAP } from "@/lib/workspace-limits";
 import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
@@ -80,7 +81,7 @@ async function TeamData({
     await Promise.all([
       listWorkspaceMembers(schoolId).catch(() => ({
         members: [],
-        seats: { used: 0, cap: 5 },
+        seats: { used: 0, cap: DEFAULT_SEAT_CAP },
       })),
       listWorkspaceNotebooks(schoolId).catch(() => []),
       listPendingInvites(schoolId).catch(() => []),

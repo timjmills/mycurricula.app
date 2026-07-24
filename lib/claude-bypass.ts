@@ -299,8 +299,8 @@ async function mintSession(
   if (process.env.CLAUDE_BYPASS_PROVISION !== "0") {
     // CONVERGENCE (ultraplan Wave 1): the single provisioning hook, shared with
     // /auth/gsi and the OAuth callback. `ensureTeacherRecord` branches on
-    // `PROVISIONING_MODE` internally (default "domain"); under "individual" the
-    // bypass user gets its own workspace too (ultraplan §8 R9) once Wave 3 lands.
+    // `PROVISIONING_MODE` internally (default "individual"); under "individual"
+    // the bypass user gets its own workspace too (ultraplan §8 R9, Wave 3 live).
     const provision = await ensureTeacherRecord(admin, bypassUser);
     if (!provision.ok) {
       return {

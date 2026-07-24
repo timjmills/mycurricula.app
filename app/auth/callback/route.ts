@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       // the session cookie is allowed to stick.
       // CONVERGENCE (ultraplan Wave 1): the single provisioning hook, shared
       // with /auth/gsi and the Claude bypass. `ensureTeacherRecord` branches on
-      // `PROVISIONING_MODE` (default "domain" = today's allow-list behavior).
+      // `PROVISIONING_MODE` (default "individual"; "domain" = legacy allow-list).
       let provisioned = false;
       try {
         const provision = await ensureTeacherRecord(getAdminClient(), {

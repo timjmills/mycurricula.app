@@ -25,6 +25,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { mapRosterRows, type WorkspaceRosterRow } from "@/lib/workspaces/row";
+import { DEFAULT_SEAT_CAP } from "@/lib/workspace-limits";
 
 // ── DB-accurate enum mirrors ────────────────────────────────────────────────
 // The grade_role Postgres enum (M1) has THREE values — distinct from the mock
@@ -55,7 +56,7 @@ export interface WorkspaceMember {
 export interface SeatUsage {
   /** Active members occupying a seat (team_memberships count). */
   used: number;
-  /** The seat ceiling (teams.seat_cap; default 5). */
+  /** The seat ceiling (teams.seat_cap; falls back to DEFAULT_SEAT_CAP). */
   cap: number;
 }
 
@@ -195,14 +196,17 @@ export async function listWorkspaceMembers(
     .maybeSingle();
   if (teamError) throw teamError;
 
-  let seats: SeatUsage = { used: members.length, cap: 5 };
+  let seats: SeatUsage = { used: members.length, cap: DEFAULT_SEAT_CAP };
   if (teamRow) {
     const { count, error: countError } = await supabase
       .from("team_memberships")
       .select("id", { count: "exact", head: true })
       .eq("team_id", teamRow.id as string);
     if (countError) throw countError;
-    seats = { used: count ?? 0, cap: (teamRow.seat_cap as number) ?? 5 };
+    seats = {
+      used: count ?? 0,
+      cap: (teamRow.seat_cap as number) ?? DEFAULT_SEAT_CAP,
+    };
   }
 
   return { members, seats };
@@ -306,14 +310,17 @@ async function listWorkspaceMembersForWorkspace(
     .maybeSingle();
   if (teamError) throw teamError;
 
-  let seats: SeatUsage = { used: members.length, cap: 5 };
+  let seats: SeatUsage = { used: members.length, cap: DEFAULT_SEAT_CAP };
   if (teamRow) {
     const { count, error: countError } = await supabase
       .from("team_memberships")
       .select("id", { count: "exact", head: true })
       .eq("team_id", teamRow.id as string);
     if (countError) throw countError;
-    seats = { used: count ?? 0, cap: (teamRow.seat_cap as number) ?? 5 };
+    seats = {
+      used: count ?? 0,
+      cap: (teamRow.seat_cap as number) ?? DEFAULT_SEAT_CAP,
+    };
   }
 
   return { members, seats };

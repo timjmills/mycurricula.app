@@ -3,9 +3,10 @@
 // StandardsSettings — the client surface for Settings → Standards.
 //
 // Two sections:
-//   1. School default (TEAM) — the framework set a school admin picks once. Admins
-//      edit it with the FrameworkBrowser; non-admins see it read-only ("set by your
-//      school admin"). Changes are team-wide → consequence toast with Undo.
+//   1. School default (TEAM) — the framework set a workspace admin picks once.
+//      Admins edit it with the FrameworkBrowser; non-admins see it read-only
+//      ("set by your workspace admin"). Changes are team-wide → consequence toast
+//      with Undo.
 //   2. Your frameworks (PERSONAL) — the teacher's effective set = school default ±
 //      personal overrides. Toggling a school-default off, or adding an extra,
 //      writes a teacher_frameworks override; returning to the default clears it.
@@ -127,7 +128,7 @@ export function StandardsSettings({
         scope="team"
         title={
           <Tooltip
-            content="The curriculum frameworks your whole school plans against. A school admin sets these; every teacher starts from this set."
+            content="The curriculum frameworks your whole school plans against. A workspace admin sets these; every teacher starts from this set."
             side="bottom"
             required
           >
@@ -150,7 +151,7 @@ export function StandardsSettings({
         ) : schoolList.length > 0 ? (
           <div className={styles.readonly}>
             <p className={styles.note}>
-              Set by your school admin. You can add or remove frameworks for
+              Set by your workspace admin. You can add or remove frameworks for
               yourself below.
             </p>
             <ul className={styles.chipList}>
@@ -164,7 +165,7 @@ export function StandardsSettings({
           </div>
         ) : (
           <p className={styles.note}>
-            Your school admin hasn’t set default frameworks yet. You can still
+            Your workspace admin hasn’t set default frameworks yet. You can still
             choose your own below.
           </p>
         )}
