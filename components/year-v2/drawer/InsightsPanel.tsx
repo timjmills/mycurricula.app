@@ -81,6 +81,15 @@ export interface InsightsPanelProps {
    * mid-hydrate unit reads as genuinely empty (the 7.16 cutover failure mode).
    */
   dataState?: PlannerDataState;
+  /**
+   * Does this lesson have ANY resource, counting SECTION resources? Supplied by
+   * the host, which can reach `getSections`; this panel stays store-free.
+   *
+   * Without it, "Needs attention" counts a lesson whose resources all live on
+   * its sections as having none — claiming a gap for a lesson whose Resources
+   * tab, one click away in the same modal, lists them.
+   */
+  hasResources?: (lesson: Lesson) => boolean;
   className?: string;
 }
 
@@ -338,9 +347,13 @@ function StandardsBody({
 export function InsightsPanel({
   lessons,
   dataState,
+  hasResources,
   className,
 }: InsightsPanelProps): ReactNode {
-  const insights = useMemo(() => unitInsights(lessons), [lessons]);
+  const insights = useMemo(
+    () => unitInsights(lessons, hasResources ? { hasResources } : undefined),
+    [lessons, hasResources],
+  );
   const rootClass = [styles.root, className].filter(Boolean).join(" ");
 
   // Readiness is consulted ONLY when there is nothing to show — PlannerEmpty's
@@ -444,8 +457,15 @@ export function InsightsPanel({
 
       {/* ── Assessment ──────────────────────────────────────────────────── */}
       <Metric
-        title="Assessment"
-        tooltip="How many of this unit’s lessons carry an assessment. It counts what’s been written down, not how well anything went."
+        // "LESSON assessments", not "Assessment". A unit also owns assessments
+        // of its own (the Assessments pane's top half), and this metric counts
+        // only the ones hanging off lessons. Titled bare, a unit with three
+        // unit-level assessments would read "0 of 8 lessons have an assessment"
+        // one click away from a pane listing three — technically true, and
+        // exactly the kind of true-but-misleading number this panel exists to
+        // avoid.
+        title="Lesson assessments"
+        tooltip="How many of this unit’s lessons carry an assessment of their own. Assessments owned by the whole unit are listed in the Assessments pane and aren’t counted here. It counts what’s been written down, not how well anything went."
         tooltipId="b3-ins-assessment"
       >
         {assessments.state !== "available" ? (

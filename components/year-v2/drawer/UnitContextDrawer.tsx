@@ -23,6 +23,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
+import { Tooltip } from "@/components/ui";
 import styles from "./UnitContextDrawer.module.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -30,6 +31,13 @@ import styles from "./UnitContextDrawer.module.css";
 export interface UnitContextDrawerPane<K extends string = string> {
   key: K;
   label: string;
+  /**
+   * What this pane is FOR, in a first-time teacher's terms (CLAUDE.md §4).
+   * "Prep" in particular is not self-explanatory from its label alone.
+   */
+  tip: string;
+  /** Stable id for the dismissible onboarding-tooltip system. */
+  tipId: string;
   /** Rendered only while this pane is the active one. */
   content: ReactNode;
 }
@@ -90,23 +98,24 @@ export function UnitContextDrawer<K extends string = string>({
           aria-orientation="horizontal"
           onKeyDown={onPaneKeyDown}
         >
-          {panes.map(({ key, label }) => {
+          {panes.map(({ key, label, tip, tipId }) => {
             const on = key === active?.key;
             return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                data-ue-pane={key}
-                id={`ue-pane-${key}`}
-                aria-selected={on}
-                aria-controls="ue-drawer-panel"
-                tabIndex={on ? 0 : -1}
-                className={`${styles.pane} ${on ? styles.paneOn : ""}`}
-                onClick={() => onPaneChange(key)}
-              >
-                {label}
-              </button>
+              <Tooltip key={key} content={tip} tooltipId={tipId} side="bottom">
+                <button
+                  type="button"
+                  role="tab"
+                  data-ue-pane={key}
+                  id={`ue-pane-${key}`}
+                  aria-selected={on}
+                  aria-controls="ue-drawer-panel"
+                  tabIndex={on ? 0 : -1}
+                  className={`${styles.pane} ${on ? styles.paneOn : ""}`}
+                  onClick={() => onPaneChange(key)}
+                >
+                  {label}
+                </button>
+              </Tooltip>
             );
           })}
         </div>

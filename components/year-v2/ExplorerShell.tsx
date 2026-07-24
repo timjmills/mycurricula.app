@@ -140,6 +140,13 @@ export interface ExplorerShellProps<K extends string = string> {
   drawerOpen?: boolean;
   /** aria-label for the drawer region ("Unit insights"). */
   drawerLabel?: string;
+  /**
+   * `title=` on the drawer region — the TOUCH long-press explanation required of
+   * every named panel (CLAUDE.md §4). A phone or tablet user has no hover, so
+   * without this the panel has no way to explain itself; the rail carries the
+   * same affordance.
+   */
+  drawerTitle?: string;
   onClose: () => void;
 }
 
@@ -193,6 +200,7 @@ export function ExplorerShell<K extends string = string>({
   drawer,
   drawerOpen = false,
   drawerLabel,
+  drawerTitle,
   onClose,
 }: ExplorerShellProps<K>): ReactNode {
   const titleId = useId();
@@ -479,6 +487,7 @@ export function ExplorerShell<K extends string = string>({
                 data-ue-drawer
                 role="region"
                 aria-label={drawerLabel}
+                title={drawerTitle}
               >
                 {drawer}
               </div>

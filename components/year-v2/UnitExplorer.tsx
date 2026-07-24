@@ -3,12 +3,16 @@
 // UnitExplorer.tsx — the Year drill-down modal's UNIT mode (v2 "The Year").
 //
 // Opened from a unit chip / node on the YearA / YearC frames. A centered,
-// frosted dialog scoped to ONE unit, showing five tabs — Overview · Lessons ·
+// frosted dialog scoped to ONE unit, showing five tabs — Unit Plan · Lessons ·
 // Standards · Resources · Notes — each bound to REAL store data only
-// (usePlanner catalog + lib/year-unit-aggregate + lib/unit-notes). The 7.2.26
-// bundle's Explorer fabricates pace / projected-finish / vs-last-year /
-// assessment stats; NONE of that is built here (locked scope) — no dead
-// placeholders.
+// (usePlanner catalog + lib/year-unit-aggregate + lib/unit-notes). Assessment
+// and planning stats DO exist now, but they live in the B3 drawer's Insights
+// pane, where lib/unit-insights returns every figure as either a value backed by
+// a real lesson field or an explicit "unavailable, and here is why". What the
+// 7.2.26 bundle's Explorer invents and this surface still refuses to render is
+// pace / projected-finish / vs-last-year: they need a configurable school-week
+// calendar we don't have, so a number there would be a guess wearing a
+// denominator. Nothing anywhere in this modal is a dead placeholder.
 //
 // WAVE 7: the modal chrome (scrim, portal, gradient header, tablist, focus
 // trap, Escape/scrim close) moved to <ExplorerShell>, which this file now
@@ -23,6 +27,11 @@
 // CSS still lives in UnitExplorer.module.css; the tab files import it from the
 // parent folder, so the hashed class names — and the render — are unchanged.
 //
+// B3: a right-hand CONTEXT DRAWER (./drawer) rides beside the tab bodies —
+// Assessments · Insights · Prep. Those three are commentary ABOUT the unit, not
+// parts OF it, which is why they are drawer panes and not a sixth/seventh/eighth
+// tab (see TABS below).
+//
 // DATA IDENTITY: `unit` is the unit-id SLUG as it sits on `Lesson.unit`
 // (e.g. "u-m3"). The display name / week span / "Unit n of N" resolve from the
 // catalog (usePlanner().unitById + .units) via lib/year-v2-data helpers.
@@ -36,7 +45,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import type { SubjectId } from "@/lib/types";
+import type { Lesson, SubjectId } from "@/lib/types";
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { unitResources, unitStandards } from "@/lib/year-unit-aggregate";
 import {
@@ -115,10 +124,15 @@ function splitUnitName(name: string): { prefix: string; rest: string } {
   };
 }
 
-/** The five tabs — locked scope (no Assessments / Refine / Insights until B2/B3;
- *  no dead tabs). B1.5 relabels the first "Unit Plan"; the key stays `overview`
- *  (the body switch + tab CSS key off it — a label-only change keeps the churn
- *  minimal). */
+/** The five tabs — and B3 deliberately kept them at five. Assessments and
+ *  Insights did NOT graduate into this strip; they went to the right-hand
+ *  context drawer instead, because the strip lists the unit's PARTS (its plan,
+ *  its lessons, its standards, its resources, its notes) while the drawer holds
+ *  commentary ABOUT the unit. Let commentary in and the strip becomes a junk
+ *  drawer that buries the parts a teacher opened the unit to reach. Refine is
+ *  out of B3 scope entirely — not built, and no dead tab stands in for it.
+ *  B1.5 relabels the first "Unit Plan"; the key stays `overview` (the body
+ *  switch + tab CSS key off it — a label-only change keeps the churn minimal). */
 type TabKey = "overview" | "lessons" | "standards" | "resources" | "notes";
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: "overview", label: "Unit Plan" },
@@ -191,6 +205,7 @@ export function UnitExplorer({
     subjectById,
     units,
     setLessonStatus,
+    getSections,
   } = usePlanner();
   const router = useRouter();
 
@@ -216,6 +231,19 @@ export function UnitExplorer({
     toggle: toggleDrawer,
   } = useWorkspaceDrawer();
   const dataState = usePlannerDataState();
+
+  // Resource truth for Insights. `Lesson.resources` is only half of it —
+  // SECTION resources are the canonical half (lib/resources-dedup.ts), and the
+  // composer attaches to a section whenever one is the destination. Sections are
+  // not on the Lesson shape, so the pure derivations cannot see them and the
+  // "Needs attention" gap counted a lesson whose resources all live on sections
+  // as having none, one click from a Resources tab listing them.
+  const hasAnyResource = useCallback(
+    (l: Lesson): boolean =>
+      l.resources.length > 0 ||
+      getSections(l.id).some((s) => s.resources.length > 0),
+    [getSections],
+  );
 
   // Closing from the drawer's OWN ✕ hides the subtree the ✕ lives in, so focus
   // would fall to <body> — outside the dialog — and the next Tab would start at
@@ -342,8 +370,15 @@ export function UnitExplorer({
       {
         key: "assessments",
         label: "Assessments",
+        tip: "Every assessment in this unit — the ones the unit owns, and the ones attached to individual lessons.",
+        tipId: "b3-pane-assessments",
         content: (
           <AssessmentsPanel
+            unitId={unit}
+            // The drawer subtree stays mounted while closed (display:none) and
+            // "assessments" is the default pane — so the unit-assessment read
+            // must wait for a real reveal, not for the mount.
+            visible={drawerOpen && drawerPane === "assessments"}
             lessons={lessons}
             onOpenLesson={openPlan}
             dataState={dataState}
@@ -353,11 +388,21 @@ export function UnitExplorer({
       {
         key: "insights",
         label: "Insights",
-        content: <InsightsPanel lessons={lessons} dataState={dataState} />,
+        tip: "What this unit’s planning adds up to so far — and, just as plainly, what the app doesn’t know yet.",
+        tipId: "b3-pane-insights",
+        content: (
+          <InsightsPanel
+            lessons={lessons}
+            dataState={dataState}
+            hasResources={hasAnyResource}
+          />
+        ),
       },
       {
         key: "prep",
         label: "Prep",
+        tip: "Materials and prior-learning notes recorded on this unit’s lessons — what to build or gather before teaching.",
+        tipId: "b3-pane-prep",
         content: (
           <PrepPanel
             lessons={lessons}
@@ -479,6 +524,7 @@ export function UnitExplorer({
       }
       drawerOpen={drawerOpen}
       drawerLabel="Unit context"
+      drawerTitle="Assessments, insights and prep for this unit — read alongside whichever tab you’re working in."
       onClose={onClose}
       body={
         <>

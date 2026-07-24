@@ -75,6 +75,13 @@ export interface ToggleGroupProps<T extends string = string> {
    * toggle. Default false.
    */
   tooltipRequired?: boolean;
+  /**
+   * Locks the whole group. Use when a longer operation is in flight and a
+   * changed selection would race it — the group keeps rendering its current
+   * value (so nothing appears to reset), it simply cannot be changed.
+   * Default false.
+   */
+  disabled?: boolean;
 }
 
 // ── ToggleGroup ─────────────────────────────────────────────────────────────
@@ -88,6 +95,7 @@ export function ToggleGroup<T extends string = string>({
   ariaLabel,
   className,
   tooltipRequired = false,
+  disabled = false,
 }: ToggleGroupProps<T>): ReactNode {
   const groupRef = useRef<HTMLDivElement>(null);
 
@@ -162,6 +170,7 @@ export function ToggleGroup<T extends string = string>({
             title={option.title}
             tabIndex={isActive ? 0 : -1}
             className={btnClasses}
+            disabled={disabled}
             onClick={() => onChange(option.value)}
           >
             {option.icon && (

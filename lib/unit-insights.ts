@@ -92,6 +92,25 @@ export type Insight<T> =
       reason: InsightUnavailableReason;
     };
 
+/**
+ * Facts this module cannot see from a `Lesson` alone, supplied by a caller that
+ * can. Optional throughout: omitted, every metric falls back to lesson-only
+ * data, which is what a store-free consumer (or a test) gets.
+ */
+export interface UnitInsightsOptions {
+  /**
+   * Does this lesson have ANY resource, counting SECTION resources?
+   *
+   * Section resources are the canonical half of a lesson's resource list
+   * (`lib/resources-dedup.ts`), and the composer attaches to a section whenever
+   * one is the destination — but sections are not on the `Lesson` shape. Without
+   * this, a lesson whose resources all live on its sections counts as "no
+   * resources", and the panel claims a gap for a lesson whose Resources tab, in
+   * the same modal, lists them.
+   */
+  hasResources?: (lesson: Lesson) => boolean;
+}
+
 function available<T>(lessonCount: number, value: T): Insight<T> {
   return { state: "available", lessonCount, value };
 }
@@ -480,9 +499,14 @@ export function prepReadiness(
  */
 export function planningGaps(
   lessons: readonly Lesson[],
+  opts?: UnitInsightsOptions,
 ): Insight<PlanningGaps> {
   const active = activeLessons(lessons);
-  return planningGapsFrom(active.length, accumulate(active), unitGaps(active));
+  return planningGapsFrom(
+    active.length,
+    accumulate(active),
+    unitGaps(active, opts),
+  );
 }
 
 /**
@@ -570,7 +594,10 @@ export function taughtDateCoverage(
  * Prefer this over the individual functions when the panel shows more than one
  * metric: calling them separately re-sweeps the list once each.
  */
-export function unitInsights(lessons: readonly Lesson[]): UnitInsights {
+export function unitInsights(
+  lessons: readonly Lesson[],
+  opts?: UnitInsightsOptions,
+): UnitInsights {
   const active = activeLessons(lessons);
   const lessonCount = active.length;
   const t = accumulate(active);
@@ -579,7 +606,7 @@ export function unitInsights(lessons: readonly Lesson[]): UnitInsights {
     assessments: assessmentsFrom(lessonCount, t),
     plannedTime: plannedTimeFrom(lessonCount, t),
     prep: prepFrom(lessonCount, t),
-    planningGaps: planningGapsFrom(lessonCount, t, unitGaps(active)),
+    planningGaps: planningGapsFrom(lessonCount, t, unitGaps(active, opts)),
     standards: standardsFrom(lessonCount, t, distinctStandardRefs(active)),
     taughtDates: taughtDatesFrom(lessonCount, t),
   };

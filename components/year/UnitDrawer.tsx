@@ -1,6 +1,12 @@
 "use client";
 
-// UnitDrawer — the tabbed Year drill-down drawer.
+// UnitDrawer — the tabbed Year drill-down drawer (v1; SUPERSEDED, UNUSED).
+//
+// Nothing imports this file. The v2 unit workspace replaced it —
+// components/year-v2/UnitExplorer for the tabs, components/year-v2/drawer for
+// the Assessments · Insights · Prep context drawer (B3) — and B5 retires this
+// one outright (see docs/7.23.26-unified-v2-plan.md §5.2). Read what follows as
+// a record of the v1 surface, not as a description of how the app behaves today.
 //
 // This extracts + upgrades the inline `renderDetail` block that used to live in
 // TimelineYear: the old expand-under-row detail showed only the Unit Overview
@@ -11,10 +17,19 @@
 // and every aria-label / sr-only status string the accessibility pass added.
 //
 // The non-Overview tabs derive their content from the unit's OWN lessons via
-// the pure helpers in `lib/year-unit-aggregate.ts` — there is no unit-level
-// resource/standard/note entity in the data model yet (Phase 1B+), so these are
-// REAL data rolled up from the lessons, never fabricated placeholders. The
-// Assessments tab is an honest stub (no assessment data exists yet).
+// the pure helpers in `lib/year-unit-aggregate.ts` — when this was written there
+// was no unit-level entity behind any of them, so these are REAL data rolled up
+// from the lessons, never fabricated placeholders. Track B has since given
+// `units` its own columns (notes / big_idea / essential_questions, migration
+// 20260728) and added `unit_assessments` (20260729); this dead file reads none
+// of them.
+//
+// Its Assessments tab still renders a "coming in a later phase" stub, and that
+// copy is now WRONG: assessment data exists at both levels — the four lesson
+// `assessment_*` columns (B2) and unit-owned `unit_assessments` rows (B3) —
+// surfaced by the year-v2 drawer's Assessments panel. The stub is left standing
+// because nothing renders it — the fix is B5's deletion, not a wiring pass on a
+// component that is already gone in every sense but the file.
 //
 // Visual contract: the PARENT wraps this in `.cp-subj.<subject.cls>` so the
 // palette bridge's --c / --cl / --cd tokens cascade; this module derives every
@@ -658,7 +673,7 @@ function StandardsTab({
   );
 }
 
-// ── Assessments tab (honest stub — no assessment data exists yet) ────────────
+// ── Assessments tab (stub; its copy is stale — see the file header) ──────────
 
 function AssessmentsTab(): ReactNode {
   return (

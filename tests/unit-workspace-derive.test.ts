@@ -167,6 +167,29 @@ describe("unitGaps — planning completeness on not-taught lessons only", () => 
     });
   });
 
+  it("uses the caller's hasResources when given — SECTION resources count", () => {
+    // `Lesson.resources` is only half the picture: section resources are the
+    // canonical half, and the composer attaches to a section whenever one is the
+    // destination. Without this hook, a lesson whose resources all live on its
+    // sections was counted as "no resources" — the panel claiming a gap for a
+    // lesson whose Resources tab, in the same modal, lists them.
+    const lessons = [
+      lesson({ id: "a", resources: [] }), // resources live on its sections
+      lesson({ id: "b", resources: [] }), // genuinely bare
+    ];
+    const hasResources = (l: (typeof lessons)[number]): boolean => l.id === "a";
+
+    expect(unitGaps(lessons, { hasResources })).toMatchObject({
+      missingResources: 1,
+      lessonsWithGaps: 1,
+    });
+    // …and without the hook it falls back to lesson-only data, so BOTH count.
+    expect(unitGaps(lessons)).toMatchObject({
+      missingResources: 2,
+      lessonsWithGaps: 2,
+    });
+  });
+
   it("ignores taught lessons entirely (their planning is history)", () => {
     const lessons = [
       // taught but incomplete — must NOT count as a gap

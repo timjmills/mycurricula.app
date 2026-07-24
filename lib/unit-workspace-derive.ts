@@ -159,7 +159,29 @@ export interface UnitGaps {
   lessonsWithGaps: number;
 }
 
-export function unitGaps(lessons: readonly Lesson[]): UnitGaps {
+export function unitGaps(
+  lessons: readonly Lesson[],
+  opts?: {
+    /**
+     * Does this lesson have ANY resource, counting SECTION resources?
+     *
+     * `Lesson.resources` is only half the picture: section resources are the
+     * canonical half (see `components/lesson-plan-v2/tabs/ResourcesTab.tsx` and
+     * `lib/resources-dedup.ts`), and the composer routes an attach to a section
+     * whenever a section is the destination. So a lesson whose resources all
+     * live on its sections has an EMPTY `Lesson.resources` and was being counted
+     * as "no resources" — the drawer claiming a gap for a lesson whose Resources
+     * tab, in the same modal, lists them.
+     *
+     * Sections are not on the `Lesson` shape, so this module cannot see them and
+     * must be told. Callers with store access (`getSections`) should pass this;
+     * the default preserves the lesson-only behaviour for those that cannot.
+     */
+    hasResources?: (lesson: Lesson) => boolean;
+  },
+): UnitGaps {
+  const hasResources =
+    opts?.hasResources ?? ((l: Lesson): boolean => l.resources.length > 0);
   let missingObjective = 0;
   let missingResources = 0;
   let missingStandards = 0;
@@ -168,7 +190,7 @@ export function unitGaps(lessons: readonly Lesson[]): UnitGaps {
     // Taught lessons are done — their planning completeness is no longer a to-do.
     if (l.status === "done") continue;
     const noObjective = l.objective.trim().length === 0;
-    const noResources = l.resources.length === 0;
+    const noResources = !hasResources(l);
     const noStandards = l.standards.length === 0;
     if (noObjective) missingObjective += 1;
     if (noResources) missingResources += 1;

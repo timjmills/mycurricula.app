@@ -3,10 +3,26 @@
 // AssessmentsPanel.tsx — the Unit workspace context drawer's Assessments panel
 // (B3).
 //
-// A unit-scoped ROLL-UP of the LESSON-level assessments B2 persists (the four
-// `assessment_*` columns behind `Lesson.assessment`). It answers "what am I
-// actually checking in this unit, and where does each check live?" — a question
-// the lesson editor can only answer one lesson at a time.
+// TWO HALVES, DELIBERATELY NOT MERGED. A teacher tags assessments at two
+// different levels, and they are different things:
+//
+//   • UNIT-OWNED (./UnitAssessments) — rows in `unit_assessments`, owned by the
+//     unit itself: a pre-test, a mid-unit check, a final task. A unit owns many;
+//     none belongs to a lesson. Rendered FIRST, in its own filled container,
+//     with "Whole unit · <kind>" on every row.
+//   • LESSON-LEVEL (this file) — the four `assessment_*` columns behind
+//     `Lesson.assessment` (B2), rolled up across the unit's lessons and grouped
+//     by kind. Every row names the lesson it hangs off.
+//
+// Merging them into one list would make "does this belong to the unit or to
+// Tuesday's lesson?" unanswerable at a glance — so the two halves carry
+// different containers, different row silhouettes (ring glyph vs filled dot) and
+// an explicit heading each. Only the KIND colours are shared, because kind means
+// the same thing on both sides.
+//
+// The lesson half is a unit-scoped ROLL-UP: it answers "what am I actually
+// checking in this unit, and where does each check live?" — a question the lesson
+// editor can only answer one lesson at a time.
 //
 // THREE BUCKETS, NOT TWO. `LessonAssessment.kind` is OPTIONAL and an absent
 // kind ROUND-TRIPS through the DB: `assessmentFromRow` (lib/planner/
@@ -58,11 +74,31 @@ import {
 } from "@/components/ui";
 import type { ToggleOption } from "@/components/ui";
 import { dayShort } from "../unit-tabs/helpers";
+import { UnitAssessments } from "./UnitAssessments";
 import styles from "./AssessmentsPanel.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
 export interface AssessmentsPanelProps {
+  /**
+   * The open unit — the id as it appears on `Lesson.unit`. Only the UNIT-owned
+   * half needs it (the lesson roll-up derives everything from `lessons`), and it
+   * is the same value the Unit Plan tab writes its team fields with.
+   */
+  unitId: string;
+  /**
+   * Whether this pane is actually on screen (`drawerOpen && pane ===
+   * "assessments"`). The drawer subtree stays MOUNTED while closed — the shell
+   * hides it with `display: none` — and "assessments" is the default pane, so
+   * without this the unit-owned half would read `unit_assessments` on every
+   * unit-explorer open, for a pane nobody opened.
+   *
+   * Deliberately REQUIRED, not defaulted to `true`: a future host that forgets
+   * it should fail to compile rather than silently reintroduce the round-trip.
+   * Only the unit half consumes it — the lesson roll-up is a pure derivation of
+   * `lessons` and fetches nothing.
+   */
+  visible: boolean;
   /**
    * The unit's lessons — already filtered + sorted by `unitLessons()` (archived
    * excluded, week→day order). The panel derives its rows from these; it never
@@ -416,6 +452,8 @@ function AddAssessment({
 // ── Panel ────────────────────────────────────────────────────────────────────
 
 export function AssessmentsPanel({
+  unitId,
+  visible,
   lessons,
   onOpenLesson,
   dataState,
@@ -488,157 +526,176 @@ export function AssessmentsPanel({
 
   const rootClass = [styles.root, className].filter(Boolean).join(" ");
 
+  // ── The LESSON half's body ────────────────────────────────────────────────
+  // Built as a value rather than an early return, because the UNIT half above it
+  // renders regardless: a unit with no lessons (or one whose plan is still
+  // hydrating) can still own a pre-test, and blanking the whole pane would hide
+  // it. Only this half depends on `lessons`.
+  //
   // Data-readiness empty: with no lessons at all we cannot tell "this unit is
   // empty" from "the 11–16s hydrate hasn't landed" or "the hydrate threw", so
   // the host's dataState decides which of the three this is.
+  let lessonBody: ReactNode;
   if (lessons.length === 0) {
     if (dataState === "pending") {
-      return (
-        <div className={rootClass}>
-          <Skeleton lines={3} size="sm" label="Loading your plan…" />
-        </div>
+      lessonBody = <Skeleton lines={3} size="sm" label="Loading your plan…" />;
+    } else if (dataState === "error") {
+      lessonBody = (
+        <EmptyState
+          size="sm"
+          heading="Couldn’t load your plan"
+          body="Check your connection and reload. Your saved work is safe."
+        />
       );
-    }
-    if (dataState === "error") {
-      return (
-        <div className={rootClass}>
-          <EmptyState
-            size="sm"
-            heading="Couldn’t load your plan"
-            body="Check your connection and reload. Your saved work is safe."
-          />
-        </div>
-      );
-    }
-    return (
-      <div className={rootClass}>
+    } else {
+      lessonBody = (
         <EmptyState
           size="sm"
           heading="No lessons in this unit yet."
-          body="Assessments hang off lessons — add a lesson to the unit and you can attach one here."
+          body="Lesson assessments hang off lessons — add a lesson to the unit and you can attach one here."
         />
-      </div>
+      );
+    }
+  } else {
+    lessonBody = (
+      <>
+        {rows.length === 0 ? (
+          // Settled data, genuinely nothing recorded — a plain message, not a
+          // loading state and not a congratulation.
+          <p className={styles.note}>
+            No assessments recorded on this unit’s {lessons.length} lesson
+            {lessons.length === 1 ? "" : "s"} yet.
+          </p>
+        ) : (
+          GROUPS.map(({ key, label }) => {
+            const groupRows = grouped[key];
+            if (groupRows.length === 0) return null;
+            return (
+              <section key={key} className={styles.group}>
+                {/* h5 under the half's h4 — the kind groups are a level below
+                    "Lesson assessments", not siblings of it. */}
+                <h5 className={styles.groupHead}>
+                  <span
+                    className={styles.groupDot}
+                    data-kind={key}
+                    aria-hidden="true"
+                  />
+                  <span className={styles.groupLabel}>{label}</span>
+                  <span className={styles.groupCount}>{groupRows.length}</span>
+                </h5>
+                <ul className={styles.list}>
+                  {groupRows.map(({ lesson, assessment }) => {
+                    const open = selectedId === lesson.id;
+                    const detailId = `${uid}-${lesson.id}-detail`;
+                    const title = (assessment.title ?? "").trim();
+                    return (
+                      <li key={lesson.id} className={styles.row}>
+                        <button
+                          type="button"
+                          className={styles.rowMain}
+                          aria-expanded={open}
+                          aria-controls={detailId}
+                          onClick={() => setSelectedId(open ? null : lesson.id)}
+                        >
+                          <span
+                            className={styles.glyph}
+                            data-kind={key}
+                            aria-hidden="true"
+                          >
+                            <span className={styles.glyphDot} />
+                          </span>
+                          <span
+                            className={
+                              title
+                                ? styles.rowTitle
+                                : `${styles.rowTitle} ${styles.rowTitleEmpty}`
+                            }
+                          >
+                            {title || "Untitled assessment"}
+                          </span>
+                          <Chevron open={open} />
+                        </button>
+
+                        <Tooltip
+                          content="Open this lesson in the Lesson Planner, where the assessment is edited alongside the rest of the plan."
+                          tooltipId="b3-assess-open-lesson"
+                          side="bottom"
+                        >
+                          <button
+                            type="button"
+                            className={styles.rowLesson}
+                            onClick={() => onOpenLesson(lesson.id)}
+                          >
+                            <span className={styles.rowLessonTitle}>
+                              {lesson.title}
+                            </span>
+                            <span className={styles.rowMeta}>
+                              {lessonMeta(lesson)}
+                            </span>
+                          </button>
+                        </Tooltip>
+
+                        {open ? (
+                          <AssessmentDetail
+                            key={lesson.id}
+                            id={detailId}
+                            lesson={lesson}
+                            assessment={assessment}
+                            onCommit={commit}
+                            onRemove={remove}
+                          />
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })
+        )}
+
+        <div className={styles.addSlot}>
+          {adding && eligible.length > 0 ? (
+            <AddAssessment
+              eligible={eligible}
+              onAdd={add}
+              onCancel={() => setAdding(false)}
+            />
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={eligible.length === 0}
+              tooltip={
+                eligible.length === 0
+                  ? "Every lesson in this unit already has an assessment."
+                  : "Attach an assessment to one of this unit’s lessons."
+              }
+              onClick={() => setAdding(true)}
+            >
+              Add assessment
+            </Button>
+          )}
+        </div>
+      </>
     );
   }
 
   return (
     <div className={rootClass}>
-      {rows.length === 0 ? (
-        // Settled data, genuinely nothing recorded — a plain message, not a
-        // loading state and not a congratulation.
-        <p className={styles.note}>
-          No assessments recorded on this unit’s {lessons.length} lesson
-          {lessons.length === 1 ? "" : "s"} yet.
-        </p>
-      ) : (
-        GROUPS.map(({ key, label }) => {
-          const groupRows = grouped[key];
-          if (groupRows.length === 0) return null;
-          return (
-            <section key={key} className={styles.group}>
-              <h4 className={styles.groupHead}>
-                <span
-                  className={styles.groupDot}
-                  data-kind={key}
-                  aria-hidden="true"
-                />
-                <span className={styles.groupLabel}>{label}</span>
-                <span className={styles.groupCount}>{groupRows.length}</span>
-              </h4>
-              <ul className={styles.list}>
-                {groupRows.map(({ lesson, assessment }) => {
-                  const open = selectedId === lesson.id;
-                  const detailId = `${uid}-${lesson.id}-detail`;
-                  const title = (assessment.title ?? "").trim();
-                  return (
-                    <li key={lesson.id} className={styles.row}>
-                      <button
-                        type="button"
-                        className={styles.rowMain}
-                        aria-expanded={open}
-                        aria-controls={detailId}
-                        onClick={() => setSelectedId(open ? null : lesson.id)}
-                      >
-                        <span
-                          className={styles.glyph}
-                          data-kind={key}
-                          aria-hidden="true"
-                        >
-                          <span className={styles.glyphDot} />
-                        </span>
-                        <span
-                          className={
-                            title
-                              ? styles.rowTitle
-                              : `${styles.rowTitle} ${styles.rowTitleEmpty}`
-                          }
-                        >
-                          {title || "Untitled assessment"}
-                        </span>
-                        <Chevron open={open} />
-                      </button>
+      {/* UNIT-owned first: it is the unit's own answer to "how is this unit
+          assessed?", and it stays visible even when the lesson list is empty or
+          still hydrating. Keyed by unit so a rail switch starts a clean read
+          rather than showing the previous unit's rows against the new one. */}
+      <UnitAssessments key={unitId} unitId={unitId} visible={visible} />
 
-                      <Tooltip
-                        content="Open this lesson in the Lesson Planner, where the assessment is edited alongside the rest of the plan."
-                        tooltipId="b3-assess-open-lesson"
-                        side="bottom"
-                      >
-                        <button
-                          type="button"
-                          className={styles.rowLesson}
-                          onClick={() => onOpenLesson(lesson.id)}
-                        >
-                          <span className={styles.rowLessonTitle}>
-                            {lesson.title}
-                          </span>
-                          <span className={styles.rowMeta}>
-                            {lessonMeta(lesson)}
-                          </span>
-                        </button>
-                      </Tooltip>
-
-                      {open ? (
-                        <AssessmentDetail
-                          key={lesson.id}
-                          id={detailId}
-                          lesson={lesson}
-                          assessment={assessment}
-                          onCommit={commit}
-                          onRemove={remove}
-                        />
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          );
-        })
-      )}
-
-      <div className={styles.addSlot}>
-        {adding && eligible.length > 0 ? (
-          <AddAssessment
-            eligible={eligible}
-            onAdd={add}
-            onCancel={() => setAdding(false)}
-          />
-        ) : (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={eligible.length === 0}
-            tooltip={
-              eligible.length === 0
-                ? "Every lesson in this unit already has an assessment."
-                : "Attach an assessment to one of this unit’s lessons."
-            }
-            onClick={() => setAdding(true)}
-          >
-            Add assessment
-          </Button>
-        )}
-      </div>
+      <section className={styles.half}>
+        <div className={styles.halfHead}>
+          <h4 className={styles.halfTitle}>Lesson assessments</h4>
+          <span className={styles.halfNote}>Each one belongs to a lesson</span>
+        </div>
+        {lessonBody}
+      </section>
     </div>
   );
 }

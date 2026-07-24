@@ -36,6 +36,283 @@
   text-wrap: pretty;
 }
 
+/* ── The two halves ─────────────────────────────────────────────────────────
+ *
+ * A unit assessment (its own row in `unit_assessments`, owned by the unit) and a
+ * lesson assessment (four columns ON a lesson) are different things, so they get
+ * two labelled halves rather than one merged list. Each half is a heading over
+ * its own list; the unit rows are then told apart by a warm-tinted card, a RING
+ * glyph where a lesson row has a filled dot, and a "Whole unit" caption on every
+ * row.
+ *
+ * NO EXTRA CONTAINER PADDING on the unit half — deliberately. The kind tray is
+ * 273px of inline-flex that cannot wrap, and the desktop drawer gives a row's
+ * inner box 269px. A padded wrapper would have cost another 26px and clipped the
+ * third chip's label outright instead of by a hair. Both halves now render at
+ * exactly the same width. */
+
+.half {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.halfHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.halfTitle {
+  margin: 0;
+  font-size: var(--t-13);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink-900);
+}
+
+.halfNote {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+/* ── Unit-owned assessments ─────────────────────────────────────────────────
+ *
+ * TEAM CONTENT: editable only in Team Curriculum mode, read-only in Personal —
+ * the same contract as the Unit Plan fields, so the badge copy matches. */
+
+.uSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* The unit rows' card fill. Warm where a lesson row is plain --surface, so the
+   two lists read as two lists even when both are scrolled past their headings.
+   Costs no width, unlike a wrapper. */
+.uRow.uRow {
+  background: var(--surface-warm);
+}
+
+.uHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.uTitle {
+  margin: 0;
+  font-size: var(--t-13);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink-900);
+}
+
+/* Pushed to the end of the head row so the badge always sits right. */
+.uBadge {
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill, 999px);
+  background: var(--surface);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-700);
+  cursor: help;
+}
+.uBadge:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: 2px;
+}
+
+/* Save / delete / reorder failures. --warn is a FILL colour; text uses
+   --warn-ink, which is tone-branched in tokens.css. */
+.uError {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-md, 14px);
+  background: var(--warn-tint);
+  font-size: var(--t-12);
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--warn-ink);
+  text-wrap: pretty;
+}
+
+.uLoadFail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* The row header. Same silhouette as a lesson row's, plus a caption line that
+   states the ownership on every row ("Whole unit · Formative"). */
+.uRowMain.uRowMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--t-13);
+  text-align: left;
+  color: var(--ink-900);
+  cursor: pointer;
+  transition: background 0.14s;
+}
+/* The row is already --surface-warm, so hover has to step further. Mixing
+   toward --ink-900 is tone-safe in both directions: it darkens on a light
+   surface and lightens on a dark one, because --ink-900 flips with the tone. */
+.uRowMain.uRowMain:hover {
+  background: color-mix(in oklab, var(--surface-warm) 92%, var(--ink-900));
+}
+.uRowMain.uRowMain:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: -2px;
+}
+
+.uRowText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.uRowCaption {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+/* A RING, where a lesson row's glyph is a filled dot — the shape difference
+   restates the ownership for anyone scanning rather than reading. Kind colour
+   is the same on both halves: kind means kind, ownership is carried by shape,
+   caption and container. */
+.uGlyph {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm, 10px);
+}
+.uGlyph[data-kind="formative"] {
+  background: var(--done-tint);
+}
+.uGlyph[data-kind="summative"] {
+  background: var(--assess-summative-tint);
+}
+.uGlyph[data-kind="unclassified"] {
+  background: var(--idle-tint);
+}
+
+.uGlyphRing {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-pill, 999px);
+  border: 2.5px solid var(--idle);
+}
+.uGlyph[data-kind="formative"] .uGlyphRing {
+  border-color: var(--done);
+}
+.uGlyph[data-kind="summative"] .uGlyphRing {
+  border-color: var(--assess-summative);
+}
+
+/* The open editor inverts the row's fill (plain surface inside a warm card), so
+   it separates from the header exactly as the lesson half's warm detail does
+   inside a plain card. */
+.uDetail.uDetail {
+  background: var(--surface);
+}
+
+/* Editor footer: reorder on the left, delete on the right. Wraps at drawer
+   width rather than overflowing. */
+.uFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.uOrder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.uOrderLabel {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+/* Doubled to survive the `.cp-root button` reset. 44px so the reorder controls
+   are usable on touch. */
+.moveBtn.moveBtn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 14px);
+  background: var(--surface);
+  color: var(--ink-700);
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s;
+}
+.moveBtn.moveBtn:hover:not(:disabled) {
+  background: var(--surface-warm);
+  color: var(--ink-900);
+}
+.moveBtn.moveBtn:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: 2px;
+}
+.moveBtn.moveBtn:disabled {
+  color: var(--ink-400);
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .moveBtn.moveBtn {
+    transition: none;
+  }
+}
+
+/* Read-only values (Personal mode) — the UnitPlanFields idiom. */
+.roText {
+  margin: 0;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--ink-900);
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+.roEmpty {
+  margin: 0;
+  font-size: var(--t-13);
+  font-style: italic;
+  color: var(--ink-400);
+}
+
 /* ── Group (Formative · Summative · Unclassified) ───────────────────────────── */
 
 .group {
