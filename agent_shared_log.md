@@ -2898,3 +2898,37 @@ these without the user's explicit reply):**
 **Next build wave when green-lit:** B1 tranche 2 (B1.4 UnitWorkspaceRail +
 workspace-prefs + ⤢, B1.5 Unit Plan sub-nav rename, B1.6 Overview stat
 strip/ring/arc). Seams are ready per the tranche-1 ship notes in `570b281`.
+
+---
+
+## [Main/orchestrator 7.24] 🚀 MULTI-WORKSPACE CUTOVER COMPLETE — LIVE ON PROD, VERIFIED
+
+**USER GO (all-at-once) executed end-to-end 2026-07-24:**
+1. Migrations 20260726 (rename RPC + search_path sweep) + 20260727 (onboarding)
+   applied STANDALONE via `db query --linked -f`; verified: both RPCs live,
+   onboarded_at backfill 0 nulls, ALL 15 SECURITY DEFINER fns pinned
+   `public, pg_temp`, authenticated-only grants.
+2. Flag delivery: deploy.yml inlines NEXT_PUBLIC_MULTI_WORKSPACE from a REPO
+   VARIABLE (=1) — rollback = flip variable + re-run deploy, no commit
+   (`ec6f7b7`).
+3. §4c flag-ON preview (version 751ad312, real edge + real Supabase): hydrate
+   gate 37/8/8 ALL PASS under the active-workspace funnel; switcher + roster
+   render; onboarding no-redirect (backfill proof); **rename_workspace live
+   round-trip** (renamed → DB verified → reverted → DB verified); 0 console
+   errors.
+4. PROMOTED (deploy green) → **same full QA re-run against mycurricula.app:
+   ALL PASS.** Prod is flag-ON, coherent, and verified.
+5. Housekeeping: workers.dev exposure confirmed both-false (verified via API);
+   tmp QA probe deleted. STILL OWED (CLI refuses non-interactive): delete
+   Supabase project mw-leak-test-scratch (wpqfikxlfvtkskfgvybv) — dashboard or
+   interactive `supabase projects delete`.
+
+**Decisions locked by USER 7.24:** cutover all-at-once (executed); onboarding =
+new-signups-only (as built, live); worktree cleanup approved (agent ran);
+**B1.7: the Year workspace SURVIVES appearance/frame changes** — drop the
+YearShell frame-change dismissal when B1 tranche 2+ builds (record: YearShell
+~:178 `useEffect(()=>setOpenUnit(null),[frame])` is to be removed, with §4b
+verify across frames).
+
+**Rollback (if ever needed):** flip repo variable NEXT_PUBLIC_MULTI_WORKSPACE
+to empty + re-run Deploy. DB objects are additive and safe to leave.
