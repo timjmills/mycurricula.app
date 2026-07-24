@@ -69,6 +69,8 @@ import type {
   Subject,
   SubjectId,
   Unit,
+  UnitKud,
+  UnitVocabItem,
 } from "../types";
 import { SUBJECTS } from "../mock/subjects";
 import type { LessonSectionContent } from "../lesson-flow";
@@ -560,8 +562,17 @@ const COPY_COLS =
 const AUTHORED_COLS =
   "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, differentiation, deleted_at";
 const COMPLETION_COLS = "core_lesson_event_id, status, reason_not_done";
+// ⚠ LAUNCH COUPLING (B1.7, §4c) — the Track-B unit columns (notes, big_idea,
+// essential_questions, vocab, kud, standards, default_flow, default_dur,
+// framework, fw_data, custom_fields, carried, archived_at) exist ONLY once the
+// 20260728120000 migration is applied. This select NAMES them, so this code MUST
+// NOT deploy before that migration is applied on the target DB — exactly the
+// SECTION_COLS color/tint_scope precedent below. If the columns are missing the
+// `units` select fails; that surfaces as the planner store's `error` hydration
+// state (listUnits throws → the hydrate Promise.all rejects → setHydration
+// "error"), never a crash — but the planner renders no data, so apply first.
 const UNIT_COLS =
-  "id, grade_level_id, subject_id, name, start_week, end_week, school_year_id";
+  "id, grade_level_id, subject_id, name, start_week, end_week, school_year_id, notes, big_idea, essential_questions, vocab, kud, standards, default_flow, default_dur, framework, fw_data, custom_fields, carried, archived_at";
 const SUBJECT_COLS =
   "id, grade_level_id, name, color, parent_id, display_order";
 const STANDARD_COLS = "id, code, description";
@@ -618,6 +629,67 @@ function jsonToDifferentiation(
     onLevel: tier(o.onLevel),
     extension: tier(o.extension),
   };
+}
+
+/** Coerce a Postgres text[]/uuid[] column (units.essential_questions,
+ *  units.standards) to a clean `string[]`, or undefined when null/absent. PostgREST
+ *  normally returns a JS array, but a corrupt/legacy value could be a scalar or
+ *  carry non-strings — filter defensively so a spread in the editor (draftFromUnit)
+ *  can never throw (§4a M6). Empty stays undefined (an unset column reads as "no
+ *  value", not an empty list). */
+function jsonToStringList(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out = raw.filter((s): s is string => typeof s === "string");
+  return out.length > 0 ? out : undefined;
+}
+
+/** Coerce a jsonb `units.vocab` value to a typed `UnitVocabItem[]`, or undefined
+ *  when null/absent/malformed. Defensive: keep only entries with a string
+ *  `term`; a companion `definition` is optional (terms-only lists stay valid). */
+function jsonToVocab(raw: unknown): UnitVocabItem[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: UnitVocabItem[] = [];
+  for (const v of raw) {
+    if (typeof v === "object" && v !== null) {
+      const term = (v as { term?: unknown }).term;
+      if (typeof term === "string") {
+        const def = (v as { definition?: unknown }).definition;
+        out.push(
+          typeof def === "string" ? { term, definition: def } : { term },
+        );
+      }
+    }
+  }
+  return out;
+}
+
+/** Coerce a jsonb `units.kud` value to a typed `UnitKud`, or undefined when
+ *  null/absent/malformed. Each of the three lists keeps only string entries;
+ *  a missing list stays undefined so a partially-filled unit round-trips. */
+function jsonToKud(raw: unknown): UnitKud | undefined {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return undefined;
+  }
+  const o = raw as Record<string, unknown>;
+  const list = (v: unknown): string[] | undefined =>
+    Array.isArray(v)
+      ? v.filter((x): x is string => typeof x === "string")
+      : undefined;
+  return { know: list(o.know), understand: list(o.understand), doGoal: list(o.doGoal) };
+}
+
+/** Coerce a jsonb open-map value (`units.fw_data` / `custom_fields` / `carried`)
+ *  to a plain object record, or undefined when null/absent or not an object.
+ *  Arrays are rejected (these columns model an open field→value map, not a
+ *  list) — matching the migration's `jsonb_typeof(...) = 'object'` shape guard
+ *  for fw_data (custom_fields/carried allow arrays at the DB layer, but the
+ *  domain type is a record, so a stray array degrades to undefined rather than
+ *  a type lie). */
+function jsonToUnitRecord(raw: unknown): Record<string, unknown> | undefined {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return undefined;
+  }
+  return raw as Record<string, unknown>;
 }
 
 /** Coerce a persisted section `status` text to the SectionStatus union the
@@ -775,6 +847,49 @@ function deriveMoved(
   if (copy.week_number !== master.week_number) return "across-weeks";
   if (copy.day_of_week !== master.day_of_week) return "same-week";
   return null;
+}
+
+/** Map a `units` row → the FLAT domain `Unit`, including the Track-B workspace
+ *  fields (migration 20260728120000). The caller supplies the resolved subject
+ *  slug and the unit-slug index. `weeks` is the human span label; `shade` is a
+ *  UI color-cycling level not modelled in the schema (deterministic 2, as the
+ *  mock seeds). Nullable Track-B columns map to `undefined` (so an un-migrated
+ *  read — columns absent → the row simply lacks the keys — degrades to the bare
+ *  scheduling unit, never a crash); `archived` derives from `archived_at`. */
+function mapUnitRow(
+  row: UnitRow,
+  subject: SubjectId,
+  uuidToUnitSlug: Map<string, string>,
+): Unit {
+  const weeks =
+    row.start_week === row.end_week
+      ? `Wk ${row.start_week}`
+      : `Wk ${row.start_week}–${row.end_week}`;
+  return {
+    id: uuidToUnitSlug.get(row.id) ?? row.id,
+    subject,
+    name: row.name,
+    weeks,
+    shade: 2,
+    // ── Track-B editable workspace fields (nullable → undefined) ────────────
+    notes: row.notes ?? undefined,
+    bigIdea: row.big_idea ?? undefined,
+    essentialQuestions: jsonToStringList(row.essential_questions),
+    vocab: jsonToVocab(row.vocab),
+    kud: jsonToKud(row.kud),
+    // units.standards is uuid[] of real standards.id — Unit.standardIds carries
+    // the uuids verbatim (no code resolution; the display/tagging picker resolves
+    // codes when a unit-standards editor lands — deferred this tranche).
+    // Decoded defensively (§4a M6) so a corrupt column can't throw downstream.
+    standardIds: jsonToStringList(row.standards),
+    framework: row.framework ?? undefined,
+    frameworkData: jsonToUnitRecord(row.fw_data),
+    customFields: jsonToUnitRecord(row.custom_fields),
+    carried: jsonToUnitRecord(row.carried),
+    defaultFlow: row.default_flow ?? undefined,
+    defaultDuration: row.default_dur ?? undefined,
+    archived: row.archived_at != null,
+  };
 }
 
 // ── Read scaffolding (grade → frameworks → standards, subject/unit indexes) ───
@@ -1295,24 +1410,9 @@ export const plannerSupabaseSource: PlannerDataSource = {
                 row.school_year_id == null ||
                 row.school_year_id === activeYearId,
             );
-    return visibleRows.map((row) => {
-      const subject = uuidToSubjectId.get(row.subject_id) ?? "math";
-      const weeks =
-        row.start_week === row.end_week
-          ? `Wk ${row.start_week}`
-          : `Wk ${row.start_week}–${row.end_week}`;
-      const unit: Unit = {
-        id: uuidToUnitSlug.get(row.id) ?? row.id,
-        subject,
-        name: row.name,
-        weeks,
-        // `shade` is a UI color-cycling level not modelled in the schema; the
-        // mock seeds 2 as the common value. Deterministic default keeps cards
-        // from all rendering shade 1.
-        shade: 2,
-      };
-      return unit;
-    });
+    return visibleRows.map((row) =>
+      mapUnitRow(row, uuidToSubjectId.get(row.subject_id) ?? "math", uuidToUnitSlug),
+    );
   },
 
   async listSubjects(gradeLevelId) {
@@ -1779,6 +1879,53 @@ export const plannerSupabaseSource: PlannerDataSource = {
     }));
   },
 
+  // ── Unit mutations ─────────────────────────────────────────────────────────
+  async updateUnitFields(unitId, patch, ownerId) {
+    // Units are TEAM / MASTER content — one shared `units` row per unit, NO
+    // personal fork (contrast updateLesson's forkAndPatch). So this is a direct
+    // in-place UPDATE, RLS-gated by `units_write` (can_edit_subject_master OR
+    // is_grade_lead). `ownerId` is signature parity only: RLS scopes by
+    // auth.uid(), not by this arg.
+    const client = await sb();
+    void ownerId;
+    // Resolve the caller-visible id → the DB uuid. The read path exposes a unit
+    // AS its DB uuid (loadUnitIndex maps id→id), so `unitId` is normally already
+    // a uuid; a fixture SLUG is hashed defensively (parity with createLesson #6).
+    const unitDbId = isUuid(unitId) ? unitId : slugToUuid("unit", unitId);
+
+    // Map the domain patch → snake_case unit columns. Only keys PRESENT in the
+    // patch are written (an absent field is never nulled). jsonb columns take the
+    // plain object/array — the migration's typeof shape CHECKs accept these.
+    const next: Partial<UnitRow> = {};
+    if (patch.notes !== undefined) next.notes = patch.notes;
+    if (patch.bigIdea !== undefined) next.big_idea = patch.bigIdea;
+    if (patch.essentialQuestions !== undefined)
+      next.essential_questions = patch.essentialQuestions;
+    if (patch.vocab !== undefined) next.vocab = patch.vocab;
+    if (patch.kud !== undefined) next.kud = patch.kud;
+    // units.standards is uuid[] with no FK — written verbatim (Unit.standardIds
+    // is documented as real standards.id uuids). A future unit-standards editor
+    // (deferred this tranche) should validate them the way updateLesson does.
+    if (patch.standardIds !== undefined) next.standards = patch.standardIds;
+    if (patch.framework !== undefined) next.framework = patch.framework;
+    if (patch.frameworkData !== undefined) next.fw_data = patch.frameworkData;
+    if (patch.customFields !== undefined)
+      next.custom_fields = patch.customFields;
+    if (patch.carried !== undefined) next.carried = patch.carried;
+    if (patch.defaultFlow !== undefined) next.default_flow = patch.defaultFlow;
+    if (patch.defaultDuration !== undefined)
+      next.default_dur = patch.defaultDuration;
+    // `archived` is derived from `archived_at IS NOT NULL`; a boolean patch maps
+    // to a stamp (archive) or null (restore).
+    if (patch.archived !== undefined)
+      next.archived_at = patch.archived ? new Date().toISOString() : null;
+
+    if (Object.keys(next).length > 0) {
+      await patchUnit(client, unitDbId, next);
+    }
+    return reloadUnit(client, unitDbId);
+  },
+
   // ── Section + resource mutations ──────────────────────────────────────────
   async setSections(
     lessonId,
@@ -2073,6 +2220,61 @@ async function patchMaster(
       `Planner repository master write affected no rows for lesson ${lessonId} — not authorized to edit this subject's Team Curriculum, or the lesson no longer exists.`,
     );
   }
+}
+
+/**
+ * TEAM-write primitive for a unit. UPDATE the shared `units` row in place (units
+ * have no personal fork). Authorization is enforced server-side by `units_write`
+ * (`can_edit_subject_master(subject_id) OR is_grade_lead(grade_level_id)`); an
+ * unauthorized caller's UPDATE silently matches 0 rows under PostgREST (RLS
+ * filters the row out of the UPDATE scope rather than raising), so we `.select()`
+ * the affected rows back and THROW when none returned — a unit edit that could
+ * not persist surfaces an error rather than a false success. Mirrors patchMaster.
+ */
+async function patchUnit(
+  client: ServerClient,
+  unitId: string,
+  patch: Partial<UnitRow>,
+): Promise<void> {
+  const res = await client
+    .from("units")
+    .update(patch)
+    .eq("id", unitId)
+    .select("id");
+  if (res.error) {
+    throw new Error(
+      `Planner repository unit write failed: ${res.error.message}`,
+    );
+  }
+  const rows = (res.data ?? []) as { id: string }[];
+  if (rows.length === 0) {
+    throw new Error(
+      `Planner repository unit write affected no rows for unit ${unitId} — not authorized to edit this unit (subject master / grade lead), or the unit no longer exists.`,
+    );
+  }
+}
+
+/** Re-read a single unit after a mutation → the FLAT domain Unit. Resolves the
+ *  subject slug against the unit's grade; the unit-slug map is trivial (the read
+ *  path exposes a unit AS its uuid), so it is built inline rather than via a
+ *  full grade unit scan. */
+async function reloadUnit(
+  client: ServerClient,
+  unitId: string,
+): Promise<Unit> {
+  const res = await client
+    .from("units")
+    .select(UNIT_COLS)
+    .eq("id", unitId)
+    .maybeSingle();
+  const row = unwrapMaybe(res, "reload unit") as UnitRow | null;
+  if (!row) throw new Error(`Unit not found: ${unitId}`);
+  const { uuidToSubjectId } = await loadSubjectIndex(client, row.grade_level_id);
+  return mapUnitRow(
+    row,
+    uuidToSubjectId.get(row.subject_id) ?? "math",
+    new Map([[row.id, row.id]]),
+  );
 }
 
 /**

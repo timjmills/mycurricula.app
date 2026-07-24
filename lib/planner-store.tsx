@@ -77,6 +77,11 @@ import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { plannerClient } from "@/lib/planner/client";
 import { resolveGrade } from "@/lib/planner/grade";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
+import type { UnitPatch } from "@/lib/planner/source";
+import {
+  createUnitWriteQueue,
+  type UnitWriteQueue,
+} from "@/lib/planner/unit-write-queue";
 import { WORKSPACE_CHANGED_EVENT } from "@/lib/workspaces";
 import {
   LESSON_TEMPLATE_BY_ID,
@@ -450,6 +455,18 @@ type SetCatalogAction = { type: "setCatalog"; catalog: PlannerCatalog };
  *  only ever ADDS keys (existing descriptions win, so a hydrate never loses to
  *  a stale merge). */
 type MergeStandardsAction = { type: "mergeStandards"; map: StandardsMap };
+/** Patch a unit's editable Track-B workspace fields (B1.7). A CATALOG-level
+ *  side-channel like setCatalog/mergeStandards: units live in the reference
+ *  catalog (a SIBLING of the document), so a unit edit NEVER enters undo/redo —
+ *  editing a big idea must not put the unit list on the lesson undo stack. The
+ *  provider tees the same patch to the source's updateUnitFields (flag ON), so
+ *  the edit persists to the shared team `units` row; flag OFF it stays
+ *  reducer-local, exactly like every other mock-path edit. */
+type EditUnitFieldsAction = {
+  type: "editUnitFields";
+  unitId: string;
+  patch: UnitPatch;
+};
 /** Insert a freshly-created lesson into the document (W3.7). The payload is
  *  the FULL Lesson RETURNED by the data source's createLesson — carrying the
  *  source-minted id — never an optimistic reducer-side uid. That ordering is
@@ -493,6 +510,7 @@ export type PlannerAction =
   | SetHydrationAction
   | SetCatalogAction
   | MergeStandardsAction
+  | EditUnitFieldsAction
   | AddLessonAction;
 
 // ── Human labels for undo/redo tooltips ──────────────────────────────────
@@ -1480,6 +1498,22 @@ export function historyReducer(
     return { ...state, catalog: { ...state.catalog, standards: merged } };
   }
 
+  // ── Edit unit fields (B1.7 — CATALOG side-channel, NOT undoable) ──────────
+  // Merge a Track-B patch into the matching catalog unit. Like setCatalog /
+  // mergeStandards this touches only the catalog slice (never the document or
+  // undo/redo history) — units are reference data, so a unit edit must not land
+  // on the lesson undo stack. No-op when the unit isn't in the catalog (a stale
+  // id, or a unit outside the hydrated grade) so a mistargeted edit can't insert
+  // a phantom unit. The persist tee (updateUnitFields) fires separately in the
+  // provider; flag OFF this reducer update is the only effect.
+  if (action.type === "editUnitFields") {
+    const idx = state.catalog.units.findIndex((u) => u.id === action.unitId);
+    if (idx === -1) return state;
+    const nextUnits = state.catalog.units.slice();
+    nextUnits[idx] = { ...nextUnits[idx], ...action.patch };
+    return { ...state, catalog: { ...state.catalog, units: nextUnits } };
+  }
+
   // ── Add lesson (W3.7 — NON-HISTORY content change) ───────────────────
   // Insert the source-created lesson into the present doc WITHOUT pushing an
   // undo entry. DECISION (locked for this wave): adding a lesson is not
@@ -2011,6 +2045,39 @@ export interface PlannerValue {
    */
   mergeStandards: (map: StandardsMap) => void;
   /**
+   * Patch a unit's editable Track-B workspace fields (B1.7 Unit Plan editor):
+   * big idea, essential questions, vocabulary, K/U/D, notes, etc. Units are
+   * TEAM / MASTER content — there is NO personal fork, so this always targets
+   * the shared `units` row and takes NO save target. The optimistic catalog
+   * update lands immediately; with the Supabase flag ON the same patch tees to
+   * `updateUnitFields` (RLS-gated to subject-master / grade-lead — an
+   * unauthorized write is surfaced via console.error, never a silent personal
+   * fork), flag OFF it stays reducer-local. NON-undoable (catalog side-channel).
+   *
+   * WRITE SEMANTICS (§4a): gated to Team Curriculum mode at the store boundary
+   * AND re-checked at send time; per-unit serialized + coalesced so writes never
+   * commit out of order; on an RLS denial / error the catalog reconciles from
+   * the CANONICAL server row (re-applying any still-pending edit — never a blind
+   * baseline revert that could erase a succeeded earlier write) and
+   * `onResult(false)` fires (never a false success). Flag OFF, `onResult(true)`
+   * fires immediately (the reducer update IS the save).
+   */
+  editUnitFields: (
+    unitId: string,
+    patch: UnitPatch,
+    onResult?: (ok: boolean) => void,
+  ) => void;
+  /** Whether a unit has a RETAINED failed write (§4a R5 H2) — a write that
+   *  errored after the editor unmounted (close / unit switch). The Unit Plan
+   *  editor reads this on open to re-surface the failure with a retry action. */
+  hasFailedUnitWrite: (unitId: string) => boolean;
+  /** Re-submit a unit's retained failed patch (§4a R5 H2 — the "retry?" action).
+   *  Gated to Team mode; a confirmed retry clears the retained patch. */
+  retryFailedUnitWrite: (
+    unitId: string,
+    onResult?: (ok: boolean) => void,
+  ) => void;
+  /**
    * The resolved active grade id (the mock "g5" slug under the flag OFF, the
    * grade uuid under the flag ON), or null when no grade is resolved.
    */
@@ -2135,6 +2202,30 @@ export function useCatalogOptional(): CatalogValue {
   };
 }
 
+// ── Unit-patch helper (B1.7) ────────────────────────────────────────────────
+/** Project a Unit's editable Track-B fields into a `UnitPatch`. Used to merge a
+ *  canonical server row back into the catalog — on a successful write's echo and
+ *  on the post-failure reconcile (unit-write-queue). Every editable key is
+ *  carried (undefined where unset) so the reconcile clears fields the failed
+ *  burst had optimistically added, not just changed. */
+function unitToPatch(u: Unit): UnitPatch {
+  return {
+    notes: u.notes,
+    bigIdea: u.bigIdea,
+    essentialQuestions: u.essentialQuestions,
+    vocab: u.vocab,
+    kud: u.kud,
+    standardIds: u.standardIds,
+    framework: u.framework,
+    frameworkData: u.frameworkData,
+    customFields: u.customFields,
+    carried: u.carried,
+    defaultFlow: u.defaultFlow,
+    defaultDuration: u.defaultDuration,
+    archived: u.archived,
+  };
+}
+
 // ── Provider ───────────────────────────────────────────────────────────────
 
 interface PlannerProviderProps {
@@ -2149,6 +2240,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   // Keep a stable ref to dispatch so useCallback deps don't bloat.
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
+
 
   // ── Identity from auth (NOT the mock slug) ─────────────────────────────
   // RLS needs the real auth uid (a uuid), not the mock `ME.id` slug. The uid
@@ -2176,6 +2268,13 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     editMode === "master" ? "core" : "personal",
   );
   saveTargetRef.current = editMode === "master" ? "core" : "personal";
+
+  // Live edit-mode ref for the unit-write BOUNDARY GATE (B1.7 §4a M4). Units are
+  // TEAM/MASTER content with no personal fork, so editUnitFields must refuse any
+  // write when not in Team Curriculum mode — even a stale debounced callback that
+  // fires after a Team→Personal switch, or any future/stale caller.
+  const editModeRef = useRef(editMode);
+  editModeRef.current = editMode;
 
   // The resolved grade uuid, captured during hydrate. createLesson needs a real
   // grade uuid for the row it writes (the reducer never carries one). Null until
@@ -2719,6 +2818,105 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
+  // ── Unit-field persistence — CONFIRM-ONLY (§4a round 4) ───────────────────
+  // The per-unit serialize + coalesce + send-time gate state machine lives in
+  // lib/planner/unit-write-queue.ts (a pure, dependency-injected module so the
+  // concurrency contract is deterministically tested — see
+  // tests/unit-write-queue.test.ts). Created ONCE; its dep callbacks read the
+  // live refs at call time, so a single instance tracks the latest owner /
+  // edit-mode without re-creating.
+  //
+  // CONFIRM-ONLY: the catalog is NEVER written optimistically. `reconcile` (the
+  // reducer dispatch) fires ONLY on a CONFIRMED write's canonical row — so a
+  // failed / dropped / mode-switched write leaves the catalog untouched (nothing
+  // to revert) and the whole "stale optimistic value" bug class is dissolved.
+  // The editor's local draft is the user's live value. Flag OFF, `updateUnitFields`
+  // routes to the in-memory mock (the confirming source of truth for the session),
+  // so its returned row is dispatched into the catalog just like a real backend —
+  // and the mock's own store is updated too, so a full reload persists as well.
+  //
+  // FAILED-WRITE RETENTION (§4a R5 H2): the editor may unmount (close / unit
+  // switch) before an RPC settles, so a post-unmount failure has no component to
+  // surface it. The queue retains a failed patch HERE (keyed by unit) so the
+  // unit's next open can re-surface / retry it — a confirmed write clears it.
+  const failedUnitWritesRef = useRef(new Map<string, UnitPatch>());
+  const unitWriteQueueRef = useRef<UnitWriteQueue | null>(null);
+  if (unitWriteQueueRef.current === null) {
+    unitWriteQueueRef.current = createUnitWriteQueue({
+      updateUnitFields: (unitId, patch) =>
+        plannerClient.updateUnitFields(unitId, patch, ownerIdRef.current ?? ""),
+      reconcile: (unitId, patch) =>
+        dispatchRef.current({ type: "editUnitFields", unitId, patch }),
+      canWrite: () => editModeRef.current === "master",
+      unitToPatch,
+      onError: (message, err) => console.error(message, err),
+      retainFailed: (unitId, patch) => {
+        const m = failedUnitWritesRef.current;
+        m.set(unitId, { ...(m.get(unitId) ?? {}), ...patch });
+      },
+      // FIELD-WISE clear (§4a R6 H2-B): remove only the fields the confirmed
+      // write covered; keep any still-unconfirmed retained fields (e.g. an
+      // earlier failed `bigIdea` retry survives a later `notes` success). Drop
+      // the entry only when nothing retained remains.
+      clearFailed: (unitId, confirmedPatch) => {
+        const m = failedUnitWritesRef.current;
+        const retained = m.get(unitId);
+        if (!retained) return;
+        const next = { ...retained };
+        for (const key of Object.keys(confirmedPatch) as (keyof UnitPatch)[]) {
+          delete next[key];
+        }
+        if (Object.keys(next).length === 0) m.delete(unitId);
+        else m.set(unitId, next);
+      },
+    });
+  }
+
+  const editUnitFields = useCallback(
+    (unitId: string, patch: UnitPatch, onResult?: (ok: boolean) => void) => {
+      // BOUNDARY GATE (§4a M4): units are TEAM content — refuse any write when not
+      // in Team Curriculum mode at ACCEPT time (the queue re-checks at SEND time
+      // too — R2 H2). Blocks a stale debounced callback fired after a
+      // Team→Personal switch, and any future/stale caller.
+      if (editModeRef.current !== "master") {
+        onResult?.(false);
+        return;
+      }
+      // CONFIRM-ONLY: no optimistic catalog write. The queue confirms via the
+      // source (mock flag-OFF, server flag-ON) and dispatches the CANONICAL row
+      // on success; on failure / mode-drop the catalog is untouched. The editor's
+      // draft holds the live value throughout.
+      unitWriteQueueRef.current?.enqueue(unitId, patch, onResult);
+    },
+    [],
+  );
+
+  /** Whether a unit has a retained FAILED write (§4a R5 H2) — the editor reads
+   *  this on open to re-surface a post-unmount failure. */
+  const hasFailedUnitWrite = useCallback(
+    (unitId: string): boolean => failedUnitWritesRef.current.has(unitId),
+    [],
+  );
+
+  /** Re-submit a unit's retained failed patch (§4a R5 H2 — the "retry?" action).
+   *  Gated to Team mode; a confirmed retry clears the retained patch (via the
+   *  queue's clearFailed). No-op when nothing is retained. */
+  const retryFailedUnitWrite = useCallback(
+    (unitId: string, onResult?: (ok: boolean) => void) => {
+      if (editModeRef.current !== "master") {
+        onResult?.(false);
+        return;
+      }
+      const patch = failedUnitWritesRef.current.get(unitId);
+      if (!patch) {
+        onResult?.(true); // nothing to retry
+        return;
+      }
+      unitWriteQueueRef.current?.enqueue(unitId, patch, onResult);
+    },
+    [],
+  );
+
   const setCellLayout = useCallback(
     (key: string, layout: CellLayout | null) => {
       dispatchRef.current({ type: "setCellLayout", key, layout });
@@ -3025,6 +3223,25 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     return map;
   }, [catalog.units]);
 
+  // §4a R6 M-C: evict retained failed-write patches for units no longer in the
+  // catalog, so failedUnitWritesRef can't grow unbounded. Keyed on COMMITTED
+  // catalog state (this effect only runs after a real commit) — deliberately
+  // NOT a render-time presence guard on retainFailed, which would leak
+  // speculative/aborted-render catalog state into the shared ref under
+  // concurrent React (Codex R7/R8). Tradeoff, documented + bounded: units
+  // deleted WHILE their writes are in flight, then failing, each leave a
+  // retained entry until the next catalog mutation (any hydrate/setCatalog/edit)
+  // prunes them — bounded by the count of units deleted while in-flight (a
+  // single catalog replacement can remove several), never unbounded. The
+  // entries are inert (a retry is user-initiated from the editor, which cannot
+  // open a deleted unit), so they are a negligible memory residual, not a
+  // correctness risk.
+  useEffect(() => {
+    const present = new Set(catalog.units.map((u) => u.id));
+    const m = failedUnitWritesRef.current;
+    for (const id of [...m.keys()]) if (!present.has(id)) m.delete(id);
+  }, [catalog.units]);
+
   const subjectById = useMemo<Record<SubjectId, Subject>>(() => {
     const map = {} as Record<SubjectId, Subject>;
     for (const s of catalog.subjects) map[s.id] = s;
@@ -3127,6 +3344,9 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       standards: catalog.standards,
       describeStandard,
       mergeStandards,
+      editUnitFields,
+      hasFailedUnitWrite,
+      retryFailedUnitWrite,
       activeGradeId: catalog.activeGradeId,
     }),
     [
@@ -3177,6 +3397,9 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       catalog.standards,
       describeStandard,
       mergeStandards,
+      editUnitFields,
+      hasFailedUnitWrite,
+      retryFailedUnitWrite,
       catalog.activeGradeId,
     ],
   );

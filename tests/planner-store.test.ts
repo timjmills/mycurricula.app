@@ -31,7 +31,7 @@ import {
   type PlannerDoc,
 } from "@/lib/planner-store";
 import type { LessonSectionContent } from "@/lib/lesson-flow";
-import type { Lesson, SubjectId } from "@/lib/types";
+import type { Lesson, SubjectId, Unit } from "@/lib/types";
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -439,5 +439,84 @@ describe("moveLesson", () => {
     expect(movedLesson(viaMove).time).toBe("1:00–1:45");
     expect(movedLesson(viaMove).modified).toBe(false);
     expect(movedLesson(viaMove).moved).toBeNull();
+  });
+});
+
+// ── editUnitFields (B1.7 — catalog side-channel, NOT undoable) ──────────────
+
+describe("editUnitFields", () => {
+  const unit = (id: string, over: Partial<Unit> = {}): Unit => ({
+    id,
+    subject: "math" as SubjectId,
+    name: `Unit ${id}`,
+    weeks: "Wk 1",
+    shade: 2,
+    ...over,
+  });
+
+  /** A state carrying two catalog units, an empty document, and one past entry
+   *  so we can prove the unit edit never touches undo/redo history. */
+  function withUnits(): HistoryReducerState {
+    const base = mkState(mkDoc([sec("s1")]));
+    return {
+      ...base,
+      history: {
+        past: [{ doc: base.history.present, label: "seed" }],
+        present: base.history.present,
+        future: [],
+      },
+      catalog: {
+        subjects: [],
+        units: [unit("u-a"), unit("u-b")],
+        standards: {},
+        activeGradeId: "g5",
+      },
+    };
+  }
+
+  it("merges the patch into the matching catalog unit, leaving siblings intact", () => {
+    const next = historyReducer(withUnits(), {
+      type: "editUnitFields",
+      unitId: "u-a",
+      patch: {
+        bigIdea: "Fractions describe equal parts of a whole.",
+        essentialQuestions: ["How do we compare unlike fractions?"],
+        kud: { know: ["fraction vocabulary"] },
+      },
+    });
+    const edited = next.catalog.units.find((u) => u.id === "u-a");
+    expect(edited?.bigIdea).toBe("Fractions describe equal parts of a whole.");
+    expect(edited?.essentialQuestions).toEqual([
+      "How do we compare unlike fractions?",
+    ]);
+    expect(edited?.kud?.know).toEqual(["fraction vocabulary"]);
+    // Sibling untouched.
+    const sibling = next.catalog.units.find((u) => u.id === "u-b");
+    expect(sibling?.bigIdea).toBeUndefined();
+  });
+
+  it("is a NON-history side-channel — never touches undo/redo or the document", () => {
+    const before = withUnits();
+    const next = historyReducer(before, {
+      type: "editUnitFields",
+      unitId: "u-a",
+      patch: { notes: "front-load vocab" },
+    });
+    // The document + both history stacks are the SAME references (untouched).
+    expect(next.history.present).toBe(before.history.present);
+    expect(next.history.past).toBe(before.history.past);
+    expect(next.history.future).toBe(before.history.future);
+    // The catalog units array is a NEW reference (immutable update).
+    expect(next.catalog.units).not.toBe(before.catalog.units);
+  });
+
+  it("no-ops (same state ref) when the unit id is not in the catalog", () => {
+    const before = withUnits();
+    const next = historyReducer(before, {
+      type: "editUnitFields",
+      unitId: "does-not-exist",
+      patch: { notes: "orphan" },
+    });
+    expect(next).toBe(before);
   });
 });

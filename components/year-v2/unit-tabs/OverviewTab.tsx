@@ -12,7 +12,7 @@
 // projected-finish, no ahead/behind pace — none of that data exists yet.
 
 import { useMemo, type ReactNode } from "react";
-import type { Lesson } from "@/lib/types";
+import type { Lesson, SubjectId } from "@/lib/types";
 import type { UnitProgress } from "@/lib/year-v2-data";
 import {
   ARC_PHASES,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/unit-workspace-derive";
 import { Tooltip } from "@/components/ui";
 import { ProgressRing } from "./ProgressRing";
+import { UnitPlanFields } from "./UnitPlanFields";
 import { dayShort } from "./helpers";
 import styles from "../UnitExplorer.module.css";
 
@@ -36,6 +37,8 @@ export function OverviewTab({
   lessons,
   progress,
   pct,
+  subjectId,
+  unitId,
   subjectName,
   resourceCount,
   standardCount,
@@ -43,6 +46,11 @@ export function OverviewTab({
   lessons: Lesson[];
   progress: UnitProgress;
   pct: number;
+  /** The unit's subject id — scopes the editable unit-plan fields (B1.7). */
+  subjectId: SubjectId;
+  /** The unit id as it appears on `Lesson.unit` (a slug flag-OFF; the units.id
+   *  uuid flag-ON). Resolves the catalog unit for the editable plan fields. */
+  unitId: string;
   subjectName: string;
   /** Distinct resources across the unit's lessons (unitResources length). */
   resourceCount: number;
@@ -109,6 +117,10 @@ export function OverviewTab({
           </div>
         </div>
       </div>
+
+      {/* ── Editable unit plan (B1.7) — big idea, EQs, vocab, K/U/D, notes.
+          Team-scoped: editable in Team Curriculum mode, read-only in Personal. */}
+      <UnitPlanFields subjectId={subjectId} unitId={unitId} />
 
       {/* ── Honest stat strip ──────────────────────────────────────────────── */}
       <div className={styles.statCards}>

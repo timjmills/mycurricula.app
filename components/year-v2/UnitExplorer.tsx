@@ -364,6 +364,8 @@ export function UnitExplorer({
               lessons={lessons}
               progress={progress}
               pct={pct}
+              subjectId={subjectId}
+              unitId={unit}
               subjectName={subject.name}
               resourceCount={resources.length}
               standardCount={standards.length}

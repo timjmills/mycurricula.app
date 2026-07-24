@@ -448,12 +448,285 @@
   outline-offset: 2px;
 }
 
+/* ── Unit plan editable fields (B1.7) ───────────────────────────────────── */
+.planFields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  border-radius: var(--r-lg, 14px);
+  border: 1px solid var(--ue-hairline);
+  background: var(--ue-tint-soft);
+}
+.planHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.planTitle {
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: var(--t-15, 15px);
+  color: var(--cd, var(--ink, #1c1b2e));
+}
+/* Team-content chip — signals these fields are shared team-wide. */
+.teamBadge {
+  font-size: var(--t-11, 11px);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--cd, var(--ink, #1c1b2e));
+  background: var(--ue-tint-hover);
+  border: 1px solid var(--ue-accent-border);
+  border-radius: var(--r-pill, 999px);
+  padding: 3px 10px;
+  cursor: help;
+}
+.teamBadge:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: 2px;
+}
+/* Confirm-only "saving" indicator (§4a R4) — the catalog updates only once the
+   write is confirmed, so a brief saving note reflects the honest latency. */
+.savingNote {
+  font-size: var(--t-11, 11px);
+  font-weight: 700;
+  color: var(--ink-500, #6e6c82);
+  letter-spacing: 0.02em;
+}
+/* Inline save-failure alert (§4a H3) — a denied/errored team-unit write. */
+.saveError {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--r-md, 12px);
+  border: 1px solid color-mix(in srgb, var(--warn) 42%, transparent);
+  background: var(--warn-tint);
+  color: var(--warn);
+  font-size: var(--t-12, 12px);
+  font-weight: 600;
+  line-height: 1.4;
+}
+/* Retry action inside the save-failure alert (§4a R5 H2). Doubled class to
+   outgun the `.cp-root button` reset the modal portal inherits. */
+.retryBtn.retryBtn {
+  appearance: none;
+  display: inline;
+  margin-left: 2px;
+  padding: 2px 10px;
+  border: 1px solid var(--warn);
+  border-radius: var(--r-pill, 999px);
+  background: transparent;
+  color: var(--warn);
+  font: inherit;
+  font-size: var(--t-12, 12px);
+  font-weight: 700;
+  cursor: pointer;
+}
+.retryBtn.retryBtn:hover {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+.retryBtn.retryBtn:focus-visible {
+  outline: 2px solid var(--warn);
+  outline-offset: 2px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fieldLabel {
+  font-size: var(--t-12, 12px);
+  font-weight: 700;
+  color: var(--ink-700, #4a4960);
+}
+/* Text inputs / textareas re-use the .notesArea treatment; NOT reset by the
+   `.cp-root button` rule (that targets buttons only), so a single class is safe
+   here — unlike the buttons below, which are doubled. */
+.fieldArea {
+  width: 100%;
+  resize: vertical;
+  min-height: 56px;
+  padding: 10px 12px;
+  border-radius: var(--r-md, 12px);
+  border: 1px solid var(--ue-accent-border);
+  background: var(--surface, #fff);
+  color: var(--ink, #1c1b2e);
+  font: inherit;
+  font-size: var(--t-14, 14px);
+  line-height: 1.5;
+}
+.fieldInput {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: var(--r-md, 12px);
+  border: 1px solid var(--ue-accent-border);
+  background: var(--surface, #fff);
+  color: var(--ink, #1c1b2e);
+  font: inherit;
+  font-size: var(--t-14, 14px);
+  line-height: 1.4;
+}
+.fieldArea:focus-visible,
+.fieldInput:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: 1px;
+}
+.listRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vocabRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vocabTerm {
+  flex: 0 0 34%;
+}
+/* Add / remove buttons are DOUBLED (`.addBtn.addBtn`, 0,2,0) so they outgun the
+   `.cp-root button` reset (0,1,1) the modal portal inherits. */
+.addBtn.addBtn {
+  align-self: flex-start;
+  appearance: none;
+  border: 1px dashed var(--ue-accent-border);
+  background: transparent;
+  color: var(--cd, var(--ink, #1c1b2e));
+  border-radius: var(--r-pill, 999px);
+  padding: 6px 12px;
+  font-size: var(--t-12, 12px);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.addBtn.addBtn:hover {
+  background: var(--ue-tint-hover);
+}
+.addBtn.addBtn:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: 2px;
+}
+.removeBtn.removeBtn {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  appearance: none;
+  border: 1px solid var(--ue-hairline);
+  background: var(--surface, #fff);
+  color: var(--ink-500, #6e6c82);
+  border-radius: var(--r-pill, 999px);
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s;
+}
+.removeBtn.removeBtn:hover {
+  background: var(--warn-tint);
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 42%, transparent);
+}
+.removeBtn.removeBtn:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: 2px;
+}
+.removeBtn svg {
+  width: 14px;
+  height: 14px;
+}
+/* K/U/D — three columns on desktop, stacked on phone. */
+.kudGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.kudCol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.kudHead {
+  font-size: var(--t-11, 11px);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-500, #6e6c82);
+}
+/* Read-only (Personal mode) values. */
+.readonlyText {
+  font-size: var(--t-14, 14px);
+  font-weight: 500;
+  color: var(--ink, #1c1b2e);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.readonlyList {
+  list-style: disc;
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.readonlyItem {
+  font-size: var(--t-13, 13px);
+  font-weight: 500;
+  color: var(--ink, #1c1b2e);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.emptyValue {
+  font-size: var(--t-13, 13px);
+  font-weight: 600;
+  color: var(--ink-500, #6e6c82);
+  font-style: italic;
+}
+@media (prefers-reduced-motion: reduce) {
+  .addBtn.addBtn,
+  .removeBtn.removeBtn {
+    transition: none;
+  }
+}
+@media (max-width: 560px) {
+  .kudGrid {
+    grid-template-columns: 1fr;
+  }
+  .vocabRow {
+    flex-wrap: wrap;
+  }
+  .vocabTerm {
+    flex: 1 1 100%;
+  }
+}
+
 /* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
 @media (pointer: coarse), (max-width: 900px) {
   /* Doubled to match the doubled base above (a single-class @media override
      would lose to `.rowBtn.rowBtn`). */
   .rowBtn.rowBtn {
     min-height: 44px;
+  }
+  /* Editable-field touch targets — inputs, textareas, add/remove buttons all
+     ≥44px on phone/tablet (single-class inputs are not reset; the buttons are
+     doubled to match their doubled base). */
+  .fieldInput,
+  .fieldArea {
+    min-height: 44px;
+  }
+  .addBtn.addBtn {
+    min-height: 44px;
+  }
+  .removeBtn.removeBtn {
+    width: 44px;
+    height: 44px;
   }
 }
 

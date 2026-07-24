@@ -78,6 +78,39 @@ export type LessonPatch = Partial<
 >;
 
 /**
+ * The editable Track-B workspace fields on a unit (migration 20260728120000 —
+ * the B1.7 Unit Plan editor). A subset of `Unit`: the identity + scheduling
+ * fields (id / subject / name / weeks / shade / start_week / end_week) are NOT
+ * patchable through this seam.
+ *
+ * UNLIKE `LessonPatch`, a unit edit takes NO `SaveTarget`: units are TEAM /
+ * MASTER content with no personal-fork table — there is one shared units row per
+ * unit, and `units_write` RLS gates the write to a subject-master or grade-lead
+ * (initial_schema.sql: `can_edit_subject_master(subject_id) OR
+ * is_grade_lead(grade_level_id)`). A teacher who lacks that role has the write
+ * denied server-side (0 rows) and the mutator throws — never a silent
+ * personal fork (there is nothing to fork into).
+ */
+export type UnitPatch = Partial<
+  Pick<
+    Unit,
+    | "notes"
+    | "bigIdea"
+    | "essentialQuestions"
+    | "vocab"
+    | "kud"
+    | "standardIds"
+    | "framework"
+    | "frameworkData"
+    | "customFields"
+    | "carried"
+    | "defaultFlow"
+    | "defaultDuration"
+    | "archived"
+  >
+>;
+
+/**
  * The planner repository contract. Every method is async so the mock and the
  * Supabase implementation share one signature — the store awaits both
  * identically.
@@ -183,6 +216,22 @@ export interface PlannerDataSource {
    *  teacher-authored lesson sets its own `deleted_at`. The shared master row is
    *  NEVER mutated. */
   softDeleteLesson(lessonId: string, ownerId: string): Promise<void>;
+
+  // ── Unit mutations (the Unit Plan editor commits through this) ─────────────
+  /** Patch a unit's editable Track-B workspace fields (big idea, essential
+   *  questions, vocabulary, K/U/D, notes, …). Units are TEAM / MASTER content:
+   *  there is NO personal fork, so this always writes the shared `units` row and
+   *  takes NO `SaveTarget`. Authorization is enforced server-side by the
+   *  `units_write` RLS policy (`can_edit_subject_master(subject_id) OR
+   *  is_grade_lead(grade_level_id)`); an unauthorized write matches 0 rows and
+   *  the Supabase source THROWS (never a silent no-op). `ownerId` is carried for
+   *  signature parity with the other mutators; the write is scoped by
+   *  `auth.uid()` under RLS, not by this argument. Returns the updated unit. */
+  updateUnitFields(
+    unitId: string,
+    patch: UnitPatch,
+    ownerId: string,
+  ): Promise<Unit>;
 
   // ── Section + resource mutations ───────────────────────────────────────────
   /** Replace a lesson's full section list (reorder / bulk edit). `saveTarget`

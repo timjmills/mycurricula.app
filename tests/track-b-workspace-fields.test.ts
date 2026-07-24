@@ -197,33 +197,30 @@ describe("migration — planner_settings posture", () => {
   });
 });
 
-describe("read/write-path lock — pre-apply no-op guarantee", () => {
-  const colsBlocks = (src.match(/const \w+_COLS = [\s\S]*?;/g) ?? []).join("\n");
-  const NEW_TOKENS = [
-    ...LESSON_COLS,
-    "big_idea",
-    "essential_questions",
-    "vocab",
-    "kud",
-    "default_flow",
-    "default_dur",
-    "custom_fields",
-  ];
+describe("read/write-path lock — lesson seam inert; unit seam is B1.7-live", () => {
+  // The LESSON read path stays LOCKED until B2 wires it (coupled to the same
+  // migration apply). The UNIT read + write path went LIVE in B1.7: UNIT_COLS
+  // now selects the Track-B unit columns and updateUnitFields writes them, so
+  // the exact UNIT_COLS snapshot below is DELIBERATELY updated (the apply-coupled
+  // change) while MASTER/COPY/AUTHORED stay pinned to their pre-apply strings.
+
+  // Only the LESSON select blocks — the unit block is intentionally excluded
+  // here (it now legitimately names Track-B columns).
+  const lessonColsBlocks = ["MASTER_COLS", "COPY_COLS", "AUTHORED_COLS"]
+    .map((n) => src.match(new RegExp(`const ${n} =[\\s\\S]*?;`))?.[0] ?? "")
+    .join("\n");
 
   // EXACT SNAPSHOTS (§4a): the negative-token check below cannot cover columns
   // whose names collide with PRE-EXISTING lesson columns (notes, standards,
   // archived_at, framework…). Pinning each select constant to its exact current
-  // string closes that hole per-table: ANY future addition — colliding or not —
-  // fails here until the B1.7/B2 apply-coupled change updates the snapshot
-  // deliberately alongside the migration apply.
+  // string closes that hole per-table: any UNPLANNED change to a locked lesson
+  // select fails here, and the intentional UNIT_COLS change is asserted exactly.
   const colString = (name: string): string => {
-    const m = src.match(
-      new RegExp(`const ${name} =\\s*\\n?\\s*"([^"]+)"`),
-    );
+    const m = src.match(new RegExp(`const ${name} =\\s*\\n?\\s*"([^"]+)"`));
     return m?.[1] ?? "";
   };
 
-  it("select constants match their pre-apply snapshots exactly", () => {
+  it("lesson select constants stay pinned to their pre-apply snapshots (B2 pending)", () => {
     expect(colString("MASTER_COLS")).toBe(
       "id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, differentiation, deleted_at",
     );
@@ -233,25 +230,47 @@ describe("read/write-path lock — pre-apply no-op guarantee", () => {
     expect(colString("AUTHORED_COLS")).toBe(
       "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, differentiation, deleted_at",
     );
+  });
+
+  it("UNIT_COLS matches its B1.7 apply-coupled snapshot exactly (Track-B columns added)", () => {
+    // DELIBERATE CHANGE (B1.7): shipping this select requires the 20260728120000
+    // migration applied first — the columns must exist before this deploys
+    // (CLAUDE.md §4c; see the ⚠ LAUNCH COUPLING note at UNIT_COLS).
     expect(colString("UNIT_COLS")).toBe(
-      "id, grade_level_id, subject_id, name, start_week, end_week, school_year_id",
+      "id, grade_level_id, subject_id, name, start_week, end_week, school_year_id, notes, big_idea, essential_questions, vocab, kud, standards, default_flow, default_dur, framework, fw_data, custom_fields, carried, archived_at",
     );
   });
 
-  it("no Track-B column is named in any *_COLS select string", () => {
-    expect(colsBlocks.length).toBeGreaterThan(0);
-    for (const t of NEW_TOKENS) {
-      expect(colsBlocks, t).not.toContain(t);
+  it("UNIT_COLS names every ruled Track-B unit column", () => {
+    const unitCols = colString("UNIT_COLS");
+    for (const c of UNIT_COLS_ADDED) {
+      expect(unitCols, c).toContain(c);
     }
   });
 
-  it("no Track-B token appears as a write key (only optional row fields)", () => {
+  it("no LESSON Track-B column is named in the lesson *_COLS selects (B2 pending)", () => {
+    expect(lessonColsBlocks.length).toBeGreaterThan(0);
+    for (const t of LESSON_COLS) {
+      expect(lessonColsBlocks, t).not.toContain(t);
+    }
+  });
+
+  it("no LESSON Track-B token appears as a write key (B2 pending; only optional row fields)", () => {
     // `token:` (an object-literal write) is forbidden; `token?:` (an optional
-    // row-interface field) is the sanctioned form. archived_at is excluded:
-    // it is a PRE-EXISTING soft-delete column with legitimate writes.
-    for (const t of NEW_TOKENS.filter((t) => t !== "carried")) {
+    // row-interface field) is the sanctioned form. `carried` is excluded (its
+    // name collides with the LessonStatus 'carried' value). The unit write path
+    // (updateUnitFields) IS live now, so unit tokens are no longer checked here.
+    for (const t of LESSON_COLS.filter((t) => t !== "carried")) {
       const writeKey = new RegExp(`^\\s*${t}\\s*:`, "m");
       expect(src, t).not.toMatch(writeKey);
+    }
+  });
+
+  it("the unit write path IS wired (updateUnitFields assigns Track-B columns)", () => {
+    // Positive counterpart: B1.7 made the unit seam live. A representative
+    // sample of the snake_case unit writes must exist as `next.<col> =`.
+    for (const w of ["big_idea", "essential_questions", "vocab", "kud"]) {
+      expect(src, w).toContain(`next.${w} =`);
     }
   });
 });

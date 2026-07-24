@@ -55,6 +55,7 @@ import type {
   LessonMoveTarget,
   ListLessonsOptions,
   SaveTarget,
+  UnitPatch,
 } from "./source";
 
 // ── Id bridge (mock slugs ↔ db uuids) ───────────────────────────────────────
@@ -76,6 +77,16 @@ export function resolveOwnerId(ownerId: string): string {
 // fixture arrays (which other modules — and the reducer store — also read).
 
 const lessons: Lesson[] = LESSONS.map(cloneLesson);
+
+/** The live, mutable unit superset — cloned from the fixtures so a Track-B unit
+ *  edit (updateUnitFields) persists for the session without mutating the
+ *  exported `ALL_UNITS` fixture (which other modules also read). Mirrors the
+ *  `lessons` store above. NOTE: with the Supabase planner flag OFF the store's
+ *  persist tee is a no-op, so unit edits stay REDUCER-LOCAL in the planner store
+ *  and never reach here — this store exists to honour the PlannerDataSource
+ *  contract faithfully (so a direct `plannerClient.updateUnitFields` call, and
+ *  the flag-ON dispatch fallback, behave like a real backend). */
+const units: Unit[] = ALL_UNITS.map(cloneUnit);
 
 /** Section content keyed by lesson id, seeded lazily on first `getSections`
  *  (mirrors the reducer's `sections` record, which seeded every lesson on
@@ -100,6 +111,32 @@ function cloneLesson(l: Lesson): Lesson {
       resources: t.resources.map((r) => ({ ...r })),
       standards: [...t.standards],
     })),
+  };
+}
+
+/** Deep-clone a unit so the live store never aliases the fixture object (or a
+ *  returned object the caller might mutate). The Track-B nested fields
+ *  (essentialQuestions / vocab / kud / frameworkData / customFields / carried /
+ *  standardIds) are copied so a caller cannot mutate the store through a
+ *  returned unit. */
+function cloneUnit(u: Unit): Unit {
+  return {
+    ...u,
+    essentialQuestions: u.essentialQuestions
+      ? [...u.essentialQuestions]
+      : undefined,
+    vocab: u.vocab ? u.vocab.map((v) => ({ ...v })) : undefined,
+    kud: u.kud
+      ? {
+          know: u.kud.know ? [...u.kud.know] : undefined,
+          understand: u.kud.understand ? [...u.kud.understand] : undefined,
+          doGoal: u.kud.doGoal ? [...u.kud.doGoal] : undefined,
+        }
+      : undefined,
+    standardIds: u.standardIds ? [...u.standardIds] : undefined,
+    frameworkData: u.frameworkData ? { ...u.frameworkData } : undefined,
+    customFields: u.customFields ? { ...u.customFields } : undefined,
+    carried: u.carried ? { ...u.carried } : undefined,
   };
 }
 
@@ -158,6 +195,11 @@ function findLesson(lessonId: string): Lesson | undefined {
   return lessons.find((l) => l.id === id);
 }
 
+/** Find a unit in the live store by id. */
+function findUnit(unitId: string): Unit | undefined {
+  return units.find((u) => u.id === unitId);
+}
+
 // ── Implementation ────────────────────────────────────────────────────────────
 
 export const plannerMockSource: PlannerDataSource = {
@@ -197,13 +239,14 @@ export const plannerMockSource: PlannerDataSource = {
     void _opts;
     // The contract's listUnits MUST return ALL units for the grade (the
     // full-year superset), matching the Supabase source which selects every
-    // grade unit. ALL_UNITS is that superset — the set SubjectView and
-    // TimelineYear filter over (`ALL_UNITS.filter(u => u.subject === id)`).
-    // The store derives the active-unit-per-subject map from this superset, so
-    // returning the active-8 here (the old behavior) would starve the catalog.
-    // Clone each row so callers can't mutate the fixture array.
+    // grade unit. The live `units` store is that superset (seeded from
+    // ALL_UNITS) — the set SubjectView and TimelineYear filter over
+    // (`units.filter(u => u.subject === id)`). The store derives the
+    // active-unit-per-subject map from this superset, so returning the active-8
+    // here (the old behavior) would starve the catalog. Clone each row (incl.
+    // the Track-B nested fields) so callers can't mutate the store.
     void _gradeLevelId;
-    return ALL_UNITS.map((u) => ({ ...u }));
+    return units.map(cloneUnit);
   },
 
   async listSubjects(_gradeLevelId: string): Promise<Subject[]> {
@@ -369,6 +412,25 @@ export const plannerMockSource: PlannerDataSource = {
     // (mark archived) mirrors the reducer's `archiveLesson`; reads exclude it.
     void _ownerId;
     if (lesson) lesson.archived = true;
+  },
+
+  // ── Unit mutations ─────────────────────────────────────────────────────────
+
+  async updateUnitFields(
+    unitId: string,
+    patch: UnitPatch,
+    _ownerId: string,
+  ): Promise<Unit> {
+    const unit = findUnit(unitId);
+    if (!unit) throw new Error(`Unit not found: ${unitId}`);
+    // Mirror the reducer's `editUnitFields`: spread the patch over the unit.
+    // Units are a single shared document in the mock (no team/personal split),
+    // and RLS authorization is a Supabase-only concern — so `_ownerId` is
+    // parity-only here. Only the keys present in `patch` are overwritten, so an
+    // absent field is never nulled.
+    void _ownerId;
+    Object.assign(unit, patch);
+    return cloneUnit(unit);
   },
 
   // ── Section + resource mutations ───────────────────────────────────────────
