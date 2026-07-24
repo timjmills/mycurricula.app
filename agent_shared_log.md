@@ -3147,3 +3147,77 @@ only a §4b/§4c preview gate before promote, NO further DDL.
 (Text tool unreachable @375, editor.module.css) + 3 a11y minors are UNBUILT —
 re-run when convenient. Board canvas confirmed rendering on prod (the §6
 "unverified" gap is closed).
+
+---
+
+## [build-b2-lessons 7.24] 🔨 B2 IN FLIGHT — data layer DONE (mock-green), editor UI next
+
+**CLAIM (owning these files):** `lib/planner/source.ts`, `lib/planner/supabase-source.ts`,
+`lib/planner/mock-source.ts`, `lib/planner/lesson-track-b.ts` (NEW leaf),
+`components/lesson-plan-v2/*`, `components/year-v2/ExplorerShell.tsx` (additive
+optional-tabs change), `tests/track-b-workspace-fields.test.ts` (sanctioned LESSON
+lock update), `tests/planner-lesson-track-b.test.ts` (NEW), `tests/planner-lesson-fields.test.ts`
+(NEW). NOT touching components/teach/*.
+
+**DATA LAYER COMPLETE (B2.0–B2.2), all uncommitted, tsc+lint+full-vitest green:**
+- B2.0 LessonPatch widened (durationMinutes/assessment/builds/prep/frameworkId/
+  frameworkData/carried; taughtAt DELIBERATELY excluded — read-only in B2).
+- B2.1 WRITE: contentKeys += 7 Track-B keys; ONE mapper `lessonTrackBColumns`
+  Object.assign'd into ALL 3 updateLesson branches (authored/core-master/personal-
+  fork) — lock test pins exactly 3 call sites. assessment_kind validated via
+  isAssessmentKind (invalid → null, other fields persist). taught_at NEVER written.
+- B2.2 READ: MASTER/COPY/AUTHORED_COLS += the 11 Track-B cols; buildLesson widened;
+  all 4 callsites pass `...trackBArgsFromRow(row)`. EXACT-SNAPSHOT lock tests updated
+  (LESSON only; UNIT_COLS untouched per B1.7).
+- Mappers extracted to PURE leaf `lib/planner/lesson-track-b.ts` (server-only
+  supabase-source can't be unit-tested) → 15 new pure-mapper assertions.
+- Tests: track-b lock 33p/7todo; new pure-mapper + mock-runtime suites green;
+  FULL suite 889 passed / 59 todo.
+
+**RIDES §4c:** the LESSON *_COLS read wiring ships under the SAME flag-ON preview
+gate as B1.7 (migration already applied on prod). Mock path (flag-OFF, shipped
+default) is byte-safe: Object.assign spreads free, cloneLesson deep-clones the new
+nested fields.
+
+**NEXT:** B2.3 editor surface (PlanPage body → single-scroll: scalar header +
+collapsible sections reusing tab bodies + Assessment + Builds/Prep + Flow via
+embedded LessonEditor; ExplorerShell tabs made optional) + B2.4 Simple/Advanced
+reveal, then §4a Codex gate + §4b live QA.
+
+---
+
+## [Main/orchestrator 7.24 pt7] ⏸ SAFE-TO-CLEAR CHECKPOINT — 2 agents mid-build, master clean
+
+Context-clear checkpoint. **MASTER `5fdf629`, 0/0 vs origin, prod hydrate gate GREEN.**
+~50 commits shipped today; nothing committed is at risk. A context clear does NOT touch
+git or the working tree.
+
+**Uncommitted in the working tree = TWO LIVE AGENTS' in-progress builds (resume by
+gating their reports; a fresh orchestrator collects each report → stage its paths →
+tsc/lint/vitest → §4a Codex on the staged diff → commit PATH-SCOPED → push):**
+
+1. **build-b2-lessons** (B2 Lessons editor) — its own claim/progress block is ABOVE.
+   Data layer B2.0–B2.2 reportedly DONE + mock-green (LessonPatch widened;
+   `lib/planner/lesson-track-b.ts` mapper into all 3 updateLesson branches; MASTER/COPY/
+   AUTHORED_COLS + buildLesson widened; LESSON snapshot lock updated; assessment kind
+   validated; taught_at read-only). Editor UI (B2.3 PlanPage single-scroll + B2.4
+   Simple/Advanced) was next → the tree may be MID-EDIT (may not compile). New files:
+   `components/lesson-plan-v2/LessonWorkspace.tsx`, `lib/planner/lesson-track-b.ts`,
+   `tests/planner-lesson-fields.test.ts`, `tests/planner-lesson-track-b.test.ts`. Also
+   touches `components/year-v2/ExplorerShell.tsx` (additive optional-tabs). Spec:
+   recon-b2-lessons' report + the build-b2-lessons brief. Locked: taughtAt read-only,
+   PlanPage evolve, framework minimal, flow via presets. DO NOT commit until gated green.
+2. **fix-teach-qa2** (teach prod-QA fixes) — `components/teach/annotation/BoardToolbar.
+   {tsx,module.css}` + editor toolbar; MAJOR-1 phone toolbar (Text tool @375) + 3 a11y
+   minors. Findings in docs/screenshots/teach-qa/QA-REPORT-teach.md. Uncommitted + likely
+   mid-build.
+
+**QUEUED (after B2):** B3 Assessments/Insights/drawer (spec + rulings locked: Option B
+no-prep, Refine excluded, tabs→drawer), B5 pop-in overlay, B4.5/B4.6. The B1.7+B2
+Track-B READ wiring rides ONE shared §4c flag-ON preview gate before promote (migration
+20260728 already applied on prod; reads currently gated).
+
+**Standing rules for the resuming session:** agents NEVER stage/commit or touch the prod
+DB; verify reported artifacts on disk (delete/crossed-message races bit us); commit
+path-scoped; re-run a mid-rollout red prod gate before believing it. Memory files carry
+the durable lessons.
