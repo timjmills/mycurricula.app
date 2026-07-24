@@ -60,17 +60,45 @@
 // same reasoning as the `.backbtn`/`.iconbtn` chrome controls. The Tooltip
 // contract (CLAUDE.md §4) still applies in full below.
 
-import type { ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { useAppState } from "@/lib/app-state";
 import { useLabels } from "@/lib/labels";
+import { useNotebookState } from "@/lib/notebook-state";
 import { Tooltip } from "@/components/ui";
 import { SHORTCUTS_TOGGLE_EVENT } from "@/components/shell";
 import { TransitionLink } from "@/lib/view-transition";
 
+const VIEWPORT_MARGIN = 8;
+const MENU_GAP = 10;
+
 /** Bottom-left context chip: identity avatar + school/grade/week stack +
- *  Help and Settings gears. Mount inside the chrome host's `.botbar`. */
+ *  Help and Settings gears. Mount inside the chrome host's `.botbar`.
+ *
+ *  R1e (USER decision): the identity cluster (avatar + stack) is now an
+ *  INTERACTIVE trigger that opens the workspace / notebook switcher — the
+ *  behavior the retired left rail's NotebookSwitcher used to carry. Multi-
+ *  workspace is live, so a teacher with ≥2 notebooks switches here; everyone
+ *  reaches full workspace management via "Manage workspace" → /settings/workspace
+ *  (reachable from every route through Settings). The chip shows on Home+Daily
+ *  (its current botbar scope); the gears stay as-is. */
 export function ChromeContext(): ReactNode {
   const { currentUser, week } = useAppState();
+  const {
+    workspaceName,
+    activeNotebooks,
+    activeNotebookId,
+    setActiveNotebookId,
+    isWorkspaceAdmin,
+  } = useNotebookState();
 
   // Renameable hierarchy caption — a school may rename "Week" → "Module",
   // so the chip follows the configured term (same as the top-bar heading).
@@ -89,41 +117,229 @@ export function ChromeContext(): ReactNode {
   // set; `initials` is derived from the same name in lib/app-state.
   const avatarInitial = currentUser.initials.charAt(0);
 
-  const chipTip = "Your school, grade and where you are in the year";
+  const chipTip =
+    "Your workspace and where you are in the year — click to switch";
+
+  // ── Switcher menu (portaled, ResMenu pattern) ─────────────────────────────
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const close = useCallback(() => setOpen(false), []);
+  const restoreFocus = useCallback(() => {
+    if (triggerRef.current?.isConnected) {
+      triggerRef.current.focus({ preventScroll: true });
+    }
+  }, []);
+
+  // The chip lives at the bottom-left, so the menu opens ABOVE the trigger,
+  // left-aligned; clamp to the viewport once measured.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trigger = triggerRef.current;
+    const menu = menuRef.current;
+    if (!trigger || !menu) return;
+    const tr = trigger.getBoundingClientRect();
+    const { width, height } = menu.getBoundingClientRect();
+    const left = Math.max(
+      VIEWPORT_MARGIN,
+      Math.min(tr.left, window.innerWidth - width - VIEWPORT_MARGIN),
+    );
+    const top = Math.max(VIEWPORT_MARGIN, tr.top - height - MENU_GAP);
+    setPos({ top, left });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent): void => {
+      const t = e.target as Node;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(t) &&
+        !triggerRef.current?.contains(t)
+      ) {
+        close();
+      }
+    };
+    const onDetach = (): void => close();
+    document.addEventListener("mousedown", onDown, true);
+    window.addEventListener("scroll", onDetach, true);
+    window.addEventListener("resize", onDetach);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      window.removeEventListener("scroll", onDetach, true);
+      window.removeEventListener("resize", onDetach);
+    };
+  }, [open, close]);
+
+  useEffect(() => {
+    if (!open) return;
+    menuRef.current
+      ?.querySelector<HTMLElement>('[role="menuitem"],[role="menuitemradio"]')
+      ?.focus({ preventScroll: true });
+  }, [open]);
+
+  const onMenuKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      close();
+      restoreFocus();
+      return;
+    }
+    if (e.key === "Tab") {
+      close();
+      restoreFocus();
+      return;
+    }
+    if (
+      e.key !== "ArrowDown" &&
+      e.key !== "ArrowUp" &&
+      e.key !== "Home" &&
+      e.key !== "End"
+    ) {
+      return;
+    }
+    e.preventDefault();
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>(
+        '[role="menuitem"],[role="menuitemradio"]',
+      ) ?? [],
+    );
+    if (items.length === 0) return;
+    const idx = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? items.length - 1
+          : e.key === "ArrowDown"
+            ? idx < 0
+              ? 0
+              : (idx + 1) % items.length
+            : idx <= 0
+              ? items.length - 1
+              : idx - 1;
+    items[next]?.focus();
+  };
+
+  const isMulti = activeNotebooks.length >= 2;
+
+  const switcherMenu = open ? (
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label="Workspace and notebooks"
+      className="chrome-menu chrome-switch-menu"
+      style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 1000 }}
+      onKeyDown={onMenuKeyDown}
+    >
+      <div className="chrome-menu-head" aria-hidden="true">
+        <span className="chrome-menu-name">{workspaceName}</span>
+        {isMulti && <span className="chrome-menu-sub">Switch notebook</span>}
+      </div>
+      {isMulti &&
+        activeNotebooks.map((nb) => {
+          const active = nb.gradeLevelId === activeNotebookId;
+          return (
+            <button
+              key={nb.gradeLevelId}
+              type="button"
+              role="menuitemradio"
+              aria-checked={active}
+              tabIndex={-1}
+              className={
+                "chrome-menu-item" + (active ? " chrome-menu-item-active" : "")
+              }
+              onClick={() => {
+                setActiveNotebookId(nb.gradeLevelId);
+                close();
+                restoreFocus();
+              }}
+            >
+              <span className="chrome-menu-check" aria-hidden="true">
+                {active ? <CheckIcon /> : null}
+              </span>
+              <span>{nb.name}</span>
+            </button>
+          );
+        })}
+      {isMulti && (
+        <div className="chrome-menu-sep" role="separator" aria-hidden="true" />
+      )}
+      <TransitionLink
+        href="/settings/workspace"
+        role="menuitem"
+        tabIndex={-1}
+        className="chrome-menu-item"
+        onClick={() => close()}
+      >
+        <SlidersIcon />
+        <span>Manage workspace</span>
+      </TransitionLink>
+      {isWorkspaceAdmin && (
+        <TransitionLink
+          href="/settings/team"
+          role="menuitem"
+          tabIndex={-1}
+          className="chrome-menu-item"
+          onClick={() => close()}
+        >
+          <PlusIcon />
+          <span>New notebook</span>
+        </TransitionLink>
+      )}
+    </div>
+  ) : null;
 
   return (
-    // The chip itself is a passive label (only the gears are interactive),
-    // so the named-panel explanation rides on title= (CLAUDE.md §4 panel
-    // rule: touch users long-press the root) plus a dismissible Tooltip on
-    // the text stack for the desktop hover/focus path.
+    // The gears stay interactive siblings; the identity cluster is now the
+    // switcher trigger. The named-panel explanation rides on title= (CLAUDE.md
+    // §4 panel rule: touch users long-press the root).
     <div className="ctx glass" title={chipTip}>
-      {/* Identity avatar dot — Google photo when the session supplies one,
-          initial monogram otherwise. Inline backgroundImage mirrors the
-          bundle exactly (the URL is data, not a style token). aria-hidden:
-          purely decorative — the teacher's name/settings live on the
-          top-bar avatar, and this dot duplicates that identity signal. */}
-      <span
-        className="cdot cdot-av"
-        aria-hidden="true"
-        style={
-          currentUser.avatarUrl
-            ? {
-                backgroundImage: `url('${currentUser.avatarUrl}')`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
+      <Tooltip
+        content="Switch your workspace or notebook, or manage workspace settings"
+        side="top"
+        tooltipId="chrome-context-switch"
       >
-        {!currentUser.avatarUrl && avatarInitial}
-      </span>
-
-      <Tooltip content={chipTip} side="top" tooltipId="chrome-context-chip">
-        <span className="cstack">
-          <span className="ctop">{topLine}</span>
-          {subLine !== null && <span className="csub">{subLine}</span>}
-        </span>
+        <button
+          type="button"
+          ref={triggerRef}
+          className="ctx-switch"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label={`Workspace: ${workspaceName}. Switch workspace or notebook`}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {/* Identity avatar dot — Google photo when the session supplies one,
+              initial monogram otherwise. aria-hidden: decorative (the button's
+              aria-label carries the name). */}
+          <span
+            className="cdot cdot-av"
+            aria-hidden="true"
+            style={
+              currentUser.avatarUrl
+                ? {
+                    backgroundImage: `url('${currentUser.avatarUrl}')`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : undefined
+            }
+          >
+            {!currentUser.avatarUrl && avatarInitial}
+          </span>
+          <span className="cstack">
+            <span className="ctop">{topLine}</span>
+            {subLine !== null && <span className="csub">{subLine}</span>}
+          </span>
+          <ChevronIcon />
+        </button>
       </Tooltip>
+
+      {switcherMenu && typeof document !== "undefined"
+        ? createPortal(switcherMenu, document.body)
+        : null}
 
       {/* Help gear. The tooltip IS the v1 feature (hover-to-learn); the
           click opens nothing yet. `required` — Help is the safety net,
@@ -205,6 +421,48 @@ function GearGlyph(): ReactNode {
     >
       <circle cx="12" cy="12" r="3.2" />
       <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" />
+    </svg>
+  );
+}
+
+// ── Switcher glyphs (chip trigger + menu) ──────────────────────────────────
+function stroke() {
+  return {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+}
+function ChevronIcon(): ReactNode {
+  return (
+    <svg {...stroke()} className="ctx-switch-chev">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+function CheckIcon(): ReactNode {
+  return (
+    <svg {...stroke()} strokeWidth={2.4}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+function SlidersIcon(): ReactNode {
+  return (
+    <svg {...stroke()}>
+      <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+    </svg>
+  );
+}
+function PlusIcon(): ReactNode {
+  return (
+    <svg {...stroke()}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }

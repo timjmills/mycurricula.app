@@ -37,9 +37,12 @@ import { ImmersiveBar } from "./ImmersiveBar";
 import { ChromeContext } from "./ChromeContext";
 import { ChromeClock } from "./ChromeClock";
 import { ChromeQuote } from "./ChromeQuote";
-import { CompactConsole, COMPACT_CONSOLE_ROUTES } from "./Console";
+import { CompactConsole, ConsoleNav, COMPACT_CONSOLE_ROUTES } from "./Console";
+import { ChromeToolsMenu } from "./ChromeToolsMenu";
+import { ChromeAccountMenu } from "./ChromeAccountMenu";
 import { ViewTitle } from "./ViewTitle";
 import { ViewEditToggle } from "./ViewEditToggle";
+import { CatchUpModalHost } from "@/components/catchup-v2";
 
 // §9b immersive surfaces — exactly Plan · Post · Teach (WAVE-3-PLAN R1).
 // Prefix match so nested routes (/planner/units, /post/wall-x) stay immersive.
@@ -106,9 +109,23 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
     );
     return (
       <div className="overlay immersive">
+        {/* R1a: the Catch-Up modal host is elected app-wide, so the Tools
+            popover's Catch-up item works from the immersive routes too. */}
+        <CatchUpModalHost />
         <ImmersiveBar
           title={viewTitle}
           showModeSwitch={showModeSwitch}
+          // R1b: the six-tab view console rides the immersbar center on the
+          // immersive surfaces (Plan/Post), matching the handoff compact-bar.
+          nav={<ConsoleNav compact />}
+          // R1a/c/d: Tools popover + account menu in the immersbar right slot,
+          // so every re-homed destination is reachable from these routes too.
+          tools={
+            <>
+              <ChromeToolsMenu />
+              <ChromeAccountMenu />
+            </>
+          }
           onBack={() => {
             // Contract (WAVE-3-PLAN R1): settle any in-flight soft swap so
             // the snapshot cannot hold input through a back-navigation this
@@ -132,6 +149,9 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
 
   return (
     <div className="overlay">
+      {/* R1a: the single elected Catch-Up modal host — the Tools popover's
+          Catch-up item dispatches CATCHUP_MODAL_TOGGLE_EVENT to it. */}
+      <CatchUpModalHost />
       <ChromeTopBar
         title={viewTitle}
         tools={

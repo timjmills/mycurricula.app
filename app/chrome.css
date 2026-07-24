@@ -1829,6 +1829,290 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   SideNav retirement (R1) — re-homed chrome controls.
+
+   The left rail's destinations moved into the corner grammar: an always-on
+   Tools popover + account avatar in the control cluster, the six-tab console in
+   the ImmersiveBar center, and the interactive workspace switcher on the botbar
+   context chip. New controls reuse the ported handoff recipes (.toolsbtn /
+   .toolspop / .iconbtn / .ctx) so they read as siblings of the existing chrome;
+   selectors carry ≥2 classes where they live inside .cp-root so the tokens.css
+   `.cp-root button` reset (0,1,1) can't strip them. Portaled dropdown menus
+   render to <body> (outside .cp-root), so the reset never reaches those items.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media screen {
+  /* ── Always-visible Tools popover ────────────────────────────────────────
+     Distinct wrapper from the phone-only `.tools .toolswrap` overflow (which is
+     display:none above 480px). Anchors the reused .toolspop popover. */
+  .toolsmenu {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .toolsmenu .toolspop {
+    top: calc(100% + 12px);
+    right: 0;
+  }
+  /* Two-row popover (§4a): a Views row above the utilities row — the phone
+     fallback for the six-tab console, which the immersive bar hides ≤600px.
+     Each row keeps the original horizontal-strip recipe; :last-child border
+     trimming is structural per row. */
+  .toolspop.toolspop-2row {
+    flex-direction: column;
+  }
+  .toolspop .toolsrow {
+    display: flex;
+    align-items: stretch;
+  }
+  .toolspop .toolsrow-views {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  }
+  :root[data-tone="light"] .toolspop .toolsrow-views,
+  .home[data-tone="light"] .toolspop .toolsrow-views {
+    border-bottom-color: rgba(28, 27, 46, 0.1);
+  }
+  /* Views items are 6-across — compact them so the row matches the utilities
+     row's width on desktop instead of forcing it wider. */
+  .toolspop .toolsrow-views .tool {
+    min-width: 0;
+    flex: 1 1 0;
+    padding: 13px 10px;
+  }
+
+  /* Phone-only Account row: hidden above 480 (the top-bar avatar covers it);
+     shown ≤480, where the avatar hides (its 44px overflowed 375 by 13px —
+     §4a round-2). The inline sign-out form is layout-transparent. */
+  .toolspop .toolsrow-account {
+    display: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+  }
+  :root[data-tone="light"] .toolspop .toolsrow-account,
+  .home[data-tone="light"] .toolspop .toolsrow-account {
+    border-top-color: rgba(28, 27, 46, 0.1);
+  }
+  .toolspop .tool-form {
+    display: contents;
+  }
+
+  /* Phone: keep all rows inside the viewport (tools share the width
+     instead of each holding min-width:88px → ~352px, which clips at 375),
+     swap the avatar for the popover Account row. */
+  @media (max-width: 480px) {
+    .toolsmenu .toolspop {
+      max-width: calc(100vw - 20px);
+    }
+    .toolsmenu .toolspop .tool {
+      min-width: 0;
+      flex: 1 1 52px;
+      padding: 13px 4px;
+    }
+    .toolspop .toolsrow-account {
+      display: flex;
+    }
+    /* Doubled class: the base `.chrome-account` rule sits LATER in this file,
+       so an equal-specificity media override here would lose the cascade. */
+    .chrome-account.chrome-account {
+      display: none;
+    }
+  }
+
+  /* ── Account avatar (R1d) ────────────────────────────────────────────────
+     The proven .iconbtn circle with the photo/initials filling it; the doubled
+     `.iconbtn.chrome-avatar` (0,2,0) clears the reset. */
+  .chrome-account {
+    display: inline-flex;
+    align-items: center;
+  }
+  .iconbtn.chrome-avatar {
+    padding: 0;
+    overflow: hidden;
+  }
+  .chrome-avatar .chrome-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+  .chrome-avatar .chrome-avatar-initials {
+    font-family: var(--font-display-sm);
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Portaled dropdown menus (account + workspace switcher) ───────────────
+     Rendered to <body> (outside .cp-root), so the button reset never reaches
+     the items. Tone-aware glass matching the .toolspop material. */
+  .chrome-menu {
+    min-width: 208px;
+    max-width: min(280px, calc(100vw - 16px));
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    border-radius: var(--r-xl, 16px);
+    background: rgba(18, 17, 30, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    backdrop-filter: blur(24px) saturate(1.3);
+    box-shadow:
+      0 26px 60px -26px rgba(12, 11, 20, 0.75),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    color: #fff;
+    animation: toolsin 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  :root[data-tone="light"] .chrome-menu,
+  .home[data-tone="light"] .chrome-menu {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(255, 255, 255, 0.9);
+    color: var(--ink-soft);
+    box-shadow:
+      0 26px 60px -28px rgba(28, 27, 46, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chrome-menu {
+      animation: none;
+    }
+  }
+  .chrome-menu-head {
+    padding: 8px 12px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .chrome-menu-name {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  .chrome-menu-sub {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.66;
+  }
+  .chrome-menu-sep {
+    height: 1px;
+    margin: 5px 8px;
+    background: rgba(255, 255, 255, 0.16);
+  }
+  :root[data-tone="light"] .chrome-menu-sep,
+  .home[data-tone="light"] .chrome-menu-sep {
+    background: rgba(28, 27, 46, 0.1);
+  }
+  /* The sign-out form is a pure grouping wrapper — collapse it so its submit
+     button is a direct flex child like the other rows. */
+  .chrome-menu-form {
+    display: contents;
+  }
+  .chrome-menu-item {
+    appearance: none;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    min-height: 44px;
+    border-radius: var(--r-lg, 12px);
+    color: inherit;
+    text-decoration: none;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: -0.005em;
+    transition: background 0.14s ease;
+  }
+  .chrome-menu-item svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    opacity: 0.85;
+  }
+  .chrome-menu-item:hover,
+  .chrome-menu-item:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+    outline: none;
+  }
+  :root[data-tone="light"] .chrome-menu-item:hover,
+  :root[data-tone="light"] .chrome-menu-item:focus-visible,
+  .home[data-tone="light"] .chrome-menu-item:hover,
+  .home[data-tone="light"] .chrome-menu-item:focus-visible {
+    background: rgba(28, 27, 46, 0.08);
+  }
+  .chrome-menu-check {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+  }
+  .chrome-menu-check svg {
+    width: 16px;
+    height: 16px;
+    opacity: 1;
+  }
+  .chrome-menu-item-active {
+    font-weight: 800;
+  }
+
+  /* ── Interactive context chip (R1e) ──────────────────────────────────────
+     The identity cluster becomes the workspace/notebook switcher trigger.
+     Doubled `.ctx .ctx-switch` (0,2,0) clears the reset; transparent + inherits
+     so it reads as the chip's own text, with a subtle hover. */
+  .ctx .ctx-switch {
+    appearance: none;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 2px 4px;
+    margin: -2px 0;
+    border-radius: var(--r-pill);
+    transition: background 0.14s ease;
+  }
+  .ctx .ctx-switch:hover,
+  .ctx .ctx-switch:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+    outline: none;
+  }
+  :root[data-tone="light"] .ctx .ctx-switch:hover,
+  :root[data-tone="light"] .ctx .ctx-switch:focus-visible,
+  .home[data-tone="light"] .ctx .ctx-switch:hover,
+  .home[data-tone="light"] .ctx .ctx-switch:focus-visible {
+    background: rgba(28, 27, 46, 0.08);
+  }
+  .ctx .ctx-switch .ctx-switch-chev {
+    width: 15px;
+    height: 15px;
+    opacity: 0.55;
+    flex: 0 0 auto;
+  }
+
+  /* ── ImmersiveBar center — the six-tab console (R1b) ─────────────────────
+     Fills the middle so the nav centers between the back/title (left) and the
+     mode/tools cluster (right). */
+  .immersbar-center {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+  }
+  /* Phone: the six tabs can't share the bar with back+title+tools — drop them
+     (the Tools popover + Back still navigate). */
+  @media (max-width: 600px) {
+    .immersbar-center {
+      display: none;
+    }
+  }
+}
+
 /* ── Print (§4a finding #6) — outside the @media screen wrapper above, so it
    actually applies on paper: the corner chrome is navigation/ambient UI and
    must never reach print output (globals.css's print rules only suppress

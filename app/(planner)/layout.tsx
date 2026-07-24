@@ -180,17 +180,23 @@ export default function PlannerLayout({
                     REPLACES the v1.3 TopBar and the red MasterBanner — team
                     mode now signals via the pink [data-mode="team"] glow
                     (CLAUDE.md §2), which ChromeShell mirrors onto <html>.
-                    W3.4 landed the console (the /home landing + the compact
-                    view-nav atop Day/Week/Year); the SideNav stays mounted
-                    INTERIM as nav for the surfaces the console doesn't yet
-                    cover (Subject, Schedule, Catch-up, Archive, Boards,
-                    Settings) — it retires once those get their own homes. The
-                    corner grammar itself carries no nav. The content column
-                    is position:relative so the absolute .overlay grid fills
-                    exactly the area right of the SideNav. Teach remains a
-                    separate route group with its own chrome. */}
+
+                    SIDENAV RETIREMENT (v2-path only): the left rail was a W3.4
+                    interim nav for the surfaces the console didn't yet cover.
+                    Those destinations are now re-homed — the six-tab console
+                    (Day·Week·Year·Plan·Post·Teach) is app-wide, Catch-up/
+                    Schedule/Archive/Settings live in the top-bar Tools popover,
+                    the account menu is a top-bar avatar, and the workspace/
+                    notebook switcher is the interactive botbar context chip —
+                    so the v2 path renders NO SideNav (the corner grammar itself
+                    carries the nav). The `!V2` branch below KEEPS the rail
+                    byte-identically for the rollback build; SideNav.* is NOT
+                    deleted. The content column is position:relative so the
+                    absolute .overlay grid fills its area (right of the rail
+                    under v1; the full width under v2). Teach remains a separate
+                    route group with its own chrome. */}
                         <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                          <SideNav />
+                          {!V2 && <SideNav />}
                           <div
                             style={{
                               flex: 1,

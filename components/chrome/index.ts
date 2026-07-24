@@ -13,4 +13,13 @@ export { ViewTitle } from "./ViewTitle";
 // W3.6 — the Day/Week View↔Edit toggle (mounted in the top bar's `.tools` slot).
 export { ViewEditToggle } from "./ViewEditToggle";
 // W3.4 — the segmented view console (home landing + compact view-nav variant).
-export { HomeConsole, CompactConsole, COMPACT_CONSOLE_ROUTES } from "./Console";
+// ConsoleNav is the bare segmented row, reused in the ImmersiveBar center.
+export {
+  HomeConsole,
+  CompactConsole,
+  ConsoleNav,
+  COMPACT_CONSOLE_ROUTES,
+} from "./Console";
+// SideNav-retirement re-homes: the Tools popover + the account menu.
+export { ChromeToolsMenu } from "./ChromeToolsMenu";
+export { ChromeAccountMenu } from "./ChromeAccountMenu";

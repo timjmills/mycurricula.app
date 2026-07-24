@@ -10,15 +10,17 @@
 //     ChromeShell route-scoped (like the botbar/quote). Suppressed on home
 //     (which renders the full console) and on the immersive surfaces.
 //
-// ENTRIES. Day/Week/Year/Plan only — the bundle's NAV/NAV_SUB/NAV_TIP for
-// those four. Post ("Resource wall") and Teach ("Present") are DEFERRED to
-// their phases: WAVE-3-PLAN R6 has them enrolling in the immersive shell when
-// those surfaces build (Phase 2/3), and neither has a v2 route on this branch
-// (wiring them now would 404 or point the v2 console at a v1 surface). A
-// recorded, deliberate divergence from the bundle's six-entry console.
+// ENTRIES. The bundle's full six-tab console: Day/Week/Year/Plan/Post/Teach
+// (NAV/NAV_SUB/NAV_TIP verbatim). Post ("Resource wall" → /post) and Teach
+// ("Present" → /boards) were interim-deferred while those surfaces were built;
+// both routes now EXIST (app/(planner)/post + app/(planner)/boards), so the
+// SideNav-retirement wave restores them to the console — the console is now the
+// app's primary nav on every route family (the left rail is retired v2-side).
 //
-// "Plan" → /planner (the W3.4 immersive stub), NOT the bundle's legacy
+// "Plan" → /planner (the W3.4 immersive Planning Hub), NOT the bundle's legacy
 // PlanPage — the deliberate §9a divergence recorded in WAVE-3-PLAN W3.4 / R2.
+// "Teach" → /boards (the board HOME, which inherits the corner-grammar chrome);
+// the full-screen board editor is its own /teach route group with its own chrome.
 //
 // Navigation goes through TransitionLink so the stage photo holds while the
 // content soft-swaps (the W3.2 View-Transitions contract), exactly as SideNav
@@ -74,24 +76,49 @@ const CONSOLE_NAV: readonly ConsoleEntry[] = [
     sub: "Planner\nhub",
     tip: "Planner — your planning hub: lessons, units, resources, catch-up",
   },
+  {
+    key: "post",
+    href: "/post",
+    word: "Post",
+    sub: "Resource\nwall",
+    tip: "Resource Wall — collections of resources for your lessons",
+  },
+  {
+    key: "teach",
+    href: "/boards",
+    word: "Teach",
+    sub: "Present",
+    tip: "Teach Board — present your lesson and resources to the class",
+  },
 ];
 
-// The routes that carry the compact console. ChromeShell reads this so the
-// route-scoping has a single source of truth. Home renders the full console
-// (as its page); the immersive surfaces render none.
+// The routes that carry the compact console in the corner-grammar shell.
+// ChromeShell reads this so the route-scoping has a single source of truth.
+// Home renders the full console (as its page); the IMMERSIVE surfaces
+// (/planner, /post) render the same nav row inside the ImmersiveBar center
+// instead (ChromeShell wires it there), so they are deliberately absent here.
+// /boards (Teach) inherits the corner grammar, so it carries the compact
+// console like Day/Week/Year.
 export const COMPACT_CONSOLE_ROUTES: readonly string[] = [
   "/daily",
   "/weekly",
   "/year",
+  "/boards",
 ];
 
 function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-// The segmented button row shared by both mounts. `compact` drops the captions
-// and lets the chrome.css `.views.console.compact` recipe slim the padding.
-function ConsoleNav({ compact = false }: { compact?: boolean }): ReactNode {
+// The segmented button row shared by every mount (home, the compact console
+// atop Day/Week/Year/Boards, and — exported — the ImmersiveBar center on
+// /planner + /post). `compact` drops the captions and lets the chrome.css
+// `.views.console.compact` recipe slim the padding.
+export function ConsoleNav({
+  compact = false,
+}: {
+  compact?: boolean;
+}): ReactNode {
   const pathname = usePathname();
   // W3.8b force-reset: the Day nav item resets Day to View (bundle B:11978 —
   // Home→Day nav; B:11986 — the compact console's Day item resets IN PLACE

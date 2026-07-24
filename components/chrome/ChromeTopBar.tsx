@@ -54,6 +54,8 @@ import {
 } from "@/components/shell";
 import { useAppState } from "@/lib/app-state";
 import { ModeSwitch } from "./ModeSwitch";
+import { ChromeToolsMenu } from "./ChromeToolsMenu";
+import { ChromeAccountMenu } from "./ChromeAccountMenu";
 
 // ── Brand glyph (bundle LOGO_SVG, themable fills) ─────────────────────────
 
@@ -357,6 +359,12 @@ export function ChromeTopBar({ title, tools }: ChromeTopBarProps): ReactNode {
           )}
         </div>
         <NotificationBell />
+        {/* SideNav-retirement re-homes (R1a/c/f + R1d): the Tools popover
+            (Catch-up · Schedule · Archive · Settings) and the account menu
+            (Account settings · Sign out). Present on every corner-grammar
+            route, so the retired left rail's destinations stay reachable. */}
+        <ChromeToolsMenu />
+        <ChromeAccountMenu />
       </div>
     </header>
   );

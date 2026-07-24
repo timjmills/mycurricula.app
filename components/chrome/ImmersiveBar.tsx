@@ -60,6 +60,20 @@ export interface ImmersiveBarProps {
   /** Personal/Team toggle in the right slot. Plan ONLY per the bundle. */
   showModeSwitch?: boolean;
   /**
+   * Center nav slot — the six-tab view console (SideNav-retirement R1b). The
+   * handoff's compact-bar `.cb-center` carries the same `.views.nav` switch on
+   * the immersive surfaces (Plan/Post), so a teacher can jump between views
+   * without leaving. ChromeShell passes the shared <ConsoleNav compact/>.
+   */
+  nav?: ReactNode;
+  /**
+   * Right-cluster extras appended AFTER the mode switch (SideNav-retirement
+   * R1a/c/d): the Tools popover + account menu, so every re-homed destination
+   * (Catch-up, Schedule, Archive, Settings, account) is reachable from the
+   * immersive route families too — matching the handoff compact-bar's ⋯ menu.
+   */
+  tools?: ReactNode;
+  /**
    * Exit handler. The CALLER settles pending View Transitions / back-pops
    * before navigating — this component only reports the click.
    */
@@ -71,6 +85,8 @@ export interface ImmersiveBarProps {
 export function ImmersiveBar({
   title,
   showModeSwitch = false,
+  nav,
+  tools,
   onBack,
   hidden = false,
 }: ImmersiveBarProps): ReactNode {
@@ -101,7 +117,11 @@ export function ImmersiveBar({
         </Tooltip>
         {title}
       </div>
-      <div className="immersbar-right">{showModeSwitch && <ModeSwitch />}</div>
+      {nav ? <div className="immersbar-center">{nav}</div> : null}
+      <div className="immersbar-right">
+        {showModeSwitch && <ModeSwitch />}
+        {tools}
+      </div>
     </div>
   );
 }

@@ -67,10 +67,44 @@ interface PaletteResult {
 
 // ── Static view results ────────────────────────────────────────────────────────
 
-// The three primary views always appear first in the results list.
-const VIEW_RESULTS: Omit<PaletteResult, "action">[] = [
-  { id: "view-weekly", kind: "view", label: "Weekly planner", meta: "View" },
-  { id: "view-daily", kind: "view", label: "Daily schedule", meta: "View" },
+// The primary views + the utility surfaces re-homed off the retired left rail
+// (Schedule, Archive — SideNav-retirement R1f). Each carries its route so the
+// action is a plain router.push; keywords let intent searches ("timetable",
+// "past years") land on the right row.
+interface ViewResultDef extends Omit<PaletteResult, "action"> {
+  href: string;
+}
+const VIEW_RESULTS: ViewResultDef[] = [
+  {
+    id: "view-weekly",
+    kind: "view",
+    label: "Weekly planner",
+    meta: "View",
+    href: "/weekly",
+  },
+  {
+    id: "view-daily",
+    kind: "view",
+    label: "Daily schedule",
+    meta: "View",
+    href: "/daily",
+  },
+  {
+    id: "view-schedule",
+    kind: "view",
+    label: "Schedule",
+    meta: "View",
+    keywords: ["timetable", "periods", "bell", "rotation"],
+    href: "/schedule",
+  },
+  {
+    id: "view-archive",
+    kind: "view",
+    label: "Archive",
+    meta: "View",
+    keywords: ["past years", "sealed", "rolled over", "curriculum archive"],
+    href: "/archive",
+  },
 ];
 
 // One "Subject — <name>" entry per subject, so teachers can jump directly to
@@ -101,17 +135,29 @@ interface ThemeActionDef {
 
 // v2 theme set (lockstep with lib/theme.tsx APP_THEMES).
 const THEME_ACTIONS: readonly ThemeActionDef[] = [
-  { theme: "clear", label: "Theme: Clear", keywords: ["light", "resting", "default"] },
+  {
+    theme: "clear",
+    label: "Theme: Clear",
+    keywords: ["light", "resting", "default"],
+  },
   {
     theme: "night",
     label: "Theme: Night",
     keywords: ["dark", "dark mode", "low light"],
   },
-  { theme: "honey", label: "Theme: Honey", keywords: ["gold", "amber", "warm"] },
+  {
+    theme: "honey",
+    label: "Theme: Honey",
+    keywords: ["gold", "amber", "warm"],
+  },
   { theme: "blossom", label: "Theme: Blossom", keywords: ["pink"] },
   { theme: "mint", label: "Theme: Mint", keywords: ["green"] },
   { theme: "sky", label: "Theme: Sky", keywords: ["blue"] },
-  { theme: "off", label: "Theme: Off (Photo)", keywords: ["photo", "ungraded", "original"] },
+  {
+    theme: "off",
+    label: "Theme: Off (Photo)",
+    keywords: ["photo", "ungraded", "original"],
+  },
   {
     theme: "system",
     label: "Theme: Follow system",
@@ -218,13 +264,13 @@ export function CommandPalette({
   const results = useMemo<PaletteResult[]>(() => {
     const q = query.trim();
 
-    // View results — always included; filter by label.
+    // View results — always included; filter by label OR keyword aliases.
     const views: PaletteResult[] = VIEW_RESULTS.filter(
-      (r) => !q || matches(r.label, q),
-    ).map((r) => ({
+      (r) => !q || matchesAny(r.label, r.keywords ?? [], q),
+    ).map(({ href, ...r }) => ({
       ...r,
       action: () => {
-        router.push(r.id === "view-weekly" ? "/weekly" : "/daily");
+        router.push(href);
         onClose();
       },
     }));
