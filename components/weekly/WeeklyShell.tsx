@@ -99,7 +99,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Button, Tooltip } from "@/components/ui";
+import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
 import {
   DndContext,
   DragOverlay,
@@ -123,6 +123,7 @@ import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
 import { DRAWER_MQ } from "./drawer-mq";
 import { WeekColumns } from "./WeekColumns";
+import { WeekGridSkeleton } from "./WeekGridSkeleton";
 // W5 — the three Week VIEW frames: WeekA (glass, read-only period×day grid),
 // WeekColumns (paper, day columns), and WeekC (color, subject lanes). Edit
 // mode uses WeekEditBoard, schedule uses ScheduleTimeline, and narrow/list uses
@@ -141,7 +142,11 @@ import {
   useWeeklyScheduleMode,
 } from "@/lib/weekly-schedule-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
-import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
+import {
+  usePlanner,
+  usePlannerDataState,
+  scrollPlannerItemIntoView,
+} from "@/lib/planner-store";
 import { useTheme } from "@/lib/theme";
 import { useViewEditMode } from "@/lib/edit-mode-state";
 import { usePhoneViewport } from "@/lib/use-phone-viewport";
@@ -568,6 +573,12 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     toggleCommentsPanel,
   } = useAppState();
   const { lessons, activeGradeId } = usePlanner();
+  // Loading/error honesty for the Week VIEW canvases (renderGridPanel). During
+  // the Supabase hydrate this is "pending" and the canvas would otherwise paint
+  // a full week of false "No lessons" columns; "error" is a failed hydrate. It
+  // is permanently "settled" with the Supabase flag OFF, so the mock/v1 path is
+  // untouched. See components/ui/PlannerEmpty for the same fix on other surfaces.
+  const gridDataState = usePlannerDataState();
 
   // ── W3.8 — lesson-editor modal state ─────────────────────────────────
   // The shell owns which lesson (if any) is open in the full-editor popup.
@@ -1225,8 +1236,23 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           <ScheduleTimeline scope="week" showNonAcademic={includeAllEvents} />
         ) : showList ? (
           // WeeklyList replaces the grid but occupies the same 1fr slot
-          // so the splitter and rail math are unaffected.
+          // so the splitter and rail math are unaffected. (It carries its own
+          // PlannerEmpty loading/error honesty, so it is gated ABOVE the
+          // grid-state branch below.)
           <WeeklyList />
+        ) : gridDataState === "pending" ? (
+          /* Hydrate in flight (Supabase, 11–16s) — a day-column skeleton in
+             place of the canvas so the load never reads as a false "no lessons
+             this week". Covers all three view frames (paper/glass/color)
+             uniformly; the settled frame branch below is untouched. Permanently
+             "settled" with the Supabase flag OFF, so this is a no-op on v1/mock. */
+          <WeekGridSkeleton />
+        ) : gridDataState === "error" ? (
+          /* Hydrate threw — the canonical "Couldn't load your plan" state
+             (PlannerEmpty renders its own error copy when the data state is
+             "error"), never a silent blank. The heading prop is the graceful
+             settled-fallback only; it is never shown in this branch. */
+          <PlannerEmpty heading="No lessons planned for this week yet." />
         ) : frame === "paper" ? (
           /* W3.6 — Frame B (paper) reads the week as DAY COLUMNS (the
              bundle's "WeekB"). Same planner data, same rich card (so the
