@@ -2795,3 +2795,44 @@ verified against prototype source. Shipped v1.1 as **PR #71** (branch
 slot after `20260717120000` is free; all 6 on-master superseded docs correctly bannered;
 B1.0–B1.8 sub-plan confirmed in this log. **Open:** no pushed branch for 12b-2 multi-workspace
 — if you hold local work on it, LOG A CLAIM.
+
+---
+
+## [Main/orchestrator 7.24] ✅ GEOGRAPHY FIX + CUTOVER-PREP + §5.1 TAIL — 11 pushes, all deployed
+
+**2026-07-24.** Main checkout moved OFF the stale branch onto **master permanently**
+(stranded content landed as `2c25ff9`: this log — now TRACKED on master — the §4c
+hydrate-gate script, planning/review docs; stale app code abandoned as superseded;
+mc-wave12-settings worktree detached to free the branch name). This file is the
+canonical log again — append here.
+
+**Cutover state (verified LIVE, not from docs):** both workspace migrations ALREADY
+APPLIED on prod; invitations table EMPTY (ADD semantics live but dormant). All three
+cutover-bundle items now DONE: invite `existing_workspace` cleanup re-applied
+(`5202157`), `rename_workspace` RPC + wiring (`cb83e46`), preview-deploy
+`multi_workspace` dispatch input (`778a79b`). Runbook §0 updated to match (`ca89b3b`).
+Remaining: apply `20260726120000` + set flag secret + flag-ON preview QA + USER GO.
+
+**Also shipped:** fork-diff-restore leaf extract (`181e30c` — /catch-up first-load
+405→239 kB measured; the linkedom edge was planner-store→fork-diff module
+co-location, NOT lesson-card families); CatchUpModal phone width (`3753e3f` — grid
+`place-items:center` makes %-max-width self-referential; bound as length);
+§5.1 settings-kit tail (`929f8d5` — workspace Team column, appearance shared-reveal
+alignment, settings-card `.header` flex-wrap, 307 comment); F8 phone frame inset
+30→10px salvaged from mc-wave2-audit (`4b9ab44`, main 223→263px @375).
+
+**Durable lessons:** (1) `set search_path = public` on SECURITY DEFINER leaves
+pg_temp implicitly FIRST for relations — Codex flagged it Critical on rename;
+`20260726120000` §3 back-fills `public, pg_temp` onto all 13 workspace-family
+functions at cutover. (2) A bare `git commit` in the shared tree swept a sibling
+agent's staged deletion into `cb83e46` (hotfixed `965fc81`) — orchestrator+agents
+rules: agents NEVER stage; inspect `git diff --cached --name-only` as its own step,
+then commit path-scoped. (3) Service-role key rotated in main+wave12+polish
+`.env.local` — localhost bypass works again.
+
+**Worktree survey (for a cleanup pass):** all worktree content confirmed landed
+(PRs #76/#77 squash-merged; W11 via re-push) — only stranded work found was F8
+(salvaged). Removable when user OKs: mc-boards-pr, mc-build, mc-curriculum-merge,
+mc-settings-pr, mc-w11-flagoff, mc-wave2-audit, mc-wave3, mycurricula-daily-preview,
+mycurricula-daily-verify + the .claude/worktrees/agent-* pile. Keep: mc-wave12-settings,
+mc-polish, mc-ushare (own node_modules + secrets). Mind the junction footgun.
