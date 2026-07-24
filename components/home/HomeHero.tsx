@@ -3,17 +3,15 @@
 // Quiet Dawn hero: a living theme-wash field, a quiet time-of-day greeting, and
 // the rolling attributed insight. This hero alone IS the "Calm" minimal mode.
 
+import { useEffect, useState } from "react";
 import { useAppState } from "@/lib/app-state";
-import { heroInsights } from "@/lib/home/insights";
+import { loadHeroInsights, type Insight } from "@/lib/home/insights";
 import { greetingWord, todayDate } from "@/lib/home/today";
 import { ThemeWash } from "@/components/ui";
 import type { QuoteTopic } from "@/lib/home/use-home-layout";
 import { HeroPhotos } from "./HeroPhotos";
 import { RollingInsight } from "./RollingInsight";
 import styles from "./home.module.css";
-
-// Balanced, display-friendly rotation pool — computed once.
-const HERO_POOL = heroInsights();
 
 function firstName(name?: string): string {
   if (!name) return "there";
@@ -37,11 +35,27 @@ export function HomeHero({
     month: "long",
     day: "numeric",
   });
+  // Balanced, display-friendly rotation pool — code-split out of the page
+  // bundle (bundle-slim lever C: insights.hero.json is ~34 kB gzip) and
+  // loaded once post-mount. Until it resolves the pool is empty and
+  // RollingInsight renders nothing (its existing empty-pool state); the
+  // greeting + date above it are unaffected. The import is cached in
+  // lib/home/insights, so re-mounts never re-fetch.
+  const [heroPool, setHeroPool] = useState<Insight[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void loadHeroInsights().then((p) => {
+      if (!cancelled) setHeroPool(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Filter the rotation pool to the chosen topic (or keep all four, mixed).
   const pool =
     quoteTopic === "all"
-      ? HERO_POOL
-      : HERO_POOL.filter((i) => i.category === quoteTopic);
+      ? heroPool
+      : heroPool.filter((i) => i.category === quoteTopic);
 
   return (
     <section className={styles.hero}>

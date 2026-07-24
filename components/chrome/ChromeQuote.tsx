@@ -17,9 +17,10 @@
 //
 // ── Data seam ────────────────────────────────────────────────────────────
 // Quotes come from the REAL insight bank — lib/home/insights.ts
-// heroInsights() (the trimmed, attributed hero pool mined from the
-// teacher's own library), NOT the mockup's inline TEACH_QUOTES sample
-// array. Field mapping onto the bundle's shape:
+// loadHeroInsights() (the trimmed, attributed hero pool mined from the
+// teacher's own library, code-split into its own async chunk and loaded
+// post-mount — bundle-slim lever C), NOT the mockup's inline TEACH_QUOTES
+// sample array. Field mapping onto the bundle's shape:
 //   quote.short → Insight.quote · author → Insight.author ·
 //   context → the lazy expand prose (Insight.hasExpand gates it; the text
 //   loads via loadInsightExpand when the popup opens) ·
@@ -56,15 +57,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
-  heroInsights,
+  loadHeroInsights,
   loadInsightExpand,
   type Insight,
 } from "@/lib/home/insights";
 import { Tooltip } from "@/components/ui";
-
-// The balanced hero pool — pure over static module data, so computing it
-// once at module scope is safe (no per-render filtering of ~320 records).
-const POOL: readonly Insight[] = heroInsights();
 
 /** user-scoped localStorage prefix; the local date key is appended. Stale
  *  previous-day keys are cleaned up on mount (below) so the entry count
@@ -138,6 +135,23 @@ export function ChromeQuote(): ReactNode {
   const [dismissed, setDismissed] = useState(false);
   const [open, setOpen] = useState(false);
 
+  // The balanced hero pool — code-split out of the layout bundle (bundle-slim
+  // lever C: insights.hero.json is ~34 kB gzip and this component mounts on
+  // EVERY planner route). Loaded once post-mount; until it resolves the
+  // component renders nothing, exactly like the pre-mount SSR state, and the
+  // quote then fades in via the existing `.hero-quote` quotefade. The import
+  // is cached in lib/home/insights, so route changes never re-fetch.
+  const [pool, setPool] = useState<readonly Insight[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadHeroInsights().then((p) => {
+      if (!cancelled) setPool(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const sync = (): void => {
       const key = localDateKey(new Date());
@@ -155,12 +169,13 @@ export function ChromeQuote(): ReactNode {
     return () => window.clearInterval(id);
   }, []);
 
-  // The deterministic daily insight (header note). Empty pool → no quote —
-  // the chrome simply omits the line rather than rendering a husk.
+  // The deterministic daily insight (header note). Pool not yet loaded or
+  // empty → no quote — the chrome simply omits the line rather than
+  // rendering a husk.
   const insight = useMemo<Insight | null>(() => {
-    if (dateKey === null || POOL.length === 0) return null;
-    return POOL[hashKey(dateKey) % POOL.length];
-  }, [dateKey]);
+    if (dateKey === null || pool === null || pool.length === 0) return null;
+    return pool[hashKey(dateKey) % pool.length];
+  }, [dateKey, pool]);
 
   // Return focus to the quote line when the popup closes (the popup steals
   // focus for Escape/screen-reader ergonomics).
@@ -199,7 +214,7 @@ export function ChromeQuote(): ReactNode {
               longer pool quotes truncate with an ellipsis; the popup
               carries the full text. */}
           <span className="hero-quote-text">{insight.quote}</span>
-          {/* heroInsights() filters to attributed quotes, but the field is
+          {/* loadHeroInsights() filters to attributed quotes, but the field is
               nullable on the Insight type — guard anyway. */}
           {insight.author !== null && (
             <span className="hero-quote-by">{insight.author}</span>

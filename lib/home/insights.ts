@@ -4,20 +4,29 @@
 // leading. Generated into insights.data.json by scripts/quote-mining; this
 // module is the typed loader + helpers the UI consumes.
 
-// The app bundles only the trimmed, source-diverse HERO POOL (insights.hero.json,
+// The app ships only the trimmed, source-diverse HERO POOL (insights.hero.json,
 // ~320 records). The full 4,088-quote bank lives in insights.data.json (the data
 // artifact / deliverable) and is intentionally NOT imported here to keep the
-// /home client bundle small.
+// client bundles small.
 //
-// PERF SPLIT: the hero records' `expand` prose (~280 kB, ~2/3 of the old
-// payload) lives in a SIBLING file, insights.expand.json, and is NOT imported
-// statically — it renders only after a click ("Read more" / the quote-context
-// popover), so it loads via dynamic import the first time an expansion opens
-// (webpack code-splits it into an async chunk; see loadInsightExpand below).
-// Records carry `hasExpand: true` so the UI can gate the affordance without
-// the prose. scripts/quote-mining/finalize-bank.mjs emits BOTH files — keep
-// the split when regenerating.
-import data from "./insights.hero.json";
+// PERF SPLIT, part 1 (expand prose): the hero records' `expand` prose (~280 kB,
+// ~2/3 of the old payload) lives in a SIBLING file, insights.expand.json, and
+// renders only after a click ("Read more" / the quote-context popover), so it
+// loads via dynamic import the first time an expansion opens (webpack
+// code-splits it into an async chunk; see loadInsightExpand below). Records
+// carry `hasExpand: true` so the UI can gate the affordance without the prose.
+// scripts/quote-mining/finalize-bank.mjs emits BOTH files — keep the split
+// when regenerating.
+//
+// PERF SPLIT, part 2 (the hero pool itself — bundle-slim lever C): even the
+// trimmed insights.hero.json is ~123 kB parsed / ~34 kB gzip, and this module
+// sat in the (planner) layout's client graph via the v2 chrome's ChromeQuote —
+// every planner route paid for the quote bank before first paint. There is
+// deliberately NO static `import ... from "./insights.hero.json"` here anymore:
+// the pool loads through loadHeroInsights() (dynamic import → its own async
+// chunk, fetched post-mount by the two quote surfaces), and this module stays
+// a light leaf (types + category constants + loaders) that anything can import
+// for free.
 
 export type InsightCategory =
   "classroom culture" | "learning" | "teaching" | "leading";
@@ -71,18 +80,40 @@ export const INSIGHT_CATEGORY_LABELS: Record<InsightCategory, string> = {
   leading: "Leading",
 };
 
-export const INSIGHTS = data as Insight[];
+// ── The hero pool (lazy — header note, PERF SPLIT part 2) ────────────────
 
-export function insightsByCategory(category: InsightCategory): Insight[] {
-  return INSIGHTS.filter((i) => i.category === category);
+// Cached in-flight/settled promise so the async chunk is fetched at most
+// once per session; every later call resolves from memory. On a FAILED
+// fetch the cache is cleared so a later mount can retry (a permanently
+// cached failure would silence the quote for the whole session over one
+// flaky request).
+let heroPoolPromise: Promise<Insight[]> | null = null;
+
+function loadHeroPool(): Promise<Insight[]> {
+  if (heroPoolPromise === null) {
+    heroPoolPromise = import("./insights.hero.json")
+      .then((mod) => mod.default as Insight[])
+      .catch(() => {
+        // Chunk fetch failed (offline, deploy skew) — degrade to an empty
+        // pool (the quote surfaces render nothing, matching their pre-mount
+        // state) and allow a retry on the next call.
+        heroPoolPromise = null;
+        return [];
+      });
+  }
+  return heroPoolPromise;
 }
 
 // A balanced, display-friendly subset for the hero rotation — display-length
-// quotes with an attribution, capped per category so the carousel stays light.
-export function heroInsights(perCategory = 60): Insight[] {
+// quotes with an attribution, capped per category so the carousel stays
+// light. Async because the pool itself is code-split (header note): callers
+// (ChromeQuote, HomeHero) load it post-mount and render their existing
+// "no quote yet" state until it resolves.
+export async function loadHeroInsights(perCategory = 60): Promise<Insight[]> {
+  const all = await loadHeroPool();
   const out: Insight[] = [];
   for (const cat of INSIGHT_CATEGORIES) {
-    const pool = INSIGHTS.filter(
+    const pool = all.filter(
       (i) =>
         i.category === cat &&
         !!i.author &&
