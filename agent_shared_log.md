@@ -2836,3 +2836,37 @@ then commit path-scoped. (3) Service-role key rotated in main+wave12+polish
 mc-settings-pr, mc-w11-flagoff, mc-wave2-audit, mc-wave3, mycurricula-daily-preview,
 mycurricula-daily-verify + the .claude/worktrees/agent-* pile. Keep: mc-wave12-settings,
 mc-polish, mc-ushare (own node_modules + secrets). Mind the junction footgun.
+
+---
+
+## [Main/orchestrator 7.24 pt2] ✅ GATE TRUST RESTORED · B1 OPENED · §5.1 CLOSED
+
+**Prod-gate false-red forensics (durable):** the §4c hydrate gate red-flagged a
+HEALTHY prod (eyes-on: /weekly 37 · /year full drill · /daily Sunday rows ·
+1,254 lessons in DB). Three gate-side causes fixed in `3e90585`: day-v2 rows
+lacked `data-planner-item` (follow-up #3 — now added to DayA/B/C);
+`data-year-lane` exists only in the YearA lane mode (default TimelineYear drill
+now carries `data-year-subject`); the edge hydrate slow-tail exceeded the 45s
+marker wait (now 75s + aria-busy skeleton-aware retry). Re-run post-deploy:
+**37/8/8/403 ALL PASS**. Lesson: a gate that intermittently reds a healthy
+build trains people to ignore it. Also flagged: TimelineYear hardcodes
+"Grade 5" (§6 violation, unfixed).
+
+**B1 tranche 1 SHIPPED (`570b281`):** unit-tabs/* extraction (UnitExplorer
+−399 lines, byte-equivalent), ExplorerShell presentation/closeOnScrimClick/rail
+seams (dormant), lib/unit-workspace-derive.ts + year-unit-aggregate
+characterization tests (+29). Codex clean first pass. B1.4+ notes in the
+commit; YearShell frame-change dismissal still needs a USER call before B1.7.
+
+**Onboarding activation gate SHIPPED (`1765368`) — §5.1 CLOSED:** column+
+backfill+RPC migration 20260727120000 (APPLY STANDALONE via `db query -f`,
+never bare `db push` — it would sweep the user-gated workspace bundle),
+fail-safe inversion, uid-keyed session latch + identity-keyed bounded
+finish-grace (Codex ×5 rounds: 1 High + 4 Medium fixed, 1 Medium dismissed —
+same-pathname identity swap has no flow here). Deployed path verified live as
+a NO-OP against prod's missing column. ⚠ LOCAL-DEV: mock-path fresh browsers
+now redirect to /onboarding — seed `mycurricula:onboarding {finished:true}`
+in probes or run planner-flag-ON.
+
+**Cutover runbook** now lists BOTH pending migrations (20260726 + 20260727)
+with standalone-apply instructions; everything else user-gated as before.
