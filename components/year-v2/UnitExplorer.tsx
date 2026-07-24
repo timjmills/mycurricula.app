@@ -499,7 +499,19 @@ export function UnitExplorer({
       mode={fallbackLessonId ? "unit" : undefined}
       onModeChange={fallbackLessonId ? onModeChange : undefined}
       presentation={workspaceEnabled ? presentation : undefined}
-      closeOnScrimClick={!(workspaceEnabled && presentation === "full")}
+      // NEVER close on a background click. The B1 spec is explicit — "outside
+      // click must NOT close it" — and this was only honouring it in the
+      // full-bleed presentation, so a stray click behind the compact modal
+      // dismissed the whole session.
+      //
+      // That matters more since B1.7 and B3: the workspace now holds editable
+      // team unit fields AND unit assessments, both written confirm-only. The
+      // debounced text itself survives (UnitPlanFields and the assessments
+      // editor each flush on unmount), so this is not silent data loss — but the
+      // teacher still loses their open editor, their scroll position, and the
+      // unit they were working in, with no undo and no warning. ✕ and Escape
+      // both still close, so nothing is trapped.
+      closeOnScrimClick={false}
       rail={
         workspaceEnabled && onUnitChange ? (
           <UnitWorkspaceRail
