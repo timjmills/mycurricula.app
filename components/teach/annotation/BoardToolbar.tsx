@@ -115,16 +115,19 @@ export function BoardToolbar({
       aria-label="Annotation tools"
       title="Draw, highlight, and annotate on top of the board"
     >
-      {/* Tool group */}
-      <ToggleGroup<BoardTool>
-        options={TOOL_OPTIONS}
-        value={state.activeTool}
-        onChange={(tool) => dispatch({ type: "setTool", tool })}
-        size="sm"
-        variant="prominent"
-        ariaLabel="Drawing tool"
-        className={styles.tools}
-      />
+      {/* Tool group — wrapped in a horizontal scroller so every tool stays
+          reachable when the toolbar is narrower than the tool set (phone). */}
+      <div className={styles.toolScroll}>
+        <ToggleGroup<BoardTool>
+          options={TOOL_OPTIONS}
+          value={state.activeTool}
+          onChange={(tool) => dispatch({ type: "setTool", tool })}
+          size="sm"
+          variant="prominent"
+          ariaLabel="Drawing tool"
+          className={styles.tools}
+        />
+      </div>
 
       <span className={styles.divider} aria-hidden="true" />
 

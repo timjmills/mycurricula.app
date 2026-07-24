@@ -216,11 +216,16 @@
 }
 
 /* ── Favorites band ────────────────────────────────────────────────────────── */
+/* The band + its text are a THEME-REACTIVE pair (--tag-amber-bg/-fg): light
+   amber + dark ink in Paper, dark amber + light ink in Night. The old
+   --wf-yellow-grad is a FIXED light cream in every theme, so on dark themes the
+   theme-white --ink title washed out (pale-on-pale). The tag-amber family flips
+   together, holding AA in every theme. */
 .favBand {
   padding: 16px 18px;
   border: 1px solid var(--wf-yellow-line);
   border-radius: var(--r-lg);
-  background: var(--wf-yellow-grad);
+  background: var(--tag-amber-bg);
 }
 
 .favBandHead {
@@ -235,7 +240,7 @@
   align-items: center;
   gap: 9px;
   font-family: var(--font-display-sm);
-  color: var(--ink);
+  color: var(--tag-amber-fg);
   font-size: var(--t-14);
   font-weight: 800;
 }
@@ -245,7 +250,11 @@
   color: var(--wf-yellow-accent);
 }
 
-.manageFavs {
+/* Doubled class: the `.cp-root button` reset (0,1,1) strips background /
+   border / padding AND forces color:inherit on a single-class button rule, so
+   the pill lost its surface and inherited the band's theme-white ink (invisible
+   on Night). `.manageFavs.manageFavs` (0,2,0) reinstates them in every theme. */
+.manageFavs.manageFavs {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -273,7 +282,9 @@
   gap: 12px;
 }
 
-.favChip {
+/* Doubled class — same `.cp-root button` reset trap as .manageFavs: without it
+   the favorite chip loses its --paper surface and floats bare on the band. */
+.favChip.favChip {
   position: relative;
   display: flex;
   flex-direction: column;

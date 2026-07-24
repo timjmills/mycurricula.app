@@ -11,6 +11,30 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* The tool group scrolls horizontally inside this wrapper when the toolbar is
+   too narrow to show every tool (phone / narrow tablet). Without it the
+   inline-flex ToggleGroup tray — which never wraps — overflows the bar and its
+   right-hand tools (…eraser · text · laser) are clipped and unreachable at
+   375px. flex:0 1 auto keeps the natural packed-left layout on wide screens
+   (no grow, no scrollbar when it fits) and lets it shrink → scroll when narrow.
+   Matches the .pageBar / .filmstrip narrow-width idiom in the editor. */
+.toolScroll {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  /* Vertical breathing room so the scroll container never clips the option
+     focus rings (desktop) or the ≤900px 44px touch-hit ::before insets
+     (phone/tablet). The negative margin cancels the padding so the bar height
+     is unchanged. */
+  padding-block: 10px;
+  margin-block: -10px;
+}
+
 .tools {
   flex: none;
 }
