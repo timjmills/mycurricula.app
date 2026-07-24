@@ -75,7 +75,6 @@ import { Button, Tooltip } from "@/components/ui";
 import { RichTextEditor } from "@/components/rich-text";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { useConsequenceToast } from "@/lib/consequence-toast";
 import { lessonTime } from "@/lib/mock";
 import styles from "./LessonModal.module.css";
 
@@ -106,10 +105,6 @@ function stripHtml(html: string): string {
   return (html ?? "").slice(0, 2000).replace(/<[^>]*>/g, "");
 }
 
-/** How long the "✓ Marked for team push" confirmation state holds
- *  (bundle: 2200ms). */
-const PUSHED_CONFIRM_MS = 2200;
-
 /** The Exit button's accessible name — also the mount-focus query target
  *  (ui/Button spreads aria-label onto the real <button>, so this is the
  *  stable hook for finding it; Button exposes no ref prop). */
@@ -122,9 +117,8 @@ export function LessonModal({
   onClose,
   readOnly = false,
 }: LessonModalProps): ReactNode {
-  const { lessons, subjectById, editLesson, setSaveTarget } = usePlanner();
+  const { lessons, subjectById, editLesson } = usePlanner();
   const { editMode } = useAppState();
-  const { showConsequence } = useConsequenceToast();
   const titleId = useId();
 
   const lesson = lessons.find((l) => l.id === lessonId) ?? null;
@@ -290,38 +284,21 @@ export function LessonModal({
     setDraftTitle("");
   }, []);
 
-  // ── Push to Team ────────────────────────────────────────────────────────
-  // Explicit push is the ONLY path to the shared plan (fork model). The
-  // store action records the intent and is a deliberate no-op until the
-  // backend wave — so the confirmation copy speaks in INTENT ("marked to
-  // push"), never asserting a team-plan change that has not actually
-  // happened yet (gate finding M3, §2 fork-truthfulness). The button flips
-  // to "✓ Marked for team push" for 2.2s and the consequence toast names
-  // the pending effect (W2-B8 pattern — the house fit for the bundle's
-  // `cc-toast` event). When the backend write lands, restore the bundle's
-  // completed-action copy ("Pushed to Team" / "moved to the shared plan").
-  const [pushed, setPushed] = useState(false);
-  const pushedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (pushedTimerRef.current !== null) clearTimeout(pushedTimerRef.current);
-    },
-    [],
-  );
-
-  const handlePushToTeam = useCallback((): void => {
-    if (lesson === null) return;
-    setSaveTarget(lessonId, "core");
-    setPushed(true);
-    showConsequence({
-      message: `"${stripHtml(lesson.title)}" is marked to push to the team curriculum — team sync arrives with the backend wave.`,
-    });
-    if (pushedTimerRef.current !== null) clearTimeout(pushedTimerRef.current);
-    pushedTimerRef.current = setTimeout(
-      () => setPushed(false),
-      PUSHED_CONFIRM_MS,
-    );
-  }, [lesson, lessonId, setSaveTarget, showConsequence]);
+  // ── NO "Push to Team" ───────────────────────────────────────────────────
+  // A button lived here that did nothing. `setSaveTarget(id, "core")` is a
+  // store no-op — the reducer returns the doc unchanged for any non-personal
+  // target — so its toast's claim that the lesson was "marked to push" recorded
+  // no mark anywhere, and the Phase-1B team sync would have found nothing
+  // waiting for it. The intent-copy wording was chosen carefully in good faith,
+  // but careful wording around an action that does not happen still leaves the
+  // teacher believing they have done something they have not.
+  //
+  // CLAUDE.md's porting-hazard list is explicit: never ship a Team-save button
+  // that claims it reached the team. Editing the team plan works TODAY through
+  // the top-bar Personal | Team Curriculum toggle, which genuinely retargets the
+  // write and carries the pink caution glow that makes the consequence visible —
+  // so nothing a teacher could actually accomplish was lost by removing this.
+  // Restore it when the backend write exists, with completed-action copy.
 
   // ── Deleted-while-open guard ────────────────────────────────────────────
   // If the lesson disappears from the store (archived / deleted on another
@@ -418,19 +395,7 @@ export function LessonModal({
                 >
                   <span className={styles.teamPill}>● Team curriculum</span>
                 </Tooltip>
-              ) : (
-                !readOnly && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`${styles.headBtn} ${pushed ? styles.headBtnDone : ""}`}
-                    onClick={handlePushToTeam}
-                    tooltip="Mark this lesson to push to the shared team curriculum — it moves from your personal copy to the team plan everyone sees once team sync lands (backend wave)"
-                  >
-                    {pushed ? "✓ Marked for team push" : "Push to Team"}
-                  </Button>
-                )
-              )}
+              ) : null}
               <Button
                 variant="ghost"
                 size="sm"

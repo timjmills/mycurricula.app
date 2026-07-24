@@ -57,10 +57,17 @@
 // this is an in-page surface).
 //
 // FORK SAFETY (CLAUDE.md §2): editing here autosaves through the store's
-// lazy-fork write path inside <LessonEditor>; the ONLY store writes this
-// file makes are editLesson (title) and setSaveTarget(id, "core") behind
-// the explicit "Push to Team" button — intent copy, a deliberate store
-// no-op until the backend wave (the LessonModal M3 contract).
+// lazy-fork write path inside <LessonEditor>; the ONLY store write this file
+// makes is editLesson (title).
+//
+// There is deliberately NO "Push to Team" button. One used to sit in the header
+// and it did nothing — `setSaveTarget(id, "core")` is a store no-op (the reducer
+// returns the doc unchanged for any non-personal target), so its toast's claim
+// that the lesson was "marked to push" recorded no mark, and the Phase-1B sync
+// would have found nothing waiting. CLAUDE.md's porting-hazard list is explicit:
+// never ship a Team-save button that claims it reached the team. Editing the
+// team plan works today through the top-bar Personal | Team Curriculum toggle,
+// which really does retarget the write.
 //
 // W3.9 testability: the split root carries data-day-edit-split; probes
 // pair it with ViewEditToggle's aria-pressed to assert the mode.
@@ -78,7 +85,6 @@ import {
 import type { Lesson } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { useConsequenceToast } from "@/lib/consequence-toast";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { todayColumnIndex } from "@/lib/now-anchor";
 import { getDayBlocks, minuteOfDay } from "@/lib/schedule-data";
@@ -104,10 +110,6 @@ const LEFT_STEP = 16;
 function clampLeftWidth(w: number): number {
   return Math.max(LEFT_MIN, Math.min(LEFT_MAX, w));
 }
-
-/** How long the "✓ Marked for team push" confirmation holds (bundle:
- *  2200ms — the LessonModal constant). */
-const PUSHED_CONFIRM_MS = 2200;
 
 /** Strip HTML tags for plain-text contexts (list rows, aria, toast copy).
  *  Titles may carry inline markup from a rich-text edit on another host.
@@ -174,9 +176,8 @@ export function DayEditSplit({
   quickAdding,
   quickAddError,
 }: DayEditSplitProps): ReactNode {
-  const { subjectById, editLesson, setSaveTarget } = usePlanner();
+  const { subjectById, editLesson } = usePlanner();
   const { editMode } = useAppState();
-  const { showConsequence } = useConsequenceToast();
   const { days: schoolWeekDays } = useSchoolWeek();
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -338,34 +339,6 @@ export function DayEditSplit({
     setDraftTitle("");
   }, []);
 
-  // ── Push to Team (the LessonModal intent-copy contract, verbatim) ───────
-  // Explicit push is the ONLY path to the shared plan (fork model). The
-  // store action records intent and is a deliberate no-op until the
-  // backend wave, so the copy speaks in INTENT ("marked to push") — never
-  // asserting a team-plan change that hasn't happened (gate finding M3).
-  const [pushed, setPushed] = useState(false);
-  const pushedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (pushedTimerRef.current !== null) clearTimeout(pushedTimerRef.current);
-    },
-    [],
-  );
-
-  const handlePushToTeam = useCallback((): void => {
-    if (sel === null) return;
-    setSaveTarget(sel.id, "core");
-    setPushed(true);
-    showConsequence({
-      message: `"${stripHtml(sel.title)}" is marked to push to the team curriculum — team sync arrives with the backend wave.`,
-    });
-    if (pushedTimerRef.current !== null) clearTimeout(pushedTimerRef.current);
-    pushedTimerRef.current = setTimeout(
-      () => setPushed(false),
-      PUSHED_CONFIRM_MS,
-    );
-  }, [sel, setSaveTarget, showConsequence]);
-
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
@@ -522,9 +495,22 @@ export function DayEditSplit({
                 </div>
               </div>
 
-              {/* Right cluster — team pill / Push to Team, then Exit
-                  (LessonModal's copy verbatim; Exit flips the mode, it is
-                  NOT a modal close). */}
+              {/* Right cluster — team pill, then Exit (Exit flips the mode, it
+                  is NOT a modal close).
+
+                  NO "Push to Team" BUTTON. It used to sit here in Personal mode
+                  and it did nothing: `setSaveTarget(id, "core")` is a store
+                  no-op (`lib/planner-store.tsx` — the reducer returns the doc
+                  unchanged for any non-personal target), so the toast's promise
+                  that the lesson "is marked to push" recorded no mark. When the
+                  Phase-1B team-sync backend lands there would have been nothing
+                  waiting to sync. CLAUDE.md's own porting-hazard list says never
+                  ship a Team-save button that claims it reached the team.
+
+                  Nothing was lost by removing it: editing the team plan works
+                  today through the top-bar Personal | Team Curriculum toggle,
+                  which really does retarget the write (and carries the pink
+                  caution glow that makes the consequence visible). */}
               <div className={styles.deTheadr}>
                 {team ? (
                   /* required:true — the team-mode explanation is on the
@@ -536,17 +522,7 @@ export function DayEditSplit({
                   >
                     <span className={styles.teamPill}>● Team curriculum</span>
                   </Tooltip>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`${styles.headBtn} ${pushed ? styles.headBtnDone : ""}`}
-                    onClick={handlePushToTeam}
-                    tooltip="Mark this lesson to push to the shared team curriculum — it moves from your personal copy to the team plan everyone sees once team sync lands (backend wave)"
-                  >
-                    {pushed ? "✓ Marked for team push" : "Push to Team"}
-                  </Button>
-                )}
+                ) : null}
                 <Button
                   variant="ghost"
                   size="sm"
