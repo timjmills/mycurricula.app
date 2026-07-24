@@ -1220,6 +1220,32 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     // The drag grip stays so the teacher can still reorder the panel at
     // any width or mode. The pills bar sits above whatever renders below.
     if (isEdit) {
+      // Loading/error honesty for the Week EDIT board — the same 3-state gate
+      // the VIEW canvases get below. With the Supabase flag ON a teacher can
+      // cold-load /weekly directly into EDIT (cc_editmode persists the mode), so
+      // during the 11–16s hydrate WeekEditBoard would otherwise paint a full,
+      // false "empty week" board — the exact loading-vs-empty conflation the
+      // view branch fixes. pending → the shared day-column skeleton (reused, not
+      // a bespoke board-shaped variant); error → the canonical PlannerEmpty
+      // "Couldn't load your plan" copy; settled → WeekEditBoard, unchanged.
+      // Permanently "settled" with the Supabase flag OFF, so mock/v1 is a no-op.
+      // Wrapped in the same columnWithGrip/data-pane="grid" host as the view
+      // branch so the panel grip still places and the splitter/rail math is
+      // unaffected while loading.
+      if (gridDataState === "pending" || gridDataState === "error") {
+        return (
+          <div className={styles.columnWithGrip} data-pane="grid">
+            {grip}
+            {gridDataState === "pending" ? (
+              <WeekGridSkeleton />
+            ) : (
+              /* heading is the settled-fallback only; PlannerEmpty renders its
+                 own "Couldn't load your plan" copy in the "error" branch. */
+              <PlannerEmpty heading="No lessons planned for this week yet." />
+            )}
+          </div>
+        );
+      }
       return <WeekEditBoard grip={grip} />;
     }
     const showList = isNarrow || viewMode === "list";
