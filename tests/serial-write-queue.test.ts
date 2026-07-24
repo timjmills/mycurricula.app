@@ -223,6 +223,38 @@ describe("createSerialWriteQueue — failure handling", () => {
     expect(q.activeKeyCount()).toBe(0);
   });
 
+  it("does NOT wedge the key when onError itself throws", async () => {
+    // The subtle one: a `.catch(...).then(...)` chain skips its trailing then
+    // when the catch handler throws, leaving inFlight true forever — every
+    // later edit to that key silently dropped, with the rejection swallowed.
+    const sent: string[] = [];
+    let call = 0;
+    const q = createSerialWriteQueue<string>({
+      send: (p) => {
+        sent.push(p);
+        call += 1;
+        return call === 1 ? Promise.reject(new Error("net")) : Promise.resolve();
+      },
+      onError: () => {
+        throw new Error("the reporter itself is broken");
+      },
+    });
+
+    q.enqueue("k", "first");
+    q.enqueue("k", "second");
+    await flush();
+
+    // The queue kept draining despite the broken reporter…
+    expect(sent).toEqual(["first", "second"]);
+    // …and the key was released rather than left in-flight forever.
+    expect(q.activeKeyCount()).toBe(0);
+
+    // And a later write still goes out — proof the key is not wedged.
+    q.enqueue("k", "third");
+    await flush();
+    expect(sent).toEqual(["first", "second", "third"]);
+  });
+
   it("keeps draining after a synchronous throw", async () => {
     const sent: string[] = [];
     let call = 0;

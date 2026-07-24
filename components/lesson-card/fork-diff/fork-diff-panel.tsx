@@ -147,7 +147,17 @@ export function ForkDiffPanel({ lesson, onClose }: ForkDiffPanelProps) {
         editLesson(lesson.id, { [diff.field]: snapshot[diff.field] }, coalesce);
         break;
       case "standards":
-        editLesson(lesson.id, { standards: [...snapshot.standards] }, coalesce);
+        // `standardIds: []` rides along: the snapshot holds CODES only, so
+        // reverting without clearing the ids leaves the lesson's current uuids
+        // paired with the snapshot's codes. Those arrays are index-aligned by
+        // contract, and a stale pairing makes Insights (which groups standards
+        // by uuid) merge this lesson into a different standard's row. Clearing
+        // engages the `code:` fallback, which is honest about what we know.
+        editLesson(
+          lesson.id,
+          { standards: [...snapshot.standards], standardIds: [] },
+          coalesce,
+        );
         break;
       case "scheduling":
         // (M4 / FIX 4) Placement goes down the store's dedicated

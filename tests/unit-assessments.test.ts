@@ -21,23 +21,43 @@ import {
 import { plannerMockSource } from "@/lib/planner/mock-source";
 import type { UnitAssessment } from "@/lib/types";
 
-const MIGRATION = join(
-  __dirname,
-  "..",
-  "supabase",
-  "migrations",
+// ALL THREE migrations, concatenated in timestamp order, so the locks below
+// describe the schema that is actually DEPLOYED rather than an intermediate one.
+// Pinning only the first file was a FALSE GUARD: 20260729140000 drops the
+// `unit_assessments_write` FOR ALL policy that a lock still asserted, so this
+// suite stayed green while production carried entirely different policies.
+const MIGRATION_DIR = join(__dirname, "..", "supabase", "migrations");
+const MIGRATION_FILES = [
   "20260729120000_unit_assessments.sql",
-);
+  "20260729130000_unit_assessments_anon_revoke.sql",
+  "20260729140000_unit_assessments_policy_split.sql",
+];
 const SOURCE = join(__dirname, "..", "lib", "planner", "supabase-source.ts");
 
-const sql = readFileSync(MIGRATION, "utf8");
+const sql = MIGRATION_FILES.map((f) =>
+  readFileSync(join(MIGRATION_DIR, f), "utf8"),
+).join("\n");
 const src = readFileSync(SOURCE, "utf8");
 
 /** Strip SQL line comments so text assertions never match prose. */
-const code = sql
-  .split("\n")
-  .filter((l) => !l.trimStart().startsWith("--"))
-  .join("\n");
+function stripComments(text: string): string {
+  return text
+    .split("\n")
+    .filter((l) => !l.trimStart().startsWith("--"))
+    .join("\n");
+}
+
+/** All three migrations. Use for EXISTENCE checks ("this statement was written
+ *  at some point"). Counting occurrences across it is meaningless — it contains
+ *  superseded statements as well as current ones. */
+const code = stripComments(sql);
+
+/** ONLY the newest migration, which defines the CURRENT policy + RPC shape. Use
+ *  for anything that counts or asserts a final state, so a lock can never be
+ *  satisfied by DDL that a later file has already replaced. */
+const latest = stripComments(
+  readFileSync(join(MIGRATION_DIR, MIGRATION_FILES[2]), "utf8"),
+);
 
 /** The table's column set, in the order the migration declares it. This array
  *  is the SINGLE source the snapshot locks below compare against — the
@@ -727,26 +747,77 @@ describe("migration — RLS posture", () => {
     expect(code).toMatch(/can_read_grade\(u\.grade_level_id\)/);
   });
 
-  it("mirrors units_write's tenancy predicate, in BOTH using and with check", () => {
-    expect(code).toMatch(
-      /create policy unit_assessments_write on public\.unit_assessments for all using/i,
+  it("has NO `for all` write policy — that would also grant SELECT", () => {
+    // The whole point of 20260729140000. RLS policies are PERMISSIVE and OR
+    // together, and `FOR ALL ... USING` covers SELECT too — so a FOR ALL write
+    // policy silently widened the read gate to
+    // `can_read_grade OR can_edit_subject_master OR is_grade_lead`.
+    // The DROP must come AFTER the original CREATE in timestamp order — the
+    // concatenation still contains the superseded statement, so a bare
+    // "does not match" would be checking the wrong thing.
+    // LAST occurrence of each, not the first: 20260729120000 uses the repo's
+    // idempotent drop-then-create idiom, so its OWN drop precedes its create.
+    // What matters is that the final word on this policy is a drop.
+    const lastIndexOf = (re: RegExp): number => {
+      const all = [...code.matchAll(new RegExp(re.source, "gi"))];
+      return all.length === 0 ? -1 : (all[all.length - 1].index ?? -1);
+    };
+    const created = lastIndexOf(
+      /create policy unit_assessments_write on public\.unit_assessments for all/,
     );
-    const writePolicy = code.slice(
-      code.indexOf("create policy unit_assessments_write"),
+    const dropped = lastIndexOf(
+      /drop policy if exists unit_assessments_write on public\.unit_assessments/,
     );
-    const stmt = writePolicy.slice(0, writePolicy.indexOf(";") + 1);
-    const predicate =
-      /can_edit_subject_master\(u\.subject_id\) or is_grade_lead\(u\.grade_level_id\)/g;
-    // Once for USING, once for WITH CHECK — a write policy missing the WITH
-    // CHECK half lets a caller INSERT rows it could never have read.
-    expect(stmt.match(predicate) ?? []).toHaveLength(2);
-    expect(stmt).toMatch(/with check/i);
+    expect(created).toBeGreaterThan(-1);
+    expect(dropped).toBeGreaterThan(created);
+    // And nothing re-creates it afterwards.
+    expect(latest).not.toMatch(
+      /create policy unit_assessments_write on public\.unit_assessments for all/i,
+    );
   });
 
-  it("scopes the policy subquery to the row's own unit", () => {
-    const hits = code.match(/u\.id = unit_assessments\.unit_id/g) ?? [];
-    // read (1) + write using (1) + write with check (1)
-    expect(hits).toHaveLength(3);
+  it("expresses writes as command-specific INSERT / UPDATE / DELETE policies", () => {
+    expect(code).toMatch(
+      /create policy unit_assessments_insert on public\.unit_assessments for insert/i,
+    );
+    expect(code).toMatch(
+      /create policy unit_assessments_update on public\.unit_assessments for update/i,
+    );
+    expect(code).toMatch(
+      /create policy unit_assessments_delete on public\.unit_assessments for delete/i,
+    );
+  });
+
+  it("mirrors units_write's tenancy predicate on every write command", () => {
+    const predicate =
+      /can_edit_subject_master\(u\.subject_id\) or is_grade_lead\(u\.grade_level_id\)/g;
+    // insert WITH CHECK (1) + update USING (1) + update WITH CHECK (1) +
+    // delete USING (1). The update's WITH CHECK is the one that stops a writer
+    // moving a row into a unit they cannot edit.
+    expect(latest.match(predicate) ?? []).toHaveLength(4);
+  });
+
+  it("scopes every write-policy subquery to the row's own unit", () => {
+    // insert + update using + update check + delete (the SELECT policy lives in
+    // the first migration and is asserted separately).
+    const hits = latest.match(/u\.id = unit_assessments\.unit_id/g) ?? [];
+    expect(hits).toHaveLength(4);
+  });
+
+  it("revokes the reorder RPC's EXECUTE from anon BY NAME", () => {
+    // Revoking from PUBLIC does not remove a grant `anon` holds in its own
+    // right via Supabase's default privileges — verified true against the live
+    // catalog after the first apply, which is why 20260729130000 exists.
+    expect(code).toMatch(
+      /revoke execute on function public\.reorder_unit_assessments\(uuid, uuid\[\]\) from anon/i,
+    );
+  });
+
+  it("makes the reorder RPC reject duplicate and foreign ids", () => {
+    // Previously both were silently ignored, so a stale client request could
+    // report a clean success while doing something other than asked.
+    expect(code).toMatch(/raise exception[\s\S]{0,120}duplicate ids/i);
+    expect(code).toMatch(/raise exception[\s\S]{0,160}not assessments of unit/i);
   });
 
   it("carries the claude_admin_all escape hatch, drop-then-create", () => {
@@ -889,11 +960,20 @@ describe("unit_assessments runtime behavior (needs a DB harness)", () => {
     "a teacher who is neither subject master nor grade lead has INSERT/UPDATE/DELETE filtered to 0 rows",
   );
   it.todo("deleting a unit cascades away its assessments");
+  // These record the CURRENT contract (20260729140000). The earlier wording
+  // here — "ignores ids belonging to a different unit (returns a short count)" —
+  // described the behaviour that migration replaced. A todo naming the wrong
+  // contract is worse than no todo: this list is what the commit message points
+  // at as the honest record of what is unproven.
   it.todo(
-    "reorder_unit_assessments ignores ids belonging to a different unit (returns a short count)",
+    "reorder_unit_assessments RAISES on an id belonging to a different unit",
+  );
+  it.todo("reorder_unit_assessments RAISES on duplicate ids");
+  it.todo(
+    "reorder_unit_assessments raises for an unauthorized caller (RLS hides every row, so the ownership check finds none)",
   );
   it.todo(
-    "reorder_unit_assessments returns 0 for an unauthorized caller (RLS filters every row)",
+    "anon cannot execute reorder_unit_assessments (EXECUTE revoked by name)",
   );
   it.todo("updated_at advances on every UPDATE (shared trigger)");
 });

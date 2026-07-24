@@ -81,15 +81,28 @@ export function createSerialWriteQueue<T>(
         // escape `enqueue` to the caller, skip `onError`, and — worse — leave
         // `inFlight` true forever, wedging that key so every later edit to the
         // field queues behind a request that will never settle.
+        // The settle step runs on BOTH arms. A plain `.catch(...).then(...)`
+        // chain looks equivalent but is not: if `onError` itself throws, the
+        // catch handler's promise REJECTS, the following `.then(onFulfilled)`
+        // is skipped, and `inFlight` stays true forever — wedging the key so
+        // every later edit to that lesson+field is silently dropped for the rest
+        // of the session, with the rejection swallowed by the `void`. That is
+        // the same failure this file already guards against for `send`; a
+        // reporting callback must not be able to cause it either.
+        const settle = (): void => {
+          entry.inFlight = false;
+          sendNext();
+        };
         void Promise.resolve()
           .then(() => send(next))
-          .catch((error: unknown) => {
-            onError?.(error, next);
+          .then(undefined, (error: unknown) => {
+            try {
+              onError?.(error, next);
+            } catch {
+              /* a broken reporter must never stall the queue */
+            }
           })
-          .then(() => {
-            entry.inFlight = false;
-            sendNext();
-          });
+          .then(settle, settle);
       };
       sendNext();
     },

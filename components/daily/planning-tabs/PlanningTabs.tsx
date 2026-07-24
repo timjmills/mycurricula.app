@@ -620,7 +620,15 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
       mergeStandards(descriptions);
       editLesson(
         lesson.id,
-        ids ? { standards: codes, standardIds: ids } : { standards: codes },
+        // `standardIds: []` when unknown — never omit the key. The reducer
+        // merges shallowly, so omitting it strands the lesson's PREVIOUS uuids
+        // beside its NEW codes. The arrays are index-aligned by contract, so a
+        // stale pairing makes Insights (which groups by uuid) merge this lesson
+        // into whichever one really holds that id — one row, a doubled lesson
+        // count, and the real standard missing from the list.
+        ids
+          ? { standards: codes, standardIds: ids }
+          : { standards: codes, standardIds: [] },
         { key: `lesson:${lesson.id}:standards`, ts: Date.now() },
       );
     }

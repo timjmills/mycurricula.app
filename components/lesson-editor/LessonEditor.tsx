@@ -401,7 +401,17 @@ export function LessonEditor({
       mergeStandards(descriptions);
       editLesson(
         lesson.id,
-        ids ? { standards: codes, standardIds: ids } : { standards: codes },
+        // `standardIds: []` when the ids are unknown — NEVER omit the key. The
+        // reducer merges shallowly, so omitting it leaves the lesson's PREVIOUS
+        // uuids sitting beside its NEW codes. The two arrays are index-aligned
+        // by contract, so a stale pairing makes a lesson claim a standard it no
+        // longer carries: `distinctStandardRefs` (lib/unit-insights.ts) groups by
+        // uuid, so that lesson merges into whichever other lesson genuinely holds
+        // the stale id, and Insights renders one row with a doubled lesson count
+        // while the real standard disappears from the list. Clearing to `[]`
+        // engages the `code:` fallback, which is honest.
+        // `components/lesson-plan-v2/tabs/StandardsTab.tsx` already does this.
+        ids ? { standards: codes, standardIds: ids } : { standards: codes, standardIds: [] },
         { key: `lesson:${lesson.id}:standards`, ts: Date.now() },
       );
       // D5 — authoring convenience: append a display line per NEWLY tagged
