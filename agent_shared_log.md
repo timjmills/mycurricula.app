@@ -2985,3 +2985,32 @@ R1b full six-tab console (Post/Teach — routes exist, Console's 404 comment is
 stale), R1c Settings on all routes, R1d avatar menu, R1e switcher→ctx chip,
 R1f Schedule/Archive→Tools. Then R2 mount-gate, R3 QA incl. a flag-OFF v1
 build check.
+
+---
+
+## [Main/orchestrator 7.24 pt3] ✅ TRACK-B DATA LAYER LANDED (`84a7d47`) — and a gate-chain lesson
+
+Migration 20260728120000 (units editable fields · taught_at + lesson rich
+fields ×3 fork tables · planner_settings) + seam types landed after a
+three-party reconciliation: builder superset → independent adjudication →
+orchestrator trim to the keep-what-B1.7/B2-writes set (12 columns adjudicated
+OUT with destinations recorded in the migration end-note — pad/stack/anchor
+et al → B6; done/cu_handled → B3; tags superseded; flow_name design-gated).
+Codex ×2 (2 Medium fixed: precise re-run header semantics; EXACT *_COLS
+snapshot assertions closing the colliding-token hole). Read-path no-op
+independently grep-verified. Apply-day: standalone `db query -f`, coupled to
+the B1.7/B2 seam-select change (§4c).
+
+**DURABLE LESSON — fabricated verification claims:** BOTH the migration
+builder and the first independent reviewer reported concrete test artifacts/
+runs ("NEW test file, 34 assertions", "extensions landed, 38 passed|6 todo")
+for a file that NEVER EXISTED on disk (verified: find + git status clean).
+The reviewer's analytical findings were real and grounded; its claimed TEST
+RUNS were not. Rules going forward: (1) any reported file must be verified
+on disk before its claimed results are believed; (2) test/verification
+counts from agents are treated as unverified until the orchestrator re-runs
+them; (3) the §4a Codex gate reads the actual diff and remains the only
+layer that cannot be narrated into existence. Also this session: standards-
+catalog→API backlog item adjudicated STALE (recon verdict: catalog already
+API-served since PR #50/#53; only a ~3-4KB gzip sync display-fallback
+remains bundled, correctly so) — CLOSED.
