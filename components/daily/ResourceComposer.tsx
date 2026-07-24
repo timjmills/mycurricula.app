@@ -510,13 +510,6 @@ export function ResourceComposer({
   const headingId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  /** Focuses the first capture-grid button ([data-autofocus]) — queried
-   *  through the panel because the Tooltip wrapper owns the trigger ref. */
-  const focusFirstCapture = useCallback(() => {
-    panelRef.current
-      ?.querySelector<HTMLButtonElement>("[data-autofocus]")
-      ?.focus();
-  }, []);
   const linkInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   // Track the element that held focus before we opened so we can restore.
@@ -536,29 +529,27 @@ export function ResourceComposer({
     subjects,
   } = usePlanner();
 
-  // ── Local UI state — the §3 composer state machine ───────────────────
-  //   mode    — from props (isNotecardMode above).
-  //   step    — 1 (capture) | 2 (review & route). Resource mode only;
-  //             notecard mode is a single screen.
+  // ── Local UI state — the unified single-screen composer (B4.2) ───────
+  //   mode    — from props (isNotecardMode above). Drives the COMMIT engine
+  //             (handleAdd) verbatim; the shell renders one flow regardless.
   //   items   — ordered captures[]; index 0 = poster (notecard mode).
   //   routing — subject/unit/lesson/section target.
   //   error   — uploadError + cached-retry state.
   //   dirty   — derived (uncommitted captures) → "Session only" badge.
-  const [step, setStep] = useState<1 | 2>(1);
   const [title, setTitle] = useState<string>("");
   const [body, setBody] = useState<string>("");
   const [linkOpen, setLinkOpen] = useState<boolean>(false);
   const [linkValue, setLinkValue] = useState<string>("");
+  /** Placeholder hint for the shared inline URL row — set by whichever tool
+   *  opened it (Link / Image URL / Video). The row itself is one engine path
+   *  (onLinkConfirm); the hint only steers the copy the teacher sees. */
+  const [linkHint, setLinkHint] = useState<string>("https://…");
   /** Switches the body to the "All tools" expanded grid (the card-wall
    *  tool menu). Returning sets this back to false. */
   const [allToolsOpen, setAllToolsOpen] = useState<boolean>(false);
-  /** Notecard mode — whether the "+" gallery tile has revealed the
-   *  capture methods block. */
-  const [captureOpen, setCaptureOpen] = useState<boolean>(false);
   const [items, setItems] = useState<CapturedItem[]>([]);
-  /** Step 2 — whether the collapsed "+ Add a note to an item" reveal is
-   *  open, and which captured item the note editor is bound to. */
-  const [notesOpen, setNotesOpen] = useState<boolean>(false);
+  /** Which captured item the single rich-note editor is bound to in resource
+   *  mode (notecard mode uses the top-level `body` instead). */
   const [noteItemId, setNoteItemId] = useState<string | null>(null);
   /** Inline status copy — "Pasted image" / "Pasted link" — appears under
    *  the captured strip so a teacher knows their paste registered. */
@@ -610,14 +601,11 @@ export function ResourceComposer({
     // the launching lesson. Existing gallery media become strip tiles that
     // carry the original LessonResource verbatim (committed as-is), so
     // reorder + remove are real edits (AC-7) without rewriting payloads.
-    setStep(1);
     setTitle(editResource ? (editResource.resource.label ?? "") : "");
     setBody(editResource ? (editResource.resource.body ?? "") : "");
     setLinkOpen(false);
     setLinkValue("");
     setAllToolsOpen(false);
-    setCaptureOpen(false);
-    setNotesOpen(false);
     setNoteItemId(null);
     const seeded: CapturedItem[] = editResource
       ? (editResource.resource.gallery ?? []).map((g) => ({
@@ -653,10 +641,9 @@ export function ResourceComposer({
     setOpenPicker(null);
 
     // Move focus into the dialog on the next frame so the panel is mounted.
-    // Notecard mode focuses the title; resource mode the first capture tool.
+    // The unified shell always opens on the title row.
     const frame = requestAnimationFrame(() => {
-      if (isNotecardMode) titleInputRef.current?.focus();
-      else focusFirstCapture();
+      titleInputRef.current?.focus();
     });
     return () => cancelAnimationFrame(frame);
     // We intentionally do NOT re-run when initialItems/initialSectionId
@@ -936,11 +923,17 @@ export function ResourceComposer({
   // ── Capture tool click handlers ──────────────────────────────────────
 
   const onUploadClick = useCallback(() => uploadInputRef.current?.click(), []);
-  const onLinkClick = useCallback(() => {
-    setLinkOpen((v) => !v);
+  /** Reveal the shared inline URL row with a tool-specific placeholder hint.
+   *  Link / Image URL / Video all funnel here — the row's confirm path
+   *  (onLinkConfirm) parses the URL and infers image / video / link, so one
+   *  engine path serves all three tools. */
+  const openUrlRow = useCallback((hint: string) => {
+    setLinkHint(hint);
+    setLinkOpen(true);
     // Focus the URL input on next frame so the inline row reveals + lands focus.
     requestAnimationFrame(() => linkInputRef.current?.focus());
   }, []);
+  const closeUrlRow = useCallback(() => setLinkOpen(false), []);
 
   /** Best-effort OG enrichment for a plain website link. The browser can't
    *  read another origin's OG tags directly (CORS), so we ask our own
@@ -1518,22 +1511,6 @@ export function ResourceComposer({
     onCommitted,
   ]);
 
-  // ── Step navigation ──────────────────────────────────────────────────
-
-  const goToReview = useCallback(() => {
-    setStep(2);
-    setLinkOpen(false);
-    setAllToolsOpen(false);
-    // Land focus on the title field so the review step is ready to type.
-    requestAnimationFrame(() => titleInputRef.current?.focus());
-  }, []);
-
-  const goToCapture = useCallback(() => {
-    setStep(1);
-    setNotesOpen(false);
-    requestAnimationFrame(() => focusFirstCapture());
-  }, [focusFirstCapture]);
-
   // ── Keyboard handler (Escape + focus trap) ───────────────────────────
 
   const handleKeyDown = useCallback(
@@ -1625,100 +1602,75 @@ export function ResourceComposer({
     items.find((c) => !c.existing) ??
     items[0];
 
-  // The capture-methods block (grid + All-tools + URL row + drop hint) is
-  // shared between resource step 1 and the notecard "+" reveal — two
-  // entries, one capture engine (P2).
-  const captureEngine = (
-    <>
-      <div className={styles.capRow} role="group" aria-label="Capture methods">
-        <CaptureButton
-          autoFocusTarget
-          label="Upload"
-          sub="Any file"
-          tone={styles.icUpload}
-          icon={<UploadIcon />}
-          onClick={onUploadClick}
-          tooltip="Pick files from this device — PDFs, docs, and images land in the captured strip below"
-        />
-        <CaptureButton
-          label="Link"
-          sub="Paste a URL"
-          tone={styles.icLink}
-          icon={<LinkIcon />}
-          onClick={onLinkClick}
-          active={linkOpen}
-          tooltip="Capture a web link — paste any URL and it joins the captured strip"
-        />
-        <CaptureButton
-          label="Google Drive"
-          sub="Soon"
-          tone={styles.icDrive}
-          icon={<DriveIcon />}
-          soon
-          tooltip="Google Drive import is coming after beta — it needs Google sign-in. For now, download the file and use Upload."
-        />
-        <CaptureButton
-          label="Camera"
-          sub="Soon"
-          tone={styles.icCamera}
-          icon={<CameraIcon />}
-          soon
-          tooltip="A built-in camera capture is coming soon — today, open All tools below and use its Camera tile."
-        />
-      </div>
+  // ── Unified-shell render helpers ─────────────────────────────────────
+  // One screen for every mode (B4.2). `mode` still drives the COMMIT engine
+  // (handleAdd) verbatim; here it only selects copy + the note binding.
+  const contextLabel = isEditMode
+    ? "Edit note"
+    : isNotecardMode
+      ? "New notecard"
+      : "Add resources";
+  const publishLabel = isEditMode
+    ? "Save"
+    : isNotecardMode
+      ? "Create card"
+      : "Publish";
+  const titlePlaceholder = isNotecardMode
+    ? "Name this card"
+    : "Name this resource";
+  // The single rich-note editor shows in notecard/edit mode always (a
+  // notes-only card is valid) and in resource mode once there's an item to
+  // attach the note to. In resource mode the note persists to a resource's
+  // own `body` (the verbatim commit engine keys notes to a resource, not a
+  // standalone Note) — the target is `noteItem`, chosen below.
+  const showNote = isNotecardMode || items.length > 0;
+  const showNotePicker = !isNotecardMode && items.length > 1 && noteItem != null;
 
-      {/* The long-tail tool wall (Card wall, YouTube, Camera, Photo album…). */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className={styles.allTools}
-        onClick={() => setAllToolsOpen(true)}
-        tooltip="Browse every capture tool the composer supports — photo album, camera, YouTube, card wall, and more"
-        leadingIcon={<MoreDotsIcon />}
-      >
-        All tools
-      </Button>
-
-      {/* Inline URL row (revealed by the Link button). */}
-      {linkOpen && (
-        <div className={styles.linkRow} role="group" aria-label="Add link">
-          <input
-            ref={linkInputRef}
-            type="url"
-            className={styles.input}
-            placeholder="https://…"
-            value={linkValue}
-            onChange={(e) => setLinkValue(e.target.value)}
-            onKeyDown={onLinkKeyDown}
-            aria-label="Resource URL"
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onLinkConfirm}
-            disabled={!linkValue.trim()}
-            tooltip="Capture this URL into the strip — you'll still review and route everything before it's added"
-          >
-            Add link
-          </Button>
-        </div>
-      )}
-
-      <div className={styles.dropHint}>
-        …or drop files anywhere in this dialog
-      </div>
-    </>
+  // Routing (Subject · Unit · Lesson · Section) — the footer's "file-to +
+  // wall column" control. RoutingField/RouteSelect are unchanged; only their
+  // home moved from the body into the footer.
+  const routingField = (
+    <RoutingField
+      labels={labels}
+      locked={routingLocked}
+      openPicker={openPicker}
+      setOpenPicker={setOpenPicker}
+      subjectOptions={subjectOptions.map((s) => ({ id: s.id, label: s.name }))}
+      unitOptions={unitOptions.map((u) => ({ id: u.id, label: u.name }))}
+      lessonOptions={lessonOptions.map((l) => ({ id: l.id, label: l.title }))}
+      sectionOptions={[
+        { id: "", label: "Whole lesson" },
+        ...sectionOptions.map((s) => ({
+          id: s.id,
+          label: plainText(s.heading) || "Section",
+        })),
+      ]}
+      subjectId={subjectId}
+      unitId={unitId}
+      lessonId={lessonId}
+      sectionId={sectionId}
+      subjectValue={selectedSubject?.name ?? ""}
+      lessonValue={selectedLesson?.title ?? ""}
+      onPickSubject={(id) => setSubjectId(id as SubjectId)}
+      onPickUnit={setUnitId}
+      onPickLesson={(id) => {
+        setLessonId(id);
+        setSectionId("");
+      }}
+      onPickSection={setSectionId}
+    />
   );
 
   return createPortal(
     <div
-      className={styles.scrim}
+      className={`${styles.scrim} cmp-scrim`}
       onClick={handleScrimClick}
       aria-hidden={false}
     >
-      {/* cp-subj feeds the subject swatch in the routing selects; the
-          dialog chrome itself is mode-colored (brand / honey), never
-          subject-colored, per the §3 spec. */}
+      {/* cp-subj feeds the subject swatch in the routing selects AND the
+          subject-colored title row (var(--c)). The global cmp-modal / cmp-scrim
+          classes enroll the surface in app/themes.css §5 so every theme washes
+          it with its own accent. */}
       <div
         ref={panelRef}
         role="dialog"
@@ -1726,12 +1678,12 @@ export function ResourceComposer({
         aria-labelledby={headingId}
         title={
           isEditMode
-            ? "Edit note dialog — write formatted notes and curate this card's media gallery"
+            ? "Edit note dialog — write formatted notes and curate this card's media"
             : isNotecardMode
-              ? "New notecard dialog — gather media into a card's gallery, then write its notes"
-              : "Add resources dialog — capture links and files, then review and pick where they land"
+              ? "New notecard dialog — gather media into a card, then write its notes"
+              : "Add resources dialog — capture links and files, then pick where they land"
         }
-        className={`${styles.dialog} cp-subj ${subjectId}`}
+        className={`${styles.dialog} cmp-modal cp-subj ${subjectId}`}
         onKeyDown={handleKeyDown}
         onPaste={onDialogPaste}
         onDragOver={onDialogDragOver}
@@ -1740,236 +1692,146 @@ export function ResourceComposer({
         {/* Phone bottom-sheet grab handle (decorative; hidden ≥480px). */}
         <div className={styles.sheetHandle} aria-hidden="true" />
 
-        {/* ── Head: mode badge · stepper · close ─────────────────────── */}
-        <header className={styles.dlgHead}>
-          <span
-            id={headingId}
-            className={`${styles.modeBadge} ${
-              isNotecardMode ? styles.modeBadgeNote : styles.modeBadgeRes
-            }`}
-          >
-            {isNotecardMode ? <NoteCardIcon /> : <UploadIcon />}
-            {isEditMode
-              ? "Edit note"
-              : isNotecardMode
-                ? "New notecard"
-                : "Add resources"}
-          </span>
-
-          {!isNotecardMode && (
-            <span className={styles.stepper} aria-label={`Step ${step} of 2`}>
-              <span
-                className={`${styles.stepDot} ${
-                  step === 1 ? styles.stepDotOn : styles.stepDotDone
-                }`}
-                aria-hidden="true"
-              >
-                {step === 1 ? "1" : <CheckIcon />}
-              </span>
-              <span className={styles.stepLabel}>Capture</span>
-              <span className={styles.stepArrow} aria-hidden="true">
-                →
-              </span>
-              <span
-                className={`${styles.stepDot} ${
-                  step === 2 ? styles.stepDotOn : ""
-                }`}
-                aria-hidden="true"
-              >
-                2
-              </span>
-              <span className={styles.stepLabel}>Review &amp; route</span>
-              <span className={styles.stepFraction} aria-hidden="true">
-                /2
-              </span>
-            </span>
-          )}
-
+        {/* ── Top bar: close · context · publish ─────────────────────── */}
+        <header className={styles.top}>
+          {/* Self-evident label → no tooltip (§4 tooltip contract). */}
           <Button
             variant="icon"
             size="sm"
             iconAriaLabel="Close composer"
             className={styles.closeBtn}
             onClick={onClose}
-            tooltip="Close — uncommitted captures are discarded"
           >
             <CloseIcon />
+          </Button>
+          <span id={headingId} className={styles.topTitle}>
+            {contextLabel}
+          </span>
+          <span className={styles.grow} />
+          <Button
+            variant="primary"
+            size="sm"
+            className={styles.publishBtn}
+            onClick={() => void handleAdd()}
+            disabled={!canAdd || uploading}
+            loading={uploading}
+          >
+            {uploading ? "Adding…" : publishLabel}
           </Button>
         </header>
 
         {/* ── Body ───────────────────────────────────────────────────── */}
-        <div className={styles.dlgBody}>
+        <div className={styles.body}>
           {allToolsOpen ? (
+            /* The long-tail tool wall — its own Back button + header. */
             <AllToolsMenu
               onBack={() => setAllToolsOpen(false)}
               onAddItem={(it) => addItem(it)}
               onAddItems={(arr) => addItems(arr)}
               onRequestLinkRow={() => {
-                // Close All-Tools, open the inline URL row in the capture
-                // block, and focus the URL field on the next frame.
+                // Close All-Tools and open the shared inline URL row.
                 setAllToolsOpen(false);
-                setLinkOpen(true);
-                if (isNotecardMode) setCaptureOpen(true);
-                requestAnimationFrame(() => linkInputRef.current?.focus());
+                openUrlRow("Paste or type a link…");
               }}
             />
-          ) : isNotecardMode ? (
-            /* ── Notecard mode — single screen ─────────────────────────── */
-            <>
-              <div className={styles.field}>
-                <label htmlFor={`${headingId}-title`}>Card title</label>
-                <input
-                  ref={titleInputRef}
-                  id={`${headingId}-title`}
-                  type="text"
-                  className={styles.input}
-                  placeholder="Name this card"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-
-              <div className={styles.field}>
-                <label id={`${headingId}-media`}>
-                  Media · drag to reorder — first item is the poster
-                </label>
-                <div
-                  className={styles.galEdit}
-                  role="list"
-                  aria-labelledby={`${headingId}-media`}
-                >
-                  {items.map((item, i) => (
-                    <GalleryTile
-                      key={item.id}
-                      item={item}
-                      index={i}
-                      count={items.length}
-                      poster={i === 0}
-                      onRemove={removeItem}
-                      onMove={moveItem}
-                      dragIndexRef={dragIndexRef}
-                    />
-                  ))}
-                  <Tooltip
-                    content="Add media to this card — opens the capture methods"
-                    side="top"
-                  >
-                    <button
-                      type="button"
-                      className={styles.galAdd}
-                      onClick={() => setCaptureOpen((v) => !v)}
-                      aria-expanded={captureOpen}
-                      aria-label="Add media — opens the capture methods"
-                      title="Add media — opens the capture methods"
-                    >
-                      <PlusIcon />
-                    </button>
-                  </Tooltip>
-                </div>
-              </div>
-
-              {/* The "+" tile reveals the shared capture engine in place. */}
-              {captureOpen && (
-                <div className={styles.captureReveal}>{captureEngine}</div>
-              )}
-
-              {(pastedStatus || rejectionStatus) && (
-                <CaptureStatus
-                  pasted={pastedStatus}
-                  rejection={rejectionStatus}
-                />
-              )}
-
-              <div className={styles.field}>
-                <label id={`${headingId}-notes`}>Notes</label>
-                {/* The EXISTING rich-text editor, consumed unchanged — it
-                    owns the sanitizer boundary (emits sanitized HTML; we
-                    never double-sanitize). */}
-                <div className={styles.rteShell}>
-                  <RichTextEditor
-                    value={body}
-                    onChange={setBody}
-                    placeholder="Write the notes for this card — formatting, links, and images all work."
-                    ariaLabel="Notecard notes"
-                    onRequestImageUrl={requestBodyImageUrl}
-                  />
-                </div>
-              </div>
-
-              <RoutingField
-                labels={labels}
-                locked={routingLocked}
-                openPicker={openPicker}
-                setOpenPicker={setOpenPicker}
-                subjectOptions={subjectOptions.map((s) => ({
-                  id: s.id,
-                  label: s.name,
-                }))}
-                unitOptions={unitOptions.map((u) => ({
-                  id: u.id,
-                  label: u.name,
-                }))}
-                lessonOptions={lessonOptions.map((l) => ({
-                  id: l.id,
-                  label: l.title,
-                }))}
-                sectionOptions={[
-                  { id: "", label: "Whole lesson" },
-                  ...sectionOptions.map((s) => ({
-                    id: s.id,
-                    label: plainText(s.heading) || "Section",
-                  })),
-                ]}
-                subjectId={subjectId}
-                unitId={unitId}
-                lessonId={lessonId}
-                sectionId={sectionId}
-                subjectValue={selectedSubject?.name ?? ""}
-                lessonValue={selectedLesson?.title ?? ""}
-                onPickSubject={(id) => setSubjectId(id as SubjectId)}
-                onPickUnit={setUnitId}
-                onPickLesson={(id) => {
-                  setLessonId(id);
-                  setSectionId("");
-                }}
-                onPickSection={setSectionId}
-              />
-            </>
-          ) : step === 1 ? (
-            /* ── Resource mode · Step 1 — capture ──────────────────────── */
-            <>
-              {captureEngine}
-
-              {items.length > 0 && (
-                <div
-                  className={styles.capturedStrip}
-                  role="list"
-                  aria-label="Captured items"
-                >
-                  {items.map((item, i) => (
-                    <CapturedTile
-                      key={item.id}
-                      item={item}
-                      index={i}
-                      count={items.length}
-                      onRemove={removeItem}
-                      onMove={moveItem}
-                      dragIndexRef={dragIndexRef}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {(pastedStatus || rejectionStatus) && (
-                <CaptureStatus
-                  pasted={pastedStatus}
-                  rejection={rejectionStatus}
-                />
-              )}
-            </>
           ) : (
-            /* ── Resource mode · Step 2 — review & route ───────────────── */
             <>
+              {/* Subject-colored title row (tinted via cp-subj → --c). */}
+              <input
+                ref={titleInputRef}
+                type="text"
+                className={styles.cmpTitle}
+                placeholder={titlePlaceholder}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                aria-label={isNotecardMode ? "Card title" : "Resource title"}
+              />
+
+              {/* Tool rail — the five real capture tools + All tools. Link /
+                  Image URL / Video share one inline URL row; its parser infers
+                  image / video / link. Draw is an honest "Soon" (no draw
+                  engine in this build). */}
+              <div
+                className={styles.rail}
+                role="group"
+                aria-label="Capture tools"
+              >
+                <RailTool
+                  label="Upload"
+                  icon={<UploadIcon />}
+                  onClick={onUploadClick}
+                  tooltip="Pick files from this device — PDFs, docs, and images stack below"
+                />
+                <RailTool
+                  label="Image URL"
+                  icon={<ImageGlyph />}
+                  onClick={() => openUrlRow("Paste an image URL…")}
+                  tooltip="Add an image from a web address — paste its URL and it stacks below"
+                />
+                <RailTool
+                  label="Draw"
+                  icon={<DrawGlyph />}
+                  soon
+                  tooltip="A built-in sketch pad is coming soon — for now upload an image, or use a drawing from All tools."
+                />
+                <RailTool
+                  label="Link"
+                  icon={<LinkIcon />}
+                  active={linkOpen}
+                  onClick={() => openUrlRow("Paste or type a link…")}
+                  tooltip="Capture a web link — paste any URL and it stacks below"
+                />
+                <RailTool
+                  label="Video"
+                  icon={<VideoGlyph />}
+                  onClick={() => openUrlRow("Paste a YouTube or video URL…")}
+                  tooltip="Embed a video — paste a YouTube (or other video) URL and it stacks below"
+                />
+                <RailTool
+                  all
+                  label="All tools"
+                  icon={<MoreDotsIcon />}
+                  onClick={() => setAllToolsOpen(true)}
+                  tooltip="Browse every capture tool — photo album, camera, YouTube, card wall, and more"
+                />
+              </div>
+              <p className={styles.railCap}>
+                Add an image, video, link, or file — each one stacks as its own
+                resource.
+              </p>
+
+              {/* Inline URL row (revealed by Link / Image URL / Video). */}
+              {linkOpen && (
+                <div
+                  className={styles.linkRow}
+                  role="group"
+                  aria-label="Add a URL"
+                >
+                  <input
+                    ref={linkInputRef}
+                    type="url"
+                    className={styles.input}
+                    placeholder={linkHint}
+                    value={linkValue}
+                    onChange={(e) => setLinkValue(e.target.value)}
+                    onKeyDown={onLinkKeyDown}
+                    aria-label="Resource URL"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onLinkConfirm}
+                    disabled={!linkValue.trim()}
+                    tooltip="Capture this URL — it stacks below, and you pick where everything lands before publishing"
+                  >
+                    Add
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={closeUrlRow}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
+
               {uploadError && (
                 <div className={styles.errStrip} role="alert">
                   <WarnIcon />
@@ -1991,18 +1853,20 @@ export function ResourceComposer({
                 </div>
               )}
 
+              {/* Stacked attachments — each capture is its own row. */}
               {items.length > 0 && (
                 <div
-                  className={styles.capturedStrip}
+                  className={styles.atts}
                   role="list"
-                  aria-label="Captured items"
+                  aria-label="Attachments"
                 >
                   {items.map((item, i) => (
-                    <CapturedTile
+                    <AttachmentRow
                       key={item.id}
                       item={item}
                       index={i}
                       count={items.length}
+                      poster={isNotecardMode && i === 0}
                       onRemove={removeItem}
                       onMove={moveItem}
                       dragIndexRef={dragIndexRef}
@@ -2011,83 +1875,70 @@ export function ResourceComposer({
                 </div>
               )}
 
-              <div className={styles.field}>
-                <label htmlFor={`${headingId}-title`}>
-                  Title{" "}
-                  <span className={styles.labelAside}>
-                    (single item only — steers its label)
-                  </span>
-                </label>
-                <input
-                  ref={titleInputRef}
-                  id={`${headingId}-title`}
-                  type="text"
-                  className={styles.input}
-                  placeholder={
-                    items.length > 1
-                      ? "Keep each item's own name"
-                      : "Name this resource"
-                  }
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+              {(pastedStatus || rejectionStatus) && (
+                <CaptureStatus
+                  pasted={pastedStatus}
+                  rejection={rejectionStatus}
                 />
-              </div>
+              )}
 
-              {/* Per-item rich notes — collapsed by default. Each captured
-                  item can carry its own formatted note (→ resource.body). */}
-              {items.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    className={styles.noteToggle}
-                    onClick={() => setNotesOpen((v) => !v)}
-                    aria-expanded={notesOpen}
-                  >
-                    + Add a note to an item (optional)
-                  </button>
-                  {notesOpen && noteItem && (
-                    <div
-                      className={styles.noteEditor}
-                      role="group"
-                      aria-label="Per-item notes"
-                    >
-                      {items.length > 1 && (
-                        <div
-                          className={styles.notePickRow}
-                          role="radiogroup"
-                          aria-label="Which item the note is for"
-                        >
-                          {items.map((it) => {
-                            const hasNote = plainText(it.body ?? "").length > 0;
-                            const on = it.id === noteItem.id;
-                            return (
-                              <button
-                                key={it.id}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                className={`${styles.notePick} ${
-                                  on ? styles.notePickOn : ""
-                                }`}
-                                onClick={() => setNoteItemId(it.id)}
-                                title={`Write a note for ${it.label}`}
-                              >
-                                {it.label}
-                                {hasNote && (
-                                  <span
-                                    className={styles.noteDot}
-                                    aria-label="Has note"
-                                  />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+              {/* Rich-text note — notecard/edit → the card body; resource →
+                  the targeted resource's own body. The RichTextEditor is
+                  consumed unchanged (it owns the sanitizer boundary). */}
+              {showNote && (
+                <div className={styles.noteBlock}>
+                  <span className={styles.noteLabel}>
+                    {isNotecardMode ? "Notes" : "Note"}
+                  </span>
+                  {showNotePicker && noteItem && (
+                    <>
+                      <div
+                        className={styles.notePickRow}
+                        role="radiogroup"
+                        aria-label="Which resource the note is for"
+                      >
+                        {items.map((it) => {
+                          const hasNote = plainText(it.body ?? "").length > 0;
+                          const on = it.id === noteItem.id;
+                          return (
+                            <button
+                              key={it.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={on}
+                              className={`${styles.notePick} ${
+                                on ? styles.notePickOn : ""
+                              }`}
+                              onClick={() => setNoteItemId(it.id)}
+                              title={`Write a note for ${it.label}`}
+                            >
+                              {it.label}
+                              {hasNote && (
+                                <span
+                                  className={styles.noteDot}
+                                  aria-label="Has note"
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                       <span className={styles.noteFor}>
                         Note for <strong>{noteItem.label}</strong>
                       </span>
-                      <div className={styles.rteShell}>
+                    </>
+                  )}
+                  <div className={styles.rteShell}>
+                    {isNotecardMode ? (
+                      <RichTextEditor
+                        value={body}
+                        onChange={setBody}
+                        placeholder="Write the notes for this card — formatting, links, and images all work."
+                        ariaLabel="Notecard notes"
+                        onRequestImageUrl={requestBodyImageUrl}
+                      />
+                    ) : (
+                      noteItem && (
                         <RichTextEditor
                           key={noteItem.id}
                           value={noteItem.body ?? ""}
@@ -2096,156 +1947,39 @@ export function ResourceComposer({
                           ariaLabel={`Note text for ${noteItem.label}`}
                           onRequestImageUrl={requestBodyImageUrl}
                         />
-                      </div>
-                    </div>
-                  )}
-                </>
+                      )
+                    )}
+                  </div>
+                </div>
               )}
-
-              <RoutingField
-                labels={labels}
-                locked={routingLocked}
-                openPicker={openPicker}
-                setOpenPicker={setOpenPicker}
-                subjectOptions={subjectOptions.map((s) => ({
-                  id: s.id,
-                  label: s.name,
-                }))}
-                unitOptions={unitOptions.map((u) => ({
-                  id: u.id,
-                  label: u.name,
-                }))}
-                lessonOptions={lessonOptions.map((l) => ({
-                  id: l.id,
-                  label: l.title,
-                }))}
-                sectionOptions={[
-                  { id: "", label: "Whole lesson" },
-                  ...sectionOptions.map((s) => ({
-                    id: s.id,
-                    label: plainText(s.heading) || "Section",
-                  })),
-                ]}
-                subjectId={subjectId}
-                unitId={unitId}
-                lessonId={lessonId}
-                sectionId={sectionId}
-                subjectValue={selectedSubject?.name ?? ""}
-                lessonValue={selectedLesson?.title ?? ""}
-                onPickSubject={(id) => setSubjectId(id as SubjectId)}
-                onPickUnit={setUnitId}
-                onPickLesson={(id) => {
-                  setLessonId(id);
-                  setSectionId("");
-                }}
-                onPickSection={setSectionId}
-              />
             </>
           )}
         </div>
 
-        {/* ── Foot: session badge · cancel/back · primary ─────────────── */}
-        <footer className={styles.dlgFoot}>
-          {showSessionBadge && (
-            <Tooltip
-              content="These captures live in this tab for now — once you add them they stay on this device for the session, and they'll sync to your team when the backend arrives."
-              side="top"
-            >
-              <button
-                type="button"
-                className={styles.sessionBadge}
-                aria-label="Session only — tap for what that means"
-                title="These captures live in this tab for now — they'll sync to your team when the backend arrives"
-              >
-                <span className={styles.sessionDot} aria-hidden="true" />
-                Session only
-              </button>
-            </Tooltip>
-          )}
-          <span className={styles.footSpacer} />
-          {isNotecardMode ? (
-            <>
-              <Button
-                variant="ghost"
-                size="md"
-                className={styles.footBtn}
-                onClick={onClose}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="honey"
-                size="md"
-                className={styles.footBtn}
-                onClick={() => void handleAdd()}
-                disabled={!canAdd || uploading}
-                loading={uploading}
-                tooltip={
-                  isEditMode
-                    ? "Save this card's notes and media back to the resource"
-                    : "Create the notecard at the chosen destination — its media flip through as a gallery"
-                }
-              >
-                {isEditMode ? "Save note" : "Create notecard"}
-              </Button>
-            </>
-          ) : step === 1 ? (
-            <>
-              <Button
-                variant="ghost"
-                size="md"
-                className={styles.footBtn}
-                onClick={onClose}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                className={styles.footBtn}
-                onClick={goToReview}
-                trailingIcon={<ChevronRightIcon />}
-                tooltip="Review what you've captured and pick which lesson and section it lands in"
-              >
-                {items.length > 0
-                  ? `Next · ${items.length} item${items.length === 1 ? "" : "s"}`
-                  : "Next"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="ghost"
-                size="md"
-                className={styles.footBtn}
-                onClick={goToCapture}
-                leadingIcon={<ChevronLeftIcon />}
-                tooltip="Back to the capture step — everything you've captured stays put"
-              >
-                Back
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                className={styles.footBtn}
-                onClick={() => void handleAdd()}
-                disabled={!canAdd || uploading}
-                loading={uploading}
-                tooltip={
-                  backendOn
-                    ? "Attach every captured resource to the chosen destination — files upload to your team's storage"
-                    : "Attach every captured resource to the chosen destination for this session"
-                }
-              >
-                {uploading
-                  ? "Adding…"
-                  : items.length > 1
-                    ? `Add ${items.length} resources`
-                    : "Add resource"}
-              </Button>
-            </>
-          )}
-        </footer>
+        {/* ── Footer: session badge · routing (file-to + wall) ────────── */}
+        {!allToolsOpen && (
+          <footer className={styles.foot}>
+            {showSessionBadge && (
+              <div className={styles.sessionRow}>
+                <Tooltip
+                  content="These captures live in this tab for now — once you add them they stay on this device for the session, and they'll sync to your team when the backend arrives."
+                  side="top"
+                >
+                  <button
+                    type="button"
+                    className={styles.sessionBadge}
+                    aria-label="Session only — tap for what that means"
+                    title="These captures live in this tab for now — they'll sync to your team when the backend arrives"
+                  >
+                    <span className={styles.sessionDot} aria-hidden="true" />
+                    Session only
+                  </button>
+                </Tooltip>
+              </div>
+            )}
+            {routingField}
+          </footer>
+        )}
 
         {/* Hidden file input — driven by the Upload capture button. */}
         <input
@@ -2264,58 +1998,57 @@ export function ResourceComposer({
   );
 }
 
-// ── CaptureButton ─────────────────────────────────────────────────────────
-// One of the 4-up capture-grid buttons (.rn-capBtn): icon tile + label +
-// sub-label. `soon` renders the visibly-disabled 55%-opacity state with a
-// why-tooltip (CLAUDE.md §4 — disabled controls explain why). The bespoke
-// anatomy (icon tile + dual label) is why this doesn't reuse FutureControl.
+// ── RailTool ───────────────────────────────────────────────────────────────
+// One cell of the tool rail (.railTool): stacked icon + label. `soon` renders
+// the visibly-disabled state with a why-tooltip (CLAUDE.md §4 — disabled
+// controls explain why). `all` gives the "All tools" cell a faint brand tint.
 
-interface CaptureButtonProps {
+interface RailToolProps {
   label: string;
-  sub: string;
   icon: ReactNode;
-  /** Tone class for the icon tile background (token-backed). */
-  tone: string;
   tooltip: string;
   onClick?: () => void;
   active?: boolean;
   soon?: boolean;
-  /** Marks the button the open-effect lands focus on (queried via
-   *  [data-autofocus] — the Tooltip wrapper owns the trigger ref, so a
-   *  forwarded ref would be clobbered by its cloneElement). */
-  autoFocusTarget?: boolean;
+  /** The "All tools" cell — a slightly stronger, brand-tinted icon. */
+  all?: boolean;
 }
 
-function CaptureButton({
+function RailTool({
   label,
-  sub,
   icon,
-  tone,
   tooltip,
   onClick,
   active = false,
   soon = false,
-  autoFocusTarget = false,
-}: CaptureButtonProps): ReactNode {
+  all = false,
+}: RailToolProps): ReactNode {
   return (
     <Tooltip content={tooltip} side="top">
       <button
         type="button"
-        className={`${styles.capBtn} ${soon ? styles.capBtnSoon : ""} ${
-          active ? styles.capBtnActive : ""
-        }`}
+        className={`${styles.railTool} ${all ? styles.railAll : ""} ${
+          active ? styles.railToolActive : ""
+        } ${soon ? styles.railToolSoon : ""}`}
+        // §4a: NOT native `disabled` — a disabled button is unreachable by
+        // keyboard, hiding both the control and its "coming soon" state from
+        // keyboard/AT users. aria-disabled keeps it focusable + announced
+        // while activation stays suppressed (no onClick on the soon path);
+        // the visual dimming rides .railToolSoon, and the accessible name
+        // carries the state directly.
         onClick={soon ? undefined : onClick}
-        disabled={soon}
         aria-disabled={soon || undefined}
         aria-pressed={onClick && !soon ? active : undefined}
+        aria-label={soon ? `${label} — coming soon` : undefined}
         title={tooltip}
-        data-autofocus={autoFocusTarget || undefined}
       >
-        <span className={`${styles.capIc} ${tone}`} aria-hidden="true">
+        <span className={styles.railIc} aria-hidden="true">
           {icon}
         </span>
-        <span className={styles.capT}>{label}</span>
-        <span className={styles.capS}>{sub}</span>
+        <span className={styles.railT}>
+          {label}
+          {soon && <span className={styles.srOnly}> — coming soon</span>}
+        </span>
       </button>
     </Tooltip>
   );
@@ -2377,10 +2110,15 @@ function useReorderHandlers(
   }, [dragIndexRef]);
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
-      if (e.key === "ArrowLeft" && index > 0) {
+      // The attachments list is vertical, so Up/Down are the primary keys;
+      // Left/Right stay as aliases (the tiles were horizontal pre-B4.2).
+      if ((e.key === "ArrowUp" || e.key === "ArrowLeft") && index > 0) {
         e.preventDefault();
         onMove(index, index - 1);
-      } else if (e.key === "ArrowRight" && index < count - 1) {
+      } else if (
+        (e.key === "ArrowDown" || e.key === "ArrowRight") &&
+        index < count - 1
+      ) {
         e.preventDefault();
         onMove(index, index + 1);
       }
@@ -2434,28 +2172,68 @@ function useTileImg(item: CapturedItem): {
   return { src, onError };
 }
 
-function CapturedTile({
+/** Human label for a captured item's type — the row's uppercase eyebrow. */
+function typeLabel(type: LessonResource["type"]): string {
+  switch (type) {
+    case "image":
+      return "Image";
+    case "pdf":
+      return "PDF";
+    case "doc":
+      return "Doc";
+    case "slides":
+      return "Slides";
+    case "youtube":
+      return "Video";
+    case "notecard":
+      return "Note";
+    case "website":
+      return "Website";
+    default:
+      return "Link";
+  }
+}
+
+// ── AttachmentRow (unified stacked list) ─────────────────────────────────
+// One captured item as a stacked row: grip · type-tinted thumb · type + name
+// (with a "has note" dot) · remove. In notecard mode the first row is the
+// POSTER (honey wash + tag — reorder IS the poster control). Pointer-drag +
+// arrow-key reorder. NO side-stripe accent (impeccable ban) — the type color
+// rides the thumb tile, never a border-left.
+
+function AttachmentRow({
   item,
   index,
   count,
+  poster,
   onRemove,
   onMove,
   dragIndexRef,
-}: TileProps): ReactNode {
+}: TileProps & { poster: boolean }): ReactNode {
   const handlers = useReorderHandlers(index, count, onMove, dragIndexRef);
-  const hasNote = plainText(item.body ?? "").length > 0;
   const img = useTileImg(item);
+  const hasNote = plainText(item.body ?? "").length > 0;
   return (
     <div
       role="listitem"
       tabIndex={0}
       draggable
-      className={styles.capItem}
-      aria-label={`${item.label} — captured item ${index + 1} of ${count}. Drag or use arrow keys to reorder.`}
+      className={`${styles.attRow} ${poster ? styles.attRowPoster : ""}`}
+      aria-label={`${item.label} — ${typeLabel(item.type)}, item ${
+        index + 1
+      } of ${count}${
+        poster ? " (poster)" : ""
+      }. Drag or use arrow keys to reorder.`}
       title={`${item.label} — drag (or use arrow keys) to reorder`}
       {...handlers}
     >
-      <div className={`${styles.ciTh} ${thumbClass(item)}`} aria-hidden="true">
+      <span className={styles.attGrip} aria-hidden="true">
+        <GripIcon />
+      </span>
+      <span
+        className={`${styles.attThumb} ${thumbClass(item)}`}
+        aria-hidden="true"
+      >
         {img.src ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -2467,89 +2245,29 @@ function CapturedTile({
         ) : (
           <TypeIcon type={item.type} />
         )}
-      </div>
-      <Tooltip
-        content={`Remove ${item.label} from this add — it won't be attached`}
-        side="top"
-        required
-      >
-        <button
-          type="button"
-          className={styles.capX}
-          onClick={() => onRemove(item.id)}
-          aria-label={`Remove ${item.label}`}
-          title={`Remove ${item.label} from this add`}
-        >
-          <SmallXIcon />
-        </button>
-      </Tooltip>
-      <div className={styles.ciL}>
-        {item.label}
-        {hasNote && <span className={styles.noteDot} aria-label="Has note" />}
-      </div>
-    </div>
-  );
-}
-
-// ── Gallery tile (.rn-galItem — 72×56, notecard mode) ────────────────────
-// Same recipe family as CapturedTile plus the grip glyph and the poster
-// treatment on index 0 (honey outline + "POSTER" tag — reorder to change).
-
-function GalleryTile({
-  item,
-  index,
-  count,
-  poster,
-  onRemove,
-  onMove,
-  dragIndexRef,
-}: TileProps & { poster: boolean }): ReactNode {
-  const handlers = useReorderHandlers(index, count, onMove, dragIndexRef);
-  const img = useTileImg(item);
-  return (
-    <div
-      role="listitem"
-      tabIndex={0}
-      draggable
-      className={`${styles.galItem} ${poster ? styles.galItemPoster : ""} ${thumbClass(item)}`}
-      aria-label={`${item.label} — gallery item ${index + 1} of ${count}${
-        poster ? " (poster)" : ""
-      }. Drag or use arrow keys to reorder; the first item is the poster.`}
-      title={`${item.label} — drag to reorder; the first item is the card's poster`}
-      {...handlers}
-    >
-      <span className={styles.giGrip} aria-hidden="true">
-        <GripIcon />
       </span>
-      {img.src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={img.src}
-          alt=""
-          className={styles.ciImg}
-          onError={img.onError}
-        />
-      ) : (
-        <TypeIcon type={item.type} />
-      )}
+      <span className={styles.attMid}>
+        <span className={styles.attType}>{typeLabel(item.type)}</span>
+        <span className={styles.attName}>
+          {item.label}
+          {hasNote && <span className={styles.noteDot} aria-label="Has note" />}
+        </span>
+      </span>
       {poster && (
-        <span className={styles.posterStar} aria-hidden="true">
+        <span className={styles.attPoster} aria-hidden="true">
           POSTER
         </span>
       )}
-      {/* required: in notecard EDIT this × deletes stored media from the
-          card — destructive per CLAUDE.md §4, so the tooltip is always on. */}
-      <Tooltip
-        content={`Remove ${item.label} from this card`}
-        side="top"
-        required
-      >
+      {/* required: this × removes the capture (in notecard EDIT it deletes
+          stored media from the card) — destructive per CLAUDE.md §4, so the
+          tooltip is always on. */}
+      <Tooltip content={`Remove ${item.label}`} side="top" required>
         <button
           type="button"
-          className={styles.capX}
+          className={styles.attX}
           onClick={() => onRemove(item.id)}
-          aria-label={`Remove ${item.label} from this card`}
-          title={`Remove ${item.label} from this card`}
+          aria-label={`Remove ${item.label}`}
+          title={`Remove ${item.label}`}
         >
           <SmallXIcon />
         </button>
@@ -2843,8 +2561,9 @@ function RouteSelect({
 // ChevronDownIcon now come from `@/components/icons` (imported above) — only
 // the composer-unique glyphs below stay local.
 
-function DriveIcon(): ReactNode {
-  // A simple triangle-fold "drive" glyph in the Lucide vocabulary.
+// Rail glyphs — Image URL / Draw / Video. Upload / Link / All-tools come from
+// the shared @/components/icons import; these three are composer-local.
+function ImageGlyph(): ReactNode {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -2855,13 +2574,14 @@ function DriveIcon(): ReactNode {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M9 3h6l6 10-3 6H6l-3-6z" />
-      <path d="M9 3 6 13h12" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
     </svg>
   );
 }
 
-function CameraIcon(): ReactNode {
+function DrawGlyph(): ReactNode {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -2872,8 +2592,25 @@ function CameraIcon(): ReactNode {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-      <circle cx="12" cy="13" r="4" />
+      <path d="M3 21h4l11-11-4-4L3 17z" />
+      <path d="M14 6l4 4" />
+    </svg>
+  );
+}
+
+function VideoGlyph(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2" y="5" width="15" height="14" rx="2" />
+      <polygon points="23 7 16 12 23 17 23 7" />
     </svg>
   );
 }
@@ -2892,22 +2629,6 @@ function NoteCardIcon(): ReactNode {
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <line x1="7" y1="9" x2="17" y2="9" />
       <line x1="7" y1="13" x2="13" y2="13" />
-    </svg>
-  );
-}
-
-function CheckIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }
@@ -2931,23 +2652,6 @@ function WarnIcon(): ReactNode {
   );
 }
 
-function PlusIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  );
-}
-
 function GripIcon(): ReactNode {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -2957,40 +2661,6 @@ function GripIcon(): ReactNode {
       <circle cx="15" cy="12" r="1.6" />
       <circle cx="9" cy="18" r="1.6" />
       <circle cx="15" cy="18" r="1.6" />
-    </svg>
-  );
-}
-
-function ChevronLeftIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={styles.footChevron}
-    >
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={styles.footChevron}
-    >
-      <polyline points="9 18 15 12 9 6" />
     </svg>
   );
 }

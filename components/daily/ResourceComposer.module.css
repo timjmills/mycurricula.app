@@ -1,38 +1,37 @@
-/* ResourceComposer.module.css — the add-resource / notecard composer.
+/* ResourceComposer.module.css — the Shared Composer (B4.2 unified shell).
 
-   Recreates the 6.12.26 Resource & Notecard Redesign §3 recipes
-   (rn.css: .rn-dialog / .rn-dlgHead / .rn-modeBadge / .rn-stepper /
-   .rn-capRow / .rn-capBtn / .rn-allTools / .rn-dropHint /
-   .rn-capturedStrip / .rn-capItem / .rn-capX / .rn-sessionBadge /
-   .rn-field / .rn-input / .rn-routeRow / .rn-select / .rn-dlgFoot /
-   .rn-btn / .rn-errStrip / .rn-retry / .rn-galEdit / .rn-galItem /
-   .rn-posterStar) in module form.
+   Reskinned to the 7.21.26 Design Handoff Update's single-screen composer
+   (source-planning-hub/ph-composer.jsx: the .ph-cmp / cmp-top / cmp-title /
+   cmp-rail / cmp-atts / cmp-write / cmp-foot family) — REBUILT on this repo's
+   design tokens (the handoff's hard-coded --phx / --cbrand light palette is
+   NOT ported; it breaks Night). The proven capture + commit engine in
+   ResourceComposer.tsx is unchanged — only this shell + its render are new.
 
-   Anatomy:
-     .scrim         — frosted full-viewport overlay (click-to-dismiss).
-     .dialog        — the centered 520px card (phone: full-height sheet).
-     .dlgHead       — mode badge · stepper · close (≥44px hit area).
-     .dlgBody       — scrollable; per mode/step content.
-     .dlgFoot       — session badge · cancel/back · primary commit.
+   Anatomy (top → bottom), one screen for every mode:
+     .scrim   — frosted full-viewport overlay (click-to-dismiss). Carries the
+                global `cmp-scrim` class → app/themes.css §5 accent wash.
+     .dialog  — the centered card (phone: full-height bottom sheet). Carries
+                the global `cmp-modal` class → §5 accent wash. ≥85% opaque
+                (var(--surface)) over the scrim blur for AA legibility.
+     .top     — close · context title · Publish.
+     .body    — scroll region: subject-colored title row · tool rail · inline
+                URL row · stacked attachments · rich-text note.
+     .foot    — routing (file-to + wall column) · quiet "Session only" badge.
 
-   All color / type via var(--token). The only raw px values are layout
-   math (tile sizes, hit-area insets, hairlines) per BUILD_STANDARD §3.
-   Touch targets ≥44px (small visuals are hit-inflated).
+   All color / type via var(--token). The only raw px values are layout math
+   (tile sizes, hit-area insets, hairlines) per BUILD_STANDARD §3. Touch
+   targets ≥44px (small visuals are hit-inflated). NO side-stripe accents
+   (impeccable ban) — the type color rides the thumb, never a border-left.
    prefers-reduced-motion drops the enter motion + transitions. */
 
 /* ── Scrim ──────────────────────────────────────────────────────────────── */
-/* A soft backdrop blur + low-opacity ink wash — NOT a flat black scrim.
-   The blur lets the rest of the UI stay visible as a ghost behind the
-   dialog so the teacher's spatial context is preserved.
+/* A soft backdrop blur + low-opacity ink wash — NOT a flat black scrim. The
+   blur keeps the rest of the UI as a ghost so spatial context survives.
 
-   z-index 1000 — the "nested dialog" tier, matching StandardsTaggingPicker.
-   The composer can be opened from INSIDE the W3.8 LessonModal (scrim
-   z 600, via the lesson editor's "+ Add resource" menu), so it must sit
-   above that modal; at the old 500 it mounted invisible behind the
-   modal scrim. Still below UndoToast (1200), Tooltip (9000), and the
-   rich-text toolbar (9999). On /daily nothing renders between 500 and
-   1000 that the composer must stay under, so this raise is safe there
-   — it only ever needed to be above the surfaces it already covered. */
+   z-index 1000 — the "nested dialog" tier (matches StandardsTaggingPicker).
+   The composer can be opened from INSIDE the LessonModal (scrim z 600), so it
+   must sit above that; still below UndoToast (1200), Tooltip (9000), and the
+   rich-text toolbar (9999). */
 
 .scrim {
   position: fixed;
@@ -61,11 +60,11 @@
   }
 }
 
-/* ── Dialog (.rn-dialog) ───────────────────────────────────────────────── */
+/* ── Dialog ─────────────────────────────────────────────────────────────── */
 
 .dialog {
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
@@ -95,113 +94,50 @@
   display: none;
 }
 
-/* ── Head (.rn-dlgHead) ────────────────────────────────────────────────── */
+/* ── Top bar (close · title · Publish) ─────────────────────────────────── */
 
-.dlgHead {
+.top {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--hairline);
   flex: 0 0 auto;
 }
 
-/* Mode badge (.rn-modeBadge) — ALWAYS visible mode identity (P2). */
-.modeBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 11px;
-  border-radius: var(--r-pill);
+.grow {
+  flex: 1 1 auto;
+}
+
+.topTitle {
   font-size: var(--t-12);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.modeBadge svg {
-  width: 13px;
-  height: 13px;
-  flex: 0 0 auto;
-}
-
-.modeBadgeRes {
-  background: var(--brand-50);
-  color: var(--brand-700);
-}
-
-.modeBadgeNote {
-  background: var(--honey-100);
-  color: var(--honey-600);
-}
-
-/* Stepper (.rn-stepper / .rn-stepDot) */
-.stepper {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--t-11);
-  font-weight: 700;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.stepDot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--ink-100);
-  color: var(--muted);
-  font-size: var(--t-11);
   font-weight: 800;
-  flex: 0 0 auto;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
-.stepDot svg {
-  width: 11px;
-  height: 11px;
-}
-
-.stepDotOn {
-  background: var(--brand-500);
-  color: var(--paper);
-}
-
-.stepDotDone {
-  background: var(--done-tint);
-  color: var(--done);
-}
-
-.stepArrow {
-  color: var(--faint);
-}
-
-/* The "/2" compact fraction only appears on the phone sheet. */
-.stepFraction {
-  display: none;
-}
-
-/* Close button — 32px visual on desktop, hit-inflated to ≥44 via ::after.
-   On phone/tablet (≤900px) the box itself grows to 44×44 so the touch
-   target meets WCAG 2.5.5 even when measured by getBoundingClientRect (a
-   pseudo-element doesn't enlarge the element's own box). The glyph stays
-   16px at every tier via `.closeBtn svg` below. */
+/* Close button — 32px visual, hit-inflated to ≥44 via ::after (desktop), and
+   the box itself grows to 44 on touch tiers. Tripled selector beats the
+   Button primitive's compound `.icon.sm` (0,2,0) without !important. */
 .closeBtn {
-  margin-left: 0;
   width: 32px;
   height: 32px;
   min-height: 32px;
   padding: 0;
   color: var(--muted);
   position: relative;
+  flex: 0 0 auto;
 }
 
 .closeBtn::after {
   content: "";
   position: absolute;
-  inset: -6px; /* 32 + 12 = ≥44 hit area on desktop pointers */
+  inset: -6px;
 }
 
 .closeBtn svg {
@@ -209,14 +145,6 @@
   height: 16px;
 }
 
-/* Phone + tablet: inflate the element box itself to ≥44×44 (the glyph
-   stays 16px). The Button primitive's own ≤900px ::before only widens the
-   click overlay, not the measured box — this guarantees the probe-measured
-   target is ≥44 on touch tiers.
-   The tripled `.closeBtn` raises specificity to (0,3,0) so it beats the
-   Button primitive's compound `.icon.sm` (0,2,0) width:32px deterministically
-   (cross-file load order can't be relied on) — without resorting to
-   !important. */
 @media (max-width: 900px) {
   .closeBtn.closeBtn.closeBtn {
     width: 44px;
@@ -225,146 +153,149 @@
   }
 }
 
-/* In notecard mode there's no stepper — push the close to the right. */
-.modeBadgeNote ~ .closeBtn {
-  margin-left: auto;
+/* Publish — the primary commit. Self-evident label → no tooltip (§4). */
+.publishBtn {
+  padding-left: 20px;
+  padding-right: 20px;
+  flex: 0 0 auto;
 }
 
-/* ── Body (.rn-dlgBody) ────────────────────────────────────────────────── */
+/* ── Body (scroll region) ──────────────────────────────────────────────── */
 
-.dlgBody {
-  padding: 16px;
+.body {
+  padding: 14px 18px 16px;
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
 }
 
-/* ── Capture grid (.rn-capRow / .rn-capBtn) ────────────────────────────── */
+/* ── Subject-colored title row ─────────────────────────────────────────── */
+/* The one big title input, tinted by the routed subject (cp-subj → --c). */
 
-.capRow {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+.cmpTitle {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  background: none;
+  outline: none;
+  padding: 2px 0 12px;
+  font-size: var(--t-24, 1.5rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--c, var(--ink-900));
+  font-family: inherit;
 }
 
-/* The Tooltip primitive wraps DISABLED triggers (the "soon" tools) in an
-   inline-flex span — let that wrapper behave as the grid cell and stretch
-   its button to match the enabled siblings. */
-.capRow > span {
+.cmpTitle::placeholder {
+  color: color-mix(in srgb, var(--c, var(--ink-400)) 42%, transparent);
+}
+
+/* ── Tool rail ─────────────────────────────────────────────────────────── */
+/* Upload · Image URL · Draw · Link · Video · All tools. The five capture
+   tools funnel through the engine's existing handlers (Upload picker, the
+   shared URL row — the parser infers image / video / link from the URL).
+   Draw is an honest "Soon" (no draw engine in this build). "All tools" opens
+   AllToolsMenu, which keeps its own Soon honesty. */
+
+.rail {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface-warm);
+}
+
+/* The Tooltip primitive wraps disabled triggers (the "Soon" Draw tool) in an
+   inline-flex span — let that wrapper behave as the grid cell. */
+.rail > span {
   display: flex;
   align-items: stretch;
   min-width: 0;
 }
 
-.capRow > span > .capBtn {
+.rail > span > .railTool {
   flex: 1;
 }
 
-.capBtn {
+.railTool {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 12px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface);
+  padding: 14px 6px;
+  border: none;
+  border-right: 1px solid var(--hairline);
+  background: none;
   min-height: 44px;
   cursor: pointer;
   font-family: inherit;
-  transition:
-    border-color 120ms ease,
-    background 120ms ease;
+  color: var(--ink-soft);
+  transition: background 120ms ease;
 }
 
-.capBtn:hover:not(:disabled) {
-  border-color: var(--brand-300);
-  background: var(--brand-50);
+.rail > span:last-child > .railTool,
+.railTool:last-child {
+  border-right: none;
 }
 
-.capBtn:focus-visible {
+.railTool:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+.railTool:focus-visible {
   outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
-.capBtnActive {
-  border-color: var(--brand-300);
+.railToolActive {
   background: var(--brand-50);
 }
 
-/* "Soon" tools — visibly disabled at 55% opacity (.rn-capBtn.soon). */
-.capBtnSoon {
-  opacity: 0.55;
+.railToolSoon {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.capIc {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--r-sm);
+.railIc {
   display: grid;
   place-items: center;
-  color: var(--paper);
-  flex: 0 0 auto;
+  color: var(--muted);
 }
 
-.capIc svg {
-  width: 16px;
-  height: 16px;
+.railIc svg {
+  width: 20px;
+  height: 20px;
 }
 
-/* Icon-tile tones — the artboard's four capture hues, token-backed. */
-.icUpload {
-  background: var(--brand-400);
+.railTool:hover:not(:disabled) .railIc {
+  color: var(--brand-600);
 }
 
-.icLink {
-  background: var(--tag-indigo);
+/* The "All tools" cell reads as the palette entry — a faint brand tint. */
+.railAll .railIc {
+  color: var(--brand-500);
 }
 
-.icDrive {
-  background: var(--honey-500);
-}
-
-.icCamera {
-  background: var(--tag-pink);
-}
-
-.capT {
-  font-size: var(--t-12);
-  font-weight: 700;
-  color: var(--ink-soft);
-}
-
-.capS {
+.railT {
   font-size: var(--t-10);
+  font-weight: 700;
   color: var(--muted);
-  margin-top: -3px;
+  text-align: center;
+  line-height: 1.1;
 }
 
-/* ── All tools (.rn-allTools) ──────────────────────────────────────────── */
-
-.allTools {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-content: center;
+.railCap {
+  margin: 8px 2px 0;
+  font-size: var(--t-11);
+  font-weight: 500;
   color: var(--muted);
-  font-size: var(--t-12);
-  font-weight: 600;
-  min-height: 36px;
-  width: 100%;
-  border-radius: var(--r-sm);
 }
 
-.allTools svg {
-  width: 14px;
-  height: 14px;
-}
-
-/* ── Inline URL row ────────────────────────────────────────────────────── */
+/* ── Inline URL row (Link / Image URL / Video) ─────────────────────────── */
 
 .linkRow {
   display: flex;
@@ -378,59 +309,91 @@
   min-width: 0;
 }
 
-/* ── Drop hint (.rn-dropHint) ──────────────────────────────────────────── */
+/* ── Shared text input ─────────────────────────────────────────────────── */
 
-.dropHint {
-  margin-top: 12px;
-  border: 1.5px dashed var(--border);
-  border-radius: var(--r-md);
-  padding: 14px;
-  text-align: center;
-  color: var(--muted);
-  font-size: var(--t-12);
-}
-
-/* ── Captured strip (.rn-capturedStrip / .rn-capItem / .rn-capX) ───────── */
-
-.capturedStrip {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-
-/* NO overflow:hidden here — it would clip the remove ×'s ::after hit
-   inflation back to the 18px visual. The inner .ciTh clips the image to
-   the rounded corners instead, so the ≥44px hit area escapes the tile. */
-.capItem {
-  position: relative;
-  width: 86px;
+.input {
+  width: 100%;
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
+  background: var(--surface-warm);
+  padding: 10px 12px;
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  min-height: 44px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.input::placeholder {
+  color: var(--faint);
+}
+
+.input:focus-visible {
+  border-color: var(--brand-300);
+}
+
+/* ── Stacked attachments list ──────────────────────────────────────────── */
+/* Each capture stacks as its own row: type-tinted thumb · type + name ·
+   remove. Poster (notecard[0]) gets a honey wash + tag — NEVER a side stripe
+   (impeccable ban). Rows are pointer-drag + arrow-key reorderable. */
+
+.atts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.attRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   background: var(--surface);
+  padding: 8px 10px;
   cursor: grab;
 }
 
-.capItem:active {
+.attRow:active {
   cursor: grabbing;
 }
 
-.capItem:focus-visible {
+.attRow:focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
-.ciTh {
-  height: 52px;
+/* Poster row (notecard mode, index 0) — honey wash + tag mark the rule. */
+.attRowPoster {
+  background: var(--honey-50);
+  border-color: var(--honey-400);
+}
+
+.attGrip {
+  color: var(--faint);
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.attGrip svg {
+  width: 11px;
+  height: 14px;
+}
+
+.attThumb {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
   display: grid;
   place-items: center;
   overflow: hidden;
-  /* Owns the clipping the tile no longer does — keep the image inside the
-     tile's rounded top corners (the -1px accounts for the 1px border). */
-  border-radius: calc(var(--r-sm) - 1px) calc(var(--r-sm) - 1px) 0 0;
+  flex: 0 0 auto;
 }
 
-.ciTh svg {
+.attThumb svg {
   width: 18px;
   height: 18px;
 }
@@ -441,48 +404,79 @@
   object-fit: cover;
 }
 
-.ciL {
+.attMid {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.attType {
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.attName {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  font-size: var(--t-10);
-  font-weight: 600;
+  gap: 5px;
+  font-size: var(--t-12);
+  font-weight: 700;
   color: var(--ink-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Remove × — 18px visual, hit-inflated to ≥44 (.rn-capX). */
-.capX {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 18px;
-  height: 18px;
+.attPoster {
+  font-size: var(--t-10);
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--honey-600);
+  background: var(--honey-100);
+  border-radius: var(--r-pill);
+  padding: 2px 7px;
+  flex: 0 0 auto;
+}
+
+/* Remove × — 24px visual, hit-inflated to ≥44 (a normal flex child, not
+   absolute — the row lays it out at the trailing edge). */
+.attX {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: none;
   padding: 0;
-  background: color-mix(in srgb, var(--ink-900) 72%, transparent);
-  color: var(--paper);
+  background: none;
+  color: var(--muted);
   display: grid;
   place-items: center;
   cursor: pointer;
+  position: relative;
+  flex: 0 0 auto;
 }
 
-.capX svg {
-  width: 9px;
-  height: 9px;
+.attX svg {
+  width: 13px;
+  height: 13px;
 }
 
-.capX::after {
+.attX::after {
   content: "";
   position: absolute;
-  inset: -13px; /* ≥44 hit */
+  inset: -10px;
 }
 
-.capX:focus-visible {
+.attX:hover {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.attX:focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
@@ -518,269 +512,35 @@
   color: var(--honey-600);
 }
 
-/* ── Gallery editor strip (.rn-galEdit / .rn-galItem) — notecard mode ──── */
-
-.galEdit {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-/* NO overflow:hidden here either (same ×-hit-area rule as .capItem) — the
-   full-bleed image clips itself to the rounded corners instead. */
-.galItem {
-  position: relative;
-  width: 72px;
-  height: 56px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  display: grid;
-  place-items: center;
-  background: var(--surface);
-  cursor: grab;
-}
-
-.galItem .ciImg {
-  border-radius: calc(var(--r-sm) - 1px);
-}
-
-.galItem:active {
-  cursor: grabbing;
-}
-
-.galItem:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
-.galItem svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* Poster = gallery[0] — honey outline + tag makes the rule visible. */
-.galItemPoster {
-  outline: 2px solid var(--honey-400);
-  outline-offset: 1px;
-}
-
-.galItemPoster:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
-.giGrip {
-  position: absolute;
-  top: 2px;
-  left: 3px;
-  color: var(--faint);
-  display: inline-flex;
-}
-
-.giGrip svg {
-  width: 10px;
-  height: 12px;
-}
-
-.posterStar {
-  position: absolute;
-  bottom: 2px;
-  left: 3px;
-  font-size: var(--t-10);
-  line-height: 1.1;
-  font-weight: 800;
-  color: var(--honey-600);
-  background: var(--honey-100);
-  border-radius: var(--r-pill);
-  padding: 1px 5px;
-}
-
-/* The dashed "+" add-media tile. */
-.galAdd {
-  width: 72px;
-  height: 56px;
-  border: 1px dashed var(--border);
-  border-radius: var(--r-sm);
-  display: grid;
-  place-items: center;
-  background: var(--surface);
-  color: var(--muted);
-  cursor: pointer;
-  position: relative;
-  transition:
-    border-color 120ms ease,
-    color 120ms ease,
-    background 120ms ease;
-}
-
-.galAdd::after {
-  content: "";
-  position: absolute;
-  inset: -4px; /* tops the 56px visual up past 44 in both axes */
-}
-
-.galAdd svg {
-  width: 16px;
-  height: 16px;
-}
-
-.galAdd:hover {
-  border-color: var(--brand-300);
-  color: var(--brand-600);
-  background: var(--brand-50);
-}
-
-.galAdd:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
-/* The capture engine revealed by the "+" tile (notecard mode). */
-.captureReveal {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  background: var(--surface-warm);
-}
-
-/* ── Status lines (paste confirmation + capture rejections) ────────────── */
-
-.statusWrap {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-}
-
-.pastedStatus {
-  margin: 0;
-  font-size: var(--t-11);
-  color: var(--muted);
-  font-style: italic;
-}
-
-.rejectionStatus {
-  margin: 0;
-  padding: 6px 9px;
-  font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--danger);
-  background: var(--danger-tint);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
-  border-radius: var(--r-md);
-}
-
-/* ── Error strip (.rn-errStrip / .rn-retry) ────────────────────────────── */
-
-.errStrip {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
-  background: var(--danger-tint);
-  border-radius: var(--r-md);
-  padding: 9px 11px;
-  font-size: var(--t-12);
-  color: var(--ink-soft);
-  margin-bottom: 12px;
-}
-
-.warnIcon {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  color: var(--danger);
-}
-
-.retry {
-  margin-left: auto;
-  border: none;
-  background: none;
-  font-family: inherit;
-  font-size: var(--t-12);
-  font-weight: 700;
-  color: var(--danger);
-  min-height: 32px;
-  padding: 0 10px;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  position: relative;
+/* Tiny "has note" dot — informational accent, never a subject color. */
+.noteDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fyi);
   flex: 0 0 auto;
 }
 
-.retry::after {
-  content: "";
-  position: absolute;
-  inset: -6px; /* ≥44 hit */
-}
+/* ── Rich-text note ────────────────────────────────────────────────────── */
 
-.retry:hover {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-.retry:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
-.retry:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ── Fields (.rn-field / .rn-input) ────────────────────────────────────── */
-
-.field {
+.noteBlock {
   margin-top: 14px;
 }
 
-.field:first-child {
-  margin-top: 0;
-}
-
-.field label {
+.noteLabel {
   display: block;
   font-size: var(--t-11);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-400);
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
-.labelAside {
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--faint);
-  font-weight: 600;
-}
-
-.input {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface-warm);
-  padding: 10px 12px;
-  font-size: var(--t-13);
-  color: var(--ink-900);
-  min-height: 44px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 120ms ease;
-}
-
-.input::placeholder {
-  color: var(--faint);
-}
-
-.input:focus-visible {
-  border-color: var(--brand-300);
-}
-
-/* Shell for the rich-text editor so it reads as an input surface; the
-   editor itself (components/rich-text) is consumed unchanged. */
+/* Shell for the rich-text editor so it reads as an input surface; the editor
+   itself (components/rich-text) is consumed unchanged — it owns the sanitizer
+   boundary. */
 .rteShell {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -794,54 +554,12 @@
   border-color: var(--brand-300);
 }
 
-/* ── Per-item note reveal (step 2) ─────────────────────────────────────── */
-
-.noteToggle {
-  margin-top: 10px;
-  border: none;
-  background: none;
-  padding: 0 2px;
-  font-family: inherit;
-  font-size: var(--t-12);
-  font-weight: 600;
-  color: var(--brand-600);
-  min-height: 36px;
-  cursor: pointer;
-  text-align: left;
-  border-radius: var(--r-sm);
-  position: relative;
-}
-
-.noteToggle::after {
-  content: "";
-  position: absolute;
-  inset: -4px 0; /* tops 36px up past 44 */
-}
-
-.noteToggle:hover {
-  color: var(--brand-700);
-}
-
-.noteToggle:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
-.noteEditor {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 10px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  background: var(--surface-warm);
-}
-
+/* Resource mode, >1 item: which captured resource the note attaches to. */
 .notePickRow {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-bottom: 8px;
 }
 
 .notePick {
@@ -871,7 +589,7 @@
 .notePick::after {
   content: "";
   position: absolute;
-  inset: -7px; /* ≥44 hit */
+  inset: -7px;
 }
 
 .notePick:hover {
@@ -890,6 +608,8 @@
 }
 
 .noteFor {
+  display: block;
+  margin-bottom: 6px;
   font-size: var(--t-10);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -905,17 +625,173 @@
   font-size: var(--t-11);
 }
 
-/* Tiny "has note" dot — informational accent, never a subject color. */
-.noteDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--fyi);
+/* ── Status lines (paste confirmation + capture rejections) ────────────── */
+
+.statusWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.pastedStatus {
+  margin: 0;
+  font-size: var(--t-11);
+  color: var(--muted);
+  font-style: italic;
+}
+
+.rejectionStatus {
+  margin: 0;
+  padding: 6px 9px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--danger);
+  background: var(--danger-tint);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  border-radius: var(--r-md);
+}
+
+/* ── Upload error strip (backend upload failure + inline Retry) ─────────── */
+
+.errStrip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  background: var(--danger-tint);
+  border-radius: var(--r-md);
+  padding: 9px 11px;
+  font-size: var(--t-12);
+  color: var(--ink-soft);
+  margin-top: 12px;
+}
+
+.warnIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--danger);
+}
+
+.retry {
+  margin-left: auto;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--danger);
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  position: relative;
   flex: 0 0 auto;
 }
 
-/* ── Routing (.rn-routeRow / .rn-select) ───────────────────────────────── */
+.retry::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.retry:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.retry:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.retry:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Footer (routing + session badge) ──────────────────────────────────── */
+
+.foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-warm);
+  flex: 0 0 auto;
+}
+
+/* RoutingField renders through `.field` — kill its top margin inside the
+   footer so it reads as a compact routing row, not a stacked form field. */
+.foot .field {
+  margin-top: 0;
+}
+
+.sessionRow {
+  display: flex;
+  align-items: center;
+}
+
+/* Quiet "Session only" badge — grey pill + amber dot (calm copy). A real
+   button so tap/click surfaces the one-line explanation. */
+.sessionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: var(--t-11);
+  font-weight: 600;
+  cursor: help;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.sessionBadge::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+}
+
+.sessionBadge:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.sessionDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex: 0 0 auto;
+}
+
+/* ── Fields (shared label recipe — used by RoutingField + note picker) ──── */
+
+.field {
+  margin-top: 14px;
+}
+
+.field:first-child {
+  margin-top: 0;
+}
+
+.field label {
+  display: block;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: 5px;
+}
+
+/* ── Routing (RoutingField / RouteSelect) ──────────────────────────────── */
 
 .routeRow {
   display: flex;
@@ -934,7 +810,7 @@
   gap: 7px;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  background: var(--surface-warm);
+  background: var(--surface);
   padding: 0 11px;
   height: 40px;
   font-family: inherit;
@@ -951,7 +827,7 @@
 .select::after {
   content: "";
   position: absolute;
-  inset: -2px; /* tops 40px up past 44 */
+  inset: -2px;
 }
 
 .select:hover:not(:disabled) {
@@ -963,7 +839,6 @@
   outline-offset: 2px;
 }
 
-/* Locked = routing fixed by the opening context (.rn-select.locked). */
 .selectLocked {
   opacity: 0.6;
   cursor: not-allowed;
@@ -978,7 +853,7 @@
 }
 
 .selV {
-  max-width: 160px;
+  max-width: 140px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1046,7 +921,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-height: 44px; /* ≥44px touch target (BUILD_STANDARD / CLAUDE.md §4) */
+  min-height: 44px;
   transition: background 80ms ease;
 }
 
@@ -1073,73 +948,7 @@
   font-style: italic;
 }
 
-/* ── Foot (.rn-dlgFoot / .rn-sessionBadge / .rn-btn) ───────────────────── */
-
-.dlgFoot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--hairline);
-  background: var(--surface-warm);
-  flex: 0 0 auto;
-}
-
-.footSpacer {
-  margin-left: auto;
-}
-
-/* Quiet "Session only" badge — grey pill + amber dot (P7: calm copy).
-   A real button so tap/click surfaces the one-line explanation. */
-.sessionBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border: none;
-  border-radius: var(--r-pill);
-  background: var(--ink-100);
-  color: var(--ink-soft);
-  font-family: inherit;
-  font-size: var(--t-11);
-  font-weight: 600;
-  cursor: help;
-  position: relative;
-  flex: 0 0 auto;
-}
-
-.sessionBadge::after {
-  content: "";
-  position: absolute;
-  inset: -9px; /* ≥44 hit */
-}
-
-.sessionBadge:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
-.sessionDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--warn);
-  flex: 0 0 auto;
-}
-
-/* Footer buttons — the Button primitive supplies the pill/brand/honey
-   recipe (.rn-btn equivalents); this just normalises padding. */
-.footBtn {
-  padding-left: 24px;
-  padding-right: 24px;
-}
-
-.footChevron {
-  width: 14px;
-  height: 14px;
-}
-
-/* Hidden file input — triggered via .click() from the Upload button. */
+/* Hidden file input — triggered via .click() from the Upload rail tool. */
 .hiddenInput {
   position: absolute;
   width: 1px;
@@ -1192,50 +1001,22 @@
     flex: 0 0 auto;
   }
 
-  .dlgBody {
+  .body {
     padding: 12px;
   }
 
-  /* 2-up capture buttons, laid out as 44px+ rows. */
-  .capRow {
-    grid-template-columns: 1fr 1fr;
+  /* Rail wraps to 3 columns × 2 rows on phone. */
+  .rail {
+    grid-template-columns: repeat(3, 1fr);
   }
 
-  .capBtn {
-    flex-direction: row;
-    justify-content: flex-start;
-    padding: 10px 12px;
-    gap: 8px;
+  /* The 4th–6th tools start a new row: drop their right border on the last
+     column, and the top three keep dividers via the shared rule. */
+  .railTool {
+    border-bottom: 1px solid var(--hairline);
   }
 
-  .capIc {
-    width: 30px;
-    height: 30px;
-  }
-
-  .capS {
-    display: none;
-  }
-
-  /* Stepper compresses to "<current dot>/2". */
-  .stepLabel,
-  .stepArrow {
-    display: none;
-  }
-
-  .stepDot {
-    display: none;
-  }
-
-  .stepDotOn {
-    display: grid;
-  }
-
-  .stepFraction {
-    display: inline;
-  }
-
-  /* Routing selects go full-width stacked; step 2 scrolls. */
+  /* Routing selects go full-width stacked. */
   .routeRow {
     flex-direction: column;
     align-items: stretch;
@@ -1262,10 +1043,8 @@
     max-width: none;
   }
 
-  /* Sticky-feel footer: the foot is a fixed flex child below the
-     scrolling body; the primary action grows to 48px. */
-  .footBtn {
-    min-height: 48px;
+  .publishBtn {
+    min-height: 44px;
   }
 }
 
@@ -1278,14 +1057,27 @@
     animation: none;
   }
 
-  .capBtn,
-  .galAdd,
+  .railTool,
   .input,
   .rteShell,
   .notePick,
-  .noteToggle,
   .select,
   .selectOption {
     transition: none;
   }
+}
+
+/* Visually-hidden text for assistive tech (the WeekGridSkeleton srOnly
+   recipe) — carries the Draw tool's "coming soon" state, which a disabled
+   button's tooltip can never surface to keyboard/AT users. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
