@@ -40,7 +40,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { TODOS, TAG_BY_ID, LESSONS, LESSON_BY_ID } from "@/lib/mock";
 import type { LessonStatus, Subject, SubjectId, Unit } from "@/lib/types";
 import { Button, Tooltip } from "@/components/ui";
-import { DRAWER_MQ } from "@/components/weekly";
+// DELIBERATE DEEP IMPORT (bundle-slim lever A1): this panel mounts on every
+// planner route via app/(planner)/layout.tsx, and it needs exactly ONE
+// constant from the Weekly family. Importing the barrel here dragged the
+// entire weekly+daily+lesson-editor+teach graph (~195 kB gzip) into every
+// planner route's first load — the leaf module exists precisely so this
+// callsite can bypass it (see components/weekly/drawer-mq.ts).
+import { DRAWER_MQ } from "@/components/weekly/drawer-mq";
 import styles from "./right-panel.module.css";
 
 // ── Status display helpers ───────────────────────────────────────────────────

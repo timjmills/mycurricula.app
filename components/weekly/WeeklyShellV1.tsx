@@ -121,6 +121,7 @@ import { WeeklyList } from "@/components/list";
 import { ScheduleTimeline } from "@/components/schedule";
 import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
+import { DRAWER_MQ } from "./drawer-mq";
 import { useAppState } from "@/lib/app-state";
 import {
   WeeklyScheduleProvider,
@@ -475,18 +476,10 @@ function ColumnDragGhost({ id }: { id: PanelId }): ReactNode {
 const NARROW_MQ = "(max-width: 900px)";
 
 // ── W3-C3 — drawer-mode breakpoint ───────────────────────────────────────
-// WeeklyShell.module.css already drops the inline rail to `display: none`
-// at ≤1280px (RES-CRIT-001 — the WeeklyGrid has a 1082px intrinsic
-// min-width so a rail next to it forces document-level horizontal scroll).
-// We mount the overlay drawer at the SAME breakpoint so the rail's content
-// is reachable at every viewport where the inline pane is hidden. The
-// audit's spec ("below ~960px") would leave a 961–1280 dead-zone — fixing
-// that by aligning to the existing CSS hide is the practical answer.
-//
-// Exported: the shell-level <RightPanel> keys its Weekly lesson-detail
-// gate off the SAME breakpoint (drawer owns ≤1280, the shell panel owns
-// wider) so the two surfaces can never mount together.
-export const DRAWER_MQ = "(max-width: 1280px)";
+// The constant lives in the dependency-free leaf ./drawer-mq (bundle-slim
+// lever A1; see that file for the full rationale). Re-exported so this
+// module's public surface is unchanged for existing consumers.
+export { DRAWER_MQ };
 
 // ── WeeklyShell ──────────────────────────────────────────────────────────
 

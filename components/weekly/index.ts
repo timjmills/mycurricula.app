@@ -9,7 +9,13 @@ export type { SaveTargetDialogProps } from "./save-target-dialog";
 // The Weekly view's 3-panel shell — icon rail + grid + right rail. Wraps
 // the existing <WeeklyGrid> unchanged in the center slot and reuses the
 // Daily-view IconRail + RightRail + PaneSplitter.
-export { WeeklyShell, DRAWER_MQ } from "./WeeklyShell";
+export { WeeklyShell } from "./WeeklyShell";
+// The rail-drawer breakpoint — a dependency-free leaf (bundle-slim lever
+// A1). Layout-graph consumers (components/shell/right-panel.tsx) import
+// ./drawer-mq DIRECTLY, never this barrel: with `sideEffects` unset,
+// importing the barrel keeps the whole weekly+daily+editor subtree in the
+// consumer's chunk graph even when only the constant is used.
+export { DRAWER_MQ } from "./drawer-mq";
 // v1 fallback shell (the pre-v2 3-panel Week: icon rail + WeeklyGrid + right
 // rail) — mounted by the weekly route when NEXT_PUBLIC_V2 is OFF. Verbatim copy
 // of master's WeeklyShell (live-on-prod v1), styled by WeeklyShellV1.module.css.
