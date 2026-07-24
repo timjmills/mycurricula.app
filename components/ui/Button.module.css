@@ -257,16 +257,25 @@
 
 /* destructive — catchup-tinted fill, on-solid ink. Archive/Delete. Danger is
    semantic and NOT theme-recoloured; only the shadow follows the crisp
-   neutral scale. */
+   neutral scale.
+
+   MIXED TOWARD BLACK, NOT WHITE. The fill used to be `--catchup` lightened 15%
+   toward white, which put white label text at 3.48:1 — an AA failure (needs 4.5)
+   on the one button class where misreading the label is most expensive, since
+   these are the archive and delete actions. Raw `--catchup` does not rescue it
+   either, at 4.21:1; the hue is simply too light for white text until it is
+   darkened. Darkening keeps danger semantic and un-theme-recoloured while making
+   the label legible: ~4.9:1 at rest, ~5.7:1 on hover (hover goes DARKER, so the
+   contrast improves as the pointer lands rather than degrading). */
 .btn.destructive {
-  background: color-mix(in srgb, var(--catchup) 85%, white);
+  background: color-mix(in srgb, var(--catchup) 92%, black);
   color: var(--on-solid);
   border-color: transparent;
   box-shadow: var(--sh-sm);
 }
 
 .btn.destructive:hover:not(:disabled) {
-  background: var(--catchup);
+  background: color-mix(in srgb, var(--catchup) 84%, black);
   box-shadow: var(--sh-md);
   transform: translateY(-1px);
 }
