@@ -3327,3 +3327,146 @@ Everything from this mega-session is committed + pushed. Master is **0/0 with or
 - B-series next = **B3 (Assessments/Insights + tabs→drawer)** — now UNBLOCKED (was queued behind B2's shared seam). Rulings already locked: Option B (no-prep), Refine excluded, tabs→drawer.
 - The B1.7 + B2 Track-B **read wiring** rides ONE shared **§4c flag-ON preview gate** before any promote. Migration `20260728120000` is ALREADY applied on prod (additive). NO further DDL. Flag-OFF locally = mock path (what §4b tested).
 - User is opening a NEW terminal to continue. Start B3 with an agent team per the standing directive.
+
+---
+
+## [Main/orchestrator 7.24 pt10] 🚩 CLAIM — B3 (Assessments · Insights · context drawer) STARTED
+
+New terminal, master `20c4ac8` (clean, 0/0 with origin). Starting B3 with an agent team per
+the standing directive. Claiming: `components/year-v2/**` (ExplorerShell/UnitExplorer/
+unit-tabs/rail), `components/lesson-plan-v2/**`, and the B3-new files. Siblings: flag before
+touching those.
+
+**USER RULINGS RE-CONFIRMED THIS SESSION (they supersede the log's shorthand):**
+1. **tabs→drawer = drawer, NOT new tabs.** Assessments + Insights render as panels in the new
+   right-hand **context drawer**. The tab strip STAYS at its current 5 (Unit Plan · Lessons ·
+   Standards · Resources · Notes). No 6th/7th tab. (The old "no dead tabs ever" rule holds.)
+2. **"Option B (no-prep)" is WITHDRAWN by the user.** New ruling verbatim: *"have the
+   prep/materials surface as an option, also assessments tagged to lessons and units. But no
+   need for assessment prep."* → (a) prep/materials surface IS in scope, as an option;
+   (b) assessments attach to **units as well as lessons** (B2 shipped lesson-level only —
+   unit-level linkage is NEW and may need DDL, which is orchestrator+user only, under a
+   separate GO); (c) NO assessment-prep authoring flow (no blueprint/rubric/item-bank builder).
+3. **Refine tab remains EXCLUDED** from B3.
+
+**Recon in flight (2 read-only agents):** handoff-prototype spec recon
+(`Documents/Claude Design/7.21.26 Design Handoff Update/source-planning-hub/ph-workspace.jsx`
++ `ph-v2.css`) and codebase-seam recon (shell props, B2 assessment persistence, free Insights
+inputs, the `done`/`cu_handled` columns adjudicated to B3, loading-honesty pattern, house traps).
+
+**Standing rules carried:** agents NEVER stage/commit and NEVER touch the prod DB; reported
+artifacts verified on disk before belief; `git commit -- <paths>` only; both gates (§4a Codex
+read-only + §4b live QA) before any commit; land on master fast.
+
+---
+
+## [Main/orchestrator 7.24 pt11] ✅ B3 commit-1 §4a CLEAN (8 rounds) — awaiting §4b; commit-2 gated on USER apply
+
+**Shape:** B3 lands as TWO commits. Commit-1 = the zero-DDL half (drawer + Insights +
+lesson-assessment roll-up + Prep). Commit-2 = the `unit_assessments` table + seam, which
+CANNOT land until the USER runs the apply (agents/orchestrator never apply unasked).
+
+**USER RULING CHANGE (supersedes "Option B no-prep"):** prep/materials surface IS in scope;
+assessments tag to **units as well as lessons**; no assessment-prep authoring flow. The
+user then chose the **`unit_assessments` TABLE** (many per unit) over 4 columns on `units` —
+the biggest option, chosen knowingly after I flagged the cost.
+
+**Commit-1 (staged, 19 files, tsc/lint clean · 1010 tests · build passed):**
+`ExplorerShell` gains a `drawer`/`drawerOpen`/`drawerLabel` slot mirroring `rail` (mounted
+always, revealed by CSS — no remount, so body scroll + focus survive the toggle); wrapper
+condition widened to `rail || drawer` so a drawer-without-rail host still renders.
+`UnitContextDrawer` = pane switcher (Assessments·Insights·Prep). `lib/unit-insights.ts` +
+panels. `--assess-summative` token pair (the handoff shipped that purple as raw hex ×10).
+Drawer prefs in `lib/workspace-prefs.ts`.
+
+**Bugs found + fixed DURING the wave (not shipped):**
+- **Latent a11y, pre-existing:** ExplorerShell's focus trap queried the whole panel, and
+  `querySelectorAll` matches inside `display:none`. The rail was already mounted-but-hidden;
+  a hidden drawer could have become the trap's last boundary → `focus()` no-ops while Tab is
+  already `preventDefault`ed = dead stop. Now filtered by `getClientRects().length`.
+- **HIGH (pre-existing, B2 shipped it):** lesson FIELD writes went through the unordered
+  fire-and-forget `persist()` tee — typing "Quiz" could persist "Qu". W3.8 fixed this for
+  SECTIONS only. Now serialized via NEW `lib/planner/serial-write-queue.ts` (latest-wins,
+  one in-flight per key, 12 tests). **Keyed per lesson+field, never per lesson** — an
+  `updateLesson` payload is a PARTIAL patch, so a per-lesson slot would let a newer
+  `{assessment}` evict a pending `{title}` and lose an unrelated edit.
+- **HIGH (mine, caught by the gate):** first cut keyed the queue by the caller's coalesce
+  string and captured `lessonId` in the drain closure → two lessons sharing a key could
+  cross-write. Fixed structurally: the payload carries its own target.
+- **Standards identity:** codes are unique only PER framework (AERO/WIDA both "S1"), so
+  grouping by code merged two different standards and UNDERSTATED reach. Now grouped by
+  `Lesson.standardIds` uuid with a `code:` fallback, counted once per lesson, and keyed in
+  React by identity (duplicate keys otherwise).
+- **False-empty:** InsightsPanel wasn't passed `dataState` → "No lessons in this unit yet"
+  during the 11–16s hydrate. Also reordered so readiness is consulted ONLY when there is
+  nothing to show, so a failed background refresh can't blank metrics being read.
+- **Draft clobber:** AssessmentsPanel's `onBlurCapture` cleared its editing guard when focus
+  moved Title→Purpose, letting an external update reseed the draft mid-typing.
+- Sync-throw in `send` wedged a queue key forever; now routed through `onError`.
+
+**Codex findings DISMISSED with reason:** (1) "persistence failures invisible" — pre-existing
+and documented at `planner-store.tsx` ~2481 (ConsequenceToastProvider mounts as a CHILD of
+PlannerProvider, so no toast is reachable there); app-wide, not a B3 defect. (2) "staging
+boundary incomplete" — FALSE: `LessonAssessment`, the Lesson Track-B fields and
+`trackBArgsFromRow` are all already on HEAD (B2, `ea75868`), and no commit-1 file references
+the unit-assessments lane. Verified against `git show HEAD:`.
+
+**Migration `20260729120000_unit_assessments.sql` is AUTHORED + UNAPPLIED.** I reviewed every
+citation against the real schema: its RLS mirrors `units` exactly (`units_read` =
+`can_read_grade`, `units_write` = `can_edit_subject_master OR is_grade_lead`,
+initial_schema.sql:1306-1311) resolved through the parent FK; RLS enabled AND `anon` revoked
+(grants, not just policies); the reorder RPC is `security invoker` with
+`search_path = public, pg_temp` (pg_temp named LAST — the repo's known Critical) and the seam
+THROWS on a zero row-count instead of reporting false success.
+
+**TRAPS for the next session:**
+- **NEVER run prettier here.** The repo predates the installed 3.9.5, whose union wrapping
+  changed; master's OWN files fail `--check`, and `--write` rewrites unrelated declarations.
+  Gate on tsc/lint/test. See [[prettier-version-drift-churn]].
+- **Do NOT `git stash` in this tree.** `--include-untracked` hits `Permission denied` on
+  `Documents/Books and Articles/` and half-completes, leaving tracked edits in place while
+  untracked new files vanish. I hit this; recovered via `stash pop`. A stash entry
+  `b3-c2-datalane-holdout` is LEFT IN PLACE as a redundant snapshot — everything in it is
+  also in the tree.
+
+---
+
+## [Main/orchestrator 7.24 pt12] 🚀 B3 COMMIT-1 SHIPPED to master (`9a9c2c1`, pushed 0/0)
+
+Both gates passed before the commit. §4a Codex → **NO BLOCKING ISSUES** after 8 rounds;
+§4b live QA in real Chrome (375 via isMobile+DSF, 768, 1440, light + dark tone).
+
+**§4b found 1 CRITICAL + 1 MAJOR — both FIXED and RE-MEASURED before commit:**
+- **CRITICAL, unit-modal header at 375.** Title rendered **19 lines of one character**;
+  header ate **79.3%** of an 812px viewport vs the §4 ≤30% contract. Pre-existing, but B3's
+  extra button tripled it (QA measured the counterfactual: 19 lines with the toggle → 5
+  without → 2 with the whole cluster hidden). ROOT CAUSE was subtler than crowding:
+  `.htitle`'s `overflow-wrap: anywhere` makes the browser treat **ONE CHARACTER** as the
+  title's min-content width, so `min-width: 0` was a *legitimate* collapse to 19px. Fixed
+  with `.head{flex-wrap:wrap}` + `.htext{flex:1 1 12rem}` + `overflow-wrap:break-word`.
+  **Re-measured: 136.8px = 16.8%, title 1 line, cluster wrapped to its own row, nothing
+  hidden.** Desktop proven unregressed (1440 + 768 both still 80px, 1 line, unwrapped).
+- **MAJOR, `--warn` AA.** The Insights attention figure measured **2.00:1** on every light
+  tone (needs 4.5). Raw `--warn` is a FILL colour used as text with no tone branch — a
+  direct §4 legibility-contract violation. New tone-branched **`--warn-ink`** token (light =
+  hue darkened via color-mix; dark = raw `--warn`, already 6.4:1). **Re-measured 7.96:1
+  light / 6.39:1 dark.** `.meterFill` deliberately keeps raw `--warn` — it's a background.
+- **MINOR deferred with reasoning:** kind dots 2.98:1 / 2.59:1 vs the 3:1 non-text bar.
+  Colour is redundant with the FORMATIVE/SUMMATIVE text headings so nothing is lost, and
+  re-toning risks making the distinction harder. Revisit only if the dots ever become the
+  sole carrier of kind.
+
+**Both §4a fixes verified live:** 60 Tabs with the drawer open → 0 escapes, 0 invisible
+focus targets; 50 Tabs closed → 0 landings in the hidden drawer; closing via the drawer's ✕
+returns focus to the toggle. Assessments title survives Title→Purpose tabbing.
+
+**LIMIT ON WHAT THIS CERTIFIES:** `NEXT_PUBLIC_PLANNER_USE_SUPABASE` is off locally, so
+assessment add/edit/remove exercised the **in-memory reducer only**. The Supabase write path
+is UNTESTED and still rides the shared **§4c flag-ON preview gate**.
+
+**STILL PENDING — commit 2 (`unit_assessments`):** migration `20260729120000` is AUTHORED,
+REVIEWED, and **UNAPPLIED**. Its seam (`lib/planner/{source,supabase-source,mock-source}.ts`
++ `unit-assessments.ts`), `lib/types.ts`'s `UnitAssessment`, and `tests/unit-assessments.test.ts`
+are UNCOMMITTED in the tree, waiting on the USER's apply GO. Per the apply-coupled rule,
+that code ships AFTER the apply, not before. QA-REPORT-b3.md + 39 screenshots are working
+artifacts (uncommitted by design).
