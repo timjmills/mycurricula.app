@@ -3470,3 +3470,65 @@ REVIEWED, and **UNAPPLIED**. Its seam (`lib/planner/{source,supabase-source,mock
 are UNCOMMITTED in the tree, waiting on the USER's apply GO. Per the apply-coupled rule,
 that code ships AFTER the apply, not before. QA-REPORT-b3.md + 39 screenshots are working
 artifacts (uncommitted by design).
+
+---
+
+## [Main/orchestrator 7.25 pt13] ✅✅ B3 COMPLETE — 6 commits on master, all pushed
+
+`9a9c2c1` drawer · `9631355` unit_assessments data layer · `3f390da` lesson-editor data-loss
+fix · `8c1ebe4` post-merge audit fixes · `52fdc36` unit-owned assessments UI + audit fixes.
+(`3ed4f8d` = the pt12 log.) Master 0/0 with origin.
+
+**Migrations 20260729120000 / 130000 / 140000 are APPLIED + VERIFIED on prod** under the
+user's explicit GO. Verified after each: RLS on, `anon` has NO table grants and NO RPC
+execute, policies are SELECT/INSERT/UPDATE/DELETE + claude_admin_all, columns/index/trigger
+exact, history repaired.
+
+**TWO INDEPENDENT AUDITS ran after the first commits landed and both earned their keep.**
+Everything below survived §4a AND §4b and was found only by a third reader:
+- **DATA LOSS, latent since B2.** The lesson editor collapsed "assessment with text but no
+  kind" into "None", HID the fields, and — `ToggleGroup` fires onChange even for the
+  already-selected option — destroyed the text on one click, invisibly. Fixed by teaching
+  the editor the state it could already be handed (a 4th "Not set" choice).
+- **A throwing `onError` wedged the write queue forever** (`.catch(h).then(settle)` skips
+  settle when h throws) → every later edit to that lesson+field silently dropped.
+- **Stale standard uuids merged two standards into one row with a DOUBLED count.** Three
+  write sites omitted `standardIds` when the picker couldn't resolve ids; the reducer merges
+  shallowly, so old uuids sat beside new codes. Insights groups by uuid.
+- **Migration locks guarded the WRONG schema** — read only the first of three files, so they
+  asserted a `for all` policy that 140000 DROPS. Green while prod differed.
+- **"Needs attention" claimed "No resources"** for lessons whose resources live on SECTIONS
+  (the canonical half) — in the one panel whose entire premise is not lying to teachers.
+- Full-presentation drawer starved the body at ≤900px (`flex: 0 0 auto` cannot shrink in a
+  column); the first QA pass missed it because it only exercised the MODAL presentation.
+
+**Five concurrency defects in the unit-assessments UI** (per-row autosaves racing unit-level
+ops that replace the whole row set) — see `52fdc36`'s message. One was mine: adding the drain
+barrier moved the `canEdit` check before an await, so a mid-drain switch to Personal would
+still have written team content.
+
+**DURABLE LESSONS**
+- **Cross-surface bugs are invisible to both gates.** The data-loss bug existed because two
+  surfaces were each correct ALONE and disagreed across a hand-off. Neither a diff review nor
+  a live pass of one surface can see that. Run an independent reader over the whole feature.
+- **A test can guard the wrong thing and stay green.** Pin migration locks to EVERY file that
+  defines the object, and scope counting assertions to the newest one.
+- **Verify audit claims before acting.** Two were wrong (a "lint warning" that doesn't exist;
+  a callsite that was already correct) — both read off a stale tree in a 4-agent worktree.
+- **NEVER `git stash` here** (`Permission denied` on `Documents/Books and Articles/` leaves it
+  half-done) and **NEVER run prettier** — see [[prettier-version-drift-churn]].
+
+**OPEN, carried forward:**
+1. **§4c flag-ON preview gate** — B1.7 + B2 + B3 write paths are ALL unexercised against real
+   Supabase (planner flag off locally). One shared gate covers them.
+2. **REACHABILITY GAP (B5's real value, not cleanup):** `/daily` and `/weekly` have **NO path
+   to the unit workspace** — unit names are inert `<div>`s on every v2 day/week frame, and
+   `/weekly` doesn't render one at all. `/year`'s **paper** frame never mounts UnitExplorer
+   either. So the whole B3 drawer is reachable only from /year glass/color and /planner.
+3. **B5 recon facts:** `UnitDrawer` is fully orphaned (zero-risk delete). `/subject` deletion
+   needs 3 edits — `tests/subject-redirect.test.ts` is in the CI deploy gate,
+   `components/home/rows.tsx:207` is a LIVE user-reachable `/subject` link that would 404,
+   and `buildSubjectLink` is dead code. **`TimelineYear` is NOT deletable** — it is the
+   v2-flag-OFF production path AND the paper frame.
+4. Unit-standards editor still unbuilt (a locked USER DECISION) — so Insights' standards
+   metric reports lesson-tag reach, not unit↔standards coverage.
