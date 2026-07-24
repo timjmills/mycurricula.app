@@ -15,11 +15,11 @@
 //     openers never re-render when the composer state changes.
 //   • STATE  — the live ComposerState. Consumed ONLY by ComposerHost.
 //
-// DORMANCY (B4.0 contract): nothing calls the actions in this tranche and no
-// existing <ResourceComposer> callsite has migrated, so `state` stays
-// {composer:null, resMenu:null} and ComposerHost renders nothing. Adding this
-// provider therefore emits zero DOM and cannot change any surface's behavior —
-// it is purely latent wiring for the B4.3+ host migrations.
+// USAGE: the planner surfaces open the shared composer via useComposer()
+// .openComposer()/.openResMenu() — the declarative <ResourceComposer> mounts in
+// ResourcesPanel / lesson-flow / LessonEditor were migrated to this singleton
+// in B4.3 (fd4d56d). `state` stays {composer:null, resMenu:null} until an
+// opener fires, so ComposerHost renders nothing at rest (zero DOM idle).
 
 import {
   createContext,
