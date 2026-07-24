@@ -37,7 +37,13 @@ import { dateNumberForWeekDay } from "@/lib/mock/calendar";
 import { useAppState } from "@/lib/app-state";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { todayColumnIndex } from "@/lib/now-anchor";
-import { NowLine } from "@/components/daily";
+// DELIBERATE DEEP IMPORT (bundle-slim lever A3): the schedule timeline is in
+// the (planner) layout's client graph on every route (shell GlobalRail →
+// ScheduleTimeline side panel), and NowLine is the ONLY runtime value it
+// needs from the Daily family. Importing the daily BARREL here kept the
+// entire daily+lesson-editor+teach graph (~150 kB gzip) in every planner
+// route's first load; NowLine.tsx itself is a light leaf (lib-only imports).
+import { NowLine } from "@/components/daily/NowLine";
 import { ScheduleBlock } from "./ScheduleBlock";
 import styles from "./ScheduleColumn.module.css";
 
