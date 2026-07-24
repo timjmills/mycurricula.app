@@ -83,23 +83,44 @@ export const INSIGHT_CATEGORY_LABELS: Record<InsightCategory, string> = {
 // ── The hero pool (lazy — header note, PERF SPLIT part 2) ────────────────
 
 // Cached in-flight/settled promise so the async chunk is fetched at most
-// once per session; every later call resolves from memory. On a FAILED
-// fetch the cache is cleared so a later mount can retry (a permanently
-// cached failure would silence the quote for the whole session over one
-// flaky request).
+// once per session; every later call resolves from memory. A FAILED fetch
+// is retried once in-loader (below) — ChromeQuote is layout-mounted and
+// never remounts across navigations, so without the in-loader retry one
+// flaky request at app start would silence the quote for the whole
+// session (§4a finding). After the final failure the cache is cleared so
+// any LATER mount (e.g. /home's HomeHero) still gets a fresh attempt.
 let heroPoolPromise: Promise<Insight[]> | null = null;
+
+/** One retry, short delay — enough to ride out a transient network blip
+ *  without turning a hard outage into a hang. */
+const HERO_RETRY_DELAY_MS = 1_500;
+
+function importHeroPool(): Promise<Insight[]> {
+  return import("./insights.hero.json").then(
+    (mod) => mod.default as Insight[],
+  );
+}
 
 function loadHeroPool(): Promise<Insight[]> {
   if (heroPoolPromise === null) {
-    heroPoolPromise = import("./insights.hero.json")
-      .then((mod) => mod.default as Insight[])
-      .catch(() => {
-        // Chunk fetch failed (offline, deploy skew) — degrade to an empty
-        // pool (the quote surfaces render nothing, matching their pre-mount
-        // state) and allow a retry on the next call.
-        heroPoolPromise = null;
-        return [];
-      });
+    heroPoolPromise = importHeroPool().catch(
+      () =>
+        // First fetch failed (offline blip, deploy skew) — retry once after
+        // a short delay before giving up for this call.
+        new Promise<Insight[]>((resolve) => {
+          setTimeout(() => {
+            importHeroPool()
+              .then(resolve)
+              .catch(() => {
+                // Still failing — degrade to an empty pool (the quote
+                // surfaces render nothing, matching their pre-mount state)
+                // and clear the cache so a later mount can retry.
+                heroPoolPromise = null;
+                resolve([]);
+              });
+          }, HERO_RETRY_DELAY_MS);
+        }),
+    );
   }
   return heroPoolPromise;
 }
