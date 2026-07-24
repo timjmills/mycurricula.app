@@ -91,6 +91,11 @@ jobs:
           NEXT_PUBLIC_TEACH_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_TEACH_USE_SUPABASE }}
           NEXT_PUBLIC_PLANNER_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_PLANNER_USE_SUPABASE }}
           NEXT_PUBLIC_THEME_SYNC: ${{ secrets.NEXT_PUBLIC_THEME_SYNC }}
+          # Multi-workspace tenancy (unified plan §0 enable cutover, 2026-07-24).
+          # Build-inlined like the rest; sourced from a repository variable so a
+          # rollback is "flip the variable + re-run" (a redeploy), not a commit.
+          # Unset/empty = OFF (the pre-cutover flag-OFF build).
+          NEXT_PUBLIC_MULTI_WORKSPACE: ${{ vars.NEXT_PUBLIC_MULTI_WORKSPACE || '' }}
           # v2 redesign shell/router gate (plan §0.1). INLINED into the artifact
           # by `next build`, so a rollback is a REBUILD — a Worker env change has
           # no effect. Sourced from a repository variable so a flip is "change the
