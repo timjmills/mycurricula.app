@@ -72,7 +72,7 @@ import {
   describeStandard as mockDescribeStandard,
 } from "@/lib/mock";
 import { useAppState } from "@/lib/app-state";
-import { snapshotRestorePatch } from "@/lib/fork-diff";
+import { snapshotRestorePatch } from "@/lib/fork-diff-restore";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { plannerClient } from "@/lib/planner/client";
 import { resolveGrade } from "@/lib/planner/grade";

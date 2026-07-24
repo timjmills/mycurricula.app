@@ -124,28 +124,11 @@ export function stripToText(value: string): string {
 
 // ── Whole-lesson restore patch ──────────────────────────────────────────────
 
-/**
- * The content fields the store's `restoreLesson` reducer writes back when
- * reverting a fork to the team's version — exactly the snapshot-captured
- * Lesson fields (title, objective, preview, standards). Placement (day/week)
- * is deliberately NOT included: the reducer routes placement through its
- * moveLesson delegation so CellLayout pruning and moved-flag handling stay
- * consistent with every other move. Pure and unit-tested here; the
- * planner-store reducer is the consumer.
- */
-export function snapshotRestorePatch(
-  snapshot: LessonMasterSnapshot,
-): Pick<Lesson, "title" | "objective" | "preview" | "standards"> {
-  return {
-    title: snapshot.title,
-    objective: snapshot.objective,
-    preview: snapshot.preview,
-    // Fresh array — the restored lesson must never share the snapshot's
-    // array identity (a later in-place standards edit would silently
-    // corrupt the captured master values).
-    standards: [...snapshot.standards],
-  };
-}
+// snapshotRestorePatch moved to lib/fork-diff-restore.ts (a sanitizer-free
+// leaf) so the planner store's import doesn't pull this module's
+// sanitize-html → linkedom chain into the (planner) layout graph. Re-exported
+// here so existing consumers (tests, any future diff callers) keep working.
+export { snapshotRestorePatch } from "./fork-diff-restore";
 
 // ── Compare-request event (M6) ──────────────────────────────────────────────
 
