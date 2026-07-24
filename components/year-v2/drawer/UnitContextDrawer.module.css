@@ -1,0 +1,114 @@
+/* UnitContextDrawer.module.css — chrome for the right context drawer (B3).
+ *
+ * Consumes the --ue-* accents declared on ExplorerShell's `.modal` root, which
+ * inherit down into the drawer slot (see that file's header). Tokens only — no
+ * hex literals, no px font sizes outside the token scale.
+ *
+ * Every button rule is DOUBLED (.foo.foo, 0-2-0). app/tokens.css carries a
+ * `.cp-root button` reset at (0,1,1) that strips padding/border/background, and
+ * this subtree portals into .cp-root. A single-class rule here would be silently
+ * overridden — and so would a single-class @media override of a doubled base. */
+
+/* ── Head — pane switcher + close ───────────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--ue-hairline);
+  background: var(--ue-tint-soft);
+  flex: 0 0 auto;
+  /* The drawer body scrolls under this, so the switcher stays reachable in a
+     long Insights list without a scroll back to the top. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.panes {
+  display: flex;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.pane.pane {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 12px 10px;
+  font-size: var(--t-13, 13px);
+  font-weight: 700;
+  color: var(--ink-500, #6e6c82);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -1px;
+  transition:
+    color 0.14s,
+    border-color 0.14s;
+}
+.pane.pane:hover {
+  color: var(--cd, var(--ink, #1c1b2e));
+}
+.paneOn.paneOn {
+  color: var(--cd, var(--ink, #1c1b2e));
+  border-bottom-color: var(--c);
+}
+.pane.pane:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: -2px;
+  border-radius: var(--r-8, 7px);
+}
+
+.close.close {
+  appearance: none;
+  border: none;
+  background: none;
+  align-self: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: var(--r-full, 999px);
+  color: var(--ink-500, #6e6c82);
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s;
+}
+.close.close:hover {
+  background: var(--ue-tint-hover);
+  color: var(--cd, var(--ink, #1c1b2e));
+}
+.close.close:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: 2px;
+}
+.close.close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Pane body — the drawer's own scroll region ─────────────────────────── */
+.paneBody {
+  padding: 16px 12px 24px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
+/* Doubled to match the doubled bases above. */
+@media (pointer: coarse), (max-width: 900px) {
+  .pane.pane {
+    padding-top: 15px;
+    padding-bottom: 15px;
+  }
+  .close.close {
+    width: 44px;
+    height: 44px;
+  }
+}

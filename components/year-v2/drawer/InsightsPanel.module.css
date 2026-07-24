@@ -1,0 +1,252 @@
+/* InsightsPanel.module.css — Unit drawer › Insights (B3).
+ *
+ * NARROW-FIRST. The drawer is ~320px on desktop and a full-width band below
+ * 900px, so every metric is a single column: heading, figure, optional meter,
+ * optional sub-counts. Nothing here has a fixed width or assumes a wide pane —
+ * the only wrapping list is the standards pills.
+ *
+ * TONE, NOT THEME. Every color is a token that already re-declares itself on the
+ * `[data-tone="dark"]` path in app/tokens.css (--surface, --surface-warm,
+ * --ink-*, --border, --hairline, --warn, --warn-tint). Branching on a theme
+ * would break the other six; branching on tone is done FOR us by the tokens.
+ * The prototype's `--phx-*` tier is deliberately NOT carried across — it
+ * branches on `data-bg`, which inverts under Photo-Bright. Zero hex literals,
+ * zero px font sizes.
+ *
+ * SEVERITY IS ONE TIER, AND IT IS --warn. "Needs attention" (a not-yet-taught
+ * lesson missing an objective / resources / standards) is the only state here
+ * worth flagging, and it is a to-do, not a failure. --danger is intentionally
+ * unused: no metric on this panel has a failure condition, and inventing a
+ * threshold to justify a red would be a fabricated severity — the same class of
+ * mistake as the fabricated numbers this panel exists to replace. The
+ * prototype's pink (#E8629C) is NOT used: it is 4° off the Team-caution glow
+ * (#E8179B, --subj-5-bright), which means "editing this changes the whole
+ * team's curriculum" — a read-only metrics panel must never borrow it.
+ *
+ * TYPE TIERS. Every piece of reading text and every figure is --t-13 or larger,
+ * so no number and no qualifying sentence is ever set smaller than body text —
+ * a denominator rendered smaller than the value it qualifies is how an honest
+ * "5 of 8" starts reading as "5". The ONE exception is `.metricHead`, the
+ * uppercase letter-spaced section label at --t-11: that is the established label
+ * tier for this exact drawer (AssessmentsPanel's `.groupLabel`, and tokens.css
+ * designates --t-11 for it), and setting it to --t-13 would make the Insights
+ * pane visibly disagree with the Assessments pane beside it in the same switcher.
+ *
+ * CP-ROOT RESET. The drawer renders inside `.cp-root`, whose `.cp-root button`
+ * reset is (0,1,1) and silently strips padding / border / background from a
+ * single-class rule. This panel hand-rolls NO buttons — the one control is the
+ * `components/ui/Button` primitive, which carries its own doubled `.btn`
+ * qualification. Any button rule added here later must be DOUBLED (`.foo.foo`,
+ * 0-2-0), including inside @media, where a single-class override would lose to
+ * its own doubled base. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* ── Metric section ─────────────────────────────────────────────────────────── */
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+.metric:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* A heading, not a styled paragraph — the panel is a list of named metrics and
+   should read as one in the accessibility tree. Focusable so the tooltip
+   reaches the keyboard (CLAUDE.md §4). */
+.metricHead {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.metricHead:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: 3px;
+  border-radius: var(--r-xs, 6px);
+}
+
+/* ── Figure — the headline number and the sentence that qualifies it ────────── */
+
+/* Column, not a row: the caption ALWAYS renders under the value at any width, so
+   a number can never be read without its denominator beside it. */
+.figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  min-width: 0;
+}
+
+.figureValue {
+  font-size: var(--t-18);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ink-900);
+  overflow-wrap: anywhere;
+}
+.figureValue[data-tone-accent="warn"] {
+  /* TEXT gets --warn-ink, which is tone-branched. Raw --warn is a fill colour and
+     measures ~2.0:1 on a light surface — an AA failure on the one number in this
+     panel that is trying to get the teacher's attention. */
+  color: var(--warn-ink);
+}
+
+.figureCaption {
+  font-size: var(--t-13);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink-500);
+  text-wrap: pretty;
+}
+
+/* ── Meter — decorative proportion bar (aria-hidden in the TSX) ─────────────── */
+
+.meter {
+  width: 100%;
+  min-width: 0;
+  height: 6px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--hairline);
+  overflow: hidden;
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill, 999px);
+  background: var(--ink-400);
+  transition: width 0.24s ease;
+}
+.meterFill[data-tone-accent="warn"] {
+  background: var(--warn);
+}
+@media (prefers-reduced-motion: reduce) {
+  .meterFill {
+    transition: none;
+  }
+}
+
+/* ── Breakdown — sub-counts under a figure ──────────────────────────────────── */
+
+.breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.breakdownRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.breakdownLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-700);
+  overflow-wrap: anywhere;
+}
+.breakdownLabel:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: 2px;
+  border-radius: var(--r-xs, 6px);
+}
+
+.breakdownValue {
+  flex: 0 0 auto;
+  min-width: 24px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--hairline);
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-700);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Unavailable — the honesty state ────────────────────────────────────────── */
+
+/* A metric with no backing data says so in a sentence. It gets a tinted card
+   rather than muted grey text so it reads as a deliberate statement, not as a
+   disabled or still-loading row a teacher would scroll past assuming a zero. */
+.unavailable {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 14px);
+  background: var(--surface-warm);
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--ink-500);
+  text-wrap: pretty;
+}
+
+/* Settled-but-notable prose (a real content note, never a loading state). */
+.note {
+  margin: 0;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--ink-500);
+  text-wrap: pretty;
+}
+
+/* ── Standards codes ────────────────────────────────────────────────────────── */
+
+.codes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+/* Pill and its count on one row; the pill may wrap its own text at 320px, so the
+   count is pinned and the pill takes the slack. */
+.codeItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.codeItem > :first-child {
+  min-width: 0;
+}
+
+.codeHits {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-500);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.moreSlot {
+  display: flex;
+}

@@ -15,7 +15,7 @@
 // while still returning the default on the server. A storage listener keeps two
 // open tabs in sync.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ExplorerPresentation } from "@/components/year-v2/ExplorerShell";
 
 /** The persisted workspace presentation — the ⤢ toggle's two states. */
@@ -86,4 +86,112 @@ export function useWorkspacePresentation(): WorkspacePresentationPref {
     setPresentation,
     toggle: () => setPresentation(presentation === "full" ? "modal" : "full"),
   };
+}
+
+// ── Context drawer (B3) ────────────────────────────────────────────────────
+
+/** The right context drawer's panes — commentary ABOUT the unit, kept out of
+ *  the tab strip (which lists the unit's parts). */
+export type WorkspaceDrawerPane = "assessments" | "insights" | "prep";
+
+const DRAWER_OPEN_KEY = "mycurricula:user:workspace-drawer-open";
+const DRAWER_PANE_KEY = "mycurricula:user:workspace-drawer-pane";
+const DRAWER_PANES: readonly WorkspaceDrawerPane[] = [
+  "assessments",
+  "insights",
+  "prep",
+];
+/** Closed by default: the drawer is a deliberate second read, and opening it
+ *  unasked would narrow the lesson list for teachers who never wanted it. */
+const DEFAULT_DRAWER_OPEN = false;
+const DEFAULT_DRAWER_PANE: WorkspaceDrawerPane = "assessments";
+
+/** Persist one drawer key. A blocked localStorage (private mode, quota) is
+ *  swallowed — the in-memory state still drives this session. */
+function writeDrawerPref(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* non-persistent this session; ignore */
+  }
+}
+
+function isDrawerPane(v: unknown): v is WorkspaceDrawerPane {
+  return (
+    typeof v === "string" && DRAWER_PANES.includes(v as WorkspaceDrawerPane)
+  );
+}
+
+/** Read the stored drawer state. SSR-safe; corrupt values fall back. */
+export function readWorkspaceDrawer(): {
+  open: boolean;
+  pane: WorkspaceDrawerPane;
+} {
+  if (typeof window === "undefined") {
+    return { open: DEFAULT_DRAWER_OPEN, pane: DEFAULT_DRAWER_PANE };
+  }
+  try {
+    const open = window.localStorage.getItem(DRAWER_OPEN_KEY);
+    const pane = window.localStorage.getItem(DRAWER_PANE_KEY);
+    return {
+      open: open === "1" ? true : open === "0" ? false : DEFAULT_DRAWER_OPEN,
+      pane: isDrawerPane(pane) ? pane : DEFAULT_DRAWER_PANE,
+    };
+  } catch {
+    return { open: DEFAULT_DRAWER_OPEN, pane: DEFAULT_DRAWER_PANE };
+  }
+}
+
+export interface WorkspaceDrawerPref {
+  open: boolean;
+  pane: WorkspaceDrawerPane;
+  setOpen: (open: boolean) => void;
+  setPane: (pane: WorkspaceDrawerPane) => void;
+  /** Convenience for the drawer toggle — flip open/closed and persist. */
+  toggle: () => void;
+}
+
+/**
+ * The context drawer's open state + active pane, persisted per device like the
+ * presentation preference above. Same no-flash lazy read and cross-tab mirror.
+ */
+export function useWorkspaceDrawer(): WorkspaceDrawerPref {
+  const [state, setState] = useState(readWorkspaceDrawer);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent): void => {
+      if (
+        e.key === DRAWER_OPEN_KEY ||
+        e.key === DRAWER_PANE_KEY ||
+        e.key === null
+      ) {
+        setState(readWorkspaceDrawer());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // Stable identities: consumers wrap these in their own useCallback (the
+  // drawer's focus-restoring close does), and a setter re-created every render
+  // would silently defeat that memoization.
+  const setOpen = useCallback((open: boolean): void => {
+    setState((s) => ({ ...s, open }));
+    writeDrawerPref(DRAWER_OPEN_KEY, open ? "1" : "0");
+  }, []);
+
+  const setPane = useCallback((pane: WorkspaceDrawerPane): void => {
+    setState((s) => ({ ...s, pane }));
+    writeDrawerPref(DRAWER_PANE_KEY, pane);
+  }, []);
+
+  // Deliberately NOT stable — it closes over `state.open`. Keeping the
+  // localStorage write OUT of the setState updater matters more: an updater must
+  // be pure, and React invokes it twice under StrictMode.
+  const toggle = useCallback((): void => {
+    setOpen(!state.open);
+  }, [setOpen, state.open]);
+
+  return { open: state.open, pane: state.pane, setOpen, setPane, toggle };
 }

@@ -37,14 +37,18 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { SubjectId } from "@/lib/types";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { unitResources, unitStandards } from "@/lib/year-unit-aggregate";
 import {
   subjectUnitGroups,
   unitProgressByKey,
   type SubjectUnitGroup,
 } from "@/lib/unit-workspace-derive";
-import { useWorkspacePresentation } from "@/lib/workspace-prefs";
+import {
+  useWorkspacePresentation,
+  useWorkspaceDrawer,
+  type WorkspaceDrawerPane,
+} from "@/lib/workspace-prefs";
 import type { UnitProgress } from "@/lib/year-v2-data";
 import { PlanPage } from "@/components/lesson-plan-v2";
 import { Tooltip } from "@/components/ui";
@@ -55,6 +59,13 @@ import {
 } from "@/lib/year-v2-data";
 import { ExplorerShell, type ExplorerMode } from "./ExplorerShell";
 import { UnitWorkspaceRail } from "./UnitWorkspaceRail";
+import {
+  UnitContextDrawer,
+  AssessmentsPanel,
+  InsightsPanel,
+  PrepPanel,
+  type UnitContextDrawerPane,
+} from "./drawer";
 import {
   ProgressRing,
   OverviewTab,
@@ -145,6 +156,27 @@ function ExpandGlyph({ full }: { full: boolean }): ReactNode {
   );
 }
 
+/** Panel-right glyph for the context-drawer toggle (B3). The side bar fills
+ *  when the drawer is open, so the button reads as a state, not just an action —
+ *  it sits beside ⤢, which uses the same convention. */
+function DrawerGlyph({ open }: { open: boolean }): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="M15 4v16" fill={open ? "currentColor" : "none"} />
+      {open ? <rect x="15" y="4" width="6" height="16" rx="2" /> : null}
+    </svg>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function UnitExplorer({
@@ -172,6 +204,30 @@ export function UnitExplorer({
   const workspaceEnabled = onUnitChange !== undefined;
   const { presentation, toggle: togglePresentation } =
     useWorkspacePresentation();
+
+  // Context drawer (B3) — Assessments · Insights · Prep. Available in BOTH
+  // presentations (unlike the rail): these panels are the only home for that
+  // information, so the compact Planner Hub modal must reach them too.
+  const {
+    open: drawerOpen,
+    pane: drawerPane,
+    setPane: setDrawerPane,
+    setOpen: setDrawerOpen,
+    toggle: toggleDrawer,
+  } = useWorkspaceDrawer();
+  const dataState = usePlannerDataState();
+
+  // Closing from the drawer's OWN ✕ hides the subtree the ✕ lives in, so focus
+  // would fall to <body> — outside the dialog — and the next Tab would start at
+  // the top of the document, escaping the modal entirely. Hand focus back to the
+  // toggle that opened it. Queried rather than ref'd because the toggle is
+  // wrapped by <Tooltip>, and rAF so the class flip has committed first.
+  const closeDrawer = useCallback((): void => {
+    setDrawerOpen(false);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>("[data-ue-drawer-toggle]")?.focus();
+    });
+  }, [setDrawerOpen]);
 
   // Rail data — the grouped unit list + a one-pass taught/total map. Gated on
   // workspaceEnabled so the Planner Hub path never runs the O(lessons) sweep.
@@ -278,6 +334,40 @@ export function UnitExplorer({
   const { prefix, rest } = splitUnitName(rawName);
   const pct = progress.total > 0 ? progress.taught / progress.total : 0;
 
+  // The drawer's three panes. Built after the early returns above (so NOT a
+  // hook — a useMemo here would sit below a conditional return). Cheap: each
+  // panel memoizes its own derivations, and only the active pane mounts.
+  const drawerPanes: ReadonlyArray<UnitContextDrawerPane<WorkspaceDrawerPane>> =
+    [
+      {
+        key: "assessments",
+        label: "Assessments",
+        content: (
+          <AssessmentsPanel
+            lessons={lessons}
+            onOpenLesson={openPlan}
+            dataState={dataState}
+          />
+        ),
+      },
+      {
+        key: "insights",
+        label: "Insights",
+        content: <InsightsPanel lessons={lessons} dataState={dataState} />,
+      },
+      {
+        key: "prep",
+        label: "Prep",
+        content: (
+          <PrepPanel
+            lessons={lessons}
+            onOpenLesson={openPlan}
+            dataState={dataState}
+          />
+        ),
+      },
+    ];
+
   return (
     <ExplorerShell
       subject={subject}
@@ -327,6 +417,28 @@ export function UnitExplorer({
               </button>
             </Tooltip>
           ) : null}
+          <Tooltip
+            content={
+              drawerOpen
+                ? "Hide the context panel."
+                : "Show assessments, insights and prep for this unit — alongside whatever you're editing."
+            }
+            tooltipId="ue-drawer"
+            side="bottom"
+          >
+            <button
+              type="button"
+              data-ue-drawer-toggle
+              className={styles.expandBtn}
+              aria-pressed={drawerOpen}
+              aria-label={
+                drawerOpen ? "Hide unit context" : "Show unit context"
+              }
+              onClick={toggleDrawer}
+            >
+              <DrawerGlyph open={drawerOpen} />
+            </button>
+          </Tooltip>
           <ProgressRing
             pct={pct}
             trackClass={styles.ringTrackOnHead}
@@ -356,6 +468,17 @@ export function UnitExplorer({
           />
         ) : undefined
       }
+      drawer={
+        <UnitContextDrawer
+          panes={drawerPanes}
+          activePane={drawerPane}
+          onPaneChange={setDrawerPane}
+          onClose={closeDrawer}
+          closeLabel="Hide unit context"
+        />
+      }
+      drawerOpen={drawerOpen}
+      drawerLabel="Unit context"
       onClose={onClose}
       body={
         <>

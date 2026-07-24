@@ -75,6 +75,7 @@ import { useAppState } from "@/lib/app-state";
 import { snapshotRestorePatch } from "@/lib/fork-diff-restore";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { plannerClient } from "@/lib/planner/client";
+import { createSerialWriteQueue } from "@/lib/planner/serial-write-queue";
 import { resolveGrade } from "@/lib/planner/grade";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
 import type { UnitPatch } from "@/lib/planner/source";
@@ -2578,6 +2579,64 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
+  // ── Serialized (latest-wins) lesson-FIELD persistence ───────────────────
+  // B3 gate fix (Codex HIGH — the same ordering race W3.8 closed for sections,
+  // still open for scalar fields). `editLesson` autosaves per keystroke through
+  // the fire-and-forget `persist()` tee, so two `updateLesson` calls for one
+  // field are UNORDERED on the wire: typing "Quiz" can leave the DB holding
+  // "Qu" if the earlier request commits last, and a reload silently discards
+  // the newer text. Pre-existing — every scalar field in the B2 lesson editor
+  // rides this path — and B3's Assessments drawer is a second editor over it.
+  //
+  // Serialized PER COALESCE KEY, not per lesson. That distinction is the whole
+  // correctness argument: an `updateLesson` payload is a PARTIAL patch, so a
+  // per-lesson latest-wins slot would let a newer `{assessment}` DISCARD a
+  // still-pending `{title}` and lose an unrelated edit. Same-key patches always
+  // carry the same field(s) at their complete current value, so dropping an
+  // intermediate one is safe — exactly the property the section queue relies on.
+  // Callers without a coalesce key get a key derived from the patch's own field
+  // names, so two different fields can never share a slot.
+  // The payload carries its own lessonId, so the queue can never apply one
+  // lesson's patch to another — the concrete hazard when a queue keyed by a
+  // caller-supplied coalesce string shares a slot between two lessons.
+  const fieldWriteQueueRef = useRef(
+    createSerialWriteQueue<{
+      lessonId: string;
+      patch: Partial<Lesson>;
+      ownerId: string;
+      saveTarget: "personal" | "core";
+    }>({
+      send: (p) =>
+        plannerClient.updateLesson(p.lessonId, p.patch, p.ownerId, p.saveTarget),
+      onError: (err) => {
+        // Mirror persist()'s error contract: reducer state stands, the dropped
+        // write is surfaced, and a newer pending patch supersedes the failure.
+        console.error("[planner] persist 'updateLesson' failed", err);
+      },
+    }),
+  );
+
+  const persistLessonPatchSerialized = useCallback(
+    (lessonId: string, patch: Partial<Lesson>, fieldKey: string): void => {
+      // Same gating as persist(): flag OFF / no session → no-op.
+      if (!isPlannerSupabaseConfigured()) return;
+      if (!ownerIdRef.current) return;
+      // ALWAYS namespaced by lessonId. `editLesson`'s public API does not
+      // require the caller's coalesce key to contain one, and two lessons
+      // sharing a key would otherwise share a slot — the newer lesson's patch
+      // would evict the older one's, losing an edit outright.
+      fieldWriteQueueRef.current.enqueue(`${lessonId}::${fieldKey}`, {
+        lessonId,
+        patch,
+        // Identity captured at ENQUEUE time so a mid-flight sign-out or a
+        // Personal↔Team flip never retargets an already-authored patch.
+        ownerId: ownerIdRef.current,
+        saveTarget: saveTargetRef.current,
+      });
+    },
+    [],
+  );
+
   // ── Granular section-mutator persistence ───────────────────────────────
   // Several section reducer actions (reorder / add / remove / duplicate section,
   // move resource) mutate `present.sections[lessonId]` but had NO dedicated
@@ -2688,15 +2747,19 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       // Only the content fields the source's LessonPatch accepts are teed; the
       // source decides whether the edit forks (personal) or writes the shared
       // master row (core — #14 authorized Team-Curriculum write, RLS-gated).
-      persist(
-        "updateLesson",
-        id,
-        patch,
-        ownerIdRef.current ?? "",
-        saveTargetRef.current,
-      );
+      //
+      // Routed through the SERIALIZED queue, not the raw persist() tee, so
+      // per-keystroke autosaves for one field can't commit out of order. The
+      // queue key is the caller's coalesce key where there is one (it already
+      // identifies the field being edited, e.g. `lesson:<id>:assessment`);
+      // otherwise it is derived from the patch's own field names, so unrelated
+      // fields never share — and therefore never discard — a pending slot.
+      const queueKey =
+        coalesce?.key ??
+        `lesson:${id}:fields:${Object.keys(patch).sort().join(",")}`;
+      persistLessonPatchSerialized(id, patch, queueKey);
     },
-    [persist],
+    [persistLessonPatchSerialized],
   );
 
   const duplicateLesson = useCallback((id: string) => {

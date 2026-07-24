@@ -317,8 +317,28 @@
   --idle-tint: #f1f0f4; /* v1; v2 light = #ecebf1 */
   --warn: #e9a526; /* needs review — honey */
   --warn-tint: #fff8e7;
+  /* TEXT-safe warn. `--warn` is a FILL colour: honey on a light surface measures
+     ~2.0:1, so using it for a number or a label fails WCAG AA (4.5:1) on every
+     light tone — measured in the B3 QA pass. This darkens the same hue for type;
+     the dark-tone path below points it back at `--warn`, which already clears
+     6.4:1 there. Use `--warn` for bars, dots and fills; `--warn-ink` for text. */
+  --warn-ink: color-mix(in oklab, var(--warn) 55%, #000);
   --danger: #ef5a5a;
   --danger-tint: #fdecec;
+
+  /* Assessment kind (B3) — formative vs summative must be distinguishable at a
+     glance wherever assessments are listed or plotted. Formative deliberately
+     REUSES --done (a formative check is a lightweight "did it land?" signal, the
+     same green the progress layer already owns); summative earns its own hue
+     because it is a different KIND of thing, not a different amount of done.
+
+     Why a dedicated token rather than a subject slot: --subj-7 (purple) belongs
+     to grammar team-wide, and CLAUDE.md §4 is explicit that subject color always
+     means subject. Borrowing it would make a summative in a math unit read as
+     grammar. This value is the design handoff's summative purple, promoted from
+     a raw hex to a token. */
+  --assess-summative: #8352c7;
+  --assess-summative-tint: #ece4f7;
 
   /* Product semantics (kept) — daily-note priorities + catch-up flame. */
   --urgent: #d92b3c; /* daily-notes urgent (pulse) */
@@ -1757,7 +1777,15 @@
     --progress-tint: color-mix(in srgb, var(--progress) 20%, var(--surface));
     --idle-tint: color-mix(in srgb, var(--idle) 20%, var(--surface));
     --warn-tint: color-mix(in srgb, var(--warn) 20%, var(--surface));
+    /* On dark, the raw honey is already AA for text (6.4:1) — darkening it here
+       would make it LESS legible, which is the whole point of branching on tone. */
+    --warn-ink: var(--warn);
     --danger-tint: color-mix(in srgb, var(--danger) 20%, var(--surface));
+    --assess-summative-tint: color-mix(
+      in srgb,
+      var(--assess-summative) 20%,
+      var(--surface)
+    );
     --urgent-bg: color-mix(in srgb, var(--urgent) 20%, var(--surface));
     --important-bg: color-mix(in srgb, var(--important) 20%, var(--surface));
     --fyi-bg: color-mix(in srgb, var(--fyi) 20%, var(--surface));

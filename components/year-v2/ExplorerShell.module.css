@@ -135,6 +135,13 @@
 .head {
   display: flex;
   align-items: center;
+  /* WRAPS (B3 QA critical). The header is glyph + text + a control cluster that
+     grew again in B3. On a phone the cluster and the ✕ cannot shrink, so an
+     unwrapped row starved `.htext` to ~19px and the title rendered ONE CHARACTER
+     PER LINE — 19 lines, a 644px header eating 79% of an 812px viewport against
+     the §4 ≤30% contract. Wrapping drops the cluster onto its own line instead.
+     Nothing wraps at desktop widths, where the row has room to spare. */
+  flex-wrap: wrap;
   gap: 14px;
   padding: 18px 20px;
   color: #fff;
@@ -152,7 +159,10 @@
   flex: 0 0 auto;
 }
 .htext {
-  flex: 1 1 auto;
+  /* A 12rem BASIS, not `auto`: it is what makes the header wrap before the title
+     is squeezed. With `auto` the basis is the content width and this item simply
+     absorbed all the shrinkage. */
+  flex: 1 1 12rem;
   min-width: 0;
 }
 .htitle {
@@ -161,7 +171,12 @@
   font-size: var(--t-20, 20px);
   line-height: 1.15;
   letter-spacing: -0.01em;
-  overflow-wrap: anywhere;
+  /* `break-word`, NOT `anywhere` — the difference is load-bearing. `anywhere`
+     lets the browser count a single CHARACTER as the min-content width, so this
+     box could legitimately shrink to 19px and break the title per character.
+     `break-word` floors min-content at the longest word, while still breaking a
+     genuinely unbreakable string (a long URL) rather than overflowing. */
+  overflow-wrap: break-word;
 }
 .htitle b {
   font-weight: 800;
@@ -356,5 +371,52 @@
     max-height: 34vh;
     border-right: none;
     border-bottom: 1px solid var(--ue-hairline);
+  }
+}
+
+/* ── B3 — right context drawer ───────────────────────────────────────────── */
+/* The mirror of `.rail`, and hidden the same way: MOUNTED whenever the caller
+   supplies one, REVEALED by the `.drawerShown` class. Toggling is therefore a
+   pure `display` flip on a subtree that never unmounts, so the body keeps its
+   scroll position and any focused field survives — the same guarantee the ⤢
+   expand toggle relies on.
+
+   Unlike the rail, the drawer is NOT tied to the full-bleed presentation: its
+   panels are the only home for Assessments and Insights, so they have to be
+   reachable from the compact modal too. */
+.drawer {
+  display: none;
+  flex: 0 0 auto;
+  width: 320px;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--ue-hairline);
+  background: var(--ue-tint-soft);
+}
+.drawerShown .drawer {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tablet + phone: a 320px third column would squeeze the body past readability
+   (and at phone width force document h-scroll), so an OPEN drawer turns the row
+   into a stack — rail band, body, drawer band — each capped and self-scrolling.
+   Scoped to `.drawerShown` so the rail's own layout is untouched whenever the
+   drawer is closed, which is every existing caller. */
+@media (max-width: 900px) {
+  .drawerShown {
+    flex-direction: column;
+  }
+  .drawerShown .rail {
+    width: 100%;
+    max-height: 34vh;
+    border-right: none;
+    border-bottom: 1px solid var(--ue-hairline);
+  }
+  .drawerShown .drawer {
+    width: 100%;
+    max-height: 45vh;
+    border-left: none;
+    border-top: 1px solid var(--ue-hairline);
   }
 }

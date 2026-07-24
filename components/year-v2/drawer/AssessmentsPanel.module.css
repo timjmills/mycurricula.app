@@ -1,0 +1,357 @@
+/* AssessmentsPanel.module.css — Unit drawer › Assessments (B3).
+ *
+ * NARROW-FIRST. The drawer is ~320px on desktop and a full-width band below
+ * 900px, so every row is a single column and nothing here assumes a wide pane.
+ *
+ * TONE, NOT THEME. Every color is a token that already re-declares itself on
+ * the `[data-tone="dark"]` path in app/tokens.css (--surface, --surface-warm,
+ * --ink-*, --border, --done, --assess-summative, --idle). Branching on a theme
+ * would break the other six; branching on tone is done FOR us by the tokens.
+ * Zero hex literals, zero px font sizes.
+ *
+ * KIND COLOR IS NOT SUBJECT COLOR. Formative reuses --done, summative gets its
+ * own --assess-summative, unclassified sits on the neutral --idle tier. A
+ * --subj-* slot would make a summative in a math unit read as grammar
+ * (CLAUDE.md §4 — subject color means subject, team-wide).
+ *
+ * CP-ROOT RESET. The drawer renders inside `.cp-root`, whose
+ * `.cp-root button` / `.cp-root input` resets are (0,1,1) and silently strip
+ * padding / border / background from a single-class rule. Every interactive
+ * rule below is DOUBLED (`.foo.foo`, 0,2,0) — including inside @media, where a
+ * single-class override would lose to its own doubled base. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Settled-but-empty message (a content empty, never a loading state). */
+.note {
+  margin: 0;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--ink-500);
+  text-wrap: pretty;
+}
+
+/* ── Group (Formative · Summative · Unclassified) ───────────────────────────── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+
+.groupDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill, 999px);
+}
+.groupDot[data-kind="formative"] {
+  background: var(--done);
+}
+.groupDot[data-kind="summative"] {
+  background: var(--assess-summative);
+}
+.groupDot[data-kind="unclassified"] {
+  background: var(--idle);
+}
+
+.groupLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.groupCount {
+  flex: 0 0 auto;
+  min-width: 20px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--hairline);
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-500);
+  text-align: center;
+}
+
+/* ── Rows ───────────────────────────────────────────────────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+/* One assessment: a select button, a lesson button, and the detail when open.
+   The two buttons are SIBLINGS, never nested — a button inside a button is
+   invalid HTML and breaks keyboard traversal. */
+.row {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg, 18px);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.rowMain.rowMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--t-13);
+  text-align: left;
+  color: var(--ink-900);
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.rowMain.rowMain:hover {
+  background: var(--surface-warm);
+}
+.rowMain.rowMain:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: -2px;
+}
+
+.glyph {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm, 10px);
+}
+.glyph[data-kind="formative"] {
+  background: var(--done-tint);
+}
+.glyph[data-kind="summative"] {
+  background: var(--assess-summative-tint);
+}
+.glyph[data-kind="unclassified"] {
+  background: var(--idle-tint);
+}
+
+.glyphDot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-pill, 999px);
+}
+.glyph[data-kind="formative"] .glyphDot {
+  background: var(--done);
+}
+.glyph[data-kind="summative"] .glyphDot {
+  background: var(--assess-summative);
+}
+.glyph[data-kind="unclassified"] .glyphDot {
+  background: var(--idle);
+}
+
+.rowTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+/* An assessment with no title says so — never a fabricated name. */
+.rowTitleEmpty {
+  font-weight: 600;
+  font-style: italic;
+  color: var(--ink-400);
+}
+
+.chev {
+  flex: 0 0 auto;
+  color: var(--ink-400);
+  transition: transform 0.16s ease;
+}
+.chevOpen {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chev {
+    transition: none;
+  }
+}
+
+/* The linked lesson — its own button so the row can both expand AND navigate. */
+.rowLesson.rowLesson {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px 10px 46px;
+  border: none;
+  border-top: 1px solid var(--hairline);
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.rowLesson.rowLesson:hover {
+  background: var(--surface-warm);
+}
+.rowLesson.rowLesson:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: -2px;
+}
+
+.rowLessonTitle {
+  font-size: var(--t-13);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink-700);
+  overflow-wrap: anywhere;
+}
+.rowMeta {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+/* ── Detail editor ──────────────────────────────────────────────────────────── */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-warm);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+/* Doubled to beat `.cp-root input`. */
+.textInput.textInput,
+.textArea.textArea,
+.select.select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-md, 14px);
+  background: var(--surface);
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--ink-900);
+}
+.textInput.textInput,
+.select.select {
+  min-height: 44px;
+}
+.textArea.textArea {
+  resize: vertical;
+  min-height: 60px;
+}
+.textInput.textInput::placeholder,
+.textArea.textArea::placeholder {
+  color: var(--ink-400);
+}
+.textInput.textInput:focus-visible,
+.textArea.textArea:focus-visible,
+.select.select:focus-visible {
+  outline: none;
+  border-color: color-mix(
+    in oklab,
+    var(--c, var(--ink-500)) 55%,
+    var(--surface)
+  );
+  box-shadow: 0 0 0 3px
+    color-mix(in oklab, var(--c, var(--ink-500)) 18%, transparent);
+}
+
+/* The ToggleGroup tray is inline-flex and cannot wrap. A contained,
+   scrollbar-less overflow keeps all three chips reachable if the drawer is ever
+   narrower than they are — the document itself never scrolls sideways. */
+.kindRow {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.kindRow::-webkit-scrollbar {
+  display: none;
+}
+
+.detailFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Add flow ───────────────────────────────────────────────────────────────── */
+
+.addSlot {
+  display: flex;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg, 18px);
+  background: var(--surface-warm);
+}
+
+.addHint {
+  margin: 0;
+  font-size: var(--t-12);
+  line-height: 1.5;
+  color: var(--ink-500);
+  text-wrap: pretty;
+}
+
+.addActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

@@ -123,6 +123,23 @@ export interface ExplorerShellProps<K extends string = string> {
    * focus trap automatically (the trap query already spans the whole panel).
    */
   rail?: ReactNode;
+  /**
+   * Optional RIGHT context-drawer slot (B3) — the mirror of `rail`, rendered
+   * after the body in the same row. It hosts the unit-scoped panels
+   * (Assessments / Insights / Prep) that deliberately did NOT become tabs: the
+   * tab strip is the unit's five PARTS, while the drawer is commentary ABOUT
+   * the unit, and mixing the two would have grown a seven-tab strip nobody can
+   * scan.
+   *
+   * Like the rail it is MOUNTED whenever supplied and revealed by CSS
+   * (`drawerOpen`), never by conditional mounting — so toggling it never
+   * remounts the body and a half-typed field or scroll position survives.
+   */
+  drawer?: ReactNode;
+  /** Whether the drawer is revealed. Purely a class flip — see `drawer`. */
+  drawerOpen?: boolean;
+  /** aria-label for the drawer region ("Unit insights"). */
+  drawerLabel?: string;
   onClose: () => void;
 }
 
@@ -173,6 +190,9 @@ export function ExplorerShell<K extends string = string>({
   presentation = "modal",
   closeOnScrimClick = true,
   rail,
+  drawer,
+  drawerOpen = false,
+  drawerLabel,
   onClose,
 }: ExplorerShellProps<K>): ReactNode {
   const titleId = useId();
@@ -228,9 +248,17 @@ export function ExplorerShell<K extends string = string>({
       if (e.key !== "Tab") return;
       const panel = panelRef.current;
       if (!panel) return;
+      // `querySelectorAll` still matches elements inside a `display: none`
+      // subtree, and BOTH side slots are mounted-but-hidden by design (the rail
+      // outside the full presentation, the drawer while closed). An unfocusable
+      // element must never become the trap's first/last boundary — `focus()`
+      // would no-op while the handler had already preventDefault()ed the Tab,
+      // stranding the user at a dead stop. Client rects are the cheap, reliable
+      // hidden test: a `display: none` element reports none, while a positioned
+      // or transformed one still does.
       const focusable = Array.from(
         panel.querySelectorAll<HTMLElement>(FOCUSABLE),
-      );
+      ).filter((el) => el.getClientRects().length > 0);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -431,14 +459,30 @@ export function ExplorerShell<K extends string = string>({
           </div>
         )}
 
-        {/* ── Body (with optional left rail) ─────────────────────────────── */}
-        {/* No rail — every caller today — renders `bodyRegion` alone, exactly as
-            before. A rail (B1.4) wraps the rail + the SAME bodyRegion in a row so
-            the workspace navigator sits beside the tab content. */}
-        {rail ? (
-          <div className={styles.railLayout}>
-            <div className={styles.rail}>{rail}</div>
+        {/* ── Body (with optional left rail + right drawer) ──────────────── */}
+        {/* Neither side slot — the Planner Hub's compact modal — renders
+            `bodyRegion` alone, exactly as before. Either one wraps the row so the
+            navigator (B1.4) and the context drawer (B3) sit beside the content.
+            The condition covers BOTH: gating on `rail` alone would silently drop
+            a drawer supplied without a rail. */}
+        {rail || drawer ? (
+          <div
+            className={`${styles.railLayout} ${
+              drawerOpen ? styles.drawerShown : ""
+            }`}
+          >
+            {rail ? <div className={styles.rail}>{rail}</div> : null}
             {bodyRegion}
+            {drawer ? (
+              <div
+                className={styles.drawer}
+                data-ue-drawer
+                role="region"
+                aria-label={drawerLabel}
+              >
+                {drawer}
+              </div>
+            ) : null}
           </div>
         ) : (
           bodyRegion
