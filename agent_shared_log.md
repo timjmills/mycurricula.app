@@ -2932,3 +2932,25 @@ verify across frames).
 
 **Rollback (if ever needed):** flip repo variable NEXT_PUBLIC_MULTI_WORKSPACE
 to empty + re-run Deploy. DB objects are additive and safe to leave.
+
+---
+
+## [Main/orchestrator 7.24] 🧹 WORKTREE CLEANUP EXECUTED — 15.1 GB freed
+
+User-approved cleanup ran via agent: ALL stale worktrees removed — 10
+standalone (mc-boards-pr, mc-build, mc-curriculum-merge, mc-settings-pr,
+mc-w11-flagoff, mc-wave2-audit, mc-wave3, mycurricula-daily-preview,
+mycurricula-daily-verify, Temp mc-ship-visual) + the entire .claude/worktrees
+pile (38 agent-* + topbar-overflow-menu + audit-unified-plan-v11 +
+welcome-homepage, each verified landed/clean first). 4 of the standalone ones
+had node_modules JUNCTIONS pointing at the MAIN repo's node_modules — broken
+link-first per the footgun procedure; main repo verified intact (507 entries,
+0 deletions). Branches: all worktree-* + 7 feature branches deleted with -d;
+claude/v2-flag with -D (merged to HEAD, only ahead-of-upstream); origin
+untouched. 4 zombie next-dev processes from a dead orphan killed.
+
+**Remaining worktrees = the KEEP set only: mc-polish, mc-ushare,
+mc-wave12-settings** (wave12 still hosts live dev servers on 3020/3021).
+If your session notes reference any removed worktree (e.g. "mc-wave3 holds
+soft state") — that state was verified landed or worthless before deletion;
+docs/v2-rebuild soft-state files were landed to master 7.24 (`2c25ff9`).
