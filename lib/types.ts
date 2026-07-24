@@ -233,6 +233,51 @@ export function isAssessmentKind(
   return value === "formative" || value === "summative";
 }
 
+/** An assessment owned by a UNIT rather than by a lesson (B3).
+ *
+ *  Unlike `LessonAssessment` — which is a lesson "wearing a hat", four columns
+ *  patched onto the lesson row — a unit assessment IS its own row, because a
+ *  unit commonly carries several (a pre-test, a mid-unit check, a final task)
+ *  and a fixed four-column set could only ever hold one. Persisted in
+ *  `public.unit_assessments`.
+ *
+ *  TEAM-LEVEL, NOT FORKABLE. Units are team-curriculum content, so a unit
+ *  assessment follows the same model B1.7 established for the editable unit
+ *  fields: one shared row per unit assessment, written only through the
+ *  confirm-only unit write path, and editable only in Team mode. It is
+ *  deliberately NOT mirrored into a personal-copy table — there is no
+ *  per-teacher fork of a unit assessment. A teacher who wants their own
+ *  version attaches a `LessonAssessment` to their personal lesson copy.
+ *
+ *  `kind` shares LessonAssessment's union and the same `isAssessmentKind`
+ *  guard — the DB column is deliberately un-CHECKed, so that guard remains the
+ *  single validity gate on the write path. */
+export interface UnitAssessment {
+  /** Row id (`unit_assessments.id`). */
+  id: string;
+  /** The owning unit (`unit_assessments.unit_id` → `units.id`). */
+  unitId: string;
+  /** Assessment kind — validate against `isAssessmentKind` before persisting.
+   *  Absent is a real, round-trippable state: an assessment can carry a title
+   *  and purpose before the teacher has decided formative vs summative. */
+  kind?: LessonAssessment["kind"];
+  title?: string;
+  /** What the assessment is checking for. */
+  purpose?: string;
+  notes?: string;
+  /** Explicit ordering within the unit. Persisted as
+   *  `unit_assessments.display_order` — the house column name
+   *  (`lesson_sections.display_order`, `subjects.display_order`), deliberately
+   *  NOT `position`, which `units.position` reserves for B6 timeline authoring.
+   *  Same camel/snake divergence as `defaultDuration ↔ default_dur`.
+   *
+   *  SPARSE after a delete: removing the middle of 0,1,2 leaves 0,2 and nothing
+   *  renumbers. Creates append at MAX+1 (never at COUNT, which would collide
+   *  with a survivor); a reorder is what rewrites a dense sequence. Never treat
+   *  this as an array index. */
+  position: number;
+}
+
 /** A sub-event inside a multi-task lesson (e.g. a center rotation). */
 export interface LessonTask {
   id: string;

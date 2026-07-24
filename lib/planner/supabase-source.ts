@@ -70,6 +70,7 @@ import type {
   Subject,
   SubjectId,
   Unit,
+  UnitAssessment,
   UnitKud,
   UnitVocabItem,
 } from "../types";
@@ -82,6 +83,15 @@ import {
   lessonTrackBColumns,
   type LessonTrackBRow,
 } from "./lesson-track-b";
+// The pure UNIT-assessment mappers (B3) — same leaf pattern: the write-path
+// validity gate for the un-CHECKed `kind` column plus the row↔domain mapping,
+// unit-testable without this server-only module.
+import {
+  sortUnitAssessments,
+  unitAssessmentColumns,
+  unitAssessmentFromRow,
+  type UnitAssessmentRow,
+} from "./unit-assessments";
 import type { LessonSectionContent } from "../lesson-flow";
 import type { SectionResource } from "../lesson-flow";
 import {
@@ -594,6 +604,17 @@ const COMPLETION_COLS = "core_lesson_event_id, status, reason_not_done";
 // "error"), never a crash — but the planner renders no data, so apply first.
 const UNIT_COLS =
   "id, grade_level_id, subject_id, name, start_week, end_week, school_year_id, notes, big_idea, essential_questions, vocab, kud, standards, default_flow, default_dur, framework, fw_data, custom_fields, carried, archived_at";
+// ⚠ APPLY COUPLING (B3, §4c) — the whole `unit_assessments` TABLE exists only
+// once the 20260729120000 migration is applied. This is a stronger coupling than
+// the column-level ones above: pre-apply, every method below fails with
+// `relation "public.unit_assessments" does not exist`, surfaced as a thrown
+// error (never a silent empty list). Nothing in the hydrate path calls them, so
+// an un-applied DB degrades to "the Assessments panel errors", not "the planner
+// renders nothing". Apply first, then ship the panel.
+// The column list is a single double-quoted literal so the exact-snapshot lock
+// in tests/unit-assessments.test.ts can pin it verbatim against the migration.
+const UNIT_ASSESSMENT_COLS =
+  "id, unit_id, kind, title, purpose, notes, display_order";
 const SUBJECT_COLS =
   "id, grade_level_id, name, color, parent_id, display_order";
 const STANDARD_COLS = "id, code, description";
@@ -2048,6 +2069,205 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return reloadUnit(client, unitDbId);
   },
 
+  // ── Unit assessments (B3) ─────────────────────────────────────────────────
+  // TEAM content, like the unit fields above: one shared row set per unit, no
+  // personal fork, no SaveTarget. `unit_assessments_write` RLS (the same tenancy
+  // predicate as `units_write`, resolved through the parent unit) is the
+  // authorization gate; every mutator below asserts rows-affected > 0 and THROWS
+  // otherwise, because PostgREST reports an RLS-filtered UPDATE/DELETE as a
+  // successful zero-row statement, not an error. `ownerId` is signature parity
+  // only — RLS scopes by auth.uid(), never by this argument.
+
+  async listUnitAssessments(unitIds) {
+    if (unitIds.length === 0) return {};
+    const client = await sb();
+    // Caller-visible unit id → DB uuid (a fixture SLUG is hashed, exactly as
+    // updateUnitFields does), keeping the reverse map so the RESULT is keyed by
+    // the ids the caller passed in — not by the uuids we queried with.
+    const dbToCaller = new Map<string, string>();
+    for (const unitId of unitIds) {
+      dbToCaller.set(
+        isUuid(unitId) ? unitId : slugToUuid("unit", unitId),
+        unitId,
+      );
+    }
+    const rows = await chunkedIn<UnitAssessmentRow>(
+      [...dbToCaller.keys()],
+      (chunk) =>
+        client
+          .from("unit_assessments")
+          .select(UNIT_ASSESSMENT_COLS)
+          .in("unit_id", chunk)
+          .order("display_order", { ascending: true }),
+      "list unit assessments",
+    );
+    // Seed EVERY requested id with an empty array first, so a unit with no
+    // assessments comes back as "read, none" rather than a missing key the
+    // caller could mistake for "not read yet".
+    const out: Record<string, UnitAssessment[]> = {};
+    for (const unitId of unitIds) out[unitId] = [];
+    for (const row of rows) {
+      const key = dbToCaller.get(row.unit_id);
+      // A row whose unit wasn't requested can't happen (we filtered on unit_id),
+      // but dropping it beats inventing a key the caller never asked for.
+      if (key == null) continue;
+      out[key]?.push(unitAssessmentFromRow(row));
+    }
+    // The `.order()` above already sorts, but re-sorting is what makes the
+    // ordering TOTAL (ties broken by id) and identical to the mock's.
+    for (const key of Object.keys(out)) {
+      out[key] = sortUnitAssessments(out[key] ?? []);
+    }
+    return out;
+  },
+
+  async createUnitAssessment(unitId, input, ownerId) {
+    const client = await sb();
+    void ownerId;
+    const unitDbId = isUuid(unitId) ? unitId : slugToUuid("unit", unitId);
+    // Append LAST: MAX(display_order) + 1, NOT the row count.
+    //
+    // POSITIONS ARE SPARSE AFTER A DELETE — deliberately. Deleting the middle of
+    // [0,1,2] leaves [0,2]; nothing renumbers. A count-based next-position would
+    // then hand the new row `2`, COLLIDING with the survivor instead of landing
+    // last — the ordering bug this comment exists to prevent from coming back.
+    // Reading the max keeps "append" true for any gap pattern, and the next
+    // reorder rewrites a dense 0…n-1 sequence anyway, so gaps never accumulate
+    // visibly. (Compacting on delete was the alternative; it costs an extra
+    // multi-row write, needs its own atomicity story, and buys nothing a
+    // total-ordered sort doesn't already give.)
+    //
+    // RACE (accepted, not overlooked): two teachers creating simultaneously can
+    // both read the same max. That is COSMETIC — no constraint is violated, both
+    // rows persist, `sortUnitAssessments` breaks the tie deterministically by
+    // id, and the next reorder cleans it up. Serializing this behind an RPC
+    // would buy nothing a teammate's drag doesn't already fix.
+    const maxRes = await client
+      .from("unit_assessments")
+      .select("display_order")
+      .eq("unit_id", unitDbId)
+      .order("display_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (maxRes.error) {
+      throw new Error(
+        `Planner repository create unit assessment (order probe) failed: ${maxRes.error.message}`,
+      );
+    }
+    const maxRow = maxRes.data as { display_order: number | null } | null;
+    const row = {
+      unit_id: unitDbId,
+      // No rows yet → -1 + 1 = 0, the first position.
+      display_order: (maxRow?.display_order ?? -1) + 1,
+      ...unitAssessmentColumns(input),
+    };
+    const res = await client
+      .from("unit_assessments")
+      .insert(row)
+      .select(UNIT_ASSESSMENT_COLS)
+      .single();
+    // An RLS-denied INSERT errors (unlike UPDATE/DELETE, which silently match
+    // zero rows), so `unwrap` surfacing it is sufficient here.
+    const inserted = unwrap(res, "create unit assessment") as UnitAssessmentRow;
+    return unitAssessmentFromRow(inserted);
+  },
+
+  async updateUnitAssessment(assessmentId, patch, ownerId) {
+    const client = await sb();
+    void ownerId;
+    const next = unitAssessmentColumns(patch);
+    if (Object.keys(next).length === 0) {
+      // Nothing to write — re-read so the caller still gets the canonical row
+      // (and a missing/invisible row still surfaces as an error).
+      return reloadUnitAssessment(client, assessmentId);
+    }
+    const res = await client
+      .from("unit_assessments")
+      .update(next)
+      .eq("id", assessmentId)
+      .select(UNIT_ASSESSMENT_COLS);
+    if (res.error) {
+      throw new Error(
+        `Planner repository unit assessment write failed: ${res.error.message}`,
+      );
+    }
+    const rows = (res.data ?? []) as UnitAssessmentRow[];
+    // RLS filters an unauthorized row OUT of the UPDATE scope rather than
+    // raising, so zero rows back means "denied or gone" — never a success.
+    // Mirrors patchUnit / patchMaster.
+    const updated = rows[0];
+    if (!updated) {
+      throw new Error(
+        `Planner repository unit assessment write affected no rows for assessment ${assessmentId} — not authorized to edit this unit (subject master / grade lead), or the assessment no longer exists.`,
+      );
+    }
+    return unitAssessmentFromRow(updated);
+  },
+
+  async deleteUnitAssessment(assessmentId, ownerId) {
+    const client = await sb();
+    void ownerId;
+    const res = await client
+      .from("unit_assessments")
+      .delete()
+      .eq("id", assessmentId)
+      .select("id");
+    if (res.error) {
+      throw new Error(
+        `Planner repository unit assessment delete failed: ${res.error.message}`,
+      );
+    }
+    const rows = (res.data ?? []) as { id: string }[];
+    if (rows.length === 0) {
+      throw new Error(
+        `Planner repository unit assessment delete affected no rows for assessment ${assessmentId} — not authorized to edit this unit (subject master / grade lead), or the assessment no longer exists.`,
+      );
+    }
+  },
+
+  async reorderUnitAssessments(unitId, orderedIds, ownerId) {
+    const client = await sb();
+    void ownerId;
+    const unitDbId = isUuid(unitId) ? unitId : slugToUuid("unit", unitId);
+    if (orderedIds.length > 0) {
+      // ATOMIC: one RPC writes the whole sequence in a single UPDATE, so a
+      // failure can never leave a half-applied order (the N-round-trip
+      // alternative can). SECURITY INVOKER — RLS still gates each row as the
+      // caller, and rows belonging to another unit are ignored server-side.
+      const rpc = await client.rpc("reorder_unit_assessments", {
+        p_unit_id: unitDbId,
+        p_ids: orderedIds,
+      });
+      if (rpc.error) {
+        throw new Error(
+          `Planner repository reorder unit assessments failed: ${rpc.error.message}`,
+        );
+      }
+      const moved = typeof rpc.data === "number" ? rpc.data : 0;
+      if (moved === 0) {
+        // Nothing moved at all — the caller is not authorized to edit this unit,
+        // or every id it sent is gone. Surfacing beats a false success.
+        throw new Error(
+          `Planner repository reorder unit assessments affected no rows for unit ${unitId} — not authorized to edit this unit (subject master / grade lead), or none of the assessments exist.`,
+        );
+      }
+      if (moved < orderedIds.length) {
+        // NOW A NARROW RACE, not the ordinary stale-id path. Since migration
+        // 20260729140000 the RPC RAISES on duplicate or foreign ids, so those
+        // arrive here as a thrown error, not a short count. Reaching this line
+        // means a row passed the RPC's ownership check and then failed to update
+        // inside the same statement — a concurrent delete landing between the two.
+        // Not fatal: the canonical list fetched below is the truth and re-syncs
+        // the client. But it must not pass unnoticed.
+        console.warn(
+          `[planner] reorderUnitAssessments: ${moved}/${orderedIds.length} assessments reordered for unit ${unitId} (a row was likely deleted concurrently; returning the canonical order).`,
+        );
+      }
+    }
+    const byUnit = await this.listUnitAssessments([unitId]);
+    return byUnit[unitId] ?? [];
+  },
+
   // ── Section + resource mutations ──────────────────────────────────────────
   async setSections(
     lessonId,
@@ -2415,6 +2635,28 @@ async function reloadUnit(
     uuidToSubjectId.get(row.subject_id) ?? "math",
     new Map([[row.id, row.id]]),
   );
+}
+
+/** Re-read a single unit assessment → the domain shape. Used by the no-op
+ *  update path (an empty patch still returns the canonical row) so "nothing to
+ *  write" and "wrote something" resolve through the same read. Throws when the
+ *  row is missing OR invisible under RLS — the two are indistinguishable to a
+ *  PostgREST client, and both are failures from the caller's point of view. */
+async function reloadUnitAssessment(
+  client: ServerClient,
+  assessmentId: string,
+): Promise<UnitAssessment> {
+  const res = await client
+    .from("unit_assessments")
+    .select(UNIT_ASSESSMENT_COLS)
+    .eq("id", assessmentId)
+    .maybeSingle();
+  const row = unwrapMaybe(
+    res,
+    "reload unit assessment",
+  ) as UnitAssessmentRow | null;
+  if (!row) throw new Error(`Unit assessment not found: ${assessmentId}`);
+  return unitAssessmentFromRow(row);
 }
 
 /**

@@ -1,0 +1,49 @@
+-- ###########################################################################
+-- ## unit_assessments — revoke reorder RPC EXECUTE from `anon` (B3 follow-up)
+-- ###########################################################################
+-- WHY A SECOND FILE. `20260729120000_unit_assessments.sql` is already APPLIED on
+-- prod, and this repo's convention (stated in that file's own header) is that a
+-- live object is amended only by a NEW migration, never by hand-editing the file
+-- that ran. Editing the applied file would leave the tree describing something
+-- other than what the database actually contains — the drift trap that has bitten
+-- this project before.
+--
+-- WHAT WAS WRONG. That migration ended with:
+--     revoke execute on function public.reorder_unit_assessments(uuid, uuid[]) from public;
+--     grant  execute on function public.reorder_unit_assessments(uuid, uuid[]) to authenticated;
+-- and DOCUMENTED the resulting posture as "EXECUTE revoked from public and
+-- granted to authenticated". Verified against the live catalog after the apply,
+-- that is NOT what happened:
+--     has_function_privilege('anon', 'public.reorder_unit_assessments(uuid,uuid[])', 'execute') = TRUE
+--
+-- Revoking from PUBLIC does not remove a grant `anon` holds in its OWN right, and
+-- Supabase's schema defaults (`alter default privileges ... grant execute on
+-- functions to anon`) give it exactly that. So the revoke was a no-op for the one
+-- role it was meant to exclude. `mark_onboarded` and `rename_workspace` are
+-- anon-false precisely because they name anon explicitly; `replace_lesson_sections`
+-- (20260604150000) shares this same latent gap and is NOT touched here — it is
+-- flagged for a security pass rather than changed as a side effect of B3.
+--
+-- SEVERITY: LOW, and this is a tightening rather than a fix for an exploit. The
+-- function is SECURITY INVOKER, so RLS still evaluates as the caller: an anon
+-- caller's UPDATE matches zero rows under `unit_assessments_write`, the function
+-- returns 0, and the seam throws on a zero count. Nothing leaks — the return value
+-- is a row count the caller itself just failed to produce. This closes the gap
+-- between the documented posture and the real one, which matters because the next
+-- reader will trust the comment.
+--
+-- Idempotent: `revoke` on an already-revoked privilege is a no-op.
+-- ###########################################################################
+
+revoke execute on function public.reorder_unit_assessments(uuid, uuid[]) from anon;
+
+-- ###########################################################################
+-- VERIFY (expect anon=false, authenticated=true):
+--   select has_function_privilege('anon',          'public.reorder_unit_assessments(uuid,uuid[])', 'execute') as anon_exec,
+--          has_function_privilege('authenticated', 'public.reorder_unit_assessments(uuid,uuid[])', 'execute') as auth_exec;
+--
+-- STILL OPEN, deliberately not changed here:
+--   * public.replace_lesson_sections — same anon-executable gap, same low
+--     severity (also SECURITY INVOKER + RLS). Belongs to a security pass that can
+--     review every RPC's grant posture at once, not to this feature tranche.
+-- ###########################################################################

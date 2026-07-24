@@ -37,6 +37,7 @@ import type {
   StandardsMap,
   Subject,
   Unit,
+  UnitAssessment,
 } from "../types";
 import type { LessonSectionContent } from "../lesson-flow";
 import {
@@ -55,8 +56,19 @@ import type {
   LessonMoveTarget,
   ListLessonsOptions,
   SaveTarget,
+  UnitAssessmentPatch,
   UnitPatch,
 } from "./source";
+// The unit-assessment store below holds ROW-shaped records and maps them with
+// the SAME pure mappers the Supabase source uses, so the flag-OFF path shares
+// the flag-ON clear/validation semantics exactly (rather than re-implementing
+// them in domain space and drifting).
+import {
+  sortUnitAssessments,
+  unitAssessmentColumns,
+  unitAssessmentFromRow,
+  type UnitAssessmentRow,
+} from "./unit-assessments";
 
 // ── Id bridge (mock slugs ↔ db uuids) ───────────────────────────────────────
 
@@ -87,6 +99,19 @@ const lessons: Lesson[] = LESSONS.map(cloneLesson);
  *  contract faithfully (so a direct `plannerClient.updateUnitFields` call, and
  *  the flag-ON dispatch fallback, behave like a real backend). */
 const units: Unit[] = ALL_UNITS.map(cloneUnit);
+
+/** The live unit-assessment rows (B3). Held in ROW shape — `unit_id`,
+ *  `display_order`, nullable text columns — so every read goes through
+ *  `unitAssessmentFromRow` and every write through `unitAssessmentColumns`,
+ *  the same two pure mappers the Supabase source uses. That is what makes the
+ *  flag-OFF round-trip a faithful rehearsal of the flag-ON one (invalid `kind`
+ *  dropped, a supplied-undefined key clearing to null, an absent key untouched)
+ *  instead of a parallel implementation that can drift.
+ *
+ *  Seeded EMPTY: there are no unit-assessment fixtures in `lib/mock`, and
+ *  inventing some would put fake curriculum content in front of a teacher on the
+ *  prototype path. The panel's empty state is the honest flag-OFF render. */
+const unitAssessmentRows: UnitAssessmentRow[] = [];
 
 /** Section content keyed by lesson id, seeded lazily on first `getSections`
  *  (mirrors the reducer's `sections` record, which seeded every lesson on
@@ -444,6 +469,135 @@ export const plannerMockSource: PlannerDataSource = {
     void _ownerId;
     Object.assign(unit, patch);
     return cloneUnit(unit);
+  },
+
+  // ── Unit assessments (B3) ──────────────────────────────────────────────────
+
+  async listUnitAssessments(
+    unitIds: string[],
+  ): Promise<Record<string, UnitAssessment[]>> {
+    // Every requested unit gets a key (empty array when it has none), matching
+    // the Supabase source — so a caller can tell "read, none" from "not read".
+    const out: Record<string, UnitAssessment[]> = {};
+    for (const unitId of unitIds) {
+      out[unitId] = sortUnitAssessments(
+        unitAssessmentRows
+          .filter((r) => r.unit_id === unitId)
+          .map(unitAssessmentFromRow),
+      );
+    }
+    return out;
+  },
+
+  async createUnitAssessment(
+    unitId: string,
+    input: UnitAssessmentPatch,
+    _ownerId: string,
+  ): Promise<UnitAssessment> {
+    // Appends LAST via MAX(display_order) + 1, matching the Supabase source
+    // exactly — positions are left SPARSE after a delete, so a COUNT-based next
+    // position would collide with a survivor instead of landing last.
+    //
+    // KNOWN DIVERGENCE (accepted, not an oversight): production enforces
+    // `unit_id → units.id` with a foreign key, so creating against an unknown
+    // unit fails there and succeeds here. It is not reachable from the app — the
+    // only caller passes the open unit's own id, which by definition exists —
+    // and the mock's synthetic fixtures deliberately use ids outside the catalog
+    // so the layer can be unit-tested in isolation. Adding a catalog lookup here
+    // would buy nothing the FK does not already guarantee in production, while
+    // forcing every fixture to hold a real unit. Revisit if a caller ever
+    // constructs a unit id rather than passing one through.
+    // `_ownerId` is parity-only: unit assessments are team content and
+    // authorization is a Supabase/RLS concern the single-document mock has no
+    // equivalent of.
+    void _ownerId;
+    const maxOrder = unitAssessmentRows
+      .filter((r) => r.unit_id === unitId)
+      // -1 seeds the empty case, so the first row lands at 0.
+      .reduce((max, r) => Math.max(max, r.display_order ?? 0), -1);
+    const row: UnitAssessmentRow = {
+      id: nextId("uassess"),
+      unit_id: unitId,
+      display_order: maxOrder + 1,
+      ...unitAssessmentColumns(input),
+    };
+    unitAssessmentRows.push(row);
+    return unitAssessmentFromRow(row);
+  },
+
+  async updateUnitAssessment(
+    assessmentId: string,
+    patch: UnitAssessmentPatch,
+    _ownerId: string,
+  ): Promise<UnitAssessment> {
+    void _ownerId;
+    const row = unitAssessmentRows.find((r) => r.id === assessmentId);
+    if (!row) throw new Error(`Unit assessment not found: ${assessmentId}`);
+    // Only the keys PRESENT in the patch are written (a present-but-undefined
+    // key clears to null; an absent key is untouched) — the mapper owns that.
+    Object.assign(row, unitAssessmentColumns(patch));
+    return unitAssessmentFromRow(row);
+  },
+
+  async deleteUnitAssessment(
+    assessmentId: string,
+    _ownerId: string,
+  ): Promise<void> {
+    void _ownerId;
+    const i = unitAssessmentRows.findIndex((r) => r.id === assessmentId);
+    // Deliberately NOT idempotent (unlike softDeleteLesson): deleting a row that
+    // isn't there throws, mirroring the Supabase source's 0-rows-affected throw,
+    // so a no-op delete can never read as a success on either path.
+    if (i < 0) throw new Error(`Unit assessment not found: ${assessmentId}`);
+    unitAssessmentRows.splice(i, 1);
+  },
+
+  async reorderUnitAssessments(
+    unitId: string,
+    orderedIds: string[],
+    _ownerId: string,
+  ): Promise<UnitAssessment[]> {
+    void _ownerId;
+    // An id's array index becomes its display_order.
+    //
+    // VALIDATES LIKE THE RPC, deliberately. `reorder_unit_assessments`
+    // (migration 20260729140000) RAISES on duplicate ids and on ids that are not
+    // assessments of this unit. If the mock quietly ignored them instead, the
+    // flag-OFF path would report a clean success for input production rejects —
+    // so a client bug would pass every local test and only surface on real
+    // Supabase. The mock exists to rehearse the real semantics, not a lenient
+    // imitation of them.
+    //
+    // Completeness is NOT required, matching the RPC: omitted rows keep their
+    // positions, and `sortUnitAssessments` is total-ordered (ties break by id),
+    // so a sparse or briefly-colliding display_order still renders stably.
+    if (orderedIds.length > 0) {
+      const distinct = new Set(orderedIds);
+      if (distinct.size !== orderedIds.length) {
+        throw new Error(
+          `reorderUnitAssessments: orderedIds contains duplicate ids (${orderedIds.length} supplied, ${distinct.size} distinct)`,
+        );
+      }
+      const owned = orderedIds.filter((id) =>
+        unitAssessmentRows.some((r) => r.id === id && r.unit_id === unitId),
+      ).length;
+      if (owned !== orderedIds.length) {
+        throw new Error(
+          `reorderUnitAssessments: ${orderedIds.length - owned} of ${orderedIds.length} ids are not assessments of unit ${unitId} (stale or foreign)`,
+        );
+      }
+      orderedIds.forEach((id, i) => {
+        const row = unitAssessmentRows.find(
+          (r) => r.id === id && r.unit_id === unitId,
+        );
+        if (row) row.display_order = i;
+      });
+    }
+    return sortUnitAssessments(
+      unitAssessmentRows
+        .filter((r) => r.unit_id === unitId)
+        .map(unitAssessmentFromRow),
+    );
   },
 
   // ── Section + resource mutations ───────────────────────────────────────────

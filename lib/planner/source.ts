@@ -21,6 +21,7 @@ import type {
   StandardsMap,
   Subject,
   Unit,
+  UnitAssessment,
 } from "../types";
 import type { LessonSectionContent } from "../lesson-flow";
 
@@ -123,6 +124,28 @@ export type UnitPatch = Partial<
     | "defaultDuration"
     | "archived"
   >
+>;
+
+/**
+ * The editable content of a UNIT assessment (migration 20260729120000 — the B3
+ * Assessments drawer). A subset of `UnitAssessment`: `id` / `unitId` are
+ * identity (fixed at create) and `position` moves only through
+ * `reorderUnitAssessments`, so none of the three is patchable here.
+ *
+ * KEY-PRESENCE, not value-presence: a key PRESENT with an `undefined` value is a
+ * deliberate CLEAR (writes NULL); a key ABSENT is left untouched. The mapper
+ * (`lib/planner/unit-assessments.ts`) implements that with `in patch`.
+ *
+ * Like `UnitPatch` — and UNLIKE `LessonPatch` — this takes NO `SaveTarget`:
+ * unit assessments are TEAM curriculum content with no personal-fork table.
+ * There is one shared row set per unit, gated server-side by
+ * `unit_assessments_write` (the same tenancy predicate as `units_write`,
+ * resolved through the parent unit). A teacher without that role has the write
+ * denied server-side (0 rows) and the mutator throws — never a silent personal
+ * fork (there is nothing to fork into).
+ */
+export type UnitAssessmentPatch = Partial<
+  Pick<UnitAssessment, "kind" | "title" | "purpose" | "notes">
 >;
 
 /**
@@ -247,6 +270,102 @@ export interface PlannerDataSource {
     patch: UnitPatch,
     ownerId: string,
   ): Promise<Unit>;
+
+  // ── Unit assessments (B3 — many per unit, TEAM content) ────────────────────
+  // A unit owns MULTIPLE assessments (pre-test / mid-unit / final), each with a
+  // kind + title + purpose + notes and a stable order. They are team curriculum
+  // content exactly like the editable unit fields (no personal fork, no
+  // `SaveTarget`); `unit_assessments_write` RLS is the authorization gate and an
+  // unauthorized write matches 0 rows, which the Supabase source THROWS on —
+  // never a silent no-op. Distinct from the B2 LESSON assessment
+  // (`Lesson.assessment`), which is untouched by these methods.
+  //
+  // ⚠ APPLY COUPLING (§4c): the Supabase implementation names the
+  // `unit_assessments` table, which exists only once migration 20260729120000 is
+  // applied. Under the planner Supabase flag these methods THROW before the
+  // apply (`relation … does not exist`) — surfaced, never a silent empty list —
+  // so nothing may call them from a hydrate path until the migration lands. The
+  // flag-OFF mock path round-trips in memory and is unaffected.
+
+  /** A unit's assessments, in display order. Batched by design: the Assessments
+   *  panel reads a whole subject/grade at once, and a per-unit call would be an
+   *  N+1 across every unit in the catalog. Returns a map keyed by the SAME unit
+   *  ids that were passed in; a unit with no assessments is present with an
+   *  empty array (so a caller can distinguish "read, none" from "not read").
+   *  An empty `unitIds` short-circuits to `{}` without a round-trip. */
+  listUnitAssessments(
+    unitIds: string[],
+  ): Promise<Record<string, UnitAssessment[]>>;
+  /** Append a new assessment to a unit. It lands LAST — `position` = the unit's
+   *  current MAX + 1, deliberately NOT the row count: positions are left SPARSE
+   *  after a delete (deleting the middle of 0,1,2 leaves 0,2 — nothing
+   *  renumbers), and a count would hand the new row a position that COLLIDES
+   *  with a survivor instead of appending. `input` may be empty — a blank
+   *  assessment the teacher then fills in is valid (every content field is
+   *  nullable, and an absent `kind` is a real state, not an error). Returns the
+   *  created row as the server confirmed it. */
+  createUnitAssessment(
+    unitId: string,
+    input: UnitAssessmentPatch,
+    ownerId: string,
+  ): Promise<UnitAssessment>;
+  /** Patch one assessment's content. `position` is NOT patchable here (use
+   *  `reorderUnitAssessments`). An empty patch is a no-op that still re-reads
+   *  and returns the canonical row. */
+  updateUnitAssessment(
+    assessmentId: string,
+    patch: UnitAssessmentPatch,
+    ownerId: string,
+  ): Promise<UnitAssessment>;
+  /** Remove an assessment. A REAL, HARD delete of the whole row — never a
+   *  soft-null of `kind`. Nulling fields individually is what left the prototype
+   *  with orphaned `purpose`/`notes` text behind a cleared kind, resurfacing
+   *  later; a row-based model deletes the row, so every field goes with it.
+   *  There is no soft-delete column anywhere in this table (team content with no
+   *  personal fork has no per-teacher hide to model).
+   *
+   *  NOT idempotent by design: deleting a row that is already gone (or that RLS
+   *  hides) affects 0 rows and THROWS, so an unauthorized delete can never be
+   *  mistaken for a successful one. Surviving rows are NOT renumbered — see
+   *  `createUnitAssessment` on why positions stay sparse. */
+  deleteUnitAssessment(assessmentId: string, ownerId: string): Promise<void>;
+  /** Reorder a unit's assessments. `orderedIds` is the final order — each id's
+   *  array index becomes its `position`, so this is also what COMPACTS a sparse
+   *  sequence back to a dense 0…n-1.
+   *
+   *  REJECTS malformed input rather than absorbing it (migration 20260729140000
+   *  hardened the RPC, and the mock source mirrors it): DUPLICATE ids throw, and
+   *  so does ANY id that is not an assessment of `unitId` — foreign, stale, or
+   *  hidden from the caller by RLS. Earlier revisions ignored those silently,
+   *  which let a stale client request report a clean success. A client cannot
+   *  reorder another unit's rows by smuggling ids in; it gets an error.
+   *
+   *  COMPLETENESS is NOT required: ids omitted from `orderedIds` keep their
+   *  positions. That is deliberate, so a teammate's concurrent insert cannot make
+   *  an otherwise-valid drag fail. Ordering stays deterministic regardless —
+   *  `sortUnitAssessments` is total-ordered and breaks ties by id.
+   *
+   *  Atomic in the Supabase source (one RPC, not N updates), so a failure can
+   *  never leave a half-applied order. Returns the unit's assessments in their
+   *  new confirmed order.
+   *
+   *  DELIBERATE AUTHORIZATION ASYMMETRY — do not "fix" this. The RPC validates
+   *  ids with a SELECT, which since migration 20260729140000 is gated by
+   *  `can_read_grade` alone, while the UPDATE itself is gated by
+   *  `can_edit_subject_master OR is_grade_lead`. So a subject master with NO
+   *  grade assignment can update a row directly but cannot reorder: validation
+   *  sees zero rows and the RPC raises. That is intended and fail-closed —
+   *  someone who cannot READ a unit's assessments has no list to drag and should
+   *  not be resequencing them. Widening the RPC's validation to the write
+   *  predicate would hand reorder rights to a role that cannot see what it is
+   *  reordering. The same role is already effectively locked out elsewhere
+   *  (`patchUnit` does `.update(...).select("id")`, which it could not read back
+   *  either), so this is consistent with the rest of the seam, not new. */
+  reorderUnitAssessments(
+    unitId: string,
+    orderedIds: string[],
+    ownerId: string,
+  ): Promise<UnitAssessment[]>;
 
   // ── Section + resource mutations ───────────────────────────────────────────
   /** Replace a lesson's full section list (reorder / bulk edit). `saveTarget`
