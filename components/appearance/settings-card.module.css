@@ -14,6 +14,11 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  /* Cards carrying BOTH an eyebrow and a header action (e.g. Vocabulary +
+     "Restore defaults") collide at ≤~380px — .action is flex:0 0 auto and the
+     eyebrow pill can't shrink. Wrapping drops the action onto its own line on
+     narrow phones instead of overlapping the eyebrow. */
+  flex-wrap: wrap;
 }
 
 .headerText {

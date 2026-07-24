@@ -209,7 +209,8 @@ export default function SettingsLayout({
   //   /settings                    — the overview dashboard (no active tab)
   //   /settings/<slug>             — a real sub-page
   //   /settings/<slug>/<anything>  — a sub-page that nests further
-  // The retired /settings/team slug 308s to /settings/workspace, so it
+  // The retired /settings/team slug 307s to /settings/workspace (next/
+  // navigation redirect() — a temporary 307, not a permanent 308), so it
   // never reaches this matcher.
   const pathname = usePathname() ?? "";
   const activeTab =

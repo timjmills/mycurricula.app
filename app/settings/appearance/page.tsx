@@ -41,8 +41,9 @@ import { LivePreview } from "@/components/appearance/live-preview";
 import { SubjectColors } from "@/components/appearance/subject-colors";
 import { PaletteReference } from "@/components/appearance/palette-reference";
 import { SettingsCard } from "@/components/appearance/settings-card";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
-import styles from "./appearance.module.css";
+import reveal from "@/components/settings/section-reveal.module.css";
 
 export default function AppearancePage(): ReactNode {
   // Team Curriculum subject → swatch mapping. Local state for this build:
@@ -58,7 +59,7 @@ export default function AppearancePage(): ReactNode {
   return (
     <div style={{ padding: 24 }}>
       <div
-        className={styles.reveal}
+        className={reveal.reveal}
         style={{
           maxWidth: 1100,
           margin: "0 auto",
@@ -268,6 +269,7 @@ function HierarchyLabelsCard(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.appearance({ size: 14 })}
       eyebrow="Vocabulary"
       title={
         <Tooltip
@@ -456,6 +458,7 @@ function OnboardingTooltipsCard(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.appearance({ size: 14 })}
       eyebrow="Onboarding"
       title={
         <Tooltip

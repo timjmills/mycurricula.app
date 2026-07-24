@@ -40,6 +40,8 @@ import { WorkspaceSettings } from "@/components/settings/workspace-settings";
 import { WorkspaceSwitcher } from "@/components/settings/workspace-switcher";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { getActiveWorkspace } from "@/lib/workspaces";
+import reveal from "@/components/settings/section-reveal.module.css";
+import styles from "./page.module.css";
 
 // ── Suspense fallback (relocated from app/settings/team/page.tsx) ─────────────
 
@@ -157,12 +159,23 @@ export default async function WorkspaceSettingsPage(): Promise<ReactNode> {
       <WorkspaceSettings key={activeWorkspaceKey} />
 
       {/* (b) Team members — the live Supabase-backed flow. The anchor id
-          gives the settings search a scroll target for "team" queries. */}
-      <section id="team-members" data-settings-anchor>
-        <Suspense fallback={<TeamLoadingSkeleton />}>
-          <TeamData activeSchoolId={activeWorkspace?.schoolId ?? null} />
-        </Suspense>
-      </section>
+          gives the settings search a scroll target for "team" queries.
+          The settings layout's .content wrapper is padding-less, and the
+          WorkspaceSettings stack above brings its own centered max-width
+          column (with the page's PageHeader + reveal choreography); this
+          column gives the Team section the SAME centered gutter + reveal so
+          its members card aligns with the cards above instead of rendering
+          edge-to-edge. The <section id="team-members"> anchor is preserved
+          verbatim inside the wrapper. */}
+      <div className={styles.page}>
+        <div className={`${styles.inner} ${reveal.reveal}`}>
+          <section id="team-members" data-settings-anchor>
+            <Suspense fallback={<TeamLoadingSkeleton />}>
+              <TeamData activeSchoolId={activeWorkspace?.schoolId ?? null} />
+            </Suspense>
+          </section>
+        </div>
+      </div>
     </>
   );
 }

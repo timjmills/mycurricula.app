@@ -1,0 +1,29 @@
+/* Settings → Workspace & Team route column.
+ *
+ * The settings layout's .content wrapper is padding-less (app/settings/
+ * layout.module.css .content: min-width:0 only), so each settings route
+ * supplies its own centered column. WorkspaceSwitcher and WorkspaceSettings
+ * self-wrap in identical max-width-1100 columns (their own module CSS); this
+ * column gives the relocated Team section the SAME centered gutter so its
+ * members card aligns with the cards above it instead of stretching edge-to-
+ * edge inside .content. All values via var(--token) — no hex.
+ */
+
+.page {
+  padding: 24px;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Phone tighten — match the other settings pages. */
+@media (max-width: 540px) {
+  .page {
+    padding: 16px;
+  }
+}
