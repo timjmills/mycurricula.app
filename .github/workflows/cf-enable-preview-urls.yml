@@ -1,0 +1,108 @@
+name: CF — enable Worker Preview URLs
+
+# Turns ON *version preview URLs* for the mycurricula-app Worker so that
+# `wrangler versions upload` (see preview-deploy.yml) returns a usable
+# *.workers.dev preview URL. Without this, a version upload succeeds but
+# Cloudflare emits no URL — which is exactly what blocked reproducing the
+# 7.16 cutover incident.
+#
+# SAFETY — this workflow does NOT deploy, build, or publish anything:
+#   * It only touches the Worker's *subdomain settings* object.
+#   * It READS the current settings first and PRESERVES `enabled` verbatim,
+#     so it never newly exposes production on a workers.dev hostname. It
+#     flips `previews_enabled` only.
+#   * If Cloudflare rejects previews-without-subdomain, the run FAILS loudly
+#     and prints the error rather than escalating to `enabled: true` on its
+#     own — that widening is a human decision.
+#
+# Uses the CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets that already
+# exist for deploys, so no new credential is created and the token never
+# leaves GitHub.
+#
+# Trigger: push to the ops branch below (runs from the branch's own file, so
+# it works without living on the default branch), or Actions → Run workflow
+# once it is on the default branch.
+
+on:
+  push:
+    branches:
+      - ops/cf-enable-preview-urls
+  workflow_dispatch:
+
+concurrency:
+  group: cf-preview-urls
+  cancel-in-progress: false
+
+jobs:
+  enable-previews:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Read current subdomain settings, then enable previews
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SCRIPT_NAME: mycurricula-app
+        run: |
+          # NOTE: no `set -x` anywhere — it would echo the Authorization header.
+          set -euo pipefail
+
+          API="https://api.cloudflare.com/client/v4"
+          URL="$API/accounts/${CF_ACCOUNT_ID}/workers/scripts/${SCRIPT_NAME}/subdomain"
+
+          say() { echo "$@" >> "$GITHUB_STEP_SUMMARY"; }
+          block() { say '```json'; echo "$1" | jq . >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || say "$1"; say '```'; }
+
+          say "## 1. Current subdomain settings"
+          before="$(curl -sS -X GET "$URL" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json")"
+          block "$before"
+
+          if [ "$(echo "$before" | jq -r '.success')" != "true" ]; then
+            say "**Could not read settings — stopping.** Most likely the token lacks *Workers Scripts: Edit*."
+            echo "::error::Failed to read Worker subdomain settings"
+            exit 1
+          fi
+
+          # Preserve whatever workers.dev exposure is configured today. We are
+          # deliberately NOT turning the public subdomain on as a side effect.
+          current_enabled="$(echo "$before" | jq -r '.result.enabled // false')"
+          current_previews="$(echo "$before" | jq -r '.result.previews_enabled // false')"
+          say ""
+          say "- \`enabled\` (public workers.dev route): **${current_enabled}** — will be preserved"
+          say "- \`previews_enabled\`: **${current_previews}** — target: **true**"
+
+          if [ "$current_previews" = "true" ]; then
+            say ""
+            say "✅ Preview URLs are **already enabled**. Nothing to change."
+            say "Next: run **Preview deploy (no overwrite)** against \`test/v2-incident-repro\`."
+            exit 0
+          fi
+
+          say ""
+          say "## 2. Enabling preview URLs"
+          after="$(curl -sS -X POST "$URL" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "{\"enabled\":${current_enabled},\"previews_enabled\":true}")"
+          block "$after"
+
+          if [ "$(echo "$after" | jq -r '.success')" != "true" ]; then
+            say ""
+            say "❌ **Failed.** If the error says previews require the workers.dev subdomain,"
+            say "that is a deliberate human decision (it publishes production on an extra"
+            say "public hostname) — do not let automation make it."
+            echo "::error::Failed to enable preview URLs"
+            exit 1
+          fi
+
+          say ""
+          say "✅ **Preview URLs enabled.**"
+          say "Next: run **Preview deploy (no overwrite)** on \`test/v2-incident-repro\` to get a"
+          say "preview URL, then gate it:"
+          say '```'
+          say 'node scripts/probe-v2-hydrate-gate.mjs --base=https://<preview>.workers.dev'
+          say '```'
