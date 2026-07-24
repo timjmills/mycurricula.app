@@ -3285,3 +3285,45 @@ tests/{track-b-workspace-fields(LESSON snapshot),planner-lesson-fields(new),
 planner-lesson-track-b(new)}. RESUME: fix the 5 → tsc/lint/vitest → §4a re-gate
 → live §4b mock (fork-per-field, clear, None) → commit path-scoped → the B1.7+B2
 read wiring then rides ONE shared §4c flag-ON preview gate before promote.
+
+---
+
+## [build-b2-lessons 7.24 pt3] ✅ §4a findings FIXED (2 High + 3 Med) — re-verified, ready to re-gate
+
+Team-lead's §4a Codex gate found 5 real issues (I never saw them — gated directly). All fixed in place, re-verified. Still unstaged.
+
+- HIGH-1 fork DATA LOSS (ensurePersonalCopy): the first-fork `base` cloned only the original cols → a teacher's first edit of ANY field forked a copy with all 11 Track-B cols NULL → master's values vanished for them (copy-over-master read). FIX: `base` now clones ALL 11 Track-B cols from master (taught_at incl., for effective-row parity). Static guard test asserts each `<col>: master.<col>` in the base.
+- HIGH-2 can't-clear + spurious empty fork: clearing Duration sends `{durationMinutes: undefined}`; the `!== undefined` mapper guard skipped it (DB value not cleared) AND hasContent missed it → empty personal fork. FIX: mapper switched to KEY-PRESENCE (`"k" in patch` + `?? null`) so a present-but-undefined field clears to NULL; updateLesson computes `trackBCols` ONCE and ORs `Object.keys(trackBCols).length>0` into hasContent (no spurious fork). No null-in-type ripple (editor keeps sending undefined; the key's presence is the signal). Pure-mapper + mock round-trip tests added.
+- MED None: picking None kept title/purpose/notes (kind=null only) → read-back showed a title-only assessment. FIX: onKind("none") commits `{}` → all 4 cols null → read collapses to undefined. Verified LIVE (title clears, summary "—").
+- MED carried read: jsonToUnitRecord rejected arrays but the col permits object OR array → array orphans dropped. FIX: new `jsonToRecordOrArray` for carried; `Lesson.carried` widened to `Record|unknown[]`; mock cloneLesson clones array-or-object. (Unit.carried has the same latent gap — B1.7 scope, flagged.)
+- MED metadata: retired OverviewTab was the only EMBEDDED render of subject/unit/week/status. FIX: new `MetaStrip` in LessonWorkspace, gated by `showMeta` (embedded passes it; modal omits — shell chrome already carries it). Verified LIVE ("Math · Fractions · Week 11 · Taught").
+
+Gates: tsc clean · lint clean · vitest 896 passed/59 todo (was 889 — 7 new tests: fork-preservation static, duration-clear path, None-clear, absent-skip, carried-array, carried-read) · `npm run build` passed · §4b live spot-check of the 2 UI deltas clean, 0 console errors, dev killed. Ready for the team-lead's §4a re-gate.
+
+---
+
+## [team-lead 7.24 pt9] ✅✅ SESSION CLOSE-OUT — B2 + all teach QA LANDED on master, fully quiescent
+
+Everything from this mega-session is committed + pushed. Master is **0/0 with origin, clean**. Both build agents (build-b2-lessons, fix-teach-qa2) signed off / idle. No lanes in flight.
+
+**Commits landed this session (each passed BOTH gates before commit):**
+- `7a7c944` fix(teach): board-card action-row wrap (MINOR-2) + widget fav-chip hover regression (MINOR-4 favChip). Presentational CSS; independent diff review.
+- `ea75868` **feat(planner): B2 single-scroll lesson editor + Track-B field persistence** (the major lane). 17 files.
+- `3e58620` fix(teach): v2 WritingBar 44px touch-target clip (MAJOR-1 residual, LIVE v2 row) + TeachChooser hero over-photo legibility (MINOR-3). Presentational CSS; independent diff review + token existence verified.
+- (earlier same session: `b1d11f2` teach base = MINOR-2 partial + MINOR-4 favBand; `cb70bbb` pt8 log.)
+
+**B2 §4a re-gate (I OWN the outcome, ran Codex on the full staged diff):** build-b2-lessons fixed my 5 findings (see pt3). I re-verified ALL against disk:
+- HIGH-1 fork data-loss — `ensurePersonalCopy` base clones all 11 Track-B cols (supabase-source.ts ~2293-2303). CONFIRMED fixed on disk.
+- HIGH-2 key-presence — traced the present-but-undefined key SURVIVES the whole path: LessonWorkspace `{durationMinutes:undefined}`/`{assessment:{}}` → `editLesson` (by-ref) → `persist` (`fn.apply`, NO serialization) → `updateLesson` → `lessonTrackBColumns` (`"k" in patch`). Agent's deviation from my null-sentinel suggestion ACCEPTED (smaller blast radius, no type ripple).
+- 3 Med (None-clear, carried read widen, MetaStrip showMeta) all confirmed on disk.
+- **Codex then found ONE more Medium** on the full diff: after picking None the title/purpose/notes inputs stayed editable → a later keystroke re-sent `{assessment:{title}}` and resurrected a title-only assessment. FIXED by me: hid the detail fields under None (`kindChoice !== "none"` gate in LessonWorkspace.tsx, prettier'd). Re-ran Codex on the fix → **NO BLOCKING ISSUES**.
+- Local stack: tsc 0 · `npm run lint` clean · prettier clean · vitest 70 pass/7 todo on the B2 suites.
+
+**B2 §4b live (I ran it, Chrome, dev :3072, mock/flag-OFF path, onboarding seeded via `localStorage mycurricula:onboarding {finished:true}`):** opened Mid-unit check — fractions embedded in /planner. Verified: MetaStrip renders ("Math · Fractions · Week 12 · …"); None shows only KIND radios (no detail fields); Formative reveals ASSESSMENT TITLE; typed a title → None → header "Assessment —" + field vanished; **reopened lesson → Formative selected with EMPTY title (no resurrection)**; duration fill(45)→clear(empty) no NaN; console clean of B2 errors (only the benign pre-existing linkedom/canvas warning); no doc h-scroll at 1440/768/375 (true isMobile emulation for 375). Screenshots: docs/screenshots/b2-lessons/regate-editor-{1440,768,375,375-open}.png.
+
+**Carried-forward nit (NOT a B2 bug):** `Unit.carried` read (mapUnitRow → `jsonToUnitRecord`, supabase-source.ts ~972) has the SAME latent array-drop that B2 fixed for `Lesson.carried`; Unit.carried type is object-only so it matches today, but the DB col permits arrays. Fold into the next Year/unit lane (B1.7 scope).
+
+**RESUME for the next terminal:**
+- B-series next = **B3 (Assessments/Insights + tabs→drawer)** — now UNBLOCKED (was queued behind B2's shared seam). Rulings already locked: Option B (no-prep), Refine excluded, tabs→drawer.
+- The B1.7 + B2 Track-B **read wiring** rides ONE shared **§4c flag-ON preview gate** before any promote. Migration `20260728120000` is ALREADY applied on prod (additive). NO further DDL. Flag-OFF locally = mock path (what §4b tested).
+- User is opening a NEW terminal to continue. Start B3 with an agent team per the standing directive.
