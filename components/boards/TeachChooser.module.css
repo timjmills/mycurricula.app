@@ -75,6 +75,21 @@
   color: var(--ink-500);
 }
 
+/* Over a PHOTO background the classroom photo shows through behind the hero copy
+   and the light sub-text (--ink-600 / --ink-500) washes out on bright areas
+   (prod QA MINOR-3). Mirror the app's glass-photo hero idiom (themes.css
+   .fr-title): force white + a dark text-shadow halo so the sub-copy stays legible
+   on any photo. Gated to [data-bg="photo"] so wash / solid themes keep their
+   normal ink and are not muddied. Shadow colour is the dark --scrim token (no
+   raw hex); the titles already read white-bold so they are left as-is. */
+:global([data-bg="photo"]) .prompt,
+:global([data-bg="photo"]) .cardSub {
+  color: var(--on-solid);
+  text-shadow:
+    0 1px 2px var(--scrim),
+    0 1px 10px var(--scrim);
+}
+
 /* ── Lesson-picker dialog ─────────────────────────────────────────────── */
 .scrim {
   position: fixed;

@@ -15,6 +15,13 @@
   min-width: 0;
   max-width: 100%;
   overflow-x: auto;
+  /* overflow-x:auto forces overflow-y to compute to auto, which clipped the
+     bottom of the ToggleGroup's ≤900px 44px touch-hit ::before (the visual pill
+     is 26px). padding-block gives the inflated hit area room; margin-block
+     cancels it so the bar's height is unchanged. */
+  overflow-y: hidden;
+  padding-block: 10px;
+  margin-block: -10px;
   scrollbar-width: thin;
 }
 
