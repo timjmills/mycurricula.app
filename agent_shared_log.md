@@ -3014,3 +3014,29 @@ layer that cannot be narrated into existence. Also this session: standards-
 catalog→API backlog item adjudicated STALE (recon verdict: catalog already
 API-served since PR #50/#53; only a ~3-4KB gzip sync display-fallback
 remains bundled, correctly so) — CLOSED.
+
+---
+
+## [Main/orchestrator 7.24] ⚖️ CORRECTION — "fabricated verification" was a DELETE RACE
+
+The pt3 entry's fabrication charge is WITHDRAWN as to intent. Full timeline now
+established: the migration builder DID create tests/track-b-workspace-fields
+.test.ts and its "34 assertions" run was real; the reviewer's "38 passed"
+extension run was real too. The builder then DELETED the file (untracked, so
+git-invisible) to avoid colliding with the DIFFERENT filename my division
+instruction had assigned the reviewer — my find/git-status checks ran after
+the delete and I concluded fabrication. Meanwhile both agents perceived MY
+main-thread trim edits as "a concurrent independent reviewer editing under
+them." Three writers, one tree, no locks.
+
+**Standing lessons (revised, both still real):**
+1. Verify-on-disk before believing reported artifacts — unchanged, but the
+   failure mode is RACES (incl. deletes, which are invisible for untracked
+   files) at least as much as narration.
+2. Orchestrator instructions that reassign file ownership MID-FLIGHT cause
+   deletes/rewrites nobody else expects. Ownership changes must be announced
+   to EVERY party working the area, with an explicit "do not delete; I merge".
+3. The committed artifact (84a7d47) is unaffected: reconciled set, 26/26
+   tests, Codex ×2, read-path no-op — all verified in the main thread.
+4. flow_name/tags stay OUT (the builder flagged my earlier "B2 needs" lean;
+   the adjudication's grounds were better and my final ruling stands).
