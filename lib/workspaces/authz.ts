@@ -52,6 +52,22 @@ export interface SwitchWorkspaceContext {
   isMember: boolean;
 }
 
+/** Inputs the RENAME-WORKSPACE decision depends on (rename_workspace RPC,
+ *  20260726120000_rename_workspace.sql). */
+export interface RenameWorkspaceContext {
+  /** The authenticated caller (auth.uid()). Empty ⇒ not authenticated. */
+  callerId: string;
+  /** The workspace to rename (schools.id). Empty ⇒ no target. */
+  targetSchoolId: string;
+  /** is_workspace_member(target) for the caller — the RPC's fail-closed
+   *  membership gate. A non-member can NEVER rename a foreign tenant. */
+  isMember: boolean;
+  /** Owner OR school_admin of the target workspace — the RPC's admin gate
+   *  (is_school_admin(target) OR workspace_members.is_owner). Mirrors
+   *  isWorkspaceAdminRole; a plain member is rejected. */
+  isWorkspaceAdmin: boolean;
+}
+
 /** Inputs the LIST-ROSTER decision depends on (list_workspace_members RPC,
  *  20260725120000_workspace_roster.sql). */
 export interface ListRosterContext {
@@ -74,6 +90,12 @@ export type SwitchWorkspaceDenyReason =
   | "not-authenticated"
   | "no-target"
   | "not-a-member";
+
+export type RenameWorkspaceDenyReason =
+  | "not-authenticated"
+  | "no-target"
+  | "not-a-member"
+  | "not-an-admin";
 
 export type ListRosterDenyReason =
   | "not-authenticated"
@@ -119,6 +141,30 @@ export function canSwitchToWorkspace(
     return deny<SwitchWorkspaceDenyReason>("no-target");
   // The RPC's crown-jewel gate: only a genuine membership may be activated.
   if (!ctx.isMember) return deny<SwitchWorkspaceDenyReason>("not-a-member");
+  return ALLOW;
+}
+
+/**
+ * Mirror of rename_workspace's preconditions
+ * (20260726120000_rename_workspace.sql). Order matches the SQL's guard order so
+ * the first-failing reason is identical to the RPC's raised error:
+ * authenticated → target-present → membership re-check → admin re-check (both
+ * fail closed). Name validation is NOT modeled here — it is input validation the
+ * UI already enforces (empty snaps back), not authorization; the RPC still
+ * rejects a blank name server-side.
+ */
+export function canRenameWorkspace(
+  ctx: RenameWorkspaceContext,
+): Decision<RenameWorkspaceDenyReason> {
+  if (!ctx.callerId)
+    return deny<RenameWorkspaceDenyReason>("not-authenticated");
+  if (!ctx.targetSchoolId)
+    return deny<RenameWorkspaceDenyReason>("no-target");
+  // Membership is the fail-closed gate; admin rights are checked after it,
+  // matching the SQL (is_workspace_member THEN is_school_admin/is_owner).
+  if (!ctx.isMember) return deny<RenameWorkspaceDenyReason>("not-a-member");
+  if (!ctx.isWorkspaceAdmin)
+    return deny<RenameWorkspaceDenyReason>("not-an-admin");
   return ALLOW;
 }
 

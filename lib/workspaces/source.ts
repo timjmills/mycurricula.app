@@ -1,10 +1,12 @@
 // lib/workspaces/source.ts — the SERVER-side multi-workspace data source.
 //
-// All three operations go through SECURITY DEFINER RPCs
+// All operations go through SECURITY DEFINER RPCs
 // (supabase/migrations/20260724120000_multi_workspace.sql):
 //   • list_my_workspaces()          — SECTION 10 (read; one row per membership)
 //   • set_active_workspace(uuid)    — SECTION 8  (repoint active_school_id)
 //   • create_workspace(text)        — SECTION 9  (mint a whole tenant graph)
+//   • rename_workspace(uuid, text)  — 20260726120000_rename_workspace.sql
+//                                      (relabel a workspace the caller administers)
 // The RPCs own ALL authorization, the fail-closed membership re-checks, the
 // anti-abuse cap, and the audit rows — this layer never re-implements any of
 // that; it just calls the RPC and surfaces the error. Reads that a plain table
@@ -92,4 +94,27 @@ export async function createWorkspace(
     );
   }
   return { schoolId: row.school_id, gradeLevelId: row.grade_level_id };
+}
+
+/**
+ * Rename a workspace the caller administers. The RPC re-checks membership + admin
+ * rights server-side (a non-member, or a member who is not a workspace admin, can
+ * never rename), trims + clamps the name, and updates schools.name only — it
+ * never re-homes teachers.school_id or the active pointer. No-op-safe (renaming
+ * to the current name commits nothing).
+ */
+export async function renameWorkspace(
+  client: ServerClient,
+  schoolId: string,
+  name: string,
+): Promise<void> {
+  const { error } = await client.rpc("rename_workspace", {
+    p_school_id: schoolId,
+    p_name: name,
+  });
+  if (error) {
+    throw new Error(
+      `Workspaces repository rename workspace failed: ${error.message}`,
+    );
+  }
 }

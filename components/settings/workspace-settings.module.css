@@ -48,6 +48,20 @@
   max-width: 64ch;
 }
 
+/* Inline error for the ON-path (MULTI_WORKSPACE) workspace rename — mirrors the
+   switcher's .formError recipe (tokens-only, danger tint). */
+.formError {
+  margin: 4px 0 0;
+  align-self: flex-start;
+  padding: 4px 8px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--danger-tint);
+  border-radius: var(--r-sm);
+  text-wrap: pretty;
+}
+
 .emptyHint {
   margin: 8px 0 0;
   font-size: var(--t-13);

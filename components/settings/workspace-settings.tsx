@@ -59,6 +59,7 @@ import {
 } from "@/lib/use-workspace-settings";
 import { useConsequenceToast } from "@/lib/consequence-toast";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
+import { renameWorkspace, WORKSPACE_CHANGED_EVENT } from "@/lib/workspaces";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "@/components/appearance/settings-card";
 import { useRovingRadio } from "@/components/appearance/use-roving-radio";
@@ -97,28 +98,38 @@ export function WorkspaceSettings(): ReactNode {
 // refused (the workspace always has a name) — the draft snaps back.
 
 function WorkspaceNameCard(): ReactNode {
-  const { workspaceName, isWorkspaceAdmin } = useNotebookState();
+  const { workspaceId, workspaceName, isWorkspaceAdmin } = useNotebookState();
   const { workspaceNameOverride, setWorkspaceName } = useWorkspaceName();
   const { showConsequence } = useConsequenceToast();
   const [savedTick, setSavedTick] = useState(0);
 
-  // ON path (MULTI_WORKSPACE): the workspace name is DB-sourced and there is no
-  // rename RPC this wave, so the legacy localStorage-override editor would flash
-  // a "Saved" toast while nothing persists — the provider IGNORES the override
-  // on the ON path (lib/notebook-state.tsx). Present the real name read-only with
-  // an honest note instead of a control that lies. OFF path (dbManaged=false):
-  // the editable localStorage card, byte-for-byte as today.
+  // ON path (MULTI_WORKSPACE): the workspace name is DB-sourced, so a rename now
+  // persists through the rename_workspace RPC (the legacy localStorage override
+  // is IGNORED on the ON path — lib/notebook-state.tsx). OFF path
+  // (dbManaged=false): the editable localStorage card, byte-for-byte as today.
   const dbManaged = MULTI_WORKSPACE;
 
+  // ON-path async rename state (unused on the OFF path).
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // ON path: a rename needs a resolved active-workspace id AND admin rights.
+  // Until the identity fetch settles (workspaceId null) the field is read-only
+  // with an honest note — never a control that lies. The RPC re-checks both
+  // server-side regardless.
+  const canRenameRemote =
+    dbManaged && isWorkspaceAdmin && workspaceId !== null;
+
   // Local draft — independent while typing; re-syncs whenever the resolved
-  // name changes (cross-tab edit, undo, overlay arrival post-mount).
+  // name changes (cross-tab edit, undo, overlay arrival post-mount, ON-path
+  // re-source after a successful rename).
   const [draft, setDraft] = useState<string>(workspaceName);
   useEffect(() => {
     setDraft(workspaceName);
   }, [workspaceName]);
 
-  const commit = (): void => {
-    if (dbManaged) return; // ON path: read-only field; never write the override
+  // OFF path — localStorage override commit (byte-identical to before the RPC).
+  const commitLocal = (): void => {
     const trimmed = draft.trim();
     if (trimmed === workspaceName) return; // untouched blur — no-op
     if (trimmed === "") {
@@ -139,6 +150,73 @@ function WorkspaceNameCard(): ReactNode {
     });
   };
 
+  // Re-source the DB-sourced identity after a rename (its own provider + the
+  // settings-layout provider both listen for this and re-fetch — router.refresh
+  // alone won't remount a client provider, and the id is unchanged so the page
+  // key doesn't move).
+  const resyncRemote = (): void => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(WORKSPACE_CHANGED_EVENT));
+    }
+  };
+
+  // ON path — rename back to a prior name (the Undo inverse). A failure is
+  // surfaced, never swallowed: the user just clicked Undo and would otherwise
+  // believe it worked while the DB kept the new name. Either way the identity
+  // is re-sourced so the card converges on the DB's actual value.
+  const renameBackTo = async (name: string, id: string): Promise<void> => {
+    try {
+      await renameWorkspace(id, name);
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message
+          ? `Undo didn't apply — ${e.message}`
+          : "Undo didn't apply — the workspace kept its new name.",
+      );
+    } finally {
+      resyncRemote();
+    }
+  };
+
+  // ON path — persist through the rename_workspace RPC, then re-source.
+  const commitRemote = async (): Promise<void> => {
+    const trimmed = draft.trim();
+    if (trimmed === workspaceName) return; // untouched blur — no-op
+    if (trimmed === "") {
+      setDraft(workspaceName); // a workspace always has a name — snap back
+      return;
+    }
+    // No target yet, or a rename already in flight — do nothing.
+    if (workspaceId === null || saving) return;
+    const targetId = workspaceId;
+    const previousName = workspaceName;
+    setError(null);
+    setSaving(true);
+    try {
+      await renameWorkspace(targetId, trimmed);
+      setSavedTick((t) => t + 1);
+      resyncRemote();
+      showConsequence({
+        message: `Workspace renamed to “${trimmed}” — every teacher in this workspace now sees the new name.`,
+        // Rename has a clean inverse — offer to rename back to the prior name.
+        onUndo: () => void renameBackTo(previousName, targetId),
+      });
+    } catch (e) {
+      // Revert the draft to the last known name + surface the friendly message
+      // the client facade threw (never a raw DB/RLS internal).
+      setDraft(previousName);
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : "That didn't work — please try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const commit = dbManaged ? () => void commitRemote() : commitLocal;
+
   // Enter commits by blurring — blur is the single commit path.
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === "Enter") {
@@ -148,11 +226,21 @@ function WorkspaceNameCard(): ReactNode {
   };
 
   // Disabled controls explain WHY they're disabled (CLAUDE.md §4).
+  const renameTip =
+    "Renames the workspace for every teacher — the new name appears in the sidebar for your whole team. Saves when you press Enter or click out of the field.";
+  const notAdminTip =
+    "Only a workspace admin can rename the workspace — ask your admin to change it.";
   const tip = dbManaged
-    ? "Your workspace's name comes from your workspace — renaming it here isn't available yet."
+    ? !isWorkspaceAdmin
+      ? notAdminTip
+      : workspaceId === null
+        ? "Loading your workspace — renaming will be available in a moment."
+        : renameTip
     : isWorkspaceAdmin
-      ? "Renames the workspace for every teacher — the new name appears in the sidebar for your whole team. Saves when you press Enter or click out of the field."
-      : "Only a workspace admin can rename the workspace — ask your admin to change it.";
+      ? renameTip
+      : notAdminTip;
+
+  const disabled = dbManaged ? !canRenameRemote || saving : !isWorkspaceAdmin;
 
   return (
     <SettingsCard
@@ -186,7 +274,7 @@ function WorkspaceNameCard(): ReactNode {
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={onKeyDown}
-            disabled={dbManaged || !isWorkspaceAdmin}
+            disabled={disabled}
             placeholder="e.g. Al-Noor School"
             autoComplete="off"
             spellCheck={false}
@@ -195,11 +283,17 @@ function WorkspaceNameCard(): ReactNode {
             className={styles.textInput}
           />
         </Tooltip>
-        <p className={styles.fieldHint}>
-          {dbManaged
-            ? "Your workspace's name is managed by your workspace."
-            : "Saves when you press Enter or click out of the field. Every teacher in the workspace sees the new name."}
-        </p>
+        {error ? (
+          <p className={styles.formError} role="alert">
+            {error}
+          </p>
+        ) : (
+          <p className={styles.fieldHint}>
+            {dbManaged && !isWorkspaceAdmin
+              ? "Your workspace admin sets the name."
+              : "Saves when you press Enter or click out of the field. Every teacher in the workspace sees the new name."}
+          </p>
+        )}
       </div>
     </SettingsCard>
   );

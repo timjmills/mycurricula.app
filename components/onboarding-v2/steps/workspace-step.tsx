@@ -5,12 +5,14 @@
 // Provisioning already mints a full solo workspace at first sign-in, so this
 // step does NOT create anything — it SHOWS + renames the existing workspace
 // and captures a solo-vs-team intent:
-//   • Rename — the LIVE rename path today is localStorage-only
-//     (lib/use-workspace-settings.ts → `mycurricula:team:workspace-name`); the
-//     server "rename workspace" RPC is a documented Phase 1B seam
-//     (renameNotebookAction renames a NOTEBOOK, not the workspace). We use the
-//     localStorage override, matching the shipped Settings → Workspace card,
-//     and gate it to workspace admins exactly as that card does.
+//   • Rename — flag-gated on MULTI_WORKSPACE:
+//       OFF (today): the localStorage override
+//       (lib/use-workspace-settings.ts → `mycurricula:team:workspace-name`),
+//       matching the shipped Settings → Workspace card, gated to workspace
+//       admins exactly as that card does.
+//       ON: the server rename_workspace RPC (via lib/workspaces/*), targeting
+//       the resolved active workspace id — the localStorage override is IGNORED
+//       on the ON path, so before the RPC existed this was a silent no-op.
 //   • Solo vs team — "Just me" needs no action (the provisioned state IS solo);
 //     "Invite my team" points at the LIVE invite surface (Settings → Workspace
 //     & Team), which already renders seat/invite UI and degrades gracefully for
@@ -23,6 +25,8 @@ import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useNotebookState } from "@/lib/notebook-state";
 import { useWorkspaceName } from "@/lib/use-workspace-settings";
+import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
+import { renameWorkspace, WORKSPACE_CHANGED_EVENT } from "@/lib/workspaces";
 import { useOnboardingV2 } from "@/lib/onboarding-v2-state";
 import { Button, Tooltip } from "@/components/ui";
 import { RadioDot } from "@/components/appearance/settings-card";
@@ -31,11 +35,23 @@ import styles from "./steps-v2.module.css";
 export function WorkspaceStep(): ReactNode {
   const router = useRouter();
   const { data, update } = useOnboardingV2();
-  const { workspaceName, isWorkspaceAdmin } = useNotebookState();
+  const { workspaceId, workspaceName, isWorkspaceAdmin } = useNotebookState();
   const { setWorkspaceName } = useWorkspaceName();
 
+  // ON path (MULTI_WORKSPACE): rename persists through the RPC; the localStorage
+  // override is ignored. OFF path: the localStorage override, as today.
+  const dbManaged = MULTI_WORKSPACE;
+
+  // ON-path async rename state (unused on the OFF path).
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // ON path: a rename needs a resolved active-workspace id AND admin rights.
+  const canRenameRemote =
+    dbManaged && isWorkspaceAdmin && workspaceId !== null;
+
   // Local rename draft — independent while typing; re-syncs when the resolved
-  // name changes (post-mount overlay arrival, cross-tab edit).
+  // name changes (post-mount overlay arrival, cross-tab edit, ON-path re-source).
   const [draft, setDraft] = useState<string>(workspaceName);
   useEffect(() => {
     setDraft(workspaceName);
@@ -45,6 +61,33 @@ export function WorkspaceStep(): ReactNode {
     const trimmed = draft.trim();
     if (trimmed === workspaceName || trimmed === "") {
       setDraft(workspaceName); // untouched or emptied — snap back
+      return;
+    }
+    if (dbManaged) {
+      // No target yet or a rename already in flight — do nothing.
+      if (workspaceId === null || saving) return;
+      const targetId = workspaceId;
+      const previousName = workspaceName;
+      setError(null);
+      setSaving(true);
+      void (async () => {
+        try {
+          await renameWorkspace(targetId, trimmed);
+          // Re-source the DB-sourced identity (the sidebar + this field's name).
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event(WORKSPACE_CHANGED_EVENT));
+          }
+        } catch (e) {
+          setDraft(previousName); // revert to the last known name
+          setError(
+            e instanceof Error && e.message
+              ? e.message
+              : "That didn't work — please try again.",
+          );
+        } finally {
+          setSaving(false);
+        }
+      })();
       return;
     }
     setWorkspaceName(trimmed);
@@ -57,9 +100,14 @@ export function WorkspaceStep(): ReactNode {
     }
   };
 
-  const renameTip = isWorkspaceAdmin
-    ? "Renames your workspace for every teacher on the team — the new name shows in the sidebar for everyone. Saves when you press Enter or click out of the field."
-    : "Only a workspace admin can rename the workspace — ask your admin to change it.";
+  // ON path also blocks while the identity is still resolving (no target id).
+  const nameDisabled = dbManaged ? !canRenameRemote || saving : !isWorkspaceAdmin;
+
+  const renameTip = !isWorkspaceAdmin
+    ? "Only a workspace admin can rename the workspace — ask your admin to change it."
+    : dbManaged && workspaceId === null
+      ? "Loading your workspace — renaming will be available in a moment."
+      : "Renames your workspace for every teacher on the team — the new name shows in the sidebar for everyone. Saves when you press Enter or click out of the field.";
 
   const mode = data.workspaceMode;
   const selectMode = (m: "solo" | "team"): void => update({ workspaceMode: m });
@@ -87,7 +135,7 @@ export function WorkspaceStep(): ReactNode {
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commitName}
             onKeyDown={onNameKeyDown}
-            disabled={!isWorkspaceAdmin}
+            disabled={nameDisabled}
             placeholder="e.g. Al-Noor School"
             maxLength={60}
             autoComplete="off"
@@ -95,11 +143,17 @@ export function WorkspaceStep(): ReactNode {
             title={renameTip}
           />
         </Tooltip>
-        <p className={styles.fieldHint}>
-          {isWorkspaceAdmin
-            ? "Every teacher in the workspace sees this name. You can change it later in Settings."
-            : "Your workspace admin sets the name. You can still finish setting up your own view below."}
-        </p>
+        {error ? (
+          <p className={styles.fieldError} role="alert">
+            {error}
+          </p>
+        ) : (
+          <p className={styles.fieldHint}>
+            {isWorkspaceAdmin
+              ? "Every teacher in the workspace sees this name. You can change it later in Settings."
+              : "Your workspace admin sets the name. You can still finish setting up your own view below."}
+          </p>
+        )}
       </div>
 
       <div className={styles.divider} />

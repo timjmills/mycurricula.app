@@ -35,6 +35,7 @@ import { listWorkspaceNotebooks } from "../admin/queries";
 import {
   createWorkspace,
   listMyWorkspaces,
+  renameWorkspace,
   setActiveWorkspace,
 } from "./source";
 import {
@@ -196,6 +197,25 @@ export async function createWorkspaceAction(
     return { ok: true, value };
   } catch (e) {
     console.error("createWorkspaceAction failed:", e);
+    return { ok: false, error: { message: GENERIC_ERROR } };
+  }
+}
+
+/** Rename a workspace the caller administers. The RPC re-checks membership +
+ *  admin rights server-side; a non-member / non-admin is rejected there. */
+export async function renameWorkspaceAction(
+  schoolId: string,
+  name: string,
+): Promise<WorkspacesActionResult<void>> {
+  if (!seamEnabled()) {
+    return { ok: false, error: { message: BACKEND_OFF } };
+  }
+  try {
+    const client = await sb();
+    await renameWorkspace(client, schoolId, name);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    console.error("renameWorkspaceAction failed:", e);
     return { ok: false, error: { message: GENERIC_ERROR } };
   }
 }

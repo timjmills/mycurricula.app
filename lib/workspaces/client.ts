@@ -17,6 +17,7 @@ import {
   getActiveWorkspaceAction,
   getActiveWorkspaceContextAction,
   listMyWorkspacesAction,
+  renameWorkspaceAction,
   setActiveWorkspaceAction,
   type ActiveWorkspaceContext,
 } from "./actions";
@@ -93,6 +94,18 @@ export async function createWorkspace(
   return res.value;
 }
 
+/** Rename a workspace the caller administers (throws BACKEND_OFF when off, or the
+ *  friendly error the RPC's membership/admin re-check produced). The caller MUST
+ *  re-source the provider after success (broadcast WORKSPACE_CHANGED_EVENT) — the
+ *  new name is DB-sourced, so the displayed identity won't update otherwise. */
+export async function renameWorkspace(
+  schoolId: string,
+  name: string,
+): Promise<void> {
+  const res = await renameWorkspaceAction(schoolId, name);
+  if (!res.ok) throw new Error(res.error.message);
+}
+
 /** Grouped facade for ergonomic imports (`workspacesClient.getActiveWorkspace()`). */
 export const workspacesClient = {
   listMyWorkspaces,
@@ -100,4 +113,5 @@ export const workspacesClient = {
   getActiveWorkspaceContext,
   setActiveWorkspace,
   createWorkspace,
+  renameWorkspace,
 };

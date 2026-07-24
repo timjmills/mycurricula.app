@@ -136,6 +136,14 @@ function writeStoredId(id: string): void {
 // ── Context shape ────────────────────────────────────────────────────────────
 
 export interface NotebookStateValue {
+  /**
+   * The ACTIVE workspace's schools.id, or null.
+   * OFF (Phase 1A): always null — there is no real workspace behind the mock,
+   * and the OFF-path rename callsites use the localStorage override instead.
+   * ON (MULTI_WORKSPACE): the resolved active workspace id (the rename target),
+   * or null until the fetch resolves / on failure / no active workspace.
+   */
+  workspaceId: string | null;
   /** The workspace name (settings override applied; managed on
    *  Settings → Workspace, quiet label everywhere else). */
   workspaceName: string;
@@ -169,6 +177,8 @@ export function useNotebookState(): NotebookStateValue {
 
 /** The real active-workspace identity the ON path layers over the mock. */
 interface RemoteIdentity {
+  /** schools.id of the active workspace — the rename target on the ON path. */
+  schoolId: string;
   name: string;
   isAdmin: boolean;
   notebooks: NotebookEntry[];
@@ -234,6 +244,7 @@ function WorkspaceIdentitySync({
         onResolved(
           workspace
             ? {
+                schoolId: workspace.schoolId,
                 name: workspace.name,
                 isAdmin: isWorkspaceAdminRole(workspace.role),
                 notebooks: notebooks.map((nb) => ({
@@ -350,6 +361,15 @@ export function NotebookProvider({
     ? (remote?.name ?? "")
     : workspaceName;
 
+  // The active workspace id — the rename target on the ON path. OFF path: always
+  // null (no real workspace behind the mock; the OFF-path rename card uses the
+  // localStorage override, so the id is never read there — keeping OFF byte-
+  // identical). ON path: the resolved id, or null until the fetch settles / on
+  // failure / no active workspace (fail closed, same as the name/admin flag).
+  const workspaceId: string | null = MULTI_WORKSPACE
+    ? (remote?.schoolId ?? null)
+    : null;
+
   // Settings overrides (workspace name + notebook overlay) are LEGACY, GLOBAL,
   // localStorage-backed keys from the single-workspace (mock) era. They apply
   // ONLY on the OFF path. On the ON path the base identity is workspace-SPECIFIC
@@ -424,6 +444,7 @@ export function NotebookProvider({
 
   const value = useMemo<NotebookStateValue>(
     () => ({
+      workspaceId,
       workspaceName: effectiveWorkspaceName,
       allNotebooks: mergedNotebooks,
       activeNotebooks,
@@ -432,6 +453,7 @@ export function NotebookProvider({
       isWorkspaceAdmin,
     }),
     [
+      workspaceId,
       effectiveWorkspaceName,
       mergedNotebooks,
       activeNotebooks,

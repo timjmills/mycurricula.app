@@ -105,6 +105,20 @@
   margin: 6px 0 0;
 }
 
+/* Inline error for the ON-path (MULTI_WORKSPACE) workspace rename (tokens-only,
+   danger tint) — matches the settings card's .formError posture. */
+.fieldError {
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--danger-tint);
+  border-radius: var(--r-sm);
+  padding: 4px 8px;
+  margin: 6px 0 0;
+  align-self: flex-start;
+  text-wrap: pretty;
+}
+
 /* A calm note callout (links to Settings for deeper editors, honesty caveats). */
 .note {
   font-size: var(--t-13);
