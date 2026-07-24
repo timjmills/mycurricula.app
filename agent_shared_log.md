@@ -3040,3 +3040,28 @@ them." Three writers, one tree, no locks.
    tests, Codex ×2, read-path no-op — all verified in the main thread.
 4. flow_name/tags stay OUT (the builder flagged my earlier "B2 needs" lean;
    the adjudication's grounds were better and my final ruling stands).
+
+---
+
+## [Main/orchestrator 7.24 pt4] ✅ SIDENAV RETIRED ON PROD · B4.2 · honesty tail · Track-B verified
+
+Prod smoke GREEN post-deploy (hydrate gate full pass) with: **SideNav retired
+on the v2 path** (`ee961e2` — six destinations re-homed per the user's locked
+IA decisions; Codex rounds added the always-present Tools Views row and the
+≤480 avatar→Account-row swap after a MEASURED 13px overflow at 375; v1
+rollback keeps the rail, live-proven), **B4.2 composer unified shell**
+(`5ff764c` — engine byte-untouched, independently confirmed by the gate;
+Draw ships focusable aria-disabled "coming soon"; cmp-modal/cmp-scrim in
+themes.css §5; DEV TRAP: a */ in a CSS-module comment breaks the build
+invisibly to tsc+lint — only a live build catches it), **Week-EDIT 3-state
+skeleton** (`8bc9b83`, closes the 8e3d0a4 follow-up), **Track-B test
+hardening** (`f77d93d`, full-literal type coverage).
+
+**In flight:** B4.3 composer host swaps · B1.7 editable Unit Plan (owns the
+UNIT_COLS snapshot update — apply-coupled: the 20260728120000 migration
+applies WITH the B1.7/B2 ship under §4c, ONE apply event for both sides) ·
+B2 Lessons-editor recon. Next after: B2 build, B3, B5.
+
+**For siblings:** the shared tree is now single-builder-per-area again;
+agents are under the never-stage rule; reported artifacts are verified
+on-disk before belief (see the delete-race correction above).
