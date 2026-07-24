@@ -18,6 +18,7 @@ import {
   UndoToastBridge,
 } from "@/components/shell";
 import { ChromeShell } from "@/components/chrome";
+import { ComposerProvider } from "@/components/composer";
 import { V2 } from "@/lib/v2-flag";
 import styles from "./layout.module.css";
 
@@ -129,40 +130,49 @@ export default function PlannerLayout({
                       ONE live instance — the weekly-schedule-state desync
                       lesson (lib/edit-mode-state.tsx header). */}
                   <EditModeProvider>
-                    {/* Skip-to-content (A11Y-004) — must be the first focusable element
+                    {/* ComposerProvider (B4.0) — the Shared Composer singleton
+                        engine. Innermost so its ComposerHost has usePlanner +
+                        the toast contexts, and so it wraps `children` for
+                        future useComposer() callers. DORMANT this tranche: no
+                        surface opens the composer/menu, so it emits zero DOM
+                        and changes no behavior — latent wiring for the B4.3+
+                        host migrations. Singleton-mount precedent:
+                        lib/undo-toast.tsx. */}
+                    <ComposerProvider>
+                      {/* Skip-to-content (A11Y-004) — must be the first focusable element
                   in the DOM so keyboard users reach it before the top-bar chrome. */}
-                    <a href="#main-content" className={styles.skipLink}>
-                      Skip to content
-                    </a>
-                    <div
-                      className="cp-root"
-                      style={{
-                        flex: 1,
-                        minHeight: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                      }}
-                    >
-                      {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
+                      <a href="#main-content" className={styles.skipLink}>
+                        Skip to content
+                      </a>
+                      <div
+                        className="cp-root"
+                        style={{
+                          flex: 1,
+                          minHeight: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
+                        {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
                     Mounted as a client leaf so the layout stays a Server Component. */}
-                      <GlobalShortcuts />
-                      {/* Remembers the active planner route so the Settings X /
+                        <GlobalShortcuts />
+                        {/* Remembers the active planner route so the Settings X /
                     Escape can return the teacher exactly where they left. */}
-                      <LastRouteRecorder />
-                      {/* First-run activation gate: bounces a teacher who has not
+                        <LastRouteRecorder />
+                        {/* First-run activation gate: bounces a teacher who has not
                     completed onboarding into the wizard. Render-nothing leaf;
                     it redirects ONLY on a resolved "needs onboarding" (never on
                     an unresolved/unknown server read), so it can't flash-bounce
                     or race the bypass login, and /onboarding lives outside this
                     group so no loop is possible. */}
-                      <FirstRunRedirect />
-                      {/* Roadmap-02 undo-toast bridge: a render-nothing client
+                        <FirstRunRedirect />
+                        {/* Roadmap-02 undo-toast bridge: a render-nothing client
                     leaf that watches the planner store's lastChange and fires
                     the undo toast for every undoable gesture (move /
                     completion / first fork / revert). Must sit inside BOTH
                     PlannerProvider and UndoToastProvider. */}
-                      <UndoToastBridge />
-                      {/* W3.3 shell: the v2 corner-grammar chrome (ChromeShell —
+                        <UndoToastBridge />
+                        {/* W3.3 shell: the v2 corner-grammar chrome (ChromeShell —
                     Framework §3 overlay grid: ChromeTopBar with brand +
                     Personal/Team icon toggle + bell · routed content in the
                     middle row · ctx BL + clock BR + quote bottom-center; with
@@ -179,47 +189,48 @@ export default function PlannerLayout({
                     is position:relative so the absolute .overlay grid fills
                     exactly the area right of the SideNav. Teach remains a
                     separate route group with its own chrome. */}
-                      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                        <SideNav />
-                        <div
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            minHeight: 0,
-                            position: "relative",
-                          }}
-                        >
-                          <PlannerChrome>
-                            {/* minWidth:0 replicates `.overlay > * { min-width: 0 }`
+                        <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                          <SideNav />
+                          <div
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              minHeight: 0,
+                              position: "relative",
+                            }}
+                          >
+                            <PlannerChrome>
+                              {/* minWidth:0 replicates `.overlay > * { min-width: 0 }`
                                 (app/chrome.css) so the flag-OFF branch, which has
                                 no `.overlay` ancestor, keeps /daily's h-scroll
                                 containment. Harmless and identical under flag-ON.
                                 (§4a M1) */}
-                            <div
-                              style={{
-                                flex: 1,
-                                minWidth: 0,
-                                minHeight: 0,
-                                display: "flex",
-                              }}
-                            >
-                              <main
-                                id="main-content"
+                              <div
                                 style={{
                                   flex: 1,
                                   minWidth: 0,
                                   minHeight: 0,
-                                  overflow: "auto",
+                                  display: "flex",
                                 }}
                               >
-                                {children}
-                              </main>
-                              <RightPanel />
-                            </div>
-                          </PlannerChrome>
+                                <main
+                                  id="main-content"
+                                  style={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    minHeight: 0,
+                                    overflow: "auto",
+                                  }}
+                                >
+                                  {children}
+                                </main>
+                                <RightPanel />
+                              </div>
+                            </PlannerChrome>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </ComposerProvider>
                   </EditModeProvider>
                 </CatchupProvider>
               </UnitNotesProvider>

@@ -1,0 +1,80 @@
+/* ResMenu.module.css — the shared resource action menu (B4.1).
+ *
+ * Mirrors the ResourceCardFace kebab-menu recipe in the app's default look,
+ * built on PROJECT TOKENS only (tokens.css tiers) — no raw hex/px colours.
+ *
+ * cp-root reset guard: every interactive-button rule DOUBLES its class
+ * (`.menuItem.menuItem` → 0,2,0) so the tokens.css `.cp-root button` (0,1,1)
+ * reset can never strip its padding/border/background. The menu portals to
+ * <body> (outside .cp-root) today, but doubling keeps it correct if a future
+ * host renders it inside the planner root — see the cp-root-button-reset-trap
+ * lesson. */
+
+.menu {
+  width: 216px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-popover);
+  padding: 4px;
+}
+
+.menuItem.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-xs);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-700);
+  /* ≥44px touch target on every device (CLAUDE.md §4). */
+  min-height: 44px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.menuItem.menuItem:hover {
+  background: var(--hairline);
+  color: var(--ink-900);
+}
+
+.menuItem.menuItem:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+.menuItem svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-400);
+  flex: 0 0 auto;
+}
+
+/* Remove — destructive; danger ink, later in the file so it wins the colour. */
+.menuItemDanger.menuItemDanger {
+  color: var(--danger);
+}
+.menuItemDanger.menuItemDanger:hover {
+  color: var(--danger);
+  background: var(--hairline);
+}
+.menuItemDanger.menuItemDanger svg {
+  color: currentColor;
+}
+
+.menuSep {
+  height: 1px;
+  background: var(--hairline);
+  margin: 4px 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menuItem.menuItem {
+    transition: none;
+  }
+}
