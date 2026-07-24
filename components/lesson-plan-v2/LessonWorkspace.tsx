@@ -298,7 +298,24 @@ function ScalarHeader({ lessonId }: { lessonId: string }): ReactNode {
 
 // ── Assessment section (B2 new) ────────────────────────────────────────────────
 
-type KindChoice = "none" | "formative" | "summative";
+type KindChoice = "none" | "unclassified" | "formative" | "summative";
+
+/**
+ * Does this assessment hold anything the teacher actually wrote?
+ *
+ * Load-bearing for the "Not set" state below: an assessment with text but no
+ * kind is a REAL persisted row (`assessmentFromRow` rebuilds one, and
+ * re-validates a garbage stored kind down to `undefined`), so the editor has to
+ * be able to tell it apart from "there is no assessment here" — otherwise it
+ * hides content it was handed.
+ */
+function hasAssessmentText(a: LessonAssessment): boolean {
+  return (
+    (a.title ?? "").trim() !== "" ||
+    (a.purpose ?? "").trim() !== "" ||
+    (a.notes ?? "").trim() !== ""
+  );
+}
 
 const KIND_OPTIONS: Array<{
   value: KindChoice;
@@ -309,6 +326,12 @@ const KIND_OPTIONS: Array<{
     value: "none",
     label: "None",
     title: "This lesson has no attached assessment.",
+  },
+  {
+    value: "unclassified",
+    label: "Not set",
+    title:
+      "Keep this assessment but leave its kind blank — decide formative or summative later.",
   },
   {
     value: "formative",
@@ -363,17 +386,34 @@ function AssessmentSection({
 
   if (!lesson) return null;
 
+  // THREE distinct states, not two. A kindless assessment that still carries
+  // text is "Not set" — NOT "None". Collapsing the two (the shipped behaviour
+  // until the B3 audit) meant an assessment written in the Assessments drawer
+  // without a kind opened here showing "None" with its fields HIDDEN, so the
+  // teacher's title/purpose/notes were invisible — and one click on the
+  // already-selected "None" (ToggleGroup fires onChange even for the active
+  // option) committed `{}` and destroyed text they could not see. The state was
+  // always reachable from the database, so this was latent before the drawer
+  // existed; the drawer only made it easy to create.
   const kindChoice: KindChoice = isAssessmentKind(draft.kind)
     ? draft.kind
-    : "none";
+    : hasAssessmentText(draft)
+      ? "unclassified"
+      : "none";
 
   function onKind(next: KindChoice): void {
     editing.current = true;
-    // "None" = no assessment → clear ALL four fields (§4a MED). Keeping
-    // title/purpose/notes with kind cleared would round-trip as a title-only
-    // assessment, contradicting "None"; the write mapper then nulls all four
-    // columns and the read collapses to `undefined` (no assessment).
-    commit(next === "none" ? {} : { ...draft, kind: next });
+    // "None" = no assessment → clear ALL four fields (§4a MED). Because the
+    // fields are now VISIBLE whenever there is text, this is no longer a silent
+    // destroy: the teacher can see what "None" is about to clear.
+    if (next === "none") {
+      commit({});
+      return;
+    }
+    // "Not set" KEEPS the text and drops only the kind — the state the drawer
+    // calls Unclassified, and the one the read mapper hands back for a row whose
+    // stored kind fails validation.
+    commit({ ...draft, kind: next === "unclassified" ? undefined : next });
   }
   function onField(field: "title" | "purpose" | "notes", value: string): void {
     editing.current = true;
@@ -398,11 +438,12 @@ function AssessmentSection({
         />
       </div>
 
-      {/* Detail fields are hidden under "None" (§4a MED, Codex): leaving the
-          title/purpose/notes inputs live while None is selected let a later
-          keystroke re-send `{ assessment: { title } }` and resurrect a
-          title-only assessment the toggle still calls "None". No rendered
-          input → no onField → no resurrection path. */}
+      {/* Fields are hidden ONLY under "None" — which now means genuinely empty,
+          since any surviving text derives "Not set" instead. The original
+          concern (§4a MED, Codex) still holds and is still satisfied: under
+          "None" there is no text to re-send, so no keystroke can resurrect a
+          title-only assessment. What changed is that text which DOES exist is
+          never hidden from the teacher who wrote it. */}
       {kindChoice !== "none" && (
         <>
           <label className={styles.field}>
