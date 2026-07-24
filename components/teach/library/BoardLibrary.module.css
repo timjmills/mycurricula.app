@@ -467,8 +467,17 @@
 }
 
 /* ── Card actions ──────────────────────────────────────────────────────────── */
+/* The five actions (Open · Duplicate · Repeat · Share · More) were flex:1 with
+   NO gap, so on a narrow card their labels packed edge-to-edge and read as one
+   run ("OpenDuplicateRepeatShare More"). Now each action is content-width and
+   the row spaces them evenly with a real gap; when the card is too narrow for
+   one row the actions WRAP to a second row instead of colliding (labels are
+   never truncated). */
 .actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  gap: 4px 8px;
   border-top: 1px solid var(--ink-150);
   padding-top: 10px;
 }
@@ -478,7 +487,7 @@
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 44px;
   padding: 2px 0;
   border: none;

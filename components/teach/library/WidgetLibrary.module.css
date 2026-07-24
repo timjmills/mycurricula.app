@@ -298,7 +298,9 @@
   cursor: pointer;
 }
 
-.favChip:hover {
+/* Doubled to match the doubled base (.favChip.favChip, 0,2,0) — a single-class
+   :hover (0,1,1) would lose to it and the hover lift would never apply. */
+.favChip.favChip:hover {
   box-shadow: var(--wf-shadow-card);
 }
 
