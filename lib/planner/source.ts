@@ -57,7 +57,14 @@ export interface LessonMoveTarget {
 export type SaveTarget = "personal" | "core";
 
 /** The fields a lesson edit can patch. A subset of `Lesson` — the content +
- *  flags the reducer mutates. The source decides whether the patch forks. */
+ *  flags the reducer mutates. The source decides whether the patch forks.
+ *
+ *  B2 (migration 20260728120000) widens this with the Track-B rich lesson
+ *  fields — every one is CONTENT (each forks in Personal mode / writes master in
+ *  Team mode, exactly like `differentiation`). `taughtAt` is DELIBERATELY absent:
+ *  it is READ-ONLY in B2 ("Mark taught" stays on the status/`setLessonStatus`
+ *  path — writing `taught_at` on a pristine master lesson would fork it,
+ *  violating the completion-never-forks rule, CLAUDE.md §2). */
 export type LessonPatch = Partial<
   Pick<
     Lesson,
@@ -74,6 +81,14 @@ export type LessonPatch = Partial<
     | "reasonNotDone"
     | "tasks"
     | "differentiation"
+    // ── Track-B rich lesson fields (B2) — all content, all fork-per-field ──
+    | "durationMinutes"
+    | "assessment"
+    | "builds"
+    | "prep"
+    | "frameworkId"
+    | "frameworkData"
+    | "carried"
   >
 >;
 

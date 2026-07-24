@@ -29,9 +29,11 @@ const MIGRATION = join(
   "20260728120000_track_b_workspace_fields.sql",
 );
 const SOURCE = join(__dirname, "..", "lib", "planner", "supabase-source.ts");
+const TRACK_B = join(__dirname, "..", "lib", "planner", "lesson-track-b.ts");
 
 const sql = readFileSync(MIGRATION, "utf8");
 const src = readFileSync(SOURCE, "utf8");
+const trackBSrc = readFileSync(TRACK_B, "utf8");
 
 /** Strip SQL line comments so text assertions don't match prose. */
 const code = sql
@@ -197,15 +199,16 @@ describe("migration — planner_settings posture", () => {
   });
 });
 
-describe("read/write-path lock — lesson seam inert; unit seam is B1.7-live", () => {
-  // The LESSON read path stays LOCKED until B2 wires it (coupled to the same
-  // migration apply). The UNIT read + write path went LIVE in B1.7: UNIT_COLS
-  // now selects the Track-B unit columns and updateUnitFields writes them, so
-  // the exact UNIT_COLS snapshot below is DELIBERATELY updated (the apply-coupled
-  // change) while MASTER/COPY/AUTHORED stay pinned to their pre-apply strings.
+describe("read/write-path lock — lesson + unit seams both LIVE (B1.7 + B2)", () => {
+  // Both seams are now wired to the applied migration. The UNIT read + write
+  // path went LIVE in B1.7 (UNIT_COLS selects the Track-B unit columns,
+  // updateUnitFields writes them). The LESSON read + write path goes LIVE in B2
+  // (MASTER/COPY/AUTHORED_COLS select the Track-B lesson columns, lessonTrackBColumns
+  // maps them into all three updateLesson write branches). Both are §4c
+  // apply-coupled: shipping these selects requires the 20260728120000 migration
+  // applied first (already applied on prod — CLAUDE.md §4c). The exact snapshots
+  // below are DELIBERATELY updated to the post-apply strings.
 
-  // Only the LESSON select blocks — the unit block is intentionally excluded
-  // here (it now legitimately names Track-B columns).
   const lessonColsBlocks = ["MASTER_COLS", "COPY_COLS", "AUTHORED_COLS"]
     .map((n) => src.match(new RegExp(`const ${n} =[\\s\\S]*?;`))?.[0] ?? "")
     .join("\n");
@@ -220,15 +223,20 @@ describe("read/write-path lock — lesson seam inert; unit seam is B1.7-live", (
     return m?.[1] ?? "";
   };
 
-  it("lesson select constants stay pinned to their pre-apply snapshots (B2 pending)", () => {
+  it("lesson select constants match their B2 apply-coupled snapshots exactly (Track-B columns added)", () => {
+    // DELIBERATE CHANGE (B2): shipping these selects requires the 20260728120000
+    // migration applied first (the columns must exist before this deploys —
+    // CLAUDE.md §4c; see the ⚠ LAUNCH COUPLING note at the *_COLS constants).
+    // The eleven Track-B lesson columns are IDENTICAL on all three fork tables.
+    const TRACK_B = LESSON_COLS.join(", ");
     expect(colString("MASTER_COLS")).toBe(
-      "id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, differentiation, deleted_at",
+      `id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, differentiation, deleted_at, ${TRACK_B}`,
     );
     expect(colString("COPY_COLS")).toBe(
-      "id, teacher_id, master_core_lesson_event_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, is_diverged_from_master, differentiation, archived_at",
+      `id, teacher_id, master_core_lesson_event_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, is_diverged_from_master, differentiation, archived_at, ${TRACK_B}`,
     );
     expect(colString("AUTHORED_COLS")).toBe(
-      "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, differentiation, deleted_at",
+      `id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, differentiation, deleted_at, ${TRACK_B}`,
     );
   });
 
@@ -248,22 +256,69 @@ describe("read/write-path lock — lesson seam inert; unit seam is B1.7-live", (
     }
   });
 
-  it("no LESSON Track-B column is named in the lesson *_COLS selects (B2 pending)", () => {
+  it("every ruled Track-B lesson column IS named in all three lesson *_COLS selects (B2)", () => {
     expect(lessonColsBlocks.length).toBeGreaterThan(0);
     for (const t of LESSON_COLS) {
-      expect(lessonColsBlocks, t).not.toContain(t);
+      // Present in the combined blocks…
+      expect(lessonColsBlocks, t).toContain(t);
+    }
+    // …and specifically in EACH of the three selects (three-fork-table read
+    // parity — a column read on one table but not the others is a silent drop).
+    for (const name of ["MASTER_COLS", "COPY_COLS", "AUTHORED_COLS"]) {
+      const cols = colString(name);
+      for (const t of LESSON_COLS) {
+        expect(cols, `${name} → ${t}`).toContain(t);
+      }
     }
   });
 
-  it("no LESSON Track-B token appears as a write key (B2 pending; only optional row fields)", () => {
-    // `token:` (an object-literal write) is forbidden; `token?:` (an optional
-    // row-interface field) is the sanctioned form. `carried` is excluded (its
-    // name collides with the LessonStatus 'carried' value). The unit write path
-    // (updateUnitFields) IS live now, so unit tokens are no longer checked here.
-    for (const t of LESSON_COLS.filter((t) => t !== "carried")) {
-      const writeKey = new RegExp(`^\\s*${t}\\s*:`, "m");
-      expect(src, t).not.toMatch(writeKey);
+  it("the lesson write path IS wired (lessonTrackBColumns maps every writable Track-B column)", () => {
+    // Positive B2 counterpart to the unit test below. The pure mapper
+    // (lib/planner/lesson-track-b.ts) assigns each writable column as
+    // `next.<col> =`. `taught_at` is EXCLUDED — it is READ-ONLY in B2 (writing it
+    // would fork a pristine master, breaking completion-never-forks), so it must
+    // NOT appear as a write key anywhere.
+    const WRITABLE = LESSON_COLS.filter((c) => c !== "taught_at");
+    for (const w of WRITABLE) {
+      expect(trackBSrc, w).toContain(`next.${w} =`);
     }
+    // The read-only guard: taught_at is selected (read) but never assigned.
+    expect(trackBSrc).not.toContain("next.taught_at =");
+    expect(src).not.toContain("next.taught_at =");
+  });
+
+  it("all THREE updateLesson branches apply the same lesson mapper (no per-branch drop)", () => {
+    // The mapper is computed ONCE (§4a HIGH-2: the result also feeds the content
+    // gate) and Object.assign'd into each write branch (authored / core-master /
+    // personal-fork). Exactly one compute + three applies → a field can't be
+    // mapped in one branch and silently missed in another.
+    const computes = src.match(/lessonTrackBColumns\(patch\)/g) ?? [];
+    expect(computes.length).toBe(1);
+    const applies = src.match(/Object\.assign\(next, trackBCols\)/g) ?? [];
+    expect(applies.length).toBe(3);
+    // The mapper result also gates content (a cleared field still forks/writes).
+    expect(src).toContain("Object.keys(trackBCols).length > 0");
+  });
+
+  it("first personal fork clones EVERY Track-B column from master (§4a HIGH-1 — no data loss)", () => {
+    // ensurePersonalCopy builds the copy's `base` from master. If it omitted any
+    // Track-B column, a teacher's first edit of ANY field would fork a copy with
+    // that column NULL → the master's value silently disappears for them (the
+    // effective read is copy-over-master). Assert the base clones each of the 11
+    // Track-B columns from `master` (taught_at included, for effective-row parity).
+    const start = src.indexOf("const base: Omit<PersonalCopyRow");
+    expect(start).toBeGreaterThan(-1);
+    const baseBlock = src.slice(start, src.indexOf("};", start) + 2);
+    for (const col of LESSON_COLS) {
+      expect(baseBlock, col).toContain(`${col}: master.${col}`);
+    }
+  });
+
+  it("reads carried via the object-OR-array coercion (§4a MED — arrays not dropped)", () => {
+    // fw_data is object-only (jsonToUnitRecord); carried permits object OR array,
+    // so it must read through the array-preserving helper.
+    expect(src).toContain("carried: jsonToRecordOrArray(row.carried)");
+    expect(src).toContain("frameworkData: jsonToUnitRecord(row.fw_data)");
   });
 
   it("the unit write path IS wired (updateUnitFields assigns Track-B columns)", () => {

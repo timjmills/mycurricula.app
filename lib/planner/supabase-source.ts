@@ -60,6 +60,7 @@
 
 import type {
   Lesson,
+  LessonAssessment,
   LessonDifferentiation,
   LessonMoved,
   LessonResource,
@@ -73,6 +74,14 @@ import type {
   UnitVocabItem,
 } from "../types";
 import { SUBJECTS } from "../mock/subjects";
+// The pure Track-B lesson-field mappers (the write-path validity gate for the
+// un-CHECKed assessment_kind column, and the read/write column mapping) live in
+// this leaf so they are unit-testable without this server-only module.
+import {
+  assessmentFromRow,
+  lessonTrackBColumns,
+  type LessonTrackBRow,
+} from "./lesson-track-b";
 import type { LessonSectionContent } from "../lesson-flow";
 import type { SectionResource } from "../lesson-flow";
 import {
@@ -555,12 +564,24 @@ interface SectionRow {
 }
 
 // Column lists kept in one place so reads stay consistent.
+// ⚠ LAUNCH COUPLING (B2, §4c) — the Track-B LESSON columns (taught_at,
+// duration_minutes, assessment_*, builds, prep, fw_data, fw_id, carried) exist
+// ONLY once the 20260728120000 migration is applied. These selects NAME them
+// (exactly as UNIT_COLS did for the unit columns in B1.7), so this code MUST NOT
+// deploy before that migration is applied on the target DB. If a column is
+// missing the lesson select fails; that surfaces as the planner store's `error`
+// hydration state (listLessons throws → hydrate Promise.all rejects →
+// setHydration "error"), never a crash — but the planner renders no data, so
+// apply first. The Track-B columns are IDENTICAL on all three fork tables (per
+// the migration's three-fork-table parity); each select is kept as a single
+// double-quoted literal so the exact-snapshot lock in
+// tests/track-b-workspace-fields.test.ts can pin it verbatim.
 const MASTER_COLS =
-  "id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, differentiation, deleted_at";
+  "id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, differentiation, deleted_at, taught_at, duration_minutes, assessment_kind, assessment_title, assessment_purpose, assessment_notes, builds, prep, fw_data, fw_id, carried";
 const COPY_COLS =
-  "id, teacher_id, master_core_lesson_event_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, is_diverged_from_master, differentiation, archived_at";
+  "id, teacher_id, master_core_lesson_event_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, is_diverged_from_master, differentiation, archived_at, taught_at, duration_minutes, assessment_kind, assessment_title, assessment_purpose, assessment_notes, builds, prep, fw_data, fw_id, carried";
 const AUTHORED_COLS =
-  "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, differentiation, deleted_at";
+  "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, differentiation, deleted_at, taught_at, duration_minutes, assessment_kind, assessment_title, assessment_purpose, assessment_notes, builds, prep, fw_data, fw_id, carried";
 const COMPLETION_COLS = "core_lesson_event_id, status, reason_not_done";
 // ⚠ LAUNCH COUPLING (B1.7, §4c) — the Track-B unit columns (notes, big_idea,
 // essential_questions, vocab, kud, standards, default_flow, default_dur,
@@ -692,6 +713,25 @@ function jsonToUnitRecord(raw: unknown): Record<string, unknown> | undefined {
   return raw as Record<string, unknown>;
 }
 
+/** Coerce a jsonb value whose column permits OBJECT or ARRAY (`lessons.carried`
+ *  — the shape guard is `jsonb_typeof in ('object','array')`). Preserves both so
+ *  an array of conversion orphans is not silently dropped on read (§4a MED),
+ *  unlike `jsonToUnitRecord` which is for object-only columns (fw_data). Null /
+ *  scalar → undefined. */
+function jsonToRecordOrArray(
+  raw: unknown,
+): Record<string, unknown> | unknown[] | undefined {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "object" && raw !== null)
+    return raw as Record<string, unknown>;
+  return undefined;
+}
+
+// The Track-B lesson-field mappers (assessmentFromRow / lessonTrackBColumns +
+// the shared LessonTrackBRow shape) live in the PURE leaf `./lesson-track-b` so
+// the write-path validity gate is unit-testable without this server-only module
+// (imported at the top). `trackBArgsFromRow` below binds them to the read path.
+
 /** Coerce a persisted section `status` text to the SectionStatus union the
  *  flow renders; anything unknown falls back to "idle". */
 function sectionStatusFromDb(raw: string | null): "idle" | "progress" | "done" {
@@ -805,6 +845,15 @@ function buildLesson(args: {
   modified: boolean;
   moved: LessonMoved;
   differentiation?: LessonDifferentiation;
+  // ── Track-B rich lesson fields (B2, migration 20260728120000) ─────────────
+  taughtAt?: string;
+  assessment?: LessonAssessment;
+  frameworkData?: Record<string, unknown>;
+  frameworkId?: string;
+  durationMinutes?: number;
+  builds?: string;
+  prep?: string;
+  carried?: Record<string, unknown> | unknown[];
 }): Lesson {
   // `preview` is a short summary; the fixtures fall it back to directions. With
   // no dedicated preview column we mirror that: first line of directions.
@@ -834,6 +883,41 @@ function buildLesson(args: {
     unreadComments: 0,
     tasks,
     differentiation: args.differentiation,
+    // Track-B rich fields — undefined when absent (matches `differentiation`).
+    taughtAt: args.taughtAt,
+    assessment: args.assessment,
+    frameworkData: args.frameworkData,
+    frameworkId: args.frameworkId,
+    durationMinutes: args.durationMinutes,
+    builds: args.builds,
+    prep: args.prep,
+    carried: args.carried,
+  };
+}
+
+/** Extract the Track-B rich-field buildLesson args off an effective lesson row
+ *  (`src` = personal copy over master, or an authored row). Shared by every
+ *  buildLesson callsite so read parity across the three tables is provable. */
+function trackBArgsFromRow(row: LessonTrackBRow): {
+  taughtAt?: string;
+  assessment?: LessonAssessment;
+  frameworkData?: Record<string, unknown>;
+  frameworkId?: string;
+  durationMinutes?: number;
+  builds?: string;
+  prep?: string;
+  carried?: Record<string, unknown> | unknown[];
+} {
+  return {
+    taughtAt: row.taught_at ?? undefined,
+    assessment: assessmentFromRow(row),
+    frameworkData: jsonToUnitRecord(row.fw_data),
+    frameworkId: row.fw_id ?? undefined,
+    durationMinutes: row.duration_minutes ?? undefined,
+    builds: row.builds ?? undefined,
+    prep: row.prep ?? undefined,
+    // carried permits object OR array (unlike fw_data) — preserve both (§4a MED).
+    carried: jsonToRecordOrArray(row.carried),
   };
 }
 
@@ -1349,6 +1433,9 @@ export const plannerSupabaseSource: PlannerDataSource = {
           modified: copy?.is_diverged_from_master ?? false,
           moved: copy ? deriveMoved(master, copy) : null,
           differentiation: jsonToDifferentiation(src.differentiation),
+          // Track-B rich fields resolve personal-over-master via `src`, exactly
+          // like every other content field (taught_at included — read-only in B2).
+          ...trackBArgsFromRow(src),
         }),
       );
     }
@@ -1380,6 +1467,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
         modified: false,
         moved: null,
         differentiation: jsonToDifferentiation(a.differentiation),
+        ...trackBArgsFromRow(a),
       });
     });
 
@@ -1523,6 +1611,12 @@ export const plannerSupabaseSource: PlannerDataSource = {
           : undefined;
     const writesStandards =
       patch.standardIds !== undefined || patch.standards !== undefined;
+    // Track-B rich-field columns, mapped ONCE (§4a HIGH-2) and applied in all
+    // three write branches below. Computed up front so it can also feed the
+    // content gate: a Track-B key present in the patch (even a CLEAR — value
+    // undefined → column NULL) yields a column here, so `hasContent` is true and
+    // the edit forks/writes instead of falling into a spurious empty fork.
+    const trackBCols = lessonTrackBColumns(patch);
     const authored = await loadAuthored(client, lessonId, ownerId);
 
     if (authored) {
@@ -1544,6 +1638,10 @@ export const plannerSupabaseSource: PlannerDataSource = {
       if (patch.status !== undefined) next.status = statusToDb(patch.status);
       if (patch.reasonNotDone !== undefined)
         next.reason_not_done = patch.reasonNotDone;
+      // Track-B rich fields (B2) — the SAME mapper as the master + fork branches
+      // below (a field mapped in one branch but missed here would be a silent
+      // drop on authored lessons only).
+      Object.assign(next, trackBCols);
       // `preview`/`time`/`tasks` are derived/unmodelled — skipped, as for copies.
       if (Object.keys(next).length > 0) {
         const upd = await client
@@ -1561,7 +1659,12 @@ export const plannerSupabaseSource: PlannerDataSource = {
     }
 
     // Master-derived path: status-only patch is delegated to setLessonStatus
-    // (which never forks); any content key forks the lesson.
+    // (which never forks); any content key forks the lesson. The Track-B rich
+    // fields (B2) are ALL content — each must appear here so a Track-B-only edit
+    // (e.g. an assessment-only change) forks in Personal mode / writes master in
+    // Team mode, rather than falling through the status-only branch into a
+    // spurious EMPTY fork (the `time` hazard — a contentKey with no column).
+    // `taughtAt` is NOT here: it is read-only in B2 (never patched).
     const contentKeys: (keyof LessonPatch)[] = [
       "title",
       "objective",
@@ -1573,8 +1676,21 @@ export const plannerSupabaseSource: PlannerDataSource = {
       "time",
       "tasks",
       "differentiation",
+      "durationMinutes",
+      "assessment",
+      "builds",
+      "prep",
+      "frameworkId",
+      "frameworkData",
+      "carried",
     ];
-    const hasContent = contentKeys.some((k) => patch[k] !== undefined);
+    // A cleared Track-B field is PRESENT-but-undefined in the patch, so the
+    // `!== undefined` scan alone would miss it; OR-in the mapped columns so a
+    // clear still counts as content (never a status-only delegate, never a
+    // spurious empty fork).
+    const hasContent =
+      contentKeys.some((k) => patch[k] !== undefined) ||
+      Object.keys(trackBCols).length > 0;
 
     if (patch.status !== undefined && !hasContent) {
       // Status-only patch: never forks (completion is always per-teacher, so the
@@ -1604,6 +1720,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
         next.standards = resolvedStandards ?? [];
       if (patch.differentiation !== undefined)
         next.differentiation = patch.differentiation;
+      // Track-B rich fields (B2) — same mapper as the authored + fork branches.
+      Object.assign(next, trackBCols);
       // `preview`/`time`/`tasks` have no master column (derived/unmodelled) —
       // skipped, exactly as in the personal-copy patch below.
       if (Object.keys(next).length > 0) {
@@ -1637,6 +1755,10 @@ export const plannerSupabaseSource: PlannerDataSource = {
         next.standards = resolvedStandards ?? [];
       if (patch.differentiation !== undefined)
         next.differentiation = patch.differentiation;
+      // Track-B rich fields (B2) — same mapper as the authored + master
+      // branches. A personal edit of any of these forks the copy (this branch
+      // only runs in personal mode), exactly like a differentiation edit.
+      Object.assign(next, trackBCols);
       // `preview`/`time`/`tasks` have no column in the copies table — they are
       // derived (preview) or unmodelled (time/tasks). Skipped intentionally.
       void copy;
@@ -2161,6 +2283,24 @@ async function ensurePersonalCopy(
     // First fork clones the master's content — differentiation included.
     differentiation: master.differentiation ?? null,
     archived_at: null,
+    // ── Track-B rich fields (B2, §4a HIGH-1) ────────────────────────────────
+    // The copy is the EFFECTIVE read (copy-over-master), so a first personal
+    // edit of ANY field must clone EVERY Track-B column from master — otherwise
+    // duration/assessment/builds/prep/framework/carried/taught_at would read as
+    // NULL for that teacher (the master's values would silently disappear the
+    // moment they edit anything). taught_at is cloned too (read-only in B2, but
+    // the copy must still surface the master's value after a fork).
+    taught_at: master.taught_at ?? null,
+    duration_minutes: master.duration_minutes ?? null,
+    assessment_kind: master.assessment_kind ?? null,
+    assessment_title: master.assessment_title ?? null,
+    assessment_purpose: master.assessment_purpose ?? null,
+    assessment_notes: master.assessment_notes ?? null,
+    builds: master.builds ?? null,
+    prep: master.prep ?? null,
+    fw_data: master.fw_data ?? null,
+    fw_id: master.fw_id ?? null,
+    carried: master.carried ?? null,
   };
   const inserted = await client
     .from("personal_core_lesson_event_copies")
@@ -2402,6 +2542,7 @@ async function reloadLesson(
     modified: copy?.is_diverged_from_master ?? false,
     moved: copy ? deriveMoved(master, copy) : null,
     differentiation: jsonToDifferentiation(src.differentiation),
+    ...trackBArgsFromRow(src),
   });
 }
 
@@ -2471,6 +2612,7 @@ async function reloadAuthoredLesson(
     modified: false,
     moved: null,
     differentiation: jsonToDifferentiation(authored.differentiation),
+    ...trackBArgsFromRow(authored),
   });
 }
 

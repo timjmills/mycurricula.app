@@ -119,6 +119,10 @@
 }
 
 /* ── Embedded variant — chromeless, for an in-page host pane ─────────────── */
+/* B2: the embedded host is now a single scrolling workspace (no tab strip).
+   `.embed` still declares the --ue-* accents so the variant is self-sufficient
+   outside the modal; `.embedScroll` supplies the horizontal padding the modal
+   shell's `.body` would otherwise own. */
 .embed {
   --ue-tint-soft: color-mix(in srgb, var(--c) 10%, var(--surface));
   --ue-tint-hover: color-mix(in srgb, var(--c) 16%, var(--surface));
@@ -129,44 +133,8 @@
   min-height: 0;
   min-width: 0;
 }
-.embedTabs {
-  display: flex;
-  gap: 2px;
-  border-bottom: 1px solid var(--ue-hairline);
-  flex: 0 0 auto;
-  overflow-x: auto;
-}
-/* Doubled (0,2,0) to outgun the `.cp-root button` reset (0,1,1). */
-.embedTab.embedTab {
-  appearance: none;
-  border: none;
-  background: none;
-  padding: 11px 12px;
-  font-size: var(--t-13, 13px);
-  font-weight: 700;
-  color: var(--ink-500, #6e6c82);
-  cursor: pointer;
-  white-space: nowrap;
-  border-bottom: 2.5px solid transparent;
-  margin-bottom: -1px;
-  transition:
-    color 0.14s,
-    border-color 0.14s;
-}
-.embedTab.embedTab:hover {
-  color: var(--cd, var(--ink, #1c1b2e));
-}
-.embedTabOn.embedTabOn {
-  color: var(--cd, var(--ink, #1c1b2e));
-  border-bottom-color: var(--c);
-}
-.embedTab.embedTab:focus-visible {
-  outline: 2px solid var(--ue-accent-border);
-  outline-offset: -2px;
-  border-radius: var(--r-8, 7px);
-}
-.embedBody {
-  padding: 14px 0 4px;
+.embedScroll {
+  padding: 14px 16px 8px;
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -183,11 +151,6 @@
 
 /* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
 @media (pointer: coarse), (max-width: 900px) {
-  /* Doubled to match the doubled bases above. */
-  .embedTab.embedTab {
-    padding-top: 15px;
-    padding-bottom: 15px;
-  }
   .lessonSel {
     min-height: 44px;
   }

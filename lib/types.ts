@@ -376,8 +376,11 @@ export interface Lesson {
   builds?: string;
   /** Prep / materials to ready before teaching (lessons.prep). */
   prep?: string;
-  /** Conversion orphans carried across a framework switch (lessons.carried jsonb). */
-  carried?: Record<string, unknown>;
+  /** Conversion orphans carried across a framework switch (lessons.carried jsonb).
+   *  The DB shape guard permits an OBJECT or an ARRAY (unlike fw_data, which is
+   *  object-only), so the domain preserves both — an array of orphans must not be
+   *  silently dropped on read (§4a MED). */
+  carried?: Record<string, unknown> | unknown[];
 }
 
 export type NoteScope = "shared" | "personal";

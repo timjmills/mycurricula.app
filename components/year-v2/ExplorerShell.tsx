@@ -71,11 +71,19 @@ export interface ExplorerShellProps<K extends string = string> {
   headerRight?: ReactNode;
   /** Optional band of real stats between the header and the tablist. */
   statStrip?: ReactNode;
-  tabs: ReadonlyArray<ExplorerShellTab<K>>;
-  activeTab: K;
-  onTabChange: (key: K) => void;
+  /**
+   * The tab strip. OPTIONAL (B2): a single-scroll body (the Lesson Planner
+   * workspace) passes no tabs — the shell then renders the body as a plain
+   * scroll region with no tablist, labelled by `bodyLabel`. The Unit Planner
+   * keeps passing tabs, so its code path is byte-unchanged.
+   */
+  tabs?: ReadonlyArray<ExplorerShellTab<K>>;
+  activeTab?: K;
+  onTabChange?: (key: K) => void;
   /** aria-label for the tablist ("Unit details" / "Lesson plan"). */
-  tablistLabel: string;
+  tablistLabel?: string;
+  /** aria-label for the body when it is a plain scroll region (no tabs). */
+  bodyLabel?: string;
   /** `title=` on the dialog root — the touch long-press explanation. */
   dialogTitle: string;
   /** aria-label on the ✕ button. */
@@ -153,6 +161,7 @@ export function ExplorerShell<K extends string = string>({
   activeTab,
   onTabChange,
   tablistLabel,
+  bodyLabel,
   dialogTitle,
   closeLabel,
   dialogAriaLabel,
@@ -241,6 +250,7 @@ export function ExplorerShell<K extends string = string>({
   // ── Tablist arrow-key roving (WAI-ARIA tablist) ───────────────────────────
   const onTabKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+      if (!tabs || tabs.length === 0 || !onTabChange) return;
       const idx = tabs.findIndex((t) => t.key === activeTab);
       let next = idx;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") next = idx + 1;
@@ -264,19 +274,27 @@ export function ExplorerShell<K extends string = string>({
 
   const showModeSwitch = mode !== undefined && onModeChange !== undefined;
   const isFull = presentation === "full";
+  const hasTabs = tabs !== undefined && tabs.length > 0;
 
   // One tabpanel serves every tab (only the active tab's body is mounted), so it
   // is named by the ACTIVE tab's id — the canonical single-panel WAI-ARIA tabs
   // relationship — rather than a free-text aria-label a screen reader can't tie
   // back to a tab (Codex W7 gate). Factored out so the with-rail and no-rail
   // branches below render the SAME element, byte-for-byte, in the no-rail path.
-  const bodyRegion = (
+  //
+  // B2: with NO tabs (the single-scroll Lesson workspace) the body is a plain
+  // scroll REGION named by `bodyLabel` — there is no tab to label it.
+  const bodyRegion = hasTabs ? (
     <div
       className={styles.body}
       role="tabpanel"
       id="ue-tabpanel"
       aria-labelledby={`ue-tab-${activeTab}`}
     >
+      {body}
+    </div>
+  ) : (
+    <div className={styles.body} role="region" aria-label={bodyLabel}>
       {body}
     </div>
   );
@@ -383,33 +401,35 @@ export function ExplorerShell<K extends string = string>({
         {/* ── Stat strip (real values only) ──────────────────────────────── */}
         {statStrip ? <div className={styles.statStrip}>{statStrip}</div> : null}
 
-        {/* ── Tabs ───────────────────────────────────────────────────────── */}
-        <div
-          className={styles.tabs}
-          role="tablist"
-          aria-label={tablistLabel}
-          onKeyDown={onTabKeyDown}
-        >
-          {tabs.map(({ key, label }) => {
-            const active = key === activeTab;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                data-ue-tab={key}
-                id={`ue-tab-${key}`}
-                aria-selected={active}
-                aria-controls="ue-tabpanel"
-                tabIndex={active ? 0 : -1}
-                className={`${styles.tab} ${active ? styles.tabActive : ""}`}
-                onClick={() => onTabChange(key)}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        {/* ── Tabs (omitted for a single-scroll body — B2) ─────────────────── */}
+        {hasTabs && (
+          <div
+            className={styles.tabs}
+            role="tablist"
+            aria-label={tablistLabel}
+            onKeyDown={onTabKeyDown}
+          >
+            {tabs.map(({ key, label }) => {
+              const active = key === activeTab;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  data-ue-tab={key}
+                  id={`ue-tab-${key}`}
+                  aria-selected={active}
+                  aria-controls="ue-tabpanel"
+                  tabIndex={active ? 0 : -1}
+                  className={`${styles.tab} ${active ? styles.tabActive : ""}`}
+                  onClick={() => onTabChange?.(key)}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* ── Body (with optional left rail) ─────────────────────────────── */}
         {/* No rail — every caller today — renders `bodyRegion` alone, exactly as

@@ -111,6 +111,19 @@ function cloneLesson(l: Lesson): Lesson {
       resources: t.resources.map((r) => ({ ...r })),
       standards: [...t.standards],
     })),
+    // Track-B nested fields (B2) — copied so a caller can never mutate the store
+    // through a returned lesson (mirrors cloneUnit's Track-B handling). The
+    // scalar Track-B fields (durationMinutes/builds/prep/frameworkId/taughtAt)
+    // ride the top-level spread.
+    assessment: l.assessment ? { ...l.assessment } : undefined,
+    frameworkData: l.frameworkData ? { ...l.frameworkData } : undefined,
+    // carried permits object OR array — clone each shape correctly (spreading an
+    // array into an object literal would corrupt it to a numeric-keyed object).
+    carried: l.carried
+      ? Array.isArray(l.carried)
+        ? [...l.carried]
+        : { ...l.carried }
+      : undefined,
   };
 }
 

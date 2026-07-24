@@ -1,42 +1,29 @@
 "use client";
 
-// PlanPage.tsx — the Lesson Planner (Wave 7): the bundle's "Lesson Planner"
-// mode of the two-mode Explorer, and the surface that restores the ability to
-// edit a lesson's `objective`, `notes`, and `differentiation` (orphaned when
-// W3.8 replaced /daily's PlanningTabs).
+// PlanPage.tsx — the Lesson Planner. B2 replaced its six-tab strip with a
+// single-scroll workspace body (<LessonWorkspace>): a scalar header
+// (title · objective · duration) followed by collapsible sections that either
+// reuse an existing tab body (Standards / Resources / Differentiation / Notes),
+// embed the shared <LessonEditor> for the lesson flow (retiring the read-only
+// FlowTab), or edit B2's new fields (Assessment · Builds & prep · Framework).
+// The old Overview tab is subsumed by the scalar header.
 //
 // TWO HOSTS, one component:
-//   • modal (default) — renders inside <ExplorerShell>, the same dialog the
-//     Unit Planner uses. UnitExplorer flips between the two modes in place.
-//   • `embedded` — chromeless (no scrim, no header band, no footer): just the
-//     tab strip + body, for an in-page host that already owns its own chrome.
-//
-// SIX TABS: Overview · Flow · Standards · Resources · Differentiation · Notes.
-// The bundle also draws **Materials** and **Stats**; neither ships here.
-// Materials has no model at all (no `Lesson` field, no table), and every Stats
-// number is fabricated — the bundle's "Resources: 5" is a literal and its
-// "planned time" sums a hard-coded flow array. Shipping dead placeholders is
-// out of scope (the precedent UnitExplorer set for pace / projected-finish).
-// The stat strip below carries only values the store actually holds.
+//   • modal (default) — renders inside <ExplorerShell>. B2 passes NO tabs, so
+//     the shell shows the workspace as one scroll region (no tablist), labelled
+//     via `bodyLabel`. UnitExplorer flips between Unit and Lesson modes in place.
+//   • `embedded` — chromeless (no scrim/header/footer): just the scrolling
+//     workspace, for an in-page host that owns its own chrome.
 //
 // SAVE TARGET: this surface deliberately has NO Team/Personal save prompt.
-// `usePlanner().setSaveTarget(id, "core")` is a store NO-OP (planner-store.tsx
-// returns the doc unchanged unless target === "personal"), so a "save to Team"
+// `usePlanner().setSaveTarget(id, "core")` is a store NO-OP, so a "save to Team"
 // affordance here would tell the teacher their edit reached the whole team when
 // nothing was written. Editing autosaves through the store's lazy-fork path;
-// the explicit Push-to-Team button stays where it already works, in
-// LessonModal / DayEditSplit.
+// the explicit Push-to-Team button stays where it works, in LessonModal /
+// DayEditSplit.
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanner } from "@/lib/planner-store";
 import { unitLessons, resolveUnitHeader } from "@/lib/year-v2-data";
@@ -50,25 +37,10 @@ import {
   LESSON_STATUS_SHORT,
   isTaught,
 } from "./lesson-status";
-import {
-  OverviewTab,
-  FlowTab,
-  StandardsTab,
-  ResourcesTab,
-  DifferentiationTab,
-  NotesTab,
-} from "./tabs";
+import { LessonWorkspace } from "./LessonWorkspace";
 import styles from "./plan-page.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────
-
-export type PlanTabKey =
-  | "overview"
-  | "flow"
-  | "standards"
-  | "resources"
-  | "differentiation"
-  | "notes";
 
 interface PlanPageCommon {
   lessonId: string;
@@ -96,33 +68,6 @@ export type PlanPageProps =
   | (PlanPageCommon & { embedded?: false; onClose: () => void })
   | (PlanPageCommon & { embedded: true; onClose?: () => void });
 
-const TABS: ReadonlyArray<{ key: PlanTabKey; label: string }> = [
-  { key: "overview", label: "Overview" },
-  { key: "flow", label: "Flow" },
-  { key: "standards", label: "Standards" },
-  { key: "resources", label: "Resources" },
-  { key: "differentiation", label: "Differentiation" },
-  { key: "notes", label: "Notes" },
-];
-
-/** Render one tab's body. Kept out of the render tree so both hosts share it. */
-function tabBody(tab: PlanTabKey, lessonId: string): ReactNode {
-  switch (tab) {
-    case "overview":
-      return <OverviewTab lessonId={lessonId} />;
-    case "flow":
-      return <FlowTab lessonId={lessonId} />;
-    case "standards":
-      return <StandardsTab lessonId={lessonId} />;
-    case "resources":
-      return <ResourcesTab lessonId={lessonId} />;
-    case "differentiation":
-      return <DifferentiationTab lessonId={lessonId} />;
-    case "notes":
-      return <NotesTab lessonId={lessonId} />;
-  }
-}
-
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function PlanPage({
@@ -142,7 +87,6 @@ export function PlanPage({
   } = usePlanner();
   const router = useRouter();
 
-  const [tab, setTab] = useState<PlanTabKey>("overview");
   // The lesson the header's picker is on. `lessonId` seeds it; cycling the
   // picker moves it WITHIN the unit without touching the host's selection.
   const [activeId, setActiveId] = useState(lessonId);
@@ -177,21 +121,18 @@ export function PlanPage({
   }, [missing, embedded, onModeChange, onClose]);
 
   // ── Footer actions ──────────────────────────────────────────────────────
-  // `partial` / `carried` / `skipped` are NOT taught — only `done` is. The
-  // header, the stat strip, and the tab bodies all read their words from
-  // ./lesson-status so a partly-taught lesson can never say "Planned" up here
-  // and "Partly taught" two hundred pixels below.
+  // `partial` / `carried` / `skipped` are NOT taught — only `done` is.
   const status = lesson?.status ?? "not_done";
   const done = isTaught(status);
-  // Stable across renders — the shell's Escape listener re-binds on identity
-  // change, and `onClose` is optional in the embedded host.
   const handleClose = useCallback((): void => onClose?.(), [onClose]);
   const onTeach = useCallback((): void => {
     onClose?.();
     router.push(`/teach?lesson=${encodeURIComponent(activeId)}`);
   }, [onClose, router, activeId]);
   const onToggleTaught = useCallback((): void => {
-    // Completion never forks the lesson (CLAUDE.md §2).
+    // Completion never forks the lesson, and taughtAt is written on the status
+    // path — NEVER as a lesson content edit (CLAUDE.md §2; B2 keeps taughtAt
+    // read-only in the editor).
     setLessonStatus(activeId, done ? "not_done" : "done");
   }, [setLessonStatus, activeId, done]);
   const onDuplicate = useCallback((): void => {
@@ -208,21 +149,26 @@ export function PlanPage({
   const seqLabel = seqIndex >= 0 ? `${seqIndex + 1}/${siblings.length}` : `1/1`;
   const standardCode = lesson.standards[0] ?? "—";
   const unitName = header?.name ?? lesson.unit;
-  const body = tabBody(tab, activeId);
 
-  // ── Embedded host — chromeless tab strip + body ─────────────────────────
+  // ── Embedded host — chromeless scrolling workspace ──────────────────────
+  // Passes `showMeta`: the embedded host has no shell header/subtitle/stat strip,
+  // so the workspace renders its own compact subject/unit/week/status strip
+  // (§4a MED — the context the retired OverviewTab used to carry here).
   if (embedded) {
     return (
-      <EmbeddedPlan
-        subjectCls={subject.cls}
-        tab={tab}
-        onTabChange={setTab}
-        body={body}
-      />
+      <div className={`${styles.embed} cp-subj ${subject.cls}`}>
+        <div className={styles.embedScroll}>
+          <LessonWorkspace lessonId={activeId} showMeta />
+        </div>
+      </div>
     );
   }
 
-  // ── Modal host — the shared ExplorerShell ───────────────────────────────
+  // Modal host: the shell chrome already carries subject/unit/status, so the
+  // workspace omits its meta strip.
+  const body = <LessonWorkspace lessonId={activeId} />;
+
+  // ── Modal host — the shared ExplorerShell (no tabs → single scroll) ──────
   return (
     <ExplorerShell
       subject={subject}
@@ -230,6 +176,7 @@ export function PlanPage({
       dialogTitle="Lesson planner — everything this lesson teaches. Close with the ✕ or Esc."
       closeLabel="Close lesson planner"
       dialogAriaLabel={`Lesson planner — ${lesson.title}`}
+      bodyLabel="Lesson plan"
       title={
         <select
           className={styles.lessonSel}
@@ -279,10 +226,6 @@ export function PlanPage({
           <Stat value={LESSON_STATUS_SHORT[status]} label="status" />
         </>
       }
-      tabs={TABS}
-      activeTab={tab}
-      onTabChange={setTab}
-      tablistLabel="Lesson plan"
       mode="lesson"
       onModeChange={onModeChange}
       onClose={handleClose}
@@ -330,90 +273,6 @@ function Stat({ value, label }: { value: string; label: string }): ReactNode {
     <div className={styles.stat}>
       <span className={styles.statValue}>{value}</span>
       <span className={styles.statLabel}>{label}</span>
-    </div>
-  );
-}
-
-// ── Embedded host ─────────────────────────────────────────────────────────
-
-/** The chromeless variant: the same six tabs with their own roving tablist.
- *  Ids come from useId so an embedded planner can coexist with an open modal
- *  without colliding on the shell's static `ue-tabpanel` id. */
-function EmbeddedPlan({
-  subjectCls,
-  tab,
-  onTabChange,
-  body,
-}: {
-  subjectCls: string;
-  tab: PlanTabKey;
-  onTabChange: (key: PlanTabKey) => void;
-  body: ReactNode;
-}): ReactNode {
-  const uid = useId();
-  const stripRef = useRef<HTMLDivElement>(null);
-  const panelId = `${uid}-panel`;
-
-  const onKeyDown = useCallback(
-    (e: ReactKeyboardEvent<HTMLDivElement>): void => {
-      const idx = TABS.findIndex((t) => t.key === tab);
-      let next = idx;
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = idx + 1;
-      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = idx - 1;
-      else if (e.key === "Home") next = 0;
-      else if (e.key === "End") next = TABS.length - 1;
-      else return;
-      e.preventDefault();
-      const wrapped = (next + TABS.length) % TABS.length;
-      onTabChange(TABS[wrapped].key);
-      stripRef.current
-        ?.querySelector<HTMLElement>(`[data-plan-tab="${TABS[wrapped].key}"]`)
-        ?.focus();
-    },
-    [tab, onTabChange],
-  );
-
-  return (
-    <div className={`${styles.embed} cp-subj ${subjectCls}`}>
-      <div
-        ref={stripRef}
-        className={styles.embedTabs}
-        role="tablist"
-        aria-label="Lesson plan"
-        onKeyDown={onKeyDown}
-      >
-        {TABS.map(({ key, label }) => {
-          const active = key === tab;
-          return (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              data-plan-tab={key}
-              id={`${uid}-tab-${key}`}
-              aria-selected={active}
-              aria-controls={panelId}
-              tabIndex={active ? 0 : -1}
-              className={`${styles.embedTab} ${
-                active ? styles.embedTabOn : ""
-              }`}
-              onClick={() => onTabChange(key)}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-      {/* Named by the active tab's id (WAI-ARIA single-panel tabs), not a
-          free-text label — mirrors ExplorerShell's panel. */}
-      <div
-        className={styles.embedBody}
-        role="tabpanel"
-        id={panelId}
-        aria-labelledby={`${uid}-tab-${tab}`}
-      >
-        {body}
-      </div>
     </div>
   );
 }
