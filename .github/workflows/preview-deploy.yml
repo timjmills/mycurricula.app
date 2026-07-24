@@ -27,6 +27,11 @@ on:
     branches:
       - claude/friendly-ride-zExL7
   workflow_dispatch:
+    inputs:
+      multi_workspace:
+        description: "Build with NEXT_PUBLIC_MULTI_WORKSPACE=1 (flag-ON preview QA for the enable cutover)"
+        type: boolean
+        default: false
 
 concurrency:
   group: preview-${{ github.ref }}
@@ -62,6 +67,9 @@ jobs:
           NEXT_PUBLIC_PLANNER_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_PLANNER_USE_SUPABASE }}
           # v2 redesign shell/router gate — inlined at build; see deploy.yml.
           NEXT_PUBLIC_V2: ${{ vars.NEXT_PUBLIC_V2 || '1' }}
+          # Multi-workspace flag — OFF unless this run was dispatched with the
+          # multi_workspace input (flag-ON preview QA; push builds stay OFF).
+          NEXT_PUBLIC_MULTI_WORKSPACE: ${{ (github.event_name == 'workflow_dispatch' && inputs.multi_workspace) && '1' || '' }}
 
       # Upload as a non-active version. Captures the Preview URL from wrangler's
       # output and writes it to the job summary. Does NOT promote to production
