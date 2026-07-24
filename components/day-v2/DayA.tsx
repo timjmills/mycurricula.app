@@ -105,6 +105,9 @@ export function DayA(props: DayViewV2Props): ReactNode {
               // nesting (Codex R2). Double-click still opens the planner.
               <div
                 key={lesson.id}
+                // Stable probe/e2e + scrollPlannerItemIntoView hook (parity
+                // with weekly/catch-up rows; cutover follow-up #3).
+                data-planner-item={`lesson:${lesson.id}`}
                 ref={(el) => {
                   if (el) rowRefs.current.set(lesson.id, el);
                   else rowRefs.current.delete(lesson.id);

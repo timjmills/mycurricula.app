@@ -570,6 +570,10 @@ export function TimelineYear(): ReactNode {
           return (
             <div
               key={subject.id}
+              // Stable probe/e2e hook: the drill view is the default Year
+              // surface, and the §4c hydrate gate asserts rendered subjects
+              // here (data-year-lane only exists in the YearA lane mode).
+              data-year-subject={subject.id}
               className={`${styles.rowwrap} ${styles.tlVars} cp-subj ${subject.cls}`}
             >
               <div className={styles.subrow}>

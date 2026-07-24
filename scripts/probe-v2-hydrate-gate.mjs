@@ -73,10 +73,9 @@ const ROUTES = [
     // v1 and v2 mark a day lesson row DIFFERENTLY, and the gate has to be
     // correct on both or it reports a phantom failure on whichever it wasn't
     // written against. v1 (components/daily/DailyView) carries
-    // data-planner-item; v2 (components/day-v2 DayA/DayB/DayC) carries NO data
-    // attribute at all — its only stable, non-hashed handle is the row title.
-    // (The real fix is to add data-planner-item to day-v2 so it matches every
-    // other surface's convention; until then, match either.)
+    // data-planner-item; day-v2 (DayA/DayB/DayC) gained the same attribute on
+    // 2026-07-24 (cutover follow-up #3). The title fallback stays so the gate
+    // remains correct against builds that predate that commit.
     // The `.cp-subj` qualifier is REQUIRED, not decoration: in the `paper`
     // frame DayB's FocusPanel root carries the same title and the bare
     // selector over-counts by one. FocusPanel has no `.cp-subj` class, so the
@@ -91,8 +90,12 @@ const ROUTES = [
   {
     path: "/year",
     label: "Year",
-    // the incident's literal symptom was "zero subjects rendered"
-    marker: "[data-year-lane]",
+    // the incident's literal symptom was "zero subjects rendered".
+    // data-year-lane only exists in the YearA lane mode; the DEFAULT Year
+    // surface is the progressive-drill TimelineYear, whose subject rows carry
+    // data-year-subject (added 2026-07-24). Accept either so the gate is
+    // correct in every view mode.
+    marker: "[data-year-lane], [data-year-subject]",
     what: "subject lanes",
     min: 1,
   },
@@ -161,11 +164,32 @@ const HYDRATE_BUDGET_MS = 18_000;
 async function settle(page, marker) {
   if (marker) {
     // The marker appearing IS hydrate completion — far better than a timer.
+    // 75s, not 45s: the edge hydrate chain's slow tail (cold isolate + six
+    // chained POSTs) intermittently exceeded 45s and produced flaky reds on a
+    // healthy prod (observed 2026-07-24: 37 items rendered at ~50s).
     await page
       .locator(marker)
       .first()
-      .waitFor({ state: "visible", timeout: 45_000 })
+      .waitFor({ state: "visible", timeout: 75_000 })
       .catch(() => {});
+    // Post-7.23 the loading-honesty skeletons (role="status", aria-busy)
+    // paint during hydrate; if the marker never showed, give the skeletons a
+    // chance to clear and re-check once — an aria-busy page is "still
+    // loading", not "empty".
+    const visible = await page.locator(marker).first().isVisible().catch(() => false);
+    if (!visible) {
+      await page
+        .waitForFunction(
+          () => document.querySelectorAll('[aria-busy="true"]').length === 0,
+          { timeout: 20_000 },
+        )
+        .catch(() => {});
+      await page
+        .locator(marker)
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .catch(() => {});
+    }
     await page.waitForLoadState("networkidle", { timeout: 45_000 }).catch(() => {});
     await page.waitForTimeout(2_000);
     return;

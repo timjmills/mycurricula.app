@@ -106,6 +106,9 @@ export function DayB(props: DayViewV2Props): ReactNode {
               // invalid AT nesting; Codex R2). Double-click opens the planner.
               <div
                 key={lesson.id}
+                // Stable probe/e2e hook (parity with weekly/catch-up rows;
+                // cutover follow-up #3).
+                data-planner-item={`lesson:${lesson.id}`}
                 className={`cp-subj ${subject.cls} ${styles.vbRailItem} ${
                   selected ? styles.vbRailItemSel : ""
                 }`}
