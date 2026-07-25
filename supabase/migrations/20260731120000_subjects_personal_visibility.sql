@@ -1,0 +1,167 @@
+-- ###########################################################################
+-- ## subjects RLS — make a personal course actually private
+-- ###########################################################################
+-- ⚠ AUTHORED, NOT APPLIED. Agents never apply anything to the production
+-- database (standing hard rule, 2026-07-24). Orchestrator + user own the apply.
+--
+-- ---------------------------------------------------------------------------
+-- IN ONE PARAGRAPH, FOR A NON-SPECIALIST
+-- ---------------------------------------------------------------------------
+-- A teacher's PERSONAL course is meant to be private — theirs alone, invisible
+-- to the rest of the team — and the people allowed to decide what happens to it
+-- are meant to be the teacher who made it plus a workspace admin. The database
+-- rules currently do close to the opposite on BOTH halves. Any grade lead can
+-- read every personal course in their grade, including ones that were never
+-- shared with them. And the workspace admin has no control at all: only the
+-- owner can change or remove a personal course. Visibility is too wide; control
+-- is too narrow.
+--
+-- THIS MIGRATION FIXES THE VISIBILITY HALF ONLY. The control half cannot be
+-- fixed with a database rule — see FIX 2 below, which explains what was tried,
+-- why it would have been an empty gesture, and what the real work is.
+--
+-- NOTHING IS LEAKING RIGHT NOW. There are zero personal courses in production
+-- (24 team courses, 3 lead assignments), so there is nothing for the wide rule
+-- to expose. It arms the moment the sharing UI ships and teachers start making
+-- personal courses — which is why the fix goes FIRST and the surface goes after.
+-- If that order is reversed, every personal course a teacher creates is readable
+-- by their grade lead from the instant it exists.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT WAS DECIDED, AND WHERE THE CODE ALREADY AGREES
+-- ---------------------------------------------------------------------------
+-- User decision, locked 2026-07-17: inside a team workspace, sharing is
+-- per-COURSE. A personal course is INVISIBLE to teammates. Sharing is controlled
+-- by the course's CREATOR plus a SCHOOL ADMIN.
+--
+-- This is not a reinterpretation. `20260717120000_course_sharing_rpcs.sql` says
+-- so in its own header — "A PERSONAL course is invisible to teammates
+-- (subjects_read: personal → owner only)" — and its RPCs authorize on
+-- `owner_id = auth.uid() OR is_school_admin(<grade's school>)`. So the RPC layer
+-- already implements the decision. It is the table policies, written in
+-- `20260518102823_initial_schema.sql` more than a year earlier, that never
+-- caught up. The two layers have been describing different products.
+--
+-- ---------------------------------------------------------------------------
+-- FIX 1 — subjects_read: drop the unscoped grade-lead arm.
+-- ---------------------------------------------------------------------------
+-- HEAD:
+--     (scope = 'team'     and can_read_grade(grade_level_id))
+--     or (scope = 'personal' and owner_id = auth.uid())
+--     or is_grade_lead(grade_level_id)          ← no scope predicate
+--
+-- The third arm carries no `scope` test, so it grants a lead SELECT on every row
+-- in the grade — personal ones included.
+--
+-- AND IT GRANTS NOTHING ELSE, which is what makes this safe to remove rather
+-- than merely correct to remove. Follow the definitions:
+--     is_grade_lead(g)          ⇒ a teacher_grade_assignments row for (uid, g)
+--     auth_teacher_grade_ids()  ⇒ every grade_level_id assigned to uid
+--     can_read_grade(g)         ⇒ g in auth_teacher_grade_ids() or school admin
+-- so `is_grade_lead(g)` STRICTLY IMPLIES `can_read_grade(g)`. For a TEAM course
+-- the third arm is redundant with the first; for a PERSONAL course it is the
+-- entire defect. Removing it cannot reduce any legitimate access — a lead keeps
+-- every team course they can see today, and school admins keep theirs through
+-- can_read_grade's own school_admins join.
+--
+-- NO ADMIN READ ARM IS ADDED, deliberately. "Control" is not "visibility", and
+-- the decision said invisible. An admin does not need SELECT here to do their
+-- job: `share_course`, `unshare_course` and `list_course_sharing` are SECURITY
+-- DEFINER, so they already give an admin the management view and the ability to
+-- act, without granting a general read over their teammates' private planning.
+--
+-- ---------------------------------------------------------------------------
+-- FIX 2 — NOT MADE HERE, AND THIS IS THE INTERESTING PART.
+-- ---------------------------------------------------------------------------
+-- The second half of the report was that `subjects_update` / `subjects_delete`
+-- gate personal rows on `owner_id = auth.uid()` alone, so a workspace admin has
+-- no control. That reading is right. The obvious fix — OR-in a school-admin arm
+-- on those two policies — was written, reviewed, and REMOVED, because it does
+-- not work and shipping it would have been worse than shipping nothing.
+--
+-- WHY IT DOES NOT WORK. Postgres applies the SELECT policy to an UPDATE or
+-- DELETE that has to READ the row to find it — which is every statement with a
+-- WHERE clause, and PostgREST always sends one (`?id=eq.…`). So an admin who
+-- cannot SELECT a personal course cannot target it for UPDATE or DELETE either,
+-- no matter what the UPDATE policy says. "Invisible but controllable" is not
+-- expressible in RLS alone. The admin arms would have been INERT: a policy that
+-- reads like a granted capability and grants nothing — exactly the class of lie
+-- this whole pass exists to remove.
+--
+-- THE TWO REAL OPTIONS, AND WHY THIS FILE PICKS NEITHER SILENTLY:
+--
+--   (a) Give admins a SELECT arm on personal courses. Control then works
+--       through plain table writes — but every workspace admin gains a blanket
+--       read over every teacher's private planning, which is most of the
+--       visibility problem FIX 1 just removed, moved from the lead to the admin.
+--
+--   (b) Keep personal courses unreadable and express admin control as SECURITY
+--       DEFINER RPCs. This is what the codebase ALREADY does, and the precedent
+--       is unambiguous: `share_course` and `unshare_course` authorize on
+--       `owner_id = auth.uid() OR is_school_admin(…)` inside a definer body, and
+--       `list_course_sharing` gives an admin the management view of every course
+--       — including personal ones — WITHOUT any RLS read. The intended shape is
+--       "gated surface, not blanket read", and it is already built for sharing.
+--
+-- So (b), and the work is a BUILD, not a policy edit: admin rename / archive /
+-- delete of a personal course needs its own definer RPC alongside the existing
+-- sharing pair, mirroring `20260606160000_workspace_notebook_admin.sql`. That is
+-- deliberately out of scope for a security correction, and it is recorded here
+-- rather than left as a silent gap — nobody should conclude from this file that
+-- admin control was considered and rejected. It was considered and DEFERRED,
+-- with the mechanism named.
+--
+-- Net effect of this migration: visibility is corrected; control is unchanged
+-- from HEAD (owner-only) and honestly so.
+--
+-- ---------------------------------------------------------------------------
+-- NOT CHANGED: subjects_insert. `(scope='personal' and owner_id = auth.uid()
+-- and can_read_grade(grade_level_id))` already matches the decision — a teacher
+-- creates their own personal course in a grade they belong to. Left alone.
+-- ---------------------------------------------------------------------------
+
+-- READ: a team course is visible grade-wide; a personal course ONLY to its
+-- owner. No third arm. `drop policy if exists` + `create policy` (not `alter`)
+-- so the file is IDEMPOTENT and safe to re-apply — this repo's runbooks do
+-- prescribe standalone re-applies, and a migration that cannot survive one is a
+-- foot-gun.
+drop policy if exists subjects_read on subjects;
+create policy subjects_read on subjects for select using (
+  (scope = 'team' and can_read_grade(grade_level_id))
+  or (scope = 'personal' and owner_id = auth.uid())
+);
+
+-- ---------------------------------------------------------------------------
+-- APPLY-DAY RUNBOOK (ORCHESTRATOR + USER ONLY; agents never apply)
+-- ---------------------------------------------------------------------------
+--   supabase db push
+--
+--   # 1. subjects_read no longer mentions is_grade_lead. subjects_update and
+--   #    subjects_delete are UNCHANGED from HEAD and should still read
+--   #    `owner_id = auth.uid()` for personal rows:
+--   supabase db query --linked "
+--     select polname, pg_get_expr(polqual, polrelid) as using_expr
+--       from pg_policy
+--      where polrelid = 'public.subjects'::regclass
+--      order by polname;"
+--
+--   # 2. Sanity on the data this protects. Expect 0 personal subjects at the
+--   #    time of writing — if that number is no longer 0, the sharing UI shipped
+--   #    first and this fix is overdue rather than preventative:
+--   supabase db query --linked "
+--     select scope, count(*) from public.subjects group by scope;"
+--
+-- ROLLBACK: re-create `subjects_read` from 20260518102823_initial_schema.sql
+-- lines 1270-1274 (the version with the third `or is_grade_lead(...)` arm).
+-- Reverting restores the wide read, so only do it if this migration is shown to
+-- break a legitimate flow — and record which flow.
+--
+-- NO APPLICATION COUPLING. `lib/subjects/source.ts` reads through RLS and writes
+-- only through the SECURITY DEFINER RPCs, none of which change here. Nothing in
+-- the app needs to ship with this.
+--
+-- SEQUENCING: this must land BEFORE the per-course sharing UI (the RPCs have
+-- been applied since 2026-07-17 with zero component importers). Shipping the
+-- surface first means every personal course a teacher creates is readable by
+-- their grade lead from the moment it exists.
+-- ###########################################################################

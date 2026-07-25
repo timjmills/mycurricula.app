@@ -487,3 +487,91 @@ describe("createSerialWriteQueue — hung-send watchdog", () => {
     expect(pending()).toBe(0);
   });
 });
+
+// ── Supersession reporting ────────────────────────────────────────────────
+// `onError`'s third argument is the difference between "this edit is lost" and
+// "this attempt lost a race it did not need to win". Under latest-wins a newer
+// payload carries the same key's complete current value, so once it lands the
+// teacher's state IS saved and the earlier failure had no user-visible
+// consequence. A caller that surfaces failures without consulting this tells a
+// teacher their work was lost while the queue is busy saving it.
+
+describe("createSerialWriteQueue — pending payload reporting", () => {
+  it("reports pending=null when nothing is queued behind the failure", async () => {
+    const seen: (string | null)[] = [];
+    const q = createSerialWriteQueue<string>({
+      send: () => Promise.reject(new Error("boom")),
+      onError: (_e, _p, pending) => seen.push(pending),
+    });
+    q.enqueue("k", "a");
+    await flush();
+    // The teacher's edit really is gone — this must be surfaced.
+    expect(seen).toEqual([null]);
+  });
+
+  it("hands over the newer payload so the caller can judge coverage", async () => {
+    // A boolean here would force the queue to assume payloads are whole values.
+    // Returning the payload lets a caller with PARTIAL patches check whether the
+    // newer one actually carries every field the failed one did.
+    const first = deferred();
+    const seen: (string | null)[] = [];
+    let call = 0;
+    const q = createSerialWriteQueue<string>({
+      send: () => {
+        call += 1;
+        return call === 1 ? first.promise : Promise.resolve();
+      },
+      onError: (_e, _p, pending) => seen.push(pending),
+    });
+    q.enqueue("k", "a");
+    q.enqueue("k", "b"); // supersedes "a" while it is in flight
+    first.reject(new Error("boom"));
+    await flush();
+    expect(seen).toEqual(["b"]);
+  });
+
+  it("reports per FAILURE, not per key", async () => {
+    // "a" has "b" behind it; "b" then fails with nothing behind it.
+    const d1 = deferred();
+    const d2 = deferred();
+    const seen: (string | null)[] = [];
+    let call = 0;
+    const q = createSerialWriteQueue<string>({
+      send: () => {
+        call += 1;
+        return call === 1 ? d1.promise : d2.promise;
+      },
+      onError: (_e, _p, pending) => seen.push(pending),
+    });
+    q.enqueue("k", "a");
+    q.enqueue("k", "b");
+    d1.reject(new Error("boom-a"));
+    await flush();
+    d2.reject(new Error("boom-b"));
+    await flush();
+    expect(seen).toEqual(["b", null]);
+  });
+
+  it("NEVER reports a watchdog timeout as superseded (pending is null), even with a payload waiting", async () => {
+    // The one case where supersession is NOT harmless. A rejection proves the
+    // write did not land, so a newer payload cleanly replaces it. A timeout
+    // proves nothing: the request was abandoned, not cancelled, so it may still
+    // commit — and it may commit AFTER the payload sent next, overwriting the
+    // NEWER edit. Suppressing here would hide the only signal for exactly the
+    // scenario where the teacher's latest work is the thing at risk.
+    const { timers, fire } = manualTimers();
+    const seen: { pending: string | null; payload: string }[] = [];
+    const q = createSerialWriteQueue<string>({
+      send: () => new Promise<void>(() => {}),
+      onError: (_e, payload, pending) => seen.push({ pending, payload }),
+      timeoutMs: 20_000,
+      timers,
+    });
+    q.enqueue("k", "a");
+    q.enqueue("k", "b");
+    await flush();
+    fire();
+    await flush();
+    expect(seen[0]).toEqual({ pending: null, payload: "a" });
+  });
+});

@@ -219,13 +219,35 @@ describe("the historical offenders are real (the back-fill has work to do)", () 
     expect(offenders.length).toBeGreaterThan(0);
   });
 
-  it("is_claude_admin uses the EMPTY search path and must stay that way", () => {
-    // The one function the back-fill must not touch. Pinning `public, pg_temp`
-    // over an empty path would make it resolve unqualified names again.
+  it("is_claude_admin is created with the EMPTY path and re-pinned separately", () => {
+    // Its CREATE uses `set search_path to ''`, so Part 1's `search_path=public`
+    // filter deliberately does not match it — it needs its own statement.
     const src = code("20260607120000_claude_access_log_reconcile.sql");
     const def = definitions(src).find((d) => d.name === "is_claude_admin");
     expect(def).toBeDefined();
     expect(def?.definer).toBe(true);
     expect(def?.header).toMatch(/set\s+search_path\s+to\s+''/i);
+  });
+
+  it("Part 2 re-pins is_claude_admin to pg_catalog, pg_temp — NOT public", () => {
+    // `''` is the STRICTER setting: nothing resolves unqualified. Moving it to
+    // `public, pg_temp` would grant visibility of every table in public that
+    // this function neither has nor needs — a widening dressed as hardening.
+    // `pg_catalog, pg_temp` grants nothing (pg_catalog is always searched
+    // anyway) while naming pg_temp explicitly LAST, which is the actual fix.
+    const sql = code(BACKFILL);
+    expect(sql).toContain(
+      "alter function public.is_claude_admin() set search_path = pg_catalog, pg_temp",
+    );
+    expect(sql).not.toMatch(/is_claude_admin\(\)\s*set search_path = public/);
+  });
+
+  it("covers is_claude_admin so the verification has NO expected exceptions", () => {
+    // "Expect zero rows except this one" is exactly where the next real
+    // regression hides. The runbook promises zero rows, full stop — which only
+    // holds because Part 2 exists.
+    const prose = readFileSync(join(MIGRATION_DIR, BACKFILL), "utf8");
+    expect(prose).toMatch(/ZERO rows/);
+    expect(prose).toMatch(/no expected exceptions/i);
   });
 });

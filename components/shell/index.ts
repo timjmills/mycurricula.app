@@ -20,6 +20,7 @@ export { RailAddButton } from "./RailAddButton";
 export { GlobalShortcuts } from "./global-shortcuts";
 export { Clock } from "./Clock";
 export { UndoToastBridge } from "./undo-toast-bridge";
+export { WriteFailureBridge } from "./write-failure-bridge";
 export {
   LastRouteRecorder,
   readSettingsReturnRoute,

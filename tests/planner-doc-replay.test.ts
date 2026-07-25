@@ -424,3 +424,48 @@ describe("splitPatchByField — one lane per column", () => {
     expect(direct).toEqual(undone);
   });
 });
+
+// ── Write-lane COVERAGE ────────────────────────────────────────────────────
+// A failure only stops mattering when the newer queued payload carries every
+// field the failed one did. Two shapes can legitimately share a lane: the direct
+// completion toggle sends `{status}` while a replayed undo sends
+// `{status, reasonNotDone}`. Treating mere existence of a pending payload as
+// supersession would suppress the failure of the RICHER patch and lose the
+// reason silently — the store therefore checks coverage key-by-key.
+
+describe("splitPatchByField — differently-shaped payloads share a lane", () => {
+  it("puts {status} and {status, reasonNotDone} in the SAME lane", () => {
+    // Sharing is correct — they are one row and must be ordered against each
+    // other. It is exactly why coverage, not existence, decides suppression.
+    const toggle = splitPatchByField({ status: "done" });
+    const replay = splitPatchByField({
+      status: "not_done",
+      reasonNotDone: "assembly",
+    });
+    expect(toggle.map(([g]) => g)).toEqual(["completion"]);
+    expect(replay.map(([g]) => g)).toEqual(["completion"]);
+  });
+
+  it("the narrower payload does NOT cover the wider one", () => {
+    // The store's rule: every key of the FAILED patch must appear in the pending
+    // one. Pinned here so a refactor that swaps it back to a boolean has to
+    // confront this case.
+    const [[, wide]] = splitPatchByField({
+      status: "not_done",
+      reasonNotDone: "assembly",
+    });
+    const [[, narrow]] = splitPatchByField({ status: "done" });
+    const covers = (failed: object, pending: object) =>
+      Object.keys(failed).every((k) => k in pending);
+    expect(covers(wide, narrow)).toBe(false); // would lose reasonNotDone
+    expect(covers(narrow, wide)).toBe(true); // safe to suppress
+  });
+
+  it("standards + standardIds travel together, so they always cover", () => {
+    const a = splitPatchByField({ standards: ["A"], standardIds: ["i1"] });
+    const b = splitPatchByField({ standards: ["B"], standardIds: ["i2"] });
+    const covers = (failed: object, pending: object) =>
+      Object.keys(failed).every((k) => k in pending);
+    expect(covers(a[0][1], b[0][1])).toBe(true);
+  });
+});

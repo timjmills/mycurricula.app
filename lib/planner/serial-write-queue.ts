@@ -83,8 +83,29 @@ export interface SerialWriteQueueOptions<T> {
   send: (payload: T) => Promise<unknown>;
   /** Notified on a rejected send. The queue continues draining regardless — a
    *  failed payload is superseded by whatever is pending behind it. Also fires
-   *  with a `SerialWriteTimeoutError` when a send exceeds `timeoutMs`. */
-  onError?: (error: unknown, payload: T) => void;
+   *  with a `SerialWriteTimeoutError` when a send exceeds `timeoutMs`.
+   *
+   *  `pending` is the NEWER payload already queued for this key, or null.
+   *
+   *  IT IS HANDED OVER RATHER THAN REDUCED TO A BOOLEAN, deliberately. Whether
+   *  a failure MATTERS is the difference between "this edit is lost" and "this
+   *  attempt lost a race it did not need to win" — and only the caller can tell,
+   *  because only the caller knows whether the newer payload COVERS the failed
+   *  one. For a whole-value payload (a resolved slot, a complete section list)
+   *  the mere existence of `pending` settles it. For a PARTIAL patch it does
+   *  not: a pending `{status}` does not cover a failed `{status, reasonNotDone}`,
+   *  and reporting that as superseded loses the reason silently.
+   *
+   *  A queue that answered this itself would have to assume the payloads are
+   *  whole values — an assumption that is true for two of this repo's three
+   *  callers and false for the third. Returning `pending` makes the caller state
+   *  its own coverage rule instead of inheriting a wrong one.
+   *
+   *  A caller that surfaces failures MUST consult this, or it will tell a
+   *  teacher their work was lost while the queue is busy saving it.
+   *
+   *  A TIMEOUT ALWAYS REPORTS `pending: null` — see the watchdog below. */
+  onError?: (error: unknown, payload: T, pending: T | null) => void;
   /** Watchdog: milliseconds a single send may stay unsettled before the queue
    *  gives up on it, reports a `SerialWriteTimeoutError`, and releases the key
    *  so the pending payload drains. Defaults to `DEFAULT_SEND_TIMEOUT_MS`. Pass
@@ -173,7 +194,15 @@ export function createSerialWriteQueue<T>(
             watchdog = null; // already fired; nothing to clear
             if (settled) return;
             try {
-              onError?.(new SerialWriteTimeoutError(key, timeoutMs), next);
+              // A TIMEOUT ALWAYS REPORTS `pending: null`, even when a newer
+              // payload is waiting. Supersession is only harmless when the
+              // failed write definitively did NOT land — then the newer payload
+              // simply overwrites it. A timeout does not establish that: the
+              // request was abandoned, not cancelled, so it may still commit,
+              // and it may commit AFTER the payload we send next. Reporting it
+              // as superseded would hide the ONLY signal for the one case where
+              // the NEWER edit is the one at risk.
+              onError?.(new SerialWriteTimeoutError(key, timeoutMs), next, null);
             } catch {
               /* a broken reporter must never stall the queue */
             }
@@ -185,7 +214,7 @@ export function createSerialWriteQueue<T>(
           .then(undefined, (error: unknown) => {
             if (settled) return; // the watchdog already reported this key
             try {
-              onError?.(error, next);
+              onError?.(error, next, entry.pending);
             } catch {
               /* a broken reporter must never stall the queue */
             }

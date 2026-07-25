@@ -5656,3 +5656,438 @@ already holds is suppressed, and that is not an edit. Derived values behave too 
 `LessonWorkspace`'s `kindChoice` derives `"unclassified"` / `"none"` rather than
 storing them, so clicking the matching option would have committed a patch
 identical to what is already persisted.
+
+---
+
+## /daily false-empty — live prod Major (fix-overlay-audit) — `bf3329f`
+
+`/daily` painted "No lessons planned for this day." for the whole Supabase hydrate
+(~9.5–11.6s) on every load, cold and warm, over a teacher's real timetable. Committed
+ALONE, ahead of the same lane's five audit fixes (`882f456`), so it keeps its own revert
+handle.
+
+**Cause.** DayA/DayB/DayC each branched on `dayLessons.length === 0` alone — "the store
+hasn't loaded" and "this day is genuinely empty" were the same state to that expression.
+`day-v2` was never wired into the 7.23 loading-honesty work (`9020f3a`). **Not** the same
+defect as the intermittent hydrate failure: false-empty reproduced 4/4, fetch failure 1/4.
+
+**Fix.** One shared `<DayEmptyState>` replaces all three copies — three parallel edits would
+leave a fourth frame free to reintroduce the bug by copying a sibling. The decision is a pure
+`dayEmptyKind(dataState, hasLessons)` in `components/day-v2/day-empty.ts`, so it is testable
+in the node harness. `pending` → skeleton · `error` → PlannerEmpty's exact wording · `settled`
+→ the ORIGINAL message, byte-identical. Also suppressed DayA's `"0 of 0 complete"` header
+counter, the same defect two lines away.
+
+### The lesson worth keeping: A PASS ON AN UNREACHABLE STATE IS NOT A PASS
+
+The first probe drew this and I nearly reported it as evidence:
+
+```
+ok  [glass/DayA] the lie NEVER appears during hydrate — 32 samples over 8841ms, 0 hits
+```
+
+Green on all three frames. It was **vacuous**. The same run showed `pre-settle samples=1` —
+the store settled almost instantly, so the window the bug lives in barely existed. Worse, a
+second draft that *forced* the window by delaying `/rest/v1/**` by 8s **still** read
+`lessons: 6` in every pass, including the one that ABORTED every request.
+
+The reason: `NEXT_PUBLIC_PLANNER_USE_SUPABASE` is unset locally, so the store reads
+`lib/mock` and `effectiveHydration` pins hydration to `"ready"` **forever**. `pending` and
+`error` are unreachable by construction on this dev server. Six assertions were being made
+against states the build cannot enter — three would have been reported as proof the fix
+works, and three as failures of a fix that was fine.
+
+**Establish which build you are measuring BEFORE asserting anything about it.** The probe now
+counts `/rest/v1` calls, prints `planner source: MOCK | SUPABASE`, and reports those passes as
+explicit **SKIPs** with the reason. 16/16 with 6 SKIPs is an honest result; 22/22 would have
+been a lie of exactly the kind this commit is about. This is the same failure shape as
+[[measure-head-not-dirty-tree]] one layer further out: there the oracle and the artifact
+disagreed, here the *state under test* did not exist in the artifact at all.
+
+**What that leaves unverified, stated rather than glossed:** the loading branch ships without
+ever having been rendered on screen. Hence it is wrapped in the same `.emptyDay` box the
+message uses, so it occupies the same slot in DayA's `.vaDay`, DayB's `.focusEmpty` and DayC's
+`.heroEmpty` rather than landing differently in each. Owed a run under the flag-ON gate.
+
+### Verified live (16/16, all three frames)
+
+```
+planner source: MOCK (hydration pinned 'ready' — A+B CANNOT be exercised here)
+[glass/DayA] C: settles into the real day — {"lie":false,"loading":false,"lessons":6,"counter":"0 of 6 complete"}
+[glass/DayA] C: a genuinely EMPTY day STILL says so — {"lie":true,"loading":false,"lessons":0}
+[paper/DayB] C: a genuinely EMPTY day STILL says so — {"lie":true,"loading":false,"lessons":0}
+[color/DayC] C: a genuinely EMPTY day STILL says so — {"lie":true,"loading":false,"lessons":0}
+```
+
+That inverse case is the one that mattered most: replacing the lie with a permanent skeleton
+passes any test that only checks the false message is gone, and is a worse bug. Reaching it
+needed jumping ~40 weeks past the end of the mock plan — walking day-by-day never leaves the
+populated weeks, which is why the first draft reported "no empty day within 8" and proved
+nothing.
+
+### §4a
+
+Codex `0.144.4`, `--sandbox read-only`, diff piped via stdin. **First pass returned two
+Mediums, both acted on:**
+
+- **`sel === null` implies empty (DayB/DayC) — half right, and taken.** `pickFocus` early-
+  returns `undefined` on `length === 0` and otherwise falls back to `dayLessons[0]`, so the
+  invariant holds today. But it is TRANSITIVE, and a component asserting emptiness it had not
+  checked is exactly how this shipped. `hasLessons` is now a REQUIRED prop; a future change to
+  that fallback chain degrades to silence, not to a fresh lie.
+- **No regression tests.** The harness is `environment: "node"` and cannot render React, so
+  the decision was extracted to a pure function and pinned with 9 tests — including the
+  inverse failure mode, and a check that all four arms stay reachable.
+
+**The RE-review could not run.** Codex's backend returned `503
+biscuit_baker_service_me_circuit_open` on both websocket and HTTPS transports, twice.
+Reported to the orchestrator; **the sandbox flag was not weakened and the diff was not routed
+elsewhere.** Substituted self-review + the full local stack (`tsc` clean on these files, lint
+clean repo-wide, 60 files / 1238 tests). Recorded here and in the commit body so the
+substitution is auditable.
+
+---
+
+## B4.5 + B4.6 — CORRECTION to the entry above (build-b45-b46-composer)
+
+**The `/post` half recorded above as shipped (`e0eab58`) has been REVERTED.** Appending
+rather than editing, per the append-only rule — the entry above is the record of
+what happened, this is the record of why it was wrong.
+
+**Why.** A design-handoff recon overturned the premise. `CLAUDE.md` §4a/§4b put the
+handoff above the plan, so it also outranks the lane brief the work was built from.
+**I verified every citation myself before deleting shipped code** — a relayed recon is
+not evidence:
+
+| Claim | Verified at |
+| --- | --- |
+| Workspace tab strip has NO Resources tab | `ph-workspace.jsx:272` — `unitplan · lessons · assessments · refine · insights` |
+| The drawer's unit-level Resources pane is READ-ONLY | `ph-workspace.jsx:167-169` — rows else `Nothing attached yet.`, no add verb |
+| The add affordance is LESSON-scoped, in the Lessons-tab editor | `ph-workspace.jsx:404` — `+ Add resource or note`, passing `unitId`/`unitName`/`lessonTitle` |
+| Unit-level filing is chosen INSIDE the composer | `ph-composer.jsx:57` `canUnit=!!req.unitId`; `:155-163` file-to `<select>` + wall-column `<select>` |
+| The wall is COLLECTION-only | `ph-more.jsx:136` and `:169`, both stating authoring happens in a lesson's editor |
+| Resources are stamped with a wall column | `ph-app.jsx:240` — `sec:r.sec||''`, `wall:r.wall||''` |
+
+So the wall's per-section "Add" creating only a wall-local note was **the specified
+behaviour, not an oversight**. Wiring the composer there built UI the spec does not
+have. Reverted in full.
+
+**What survives from the reverted work, and why:**
+- The **`safeHref` open-redirect fix** (`unit-tabs/helpers.ts`) — unrelated to the wall,
+  a real security defect, kept.
+- The **button copy**. It promised "Add a resource or a note" for a control that only
+  ever made notes. Now **"Add note"**, with a tooltip that also says where resources DO
+  appear. The visibility half is deliberately QUALIFIED — a §4a round caught that
+  "they collect onto this wall automatically" is false twice over (a saved wall renders
+  a frozen `override` and never picks up later lesson edits; a live preset only covers
+  lessons in its own scope). Swapping one false promise for another would have been no
+  improvement.
+
+### The real finding — the handoff's unit-filing capability is ABSENT, not unwired
+
+The re-scoped brief was "verify the wiring and report what's missing". The wiring is not
+what's missing. Four independent checks:
+
+1. **No wall-column field exists.** `LessonResource` (`lib/types.ts`) has no
+   `wall`/column/lane field. The composer renders no control for it. Nothing writes it.
+   No migration defines one (`supabase/migrations/*` — the three files matching "wall"
+   all match on the word *swallows*).
+2. **No file-to selector, and no unit-level storage to file INTO.** `Unit`
+   (`lib/types.ts:56+`) has no `resources` field at all. Our composer's footer routing is
+   **Subject · Unit · Lesson · Section** — a drill-down that *locates a lesson*; the Unit
+   select narrows which lessons are offered, it is not a destination. A teacher cannot
+   file a resource to a unit.
+3. **Nothing unit-scoped reaches the composer.** `ResourceComposerProps` has no
+   `unitId`/`unitName` (0 matches), so `ComposerOpenOptions` cannot carry them and no
+   callsite can pass them.
+4. **`/post` has nothing to read.** `lib/wall-scope.ts` groups by `lesson:` /
+   `subject:` / `day:` / `unit:<subj>:<id>` only — zero references to a resource-level
+   wall/column field.
+
+**Consequence for the plan:** "lesson-authored resources are landing on the wall
+uncolumned" is not quite the defect. Nothing is landing uncolumned because **the column
+concept does not exist anywhere in the stack** — types, storage, composer UI, and wall
+projection all lack it. That is an unbuilt feature spanning a data-model change (and
+probably a migration), not a callsite fix, and it is materially larger than B4.5/B4.6.
+**Do not treat it as wiring.**
+
+### ResMenu — the handoff answers it, and the answer was neither option on the table
+
+`ph-workspace.jsx:400` puts a `⋯` **"More — open, edit, remove"** on the **lesson
+editor's resource rows**, whose `edit` reopens the composer with that resource loaded.
+
+Our equivalent row — `components/lesson-editor/SectionBlock.tsx:300-313` — is a chip with
+exactly **one** action: **✕ Remove**. No open, no edit. From the lesson editor a teacher
+can *delete* a resource and do nothing else with it: a **destructive-only control**,
+which is a defect in its own right, and precisely the shape `ResMenu` was built for
+(`onOpen`/`onEdit`/`onRemove` + the `isSafeUrl`-gated open/copy-link).
+
+`/post`'s Card row (`Card.tsx:444`) is four buttons that are **all view/present** — Open
+full-screen, Slideshow, Enlarge, Send to board — equally weighted, none destructive, on a
+surface where nothing is edited. Collapsing four peers into a menu costs a click and
+relieves no crowding. **The inline row is right there.**
+
+So `ResMenu` should be wired to the **lesson-editor resource row**, not `/post`, and not
+deleted. That is `components/lesson-editor/**` — another lane's territory, handed off.
+
+### Teach — NOT APPLICABLE (recorded so it is not re-litigated as an omission)
+
+`/teach` sits in route group `(teach)`; `app/(teach)/layout.tsx` mounts AppState /
+Planner / ConsequenceToast only, so `ComposerProvider` never exists there and
+`useComposer()` would throw. That is the secondary reason. The **decisive** one is
+semantic: `teach-v2/WritingBar.tsx:144`'s "Resource" popover emits
+`{type:"addResource", pageId, resource, canvas:{x,y,w}}` — it **places an existing**
+lesson resource on a board page at canvas coordinates. The composer **creates** a
+resource row on a lesson. Different verb, different target, different store; the composer
+would sit beside that popover, never replace it. The handoff is silent on creating a
+resource from Teach (`teach.jsx:236-237` stores an `rid` reference; `:467-474` is a picker
+over existing resources).
+
+### Gates on the revert
+
+**§4a — four Codex rounds completed** (`--sandbox read-only`, diff piped on stdin), each
+finding fixed:
+1. Deleting the lane probe broke `scripts/probe-4b-consolidated.mjs:635`, which spawns it
+   as its 4.7 step. The probe was **rewritten**, not deleted — the path is load-bearing.
+2. The replacement copy overclaimed (the custom-wall / out-of-scope cases above).
+3. **Bypass-token disclosure.** The rewritten probe had gone back to a raw
+   `boot.goto()` with the token in the url — undoing exactly what `798e7e7` centralised.
+   A navigation timeout prints the full url in Playwright's thrown message. Now routed
+   through `scripts/lib/auth.mjs` `bypassLogin`, which redacts.
+4. Selector drift: the probe looked for `addBtn`, a class this lane introduced and then
+   reverted. **After a revert, a stale selector reads exactly like a real defect.**
+5. Two vacuous assertions — the guard matched only verb+noun ("Add resource") and so
+   would have missed the button actually reverted, whose label was bare **"Resource"**;
+   and the bare-`Add` check counted page-wide allowing one, so a stale per-section Add
+   could hide behind a renamed toolbar Add.
+
+**The fifth round could not run: Codex is DOWN** — `503 … biscuit_baker_service_me_circuit_open`
+on both websocket and HTTPS transports, retried. **The sandbox flag was not weakened and
+no code was routed elsewhere.** Per §4a's failure protocol an **independent review agent**
+(which did not author the diff) reviewed the full diff, plus the local stack. Only the
+probe changed after the last successful Codex round; the app code is fully Codex-reviewed.
+
+**Local:** `tsc --noEmit` clean · `next lint --no-cache` clean ·
+`vitest` **1238 passed / 68 todo / 0 failed**.
+
+**§4b live — 16/16, real Chrome, localhost:3099.** Add-note on all 5 sections, correct
+tooltip text, note round-trip (cards 34 → 35), **no resource-authoring trigger in the
+section grid**, zero `.cmp-modal` / `.cmp-scrim`, clean console, no failing requests,
+375/768/1440 no page h-scroll.
+
+**The regression guard was SELF-TESTED.** I re-added a `Resource` button and re-ran: the
+guard failed and named all five instances. It had two vacuity bugs before that test — it
+passed *with the button present*, and it passed on a blank page. **A guard that has never
+been observed to fail is unproven**, and both bugs were exactly the kind that make a probe
+report green on a broken surface. Every guard is now gated on sections actually rendering
+and reports `INCONCLUSIVE` rather than passing over an empty page.
+
+### One self-inflicted trap worth recording
+
+While self-testing, the injected `Resource` button gave `<Tooltip>` two children — a real
+`tsc` error (`TS2746`) that blanked the planner layout and made the wall render nothing.
+I had already started attributing that blank page to a sibling lane, because this session
+had genuinely seen three foreign breakages with the same signature. **`npx tsc --noEmit`
+named the file in one command and it was mine.** Attribute by ownership *after* checking
+the compiler, not before — a shared dirty tree makes "it's probably someone else" the
+most comfortable and most expensive assumption available.
+
+---
+
+## B4 close-out — ResMenu verdict + the composer comment fix (build-b45-b46-composer)
+
+### ResMenu — the handoff decides, and it says NOT the wall
+
+The question was: does the design show a **menu** on a wall card, or an inline action
+row? Answered by grep across the whole 7.21 handoff, not by taste:
+
+- **`ph-more.jsx` (the wall) contains ZERO `openResMenu`, `rmore`, or `⋯`.** A wall card
+  is not even an inline action row there — the card itself is one click target that opens
+  the resource's lesson (`ph-more.jsx:157`, `:163`). Our `/post` Card's four inline
+  view/present buttons are already *more* affordance than the handoff gives a wall card.
+- **`openResMenu` appears in exactly two product surfaces**: `ph-workspace.jsx` (twice —
+  the lesson editor's resource rows) and `source-home/planbook-edit.jsx` (the planbook
+  chips). `ph-composer.jsx` only defines/clears the global.
+- The handoff **README:96-98** states the same in prose: the shared resource action menu's
+  callsites are "workspace resource pills and the planbook chips". `/post` is not among
+  them.
+
+**Verdict: do not wire it to `/post`; do not delete it.** Its specified home is the
+**lesson-editor resource row** — which in our app (`components/lesson-editor/SectionBlock.tsx:300-313`)
+offers exactly **one** action, **✕ Remove**. A teacher can delete a resource from the
+lesson editor and do nothing else with it. A **destructive-only control is a defect in its
+own right**, and `ResMenu`'s `onOpen`/`onEdit`/`onRemove` + `isSafeUrl`-gated open/copy is
+the exact shape that gap needs. The planbook chips are the second specified callsite.
+
+So the 364 lines stop being dead code by **closing a real gap**, not by justifying
+themselves. That is `components/lesson-editor/**` — another lane's territory, routed.
+
+### The two lying comments — fixed (`dd7d7a9`)
+
+`components/daily/ResourceComposer.tsx:1636` and `:1965` both described the footer as a
+**"file-to + wall column"** control. That is the handoff's design, not this code.
+Comment-only edit (two hunks, both comment blocks; **zero logic** — the B4.2 engine stays
+untouched), made outside this lane with explicit permission.
+
+What the footer actually is: a four-level **narrowing path** to one lesson, labelled
+**"Destination"** (`:2368`). Subject and Unit are **filters** — `unitId` only scopes
+`lessonOptions` (`:810`) — and the only real destination choice is Section vs "Whole
+lesson", which is why the commit path has exactly two terminal writes
+(`addSectionResource` / `editLesson`) and no unit branch.
+
+**Why this is worth a commit of its own.** A comment naming a control that does not exist
+is how a capability gets *believed into existence*: the next engineer reads "wall column",
+assumes the field is there, and wires against it. Same trap shape as the mislabelled
+buttons found in `weekly-lesson-card.tsx` today. The replacement says what renders, then
+names what the handoff specifies (`ph-composer.jsx:57` `canUnit`; `:155-163` the two
+selects; `ph-app.jsx:240` `wall: r.wall || ''`) and what closing the gap would take — a
+`wall` field on `LessonResource`, a `resources` field on `Unit` (which has none) so "Whole
+unit" has somewhere to go, a `UnitPatch` widening, a store action, a DB column, the two
+selects, and `/post` reading the column. **A wave, not a wiring change.**
+
+### One thing I broke, and the lesson
+
+While self-testing the regression guard I injected a `Resource` button into
+`Section.tsx` **on the shared working tree** and left it there across a multi-minute probe
+run. I placed it inside the `<Tooltip>` rather than beside it, so it was not merely an
+extra button — it was `TS2746`, which broke the client bundle and **made every click on
+the app a no-op**. That is indistinguishable from a real defect: it cost three lanes a
+false live result, and one lost a probe run.
+
+The self-test itself was right — it found two vacuity bugs in the guard that no amount of
+reading would have. **The mistake was where I ran it.** A fixture that can break the build
+belongs in a scratch copy or behind a flag, and if it must touch the shared tree it should
+be in and out inside a single command, never spanning a probe. Compounding it, when the
+blank page appeared I started attributing it to a sibling lane — three genuine foreign
+breakages that session had made "probably someone else" the comfortable read.
+`npx tsc --noEmit` named the file in one command, and it was mine.
+
+**Rule for a shared tree: never leave a knowingly-broken build in it, and attribute by
+ownership only AFTER the compiler has spoken.**
+
+### Tranche 2 — cancelled-vs-failed hydrate, write-failure surfacing, subjects RLS
+
+**Live prod fix.** The hydrate runs as a Next server action, so navigating away
+CANCELS it: `net::ERR_ABORTED`, then `TypeError: Failed to fetch` six
+milliseconds later. The store treated that exactly like a backend error and
+painted `hydration:"error"` over an empty document — for a request the teacher
+cancelled by clicking a link. New `lib/async-failure.ts` draws the distinction
+the whole data layer was missing (`git grep AbortError` over lib+components
+found ONE file, animation code). Three states, and the middle one is the honest
+one: `aborted` (definitely cancelled) · `transport` (no verdict — cancelled OR
+network down, genuinely ambiguous) · `failed` (a real message). The ambiguity is
+settled by OBSERVATION, not a guess: bounded retry (`shouldRetryRead`, max 3),
+distinct log lines, and `hydration:"error"` only when the budget is spent.
+
+**`error` even for an exhausted cancellation, deliberately.** Leaving it on
+"loading" labels the CAUSE honestly and lies about the STATE — nothing is
+loading, nothing is coming, and the teacher sits in front of a skeleton forever.
+From their seat a permanently blank planner is a failure whatever cancelled it.
+
+**The `TypeError` gate in the classifier is load-bearing.** Every engine reports
+a failed/cancelled `fetch` as a TypeError specifically; our throws and
+PostgREST/RLS errors are plain Errors. Without it, `"transaction terminated by
+administrator"` classifies as transport and gets retried forever. Caught by the
+gate; the fragment list is only consulted for a TypeError now.
+
+**Persist failures now reach the teacher.** `PlannerValue.lastWriteFailure` +
+`components/shell/write-failure-bridge.tsx`, mounted beside `<UndoToastBridge/>`.
+A signal, not a `{ok:false}` Result — `lib/workspaces/actions.ts`'s envelope is
+right for a server action because a caller is waiting; the planner's tees are
+fire-and-forget from a function that returned long ago, and the store cannot
+raise the toast itself (ConsequenceToastProvider is a CHILD of PlannerProvider).
+The copy names the SCOPE, because the sharpest case is a teacher without
+`can_edit_subject_master` flipping to Team: a normal-looking edit, RLS-denied
+against the shared row, gone tomorrow with no explanation.
+
+**I edited two files outside my declared set** — `app/(planner)/layout.tsx` and
+the `components/shell/` barrel — to mount that bridge. Both were clean, the edit
+is additive and sits beside an identical existing bridge, and the alternative was
+shipping a signal with no consumer. Flagged to the lead; three lines to revert.
+
+**§4a gate: 6 rounds, and Codex then went DOWN.** Rounds 1–4 completed and every
+finding was acted on. Two were assessed and DISMISSED with evidence rather than
+appeased: (a) "the migration's admin arms are fine" — no, they're inert, see
+below; (b) "superseded is unsafe for partial patches" — not applicable, every
+lane is keyed per field group or per axis. Rounds 5–6 could not run:
+`503 ... biscuit_baker_service_me_circuit_open` on both WebSocket and HTTPS
+transports, ~10 attempts over 15 minutes. **The sandbox flag was never weakened
+and no other channel was used.** Substituted per §4a: an independent review agent
+(did not write the diff) plus the full local stack.
+
+**The self-review layer earned its keep.** Between gate rounds I found a real
+hole I had introduced: suppressing a write failure whenever ANY payload was
+pending. Lanes can legitimately carry differently-shaped patches — the direct
+completion toggle sends `{status}`, a replayed undo sends
+`{status, reasonNotDone}` — so a pending `{status}` would have suppressed the
+richer patch's failure and lost the reason silently. Fixed by handing `onError`
+the PENDING PAYLOAD instead of a boolean, so each caller states its own coverage
+rule: the field queue requires the pending patch to carry every key of the failed
+one; the op and section queues treat existence as coverage because their payloads
+are whole values. A boolean forced the queue to assume something true of two of
+its three callers.
+
+**`20260731120000_subjects_personal_visibility.sql` — AUTHORED, NOT APPLIED.**
+Fixes the VISIBILITY half only. Dropping `subjects_read`'s unscoped
+`or is_grade_lead(grade_level_id)` arm removes NO legitimate access, provably:
+`is_grade_lead(g)` strictly implies `can_read_grade(g)`, so for a team course the
+arm is redundant and for a personal one it is the entire defect.
+
+**The control half is deliberately absent, and that is the finding.** I wrote the
+admin arms on `subjects_update`/`subjects_delete`, then removed them: Postgres
+applies the SELECT policy to an UPDATE/DELETE that has to read the row to find it
+(any WHERE clause, which PostgREST always sends), so an admin who cannot SELECT a
+personal course cannot target it either. **"Invisible but controllable" is not
+expressible in RLS alone** — the arms would have been inert, a policy that reads
+like a capability and grants nothing. The mechanism that WOULD work is already
+the codebase's own: `share_course` / `unshare_course` / `list_course_sharing` are
+SECURITY DEFINER and give an admin the management view with no RLS read. Named in
+the header as a build, so nobody later reads the file and concludes admin control
+was considered and rejected.
+
+**`is_claude_admin()` → `pg_catalog, pg_temp`, not `public, pg_temp`.** The lead's
+instinct was right that `public` would be a widening dressed as hardening: `''`
+is the stricter setting. But `''` does still fail the rule — per the Postgres
+docs the temp schema "is searched FIRST (even before pg_catalog)" when absent
+from the list, and that is about absence, not list length. `pg_catalog, pg_temp`
+grants nothing new while naming pg_temp last. Changed despite not being
+exploitable (the body touches no relations) because the alternative is a
+verification query with a known exception, and "expect zero rows except this one"
+is where the next regression hides.
+
+**Migration count reconciled: 38 vs 26 are both right.** 38 still READ
+`= public` in their own `create`; only 26 are unpinned at RUNTIME, because
+`20260726120000` §3 pins 14 by name through `pg_proc`. My file keys off the LIVE
+setting, so it lands on the right 26 either way and cannot un-fix the 14.
+
+**`buildLesson`'s fifth callsite** is now a warning with a fuse, not a clean bill
+of health: `units.default_dur`/`default_flow` are already read into `Unit`, so the
+first time `createLesson` honours a unit default the returned lesson silently
+drops it until a full re-hydrate.
+
+**§4b live pass — DONE this time, and one honest caveat.** Dev server recovered.
+Opened the unit workspace from a `/weekly` UnitChip: **Unit Plan "Gaps" = 4** and
+**Insights "NEEDS ATTENTION" = 4 of 9** — they agree, which is the fix. Zero
+console errors across the whole interaction. Screenshot
+`gaps-parity-unitplan-insights-1280.png`. **The caveat: on the mock path this
+would agree even WITHOUT the fix**, because mock sections are synthesized FROM
+`lesson.resources`, so both predicates see the same set. The pass proves parity
+and no regression; it does NOT prove the fix is load-bearing. That needs the
+flag-ON path (§4c, task #11).
+
+**Verification:** `npx tsc --noEmit` clean · `npx next lint --no-cache` →
+`✔ No ESLint warnings or errors` · `npm run test` → **60 files, 1241 passed,
+68 todo, 0 failed**.
+
+**§4a GATE STATUS, stated precisely so nobody over-reads it.** Rounds 1–4 of
+this tranche WERE reviewed by Codex and every finding was acted on or dismissed
+with evidence. Rounds 5–6 could NOT run — `503 …
+biscuit_baker_service_me_circuit_open`, both transports, 12+ attempts over ~30
+minutes. The sandbox flag was never weakened and no other channel was used. Two
+independent review agents were spawned per the §4a substitution rule; neither
+returned findings. So the delta committed WITHOUT independent review is exactly
+three changes: the watchdog `pending: null` fix (which IMPLEMENTS a Codex
+finding), the bounded hydrate retry (self-caught), and the coverage rule
+(self-caught, replacing a boolean Codex had already reviewed). Self-review plus
+the full local stack cover them. **A re-review of that delta is owed when Codex
+is back** — it is small and named here so it can be found.

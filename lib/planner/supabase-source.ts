@@ -1969,6 +1969,27 @@ export const plannerSupabaseSource: PlannerDataSource = {
       modified: false,
       moved: null,
       differentiation: jsonToDifferentiation(inserted.differentiation),
+      // ⚠ THE FIFTH `buildLesson` CALLSITE — AND THE ONE WITHOUT
+      // `...trackBArgsFromRow(inserted)`. The other four (two list-hydrate, two
+      // post-mutation reload) all spread it, which is what makes "widen the
+      // mapper, widen every read" hold. This one does not, and that is a
+      // LATENT BUG, not a design decision:
+      //
+      //   Benign TODAY only because the insert above sets no Track-B column and
+      //   none has a DB default, so every Track-B field on `inserted` is null
+      //   and spreading them would add nothing.
+      //
+      //   It ARMS the moment `createLesson` honours a unit default. `units`
+      //   already HAS `default_dur` and `default_flow`, and both are already
+      //   read into the `Unit` type — so the feature is one small change away.
+      //   The first time this insert carries a duration, the lesson returned to
+      //   the store will silently DROP it: the card shows no duration until a
+      //   full re-hydrate, and the teacher's "why did that not save" is
+      //   unanswerable from the UI.
+      //
+      // If you add ANY Track-B column to the insert, add
+      // `...trackBArgsFromRow(inserted)` here in the same change. Do not read
+      // this comment as a clean bill of health — it is a warning with a fuse.
     });
   },
 

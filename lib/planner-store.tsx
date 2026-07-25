@@ -76,6 +76,10 @@ import { snapshotRestorePatch } from "@/lib/fork-diff-restore";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { plannerClient } from "@/lib/planner/client";
 import { createSerialWriteQueue } from "@/lib/planner/serial-write-queue";
+import {
+  classifyAsyncFailure,
+  shouldRetryRead,
+} from "@/lib/async-failure";
 import { diffLessonsForReplay } from "@/lib/planner/doc-replay";
 import { resolveGrade } from "@/lib/planner/grade";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
@@ -1710,6 +1714,32 @@ export function splitPatchByField(
   return groups.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 
+/**
+ * How many times one hydrate effect will try before it settles to "error".
+ *
+ * BOUNDED IN BOTH DIRECTIONS, and both bounds matter. Too few and a teacher who
+ * navigates twice in quick succession is left staring at a skeleton with nothing
+ * coming. Too many (or unbounded) and a teacher clicking around during a slow
+ * cold hydrate spawns a retry chain that never terminates. Three attempts covers
+ * the realistic case — the live symptom is ONE cancellation per session and the
+ * data always renders on the next attempt — and terminates.
+ */
+const MAX_HYDRATE_ATTEMPTS = 3;
+
+/** A persist failure, published on the planner value so a bridge can surface it.
+ *  See `PlannerValue.lastWriteFailure` for why this is a signal, not a Result. */
+export interface PlannerWriteFailure {
+  /** Monotonic; changes on every failure so an effect can depend on the object. */
+  id: number;
+  /** The source verb that failed — "updateLesson", "setSections", "move", … */
+  op: string;
+  /** Where the lost edit was headed. "team" means a SHARED row: the failure is
+   *  team-visible in consequence and the teacher must be told so explicitly. */
+  scope: "personal" | "team";
+  /** Best-effort message off the error, for the surface to show or log. */
+  message: string;
+}
+
 /** A non-field lesson write, before identity (owner / save target) is attached.
  *  `move` is the resolved FINAL slot, never a partial patch — sending a bare
  *  `{ day }` lets the omitted `week` default to 0 server-side and the lesson
@@ -2054,6 +2084,32 @@ export interface PlannerValue {
    * can undercount — acceptable until item 06's real batch undo lands.
    */
   historyDepth: number;
+  /**
+   * The most recent persist failure, or null. Identity changes on EVERY
+   * failure (monotonic `id`), so a bridge can `useEffect(..., [lastWriteFailure])`.
+   *
+   * WHY THIS IS A SIGNAL AND NOT A RESULT. `lib/workspaces/actions.ts` is the
+   * right pattern for a server action — it has a caller, so it resolves
+   * `{ok:false,error}` and the caller decides. The planner's persist tees have
+   * no caller: they are fire-and-forget, dispatched optimistically after the
+   * reducer has already committed, and the function that started them returned
+   * long ago. There is nothing to return a Result TO. So the equivalent honesty
+   * is to publish the failure where something can render it.
+   *
+   * The store cannot render it itself: ConsequenceToastProvider mounts as a
+   * CHILD of PlannerProvider (see app/(planner)/layout.tsx), so its hook is out
+   * of scope in this provider body. A small bridge inside that provider — the
+   * same shape as components/shell/undo-toast-bridge.tsx — turns this into a
+   * toast. Until one exists the failure still reaches console.error, so nothing
+   * regresses; it just stays invisible to the teacher.
+   *
+   * `scope` is the part that matters most. A teacher without
+   * `can_edit_subject_master` who flips to Team Curriculum sees an entirely
+   * normal edit, and finds it gone on reload — the write was RLS-denied against
+   * the shared row. A toast that says "Team" is the difference between
+   * "something failed" and "the change you just made for everyone did not save".
+   */
+  lastWriteFailure: PlannerWriteFailure | null;
   /**
    * The human label of the action that WILL be undone next, or null.
    * Use this to render tooltip text like "Undo Move lesson".
@@ -2448,7 +2504,27 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     }
 
     let alive = true;
-    void (async () => {
+    // ── CANCELLED IS NOT FAILED ────────────────────────────────────────────
+    // The hydrate runs as a Next server action — a POST to the page route — so
+    // navigating away CANCELS it. The browser logs `net::ERR_ABORTED` and the
+    // fetch rejects `TypeError: Failed to fetch` about six milliseconds later.
+    // This catch used to treat that exactly like a backend error and paint
+    // hydration:"error" over an empty document — for a request the teacher
+    // themselves cancelled by clicking a link. Live on prod, once per session,
+    // on clean auth, and it fed a second surface's false "No lessons planned".
+    //
+    // A cancelled fetch and a genuinely unreachable network are NOT
+    // distinguishable from the error object (see lib/async-failure.ts), so the
+    // ambiguity is resolved by OBSERVATION rather than by guessing: an
+    // unsettled attempt is retried once, and only a second unsettled attempt —
+    // or any error with a real message — is reported as a failure. That also
+    // matches the live behaviour, where the data always renders on the retry.
+    //
+    // Nothing here paints an intermediate state. A superseded attempt leaves
+    // hydration on "loading", so no surface is ever told the document is empty
+    // because of a click.
+    let attempt = 0;
+    const runHydrate = async (): Promise<void> => {
       try {
         const gradeLevelId = await resolveGrade(ownerId);
         if (!alive) return;
@@ -2525,10 +2601,22 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
             ownerId,
           );
         } catch (err) {
-          console.error(
-            "[planner] section batch failed; falling back to synthetic sections",
-            err,
-          );
+          // Same cancelled-vs-failed distinction as the outer catch, minus the
+          // retry: this read is supplementary, the fallback is already correct,
+          // and a superseded batch is not worth a second round-trip. It IS worth
+          // a truthful log line — an error entry here for a navigation would
+          // send the next reader hunting a section bug that never existed.
+          if (classifyAsyncFailure(err) === "failed") {
+            console.error(
+              "[planner] section batch failed; falling back to synthetic sections",
+              err,
+            );
+          } else {
+            console.info(
+              "[planner] section batch cancelled (likely superseded by navigation); using synthetic sections",
+              err,
+            );
+          }
         }
         if (!alive) return;
         const sections = fillSyntheticSections(lessons, batchedSections);
@@ -2545,15 +2633,46 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
           owner: ownerId,
         });
       } catch (err) {
-        // On any backend/auth error, stay on EMPTY_DOC (already hydrated above)
-        // rather than falling back to the mock — surfacing mock/Grade-5 fixtures
-        // as if they were live data would be worse than an honest blank planner.
-        // Surface the failure so a dropped hydrate is visible in the console.
         if (!alive) return;
-        console.error("[planner] hydrate failed; showing empty document", err);
+        const kind = classifyAsyncFailure(err);
+
+        // DEFINITELY cancelled, or not yet settled: try again instead of
+        // concluding anything. Distinct log lines on purpose — a console
+        // reading "superseded" tells the next person this was a navigation,
+        // not breakage. Reading a navigation-abort sweep AS breakage is how the
+        // 7.16 cutover was misdiagnosed.
+        if (shouldRetryRead(err, attempt, MAX_HYDRATE_ATTEMPTS)) {
+          attempt += 1;
+          console.info(
+            `[planner] hydrate ${kind === "aborted" ? "cancelled" : "did not settle"} (likely superseded by navigation) — retry ${attempt}/${MAX_HYDRATE_ATTEMPTS - 1}; state left on "loading"`,
+            err,
+          );
+          // A short beat so a retry fired mid-navigation isn't cancelled by the
+          // same navigation that killed the first attempt.
+          await new Promise((r) => setTimeout(r, 400));
+          if (!alive) return;
+          return runHydrate();
+        }
+        // A real error, or the retry budget is spent. Stay on EMPTY_DOC —
+        // surfacing mock/Grade-5 fixtures as if they were live data would be
+        // worse than an honest blank planner — and mark "error" so
+        // usePlannerDataState reports `"error"` rather than `"settled"`, which
+        // is what stops a surface asserting the teacher's day is empty.
+        //
+        // "error" EVEN FOR AN EXHAUSTED CANCELLATION, and that is deliberate.
+        // Leaving hydration on "loading" would be the honest label for the
+        // CAUSE and a lie about the STATE: nothing is loading any more, no
+        // further attempt is coming, and the teacher would sit in front of a
+        // skeleton forever until the workspace or account changed. From their
+        // seat a permanently blank planner IS a failure whatever cancelled it.
+        console.error(
+          `[planner] hydrate gave up after ${attempt + 1} attempt(s); showing empty document`,
+          err,
+        );
         dispatchRef.current({ type: "setHydration", hydration: "error" });
       }
-    })();
+    };
+    void runHydrate();
     return () => {
       alive = false;
     };
@@ -2617,6 +2736,55 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   // more: every lesson write now belongs to an ORDERED axis (field patch,
   // slot/completion/archive, sections), and an unordered one-shot alongside them
   // is how two edits to the same axis commit out of order with nothing logged.
+
+  // Every persist failure lands here as well as in the console, so a bridge
+  // inside ConsequenceToastProvider can tell the teacher. See
+  // PlannerValue.lastWriteFailure for why a signal rather than a Result.
+  const [lastWriteFailure, setLastWriteFailure] =
+    useState<PlannerWriteFailure | null>(null);
+  const writeFailureSeqRef = useRef(0);
+  const reportWriteFailure = useCallback(
+    (
+      op: string,
+      scope: "personal" | "team",
+      err: unknown,
+      inconsequential = false,
+    ): void => {
+      // THE ONLY REASON TO STAY QUIET IS SUPERSESSION — not the error's shape.
+      //
+      // The hydrate can afford to ignore an "aborted" or ambiguous "transport"
+      // rejection because it RETRIES and settles the question by observation. A
+      // write has no retry: the queue drains what is pending and moves on. So
+      // for a write, an aborted request is just as lost as a failed one, and
+      // classifying by error shape here would silently drop exactly the signal
+      // this seam exists to provide (a teacher going offline mid-keystroke, or a
+      // request cancelled during teardown).
+      //
+      // What DOES make a failure inconsequential is a newer queued payload that
+      // COVERS this one — carries every field it carried. When that lands the
+      // teacher's state is saved and this attempt lost a race it never needed to
+      // win; reporting it would say their work was lost while the queue is busy
+      // saving it. Each caller computes coverage itself, because only it knows
+      // whether its payloads are whole values or partial patches.
+      if (inconsequential) return;
+      writeFailureSeqRef.current += 1;
+      setLastWriteFailure({
+        id: writeFailureSeqRef.current,
+        op,
+        scope,
+        message:
+          err instanceof Error && err.message
+            ? err.message
+            : "The change could not be saved.",
+      });
+    },
+    [],
+  );
+  // The write queues are built ONCE in a ref initializer, so their onError
+  // closures capture the first render. Reading the reporter through a ref keeps
+  // them pointed at the live one regardless of declaration order.
+  const reportWriteFailureRef = useRef(reportWriteFailure);
+  reportWriteFailureRef.current = reportWriteFailure;
 
   // ── Serialized (latest-wins) section persistence ────────────────────────
   // W3.8 gate fix (Codex HIGH — persistence ordering race): the lesson editor
@@ -2695,6 +2863,17 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
             // dropped write is surfaced without blocking the UI. A newer
             // pending snapshot (drained below) supersedes the failed payload.
             console.error("[planner] persist 'setSections' failed", err);
+            // Same supersession rule as the shared queue: a newer snapshot in
+            // the pending slot carries the teacher's complete current sections,
+            // so this failure has no user-visible consequence once it lands.
+            reportWriteFailureRef.current(
+              "setSections",
+              next.saveTarget === "core" ? "team" : "personal",
+              err,
+              // A snapshot is the COMPLETE resolved section list, so a pending
+              // one always covers the failed one — existence is coverage here.
+              queued.pending !== null,
+            );
           })
           .then(() => {
             queued.inFlight = false;
@@ -2735,10 +2914,26 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     }>({
       send: (p) =>
         plannerClient.updateLesson(p.lessonId, p.patch, p.ownerId, p.saveTarget),
-      onError: (err) => {
-        // Per the write-tee contract: reducer state stands, the dropped
-        // write is surfaced, and a newer pending patch supersedes the failure.
+      onError: (err, p, pending) => {
+        // Per the write-tee contract: reducer state stands and the dropped
+        // write is surfaced.
         console.error("[planner] persist 'updateLesson' failed", err);
+        // COVERAGE, not mere existence. These payloads are PARTIAL patches, and
+        // a lane can legitimately carry differently-shaped ones: the direct
+        // toggle sends `{status}` while a replayed undo sends
+        // `{status, reasonNotDone}`. A pending `{status}` does not carry the
+        // reason, so treating it as superseding would lose that field with no
+        // trace. Only a pending patch that covers EVERY key of the failed one
+        // makes the failure inconsequential.
+        const covered =
+          pending !== null &&
+          Object.keys(p.patch).every((k) => k in pending.patch);
+        reportWriteFailureRef.current(
+          "updateLesson",
+          p.saveTarget === "core" ? "team" : "personal",
+          err,
+          covered,
+        );
       },
     }),
   );
@@ -2780,10 +2975,20 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
             return plannerClient.unarchiveLesson(p.lessonId, p.ownerId);
         }
       },
-      onError: (err, p) => {
+      onError: (err, p, pending) => {
         // Per the write-tee contract: reducer state stands and the
         // dropped write is surfaced.
         console.error(`[planner] persist '${p.kind}' failed`, err);
+        // Every payload on these lanes is a WHOLE axis value — a fully-resolved
+        // {week, day}, or the archived flag — so any pending payload covers the
+        // failed one and existence is coverage. (Contrast the field queue, whose
+        // payloads are partial patches.)
+        reportWriteFailureRef.current(
+          p.kind,
+          p.saveTarget === "core" ? "team" : "personal",
+          err,
+          pending !== null,
+        );
       },
     }),
   );
@@ -3298,7 +3503,13 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         dispatchRef.current({ type: "editUnitFields", unitId, patch }),
       canWrite: () => editModeRef.current === "master",
       unitToPatch,
-      onError: (message, err) => console.error(message, err),
+      onError: (message, err) => {
+        console.error(message, err);
+        // Units are TEAM content with no personal fork, so a failed unit write
+        // is ALWAYS team-scoped — the teacher needs to know the whole team did
+        // not get the change.
+        reportWriteFailureRef.current("updateUnitFields", "team", err);
+      },
       retainFailed: (unitId, patch) => {
         const m = failedUnitWritesRef.current;
         const prior = m.get(unitId);
@@ -3895,6 +4106,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       canUndo,
       canRedo,
       historyDepth,
+      lastWriteFailure,
       undoLabel,
       redoLabel,
       lastChange,
@@ -3948,6 +4160,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       canUndo,
       canRedo,
       historyDepth,
+      lastWriteFailure,
       undoLabel,
       redoLabel,
       lastChange,

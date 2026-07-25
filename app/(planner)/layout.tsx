@@ -16,6 +16,7 @@ import {
   SideNav,
   TopBar,
   UndoToastBridge,
+  WriteFailureBridge,
 } from "@/components/shell";
 import { ChromeShell } from "@/components/chrome";
 import { ComposerProvider } from "@/components/composer";
@@ -200,6 +201,14 @@ export default function PlannerLayout({
                     completion / first fork / revert). Must sit inside BOTH
                     PlannerProvider and UndoToastProvider. */}
                         <UndoToastBridge />
+                        {/* Sibling leaf, same contract: watches the store's
+                    lastWriteFailure signal and tells the teacher when a write
+                    did NOT save. Without it a failed write — most sharply an
+                    RLS-denied Team Curriculum edit — leaves the optimistic
+                    value on screen and vanishes on the next reload, with the
+                    only trace in the console. Must sit inside BOTH
+                    PlannerProvider and ConsequenceToastProvider. */}
+                        <WriteFailureBridge />
                         {/* W3.3 shell: the v2 corner-grammar chrome (ChromeShell —
                     Framework §3 overlay grid: ChromeTopBar with brand +
                     Personal/Team icon toggle + bell · routed content in the
