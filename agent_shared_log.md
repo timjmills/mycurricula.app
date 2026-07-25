@@ -5558,3 +5558,101 @@ broke the shared client bundle again mid-run — `pageerror: "Unexpected end of 
 click a no-op, my first probe run 0/4. Retried after the lane recovered: 7/7 on identical code.
 **Check `npx tsc --noEmit` on the whole tree before believing a red live result during a
 multi-lane wave.** That is now three for three.
+
+---
+
+## ToggleGroup — addendum: one press must cause one change (fix-toggle-drawer)
+
+Follow-up to the entry above. Two updates.
+
+**1. The Critical is now CLOSED end to end.** `f3609bc` added `destructive: true`
+to `LessonWorkspace`'s `"none"` option (and made its tooltip `required`, which
+§4 puts on the always-on list for destructive actions). Verified that the
+composition typechecks and that the option shape that commit declares is exactly
+what `arrowCommits` reads. The earlier entry's "half closed" no longer applies.
+
+**2. `stopPropagation` on handled arrows.** `RightRail` renders its Tabs/Stack
+toggle INSIDE the rail's own `role="tablist"` strip, whose `onKeyDown` reads
+arrows on bubble with no `e.target` check — so one ArrowRight fired both
+`selectMode` and `selectTab`, and choosing "Stack" then unmounted the strip the
+focused button lived in. Fixed in the primitive: a control that HANDLES a key
+must not let that key also reach an ancestor.
+
+Deliberately narrow — the call sits after both the `disabled` bail and the
+`arrowTarget === null` bail, so it covers only the arrows this group consumed.
+Tab, Escape, Enter and Space still bubble, which matters because Escape ordering
+is load-bearing for the overlays this primitive renders inside. Audited what
+could rely on arrows escaping a radiogroup: `use-keyboard-shortcuts.ts` has zero
+Arrow references; `undo-toast.tsx` and `useDockLayout.ts` listen in CAPTURE so
+they fire first regardless; `use-teach-shortcuts.ts` mentions arrows only in a
+comment explaining that it deliberately does NOT handle them so they reach the
+tablist roving nav — unaffected, since this only fires when focus is inside the
+group. The rail strip was the only consumer.
+
+`use-roving-radio.ts` is untouched: follows-focus is correct there (instant-apply
+preferences, no destructive member), per the fix-class-sweep entry above.
+
+### Two measurement traps this cost, both worth keeping
+
+**`[aria-selected]` was the wrong signal.** Choosing "Stack" unmounts the whole
+tab strip, so the live DOM answer is `null` whether or not the rail handler ran —
+a probe reading it "passes" for the wrong reason. `selectTab` writes through to
+`localStorage`, and that survives the unmount. Read the persisted value.
+
+**The first two runs reported the fix doing nothing — that was PRE-HYDRATION.**
+Keys were going into markup with no listeners; NEITHER handler fired, which reads
+exactly like "the arrow does nothing". Hydration here measured 1.9-16.7s in the
+same session. `scripts/probe-toggle-drawer.mjs` now opens with a canary that
+clicks a known-good control and requires `aria-checked` to move before ANY
+keyboard assertion runs, and fails loudly if it never does.
+[[dev-hydration-audit-trap]]
+
+Two smaller harness bugs, in case they bite elsewhere: a Playwright
+`filter({ hasNot: ... })` does NOT exclude an element by its OWN attribute (only
+by descendant), so a canary built that way silently re-clicked the already-active
+option for 81s and reported "not hydrated" against a live page; and a canary that
+changes a real view mode has to RESTORE it, or the next section waits 30s for a
+surface its own setup removed.
+
+The live result carries a sensitivity control, because "the tab did not change"
+means nothing unless the signal can move:
+
+```
+ok  the rail's mode toggle really is nested inside the rail tablist — nested=true
+ok  rail toggle is hydrated and restored to its starting mode — 2.9s
+ok  sensitivity: a real rail-tab click moves the stored tab — stored became todos
+ok  arrow still switches the rail's display mode — Tabs -> Stack
+ok  ONE press, ONE change — storedTab resources -> resources
+```
+
+47/52 checks pass; all five failures are the drawer-surface SKIP (the unit
+workspace still does not mount in this tree — the chip receives
+pointerdown/mousedown/click, the URL does not change, zero `.ue-modal`).
+
+### §4a could not run for this delta — substitution recorded
+
+`codex exec --sandbox read-only` failed with **HTTP 503,
+`biscuit_baker_service_me_circuit_open`**, on BOTH transports (WebSocket, then
+the HTTPS fallback), twice, minutes apart. CLI 0.144.4; it had run four passes
+successfully forty minutes earlier. `--sandbox read-only` was on every attempt —
+never weakened, and the diff was never routed anywhere else. Blocker reported to
+the orchestrator, who approved the documented fallback: the parent diff carrying
+the actual behaviour change had already passed Codex four times, and this delta
+is a `stopPropagation` on arrows the group already consumed.
+
+Substituted: a self-administered adversarial review against five named cases
+(`destructive` on a non-first option; every option destructive; `selectOnFocus:
+false` combined with destructive; whether the unchanged-value guard can suppress
+a legitimate `onChange`; whether `stopPropagation` can break a legitimate
+ancestor) plus the full local stack — `tsc` clean, `next lint --no-cache` clean,
+`npm run test` **60 files / 1238 passed / 68 todo / 0 failed** — plus the live
+§4b run above.
+
+The case worth recording: **the no-op guard compares against the LIVE `value`
+prop, not a remembered "last emitted"**. That is what makes it safe. A controlled
+parent that rejects or ignores a change leaves `value` unmoved, so the next click
+still differs from it and still fires; only re-selecting a value the parent
+already holds is suppressed, and that is not an edit. Derived values behave too —
+`LessonWorkspace`'s `kindChoice` derives `"unclassified"` / `"none"` rather than
+storing them, so clicking the matching option would have committed a patch
+identical to what is already persisted.

@@ -176,6 +176,19 @@ export function ToggleGroup<T extends string = string>({
       const nextIndex = arrowTarget(e.key, tabStop, options.length);
       if (nextIndex === null) return;
       e.preventDefault();
+      // A key this group ACTS ON must not also reach an ancestor's handler.
+      // RightRail renders its Tabs/Stack toggle inside the rail's own
+      // `role="tablist"` strip, whose onKeyDown reads arrows on bubble with no
+      // target check — so one ArrowRight inside the toggle both switched the
+      // rail's display mode AND moved the rail to the next PANEL, two unrelated
+      // changes from one press (and "Stack" then unmounts the strip the focused
+      // button lives in, losing focus too).
+      //
+      // Deliberately narrow: this line sits AFTER the `null` bail, so it only
+      // covers the arrows actually handled here. Tab, Escape, Enter, Space and
+      // everything else still bubble untouched — Escape ordering in particular
+      // is load-bearing for the overlays this primitive renders inside.
+      e.stopPropagation();
       setFocusIndex(nextIndex);
       if (commitsOnArrow) select(options[nextIndex].value);
       // Move DOM focus to the option the arrow landed on, so the outline

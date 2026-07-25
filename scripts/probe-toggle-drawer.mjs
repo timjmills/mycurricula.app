@@ -397,6 +397,50 @@ async function openDrawer(ctx, label) {
   );
   }
 
+  // ── HYDRATION CANARY — everything below is a KEYBOARD result ─────────────
+  //
+  // A radiogroup in the SSR HTML says nothing about React being attached, and
+  // the dev-server hydrate here runs 6-17s. An earlier run of this probe pressed
+  // arrows into markup with no listeners and dutifully reported "arrow does not
+  // move focus" — a fabricated finding about a fix that was working. So: poll
+  // until a real CLICK moves aria-checked, and fail loudly if it never does,
+  // rather than reporting whatever dead markup says.
+  {
+    const CANARY = scope + '[role="radiogroup"]';
+    const checkedOf = () =>
+      page.evaluate(
+        (sel) =>
+          [...document.querySelectorAll(`${sel} [role="radio"]`)].findIndex(
+            (r) => r.getAttribute("aria-checked") === "true",
+          ),
+        CANARY,
+      );
+    const opts = page.locator(CANARY).first().locator('[role="radio"]');
+    const n = await opts.count();
+    // The canary CHANGES a real view mode, so put it back. Leaving "Weekly view
+    // mode" on Schedule swapped out the whole surface and took the rail's tab
+    // strip with it, which the next section then waited 30s for.
+    const original = await checkedOf();
+    let live = false;
+    const t0 = Date.now();
+    for (let i = 0; i < 30 && !live && n > 1; i++) {
+      const was = await checkedOf();
+      await opts.nth(was === n - 1 ? 0 : n - 1).click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      if ((await checkedOf()) !== was) live = true;
+      else await page.waitForTimeout(1500);
+    }
+    if (live && original >= 0) {
+      await opts.nth(original).click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(800);
+    }
+    check(
+      live,
+      "React is hydrated before any keyboard assertion",
+      `${((Date.now() - t0) / 1000).toFixed(1)}s, restored to option ${original}`,
+    );
+  }
+
   // ── Keyboard: an ordinary group still commits on arrow (no regression) ───
   const arrow = await page.evaluate((scope) => {
     const g = document.querySelector(scope + '[role="radiogroup"]');
@@ -458,6 +502,7 @@ async function openDrawer(ctx, label) {
     );
   }
 
+
   // Scoped to errors this lane could have caused. The shared tree currently
   // emits a React hydration-mismatch from WeeklyShell's srOnly useId and the
   // Shoutbox composer input — both other lanes' dirty files, both present
@@ -510,6 +555,177 @@ async function openDrawer(ctx, label) {
       `H7 dark tone: "${o.label}"${o.checked ? " (active)" : ""} clears 4.5:1`,
       `${o.ratio}:1 (${o.fg} on ${o.bg})`,
     );
+  }
+  await ctx.close();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 2a. ONE PRESS, ONE CHANGE — a handled key must not reach an ancestor
+//
+// RightRail renders its Tabs/Stack toggle INSIDE the rail's own role="tablist"
+// strip, whose onKeyDown reads arrows on bubble with no target check. Without
+// `stopPropagation`, one ArrowRight in the toggle fired both `selectMode` and
+// `selectTab` — two unrelated changes from one press.
+//
+// ITS OWN PAGE, deliberately. The section above leaves the weekly view on List
+// or Schedule, and the rail paints a different set of tabs in each; threading
+// that state through cost two runs of phantom failures.
+//
+// And the live `[aria-selected]` tab is NOT the signal: choosing "Stack"
+// unmounts the strip, so the DOM answer is null whether or not the rail handler
+// ran. `selectTab` writes through to localStorage, which survives it.
+// ════════════════════════════════════════════════════════════════════════════
+{
+  const TAB_KEY = "mycurricula:daily-right-rail-tab";
+  const RAIL = '[role="radiogroup"][aria-label="Rail display mode"]';
+  const ctx = await makeContext({ theme: "clear", width: 1440 });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/weekly`, {
+    waitUntil: "domcontentloaded",
+    timeout: 180000,
+  });
+  await page
+    .locator('[data-planner-item^="lesson:"]')
+    .first()
+    .waitFor({ timeout: HYDRATE_BUDGET_MS });
+
+  const present = await page
+    .locator(RAIL)
+    .waitFor({ timeout: HYDRATE_BUDGET_MS })
+    .then(() => true, () => false);
+  const nested = present
+    ? await page.evaluate(
+        (sel) => !!document.querySelector(sel)?.closest('[role="tablist"]'),
+        RAIL,
+      )
+    : false;
+  check(
+    nested,
+    "the rail's mode toggle really is nested inside the rail tablist",
+    `present=${present} nested=${nested}`,
+  );
+
+  const railMode = () =>
+    page.evaluate(
+      (sel) =>
+        [...document.querySelectorAll(`${sel} [role="radio"]`)]
+          .find((r) => r.getAttribute("aria-checked") === "true")
+          ?.textContent?.trim() ?? null,
+      RAIL,
+    );
+  // Retried: a rail-tab click can navigate, and an `evaluate` that straddles a
+  // navigation throws "Execution context was destroyed" — which killed the run
+  // rather than reporting anything.
+  const storedTab = async () => {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        return await page.evaluate((k) => localStorage.getItem(k), TAB_KEY);
+      } catch {
+        await page.waitForTimeout(600);
+      }
+    }
+    return null;
+  };
+
+  if (nested) {
+    // HYDRATION CANARY, using the rail toggle itself: click the OTHER mode and
+    // back. It proves React is attached AND returns us to Tabs, where the strip
+    // exists and the bug lives. Pressing keys into un-hydrated markup is how an
+    // earlier run "found" that a working fix did nothing.
+    // Index-based, NOT a `hasNot` filter: aria-checked sits on the chip itself,
+    // and `hasNot` only excludes elements by DESCENDANT, so it never excluded
+    // anything and the loop kept re-clicking the option that was already
+    // active — 81 seconds of "not hydrated" against a page that was.
+    const chips = page.locator(RAIL).locator('[role="radio"]');
+    const chipCount = await chips.count();
+    const checkedIndex = () =>
+      page.evaluate(
+        (sel) =>
+          [...document.querySelectorAll(`${sel} [role="radio"]`)].findIndex(
+            (r) => r.getAttribute("aria-checked") === "true",
+          ),
+        RAIL,
+      );
+    const startMode = await railMode();
+    const startIndex = await checkedIndex();
+    let live = false;
+    const t0 = Date.now();
+    for (let i = 0; i < 20 && !live && chipCount > 1; i++) {
+      const was = await checkedIndex();
+      await chips
+        .nth(was === chipCount - 1 ? 0 : chipCount - 1)
+        .click({ timeout: 5000 })
+        .catch(() => {});
+      await page.waitForTimeout(600);
+      if ((await checkedIndex()) !== was) live = true;
+      else await page.waitForTimeout(1200);
+    }
+    if (live && startIndex >= 0) {
+      await chips.nth(startIndex).click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(800);
+    }
+    check(
+      live && (await railMode()) === startMode,
+      "rail toggle is hydrated and restored to its starting mode",
+      `${((Date.now() - t0) / 1000).toFixed(1)}s, mode=${await railMode()}`,
+    );
+
+    // PROBE SENSITIVITY. "the tab did not change" means nothing unless the
+    // signal moves when selectTab genuinely runs.
+    const tabs = page.locator('[role="tab"][id^="rail-tab-"]');
+    const startTab = await page.evaluate(
+      () =>
+        document.querySelector('[role="tab"][id^="rail-tab-"][aria-selected="true"]')
+          ?.id ?? null,
+    );
+    let target = null;
+    for (let i = 0; i < (await tabs.count()); i++) {
+      const t = tabs.nth(i);
+      const id = await t.getAttribute("id");
+      if (id !== startTab && (await t.isVisible())) {
+        target = { locator: t, id };
+        break;
+      }
+    }
+    let moved = false;
+    let observed = null;
+    if (target) {
+      await target.locator.click({ timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      // Read it HERE, before the restore — reporting the post-restore value
+      // made a passing check read like a failing one.
+      observed = await storedTab();
+      moved = observed === target.id.replace("rail-tab-", "");
+      if (startTab) {
+        await page.locator(`#${startTab}`).click({ timeout: 10000 }).catch(() => {});
+        await page.waitForTimeout(800);
+      }
+    }
+    check(
+      moved,
+      "sensitivity: a real rail-tab click moves the stored tab",
+      `selected=${startTab}, clicked=${target?.id ?? "none"}, stored became ${observed}`,
+    );
+
+    // THE TEST.
+    const beforeMode = await railMode();
+    const beforeTab = await storedTab();
+    await page.locator(`${RAIL} [role="radio"][aria-checked="true"]`).focus();
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(1200);
+    const afterMode = await railMode();
+    const afterTab = await storedTab();
+    check(
+      beforeMode !== afterMode,
+      "arrow still switches the rail's display mode",
+      `${beforeMode} -> ${afterMode}`,
+    );
+    check(
+      moved && beforeTab === afterTab,
+      "ONE press, ONE change — the arrow does not also move the rail's panel",
+      `storedTab ${beforeTab} -> ${afterTab}`,
+    );
+    await page.screenshot({ path: `${SHOTS}/rail-bubble-after.png` });
   }
   await ctx.close();
 }
