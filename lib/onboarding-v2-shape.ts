@@ -109,6 +109,22 @@ export interface OnboardingPersistenceNote {
  * One entry per thing the wizard collects, in recap order. Keep in lockstep
  * with the rows SummaryStep renders — a row without an entry silently loses
  * its disclosure, which is the failure mode this map exists to prevent.
+ *
+ * A `device` caption asserts something specific: the answer really is stored on
+ * this browser and really is read back. That is only true because each of the
+ * four has a SEED BRIDGE from this record to the live settings key its surfaces
+ * read — `use-subject-settings` (subjects), `use-schedule-settings` (rotation),
+ * `use-default-template` (template), `use-academic-year` (school year).
+ *
+ * The last of those did not exist until it was added alongside this map: the
+ * year step wrote `yearStart`/`yearEnd` here and nothing ever read them, so
+ * Roadmap, Progression and every other `useAcademicYear` consumer used the
+ * heuristic default no matter what the teacher typed. "This browser only" was
+ * an OVER-claim for that row — the answer was not saved anywhere usable, on
+ * this device or any other. Adding the bridge is what made the caption true.
+ *
+ * So: before moving a row to `device`, confirm a bridge actually carries it.
+ * The caption is a promise about behaviour, not about intent.
  */
 export const ONBOARDING_PERSISTENCE: readonly OnboardingPersistenceNote[] = [
   {
