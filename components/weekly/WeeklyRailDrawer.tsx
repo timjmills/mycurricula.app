@@ -60,6 +60,7 @@ import { createPortal } from "react-dom";
 import { Button, Tooltip } from "@/components/ui";
 import { RightRail } from "@/components/daily";
 import type { Lesson } from "@/lib/types";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import styles from "./WeeklyRailDrawer.module.css";
 
 // ── Focusable selector (mirrors SchedulePanel / ResourceComposer) ──────────
@@ -130,7 +131,13 @@ export function WeeklyRailDrawer({
   // Track the element that held focus before we opened so we can restore.
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  // ── On open: move focus into the drawer; lock body scroll ────────────────
+  // Lock body scroll while the drawer is open so a phone user doesn't get the
+  // document scrolling behind a full-viewport overlay. Refcounted so this
+  // drawer and a lesson/unit overlay opened over it can be closed in either
+  // order without stranding the lock — lib/use-body-scroll-lock.
+  useBodyScrollLock(open);
+
+  // ── On open: move focus into the drawer ──────────────────────────────────
   useEffect(() => {
     if (!open) return;
 
@@ -148,14 +155,8 @@ export function WeeklyRailDrawer({
       closeBtn?.focus();
     });
 
-    // Lock body scroll while the drawer is open so a phone user doesn't
-    // get the document scrolling behind a full-viewport overlay.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
     return () => {
       cancelAnimationFrame(frame);
-      document.body.style.overflow = previousOverflow;
     };
   }, [open]);
 

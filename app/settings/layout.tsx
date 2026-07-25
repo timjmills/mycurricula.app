@@ -55,6 +55,7 @@ import { AppStateProvider } from "@/lib/app-state";
 import { ConsequenceToastProvider } from "@/lib/consequence-toast";
 import { NotebookProvider } from "@/lib/notebook-state";
 import { useSettingsDirty } from "@/lib/use-settings-dirty";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { Clock } from "@/components/shell/Clock";
 import { readSettingsReturnRoute } from "@/components/shell";
 import { ThemeQuickSwitch } from "@/components/appearance/theme-quick-switch";
@@ -288,14 +289,9 @@ export default function SettingsLayout({
   }, [exitSettings]);
 
   // Lock background scroll while the popup is mounted; restore on unmount.
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
+  // Refcounted (lib/use-body-scroll-lock) so an overlay opened over settings
+  // can't restore this lock's captured value out of order.
+  useBodyScrollLock();
 
   // Move focus into the dialog on mount so keyboard + screen-reader users
   // land inside the modal, and restore it to wherever it was when the popup

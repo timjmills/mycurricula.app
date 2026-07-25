@@ -35,6 +35,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { Tooltip } from "@/components/ui";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
   WALL_PRESETS,
   WALL_PRESET_LABEL,
@@ -180,9 +181,16 @@ export function WallLibrary({
     setPresetBg(loadPresetBackgrounds());
   }, []);
 
-  // Scroll-lock + LAYERED Escape (bundle :60): a menu closes first, then the
-  // background popover, then the delete confirm, then the modal — so Escape
-  // unwinds one layer at a time instead of blowing the whole modal away.
+  // Scroll-lock is held for the whole life of the modal, NOT inside the Escape
+  // effect below: that effect re-runs on every menu/popover/confirm change, so
+  // the old inline lock tore down and re-captured `overflow` on each one —
+  // re-reading a value another overlay may have set in between. Refcounted and
+  // mount-scoped here instead (lib/use-body-scroll-lock).
+  useBodyScrollLock();
+
+  // LAYERED Escape (bundle :60): a menu closes first, then the background
+  // popover, then the delete confirm, then the modal — so Escape unwinds one
+  // layer at a time instead of blowing the whole modal away.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== "Escape") return;
@@ -193,11 +201,8 @@ export function WallLibrary({
       onClose();
     };
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
     };
   }, [menuId, bgForId, confirmId, onClose]);
 

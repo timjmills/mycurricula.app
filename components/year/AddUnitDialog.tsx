@@ -55,6 +55,7 @@ import {
 } from "@/lib/use-custom-units";
 import { Tooltip } from "@/components/ui";
 import { useLabels, pluralize } from "@/lib/labels";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import styles from "./AddUnitDialog.module.css";
 
 // ── Focusable selector for the trap ───────────────────────────────────────
@@ -193,16 +194,11 @@ export function AddUnitDialog({
   }, [open]);
 
   // ── Body scroll lock while open ─────────────────────────────────────
+  //
+  // Refcounted (lib/use-body-scroll-lock): this dialog and the unit workspace
+  // can both be up at once, and either may be closed first.
 
-  useEffect(() => {
-    if (!open) return;
-    if (typeof document === "undefined") return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  useBodyScrollLock(open);
 
   // ── Focus trap + Esc to close ───────────────────────────────────────
 

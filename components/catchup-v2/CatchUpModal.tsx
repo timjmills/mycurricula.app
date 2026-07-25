@@ -75,6 +75,7 @@ import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { todayColumnIndex } from "@/lib/now-anchor";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { stripHtml } from "@/lib/html-text";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { PlannerEmpty, Tooltip } from "@/components/ui";
 import {
   closeCatchupModal,
@@ -452,6 +453,10 @@ function CatchUpModalBody({
   );
 
   // ── Modal lifecycle: focus in, restore on close, lock body scroll ─────────
+  // Refcounted — this modal is mounted app-wide by ChromeShell, so it can
+  // overlap anything and be closed in any order (lib/use-body-scroll-lock).
+  useBodyScrollLock();
+
   useEffect(() => {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     let cancelled = false;
@@ -464,13 +469,10 @@ function CatchUpModalBody({
         panel.querySelector<HTMLElement>("[data-cu-close]")?.focus();
       });
     });
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame1);
       cancelAnimationFrame(frame2);
-      document.body.style.overflow = prevOverflow;
       const prev = previousFocusRef.current;
       if (prev && typeof prev.focus === "function" && document.contains(prev)) {
         prev.focus();

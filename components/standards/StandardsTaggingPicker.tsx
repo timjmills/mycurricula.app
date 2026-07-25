@@ -38,6 +38,7 @@ import { Badge, Button, Tooltip } from "@/components/ui";
 import { formatStandardCode } from "@/lib/mock/standards";
 import type { FrameworkSummary } from "@/lib/standards/queries";
 import type { StandardsMap } from "@/lib/types";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import styles from "./StandardsTaggingPicker.module.css";
 
 const FOCUSABLE =
@@ -321,15 +322,12 @@ export function StandardsTaggingPicker({
     });
   }, []);
 
-  // ── Body-scroll lock + Esc/Tab trap ───────────────────────────────────────
-  useEffect(() => {
-    if (!open || typeof document === "undefined") return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  // ── Body-scroll lock ──────────────────────────────────────────────────────
+  //
+  // Refcounted (lib/use-body-scroll-lock): this picker opens INSIDE the lesson
+  // editor and the unit workspace, both of which hold a lock of their own, and
+  // a React subtree deletion tears the parent down before the child.
+  useBodyScrollLock(open);
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {

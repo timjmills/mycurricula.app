@@ -43,6 +43,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { Subject } from "@/lib/types";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { SubjGlyph } from "@/components/planner-v2";
 import { Tooltip } from "@/components/ui";
 import styles from "./ExplorerShell.module.css";
@@ -207,7 +208,11 @@ export function ExplorerShell<K extends string = string>({
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  // ── Modal lifecycle: focus in on open, restore on close, lock body scroll ──
+  // Refcounted so a second overlay (a nested dialog, or a sibling drawer
+  // closed before this one) cannot strand the page — see lib/use-body-scroll-lock.
+  useBodyScrollLock();
+
+  // ── Modal lifecycle: focus in on open, restore focus on close ─────────────
   useEffect(() => {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
 
@@ -224,14 +229,10 @@ export function ExplorerShell<K extends string = string>({
       });
     });
 
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame1);
       cancelAnimationFrame(frame2);
-      document.body.style.overflow = prevOverflow;
       const prev = previousFocusRef.current;
       if (prev && typeof prev.focus === "function" && document.contains(prev)) {
         prev.focus();

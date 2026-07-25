@@ -61,6 +61,7 @@ import { useSchoolWeek, WEEKDAY_INDEX } from "@/lib/use-school-week";
 import { WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
 import { dateNumberForWeekDay } from "@/lib/mock/calendar";
 import { todayDayIndex } from "@/lib/schedule-data";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { Button, Tooltip } from "@/components/ui";
 import { ScheduleDayPane } from "./ScheduleDayPane";
 import styles from "./SchedulePanel.module.css";
@@ -120,7 +121,13 @@ export function SchedulePanel({
   // Track the element that held focus before we opened so we can restore.
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  // ── On open: move focus into the drawer; lock body scroll ─────────────────
+  // Lock body scroll while the drawer is open so a phone user doesn't get the
+  // document scrolling behind a full-viewport overlay. Refcounted, so closing
+  // this drawer while another overlay is still up can't unlock the page (or,
+  // worse, leave it locked once that one closes) — lib/use-body-scroll-lock.
+  useBodyScrollLock(open);
+
+  // ── On open: move focus into the drawer ───────────────────────────────────
   useEffect(() => {
     if (!open) return;
 
@@ -141,14 +148,8 @@ export function SchedulePanel({
       closeBtn?.focus();
     });
 
-    // Lock body scroll while the drawer is open so a phone user doesn't
-    // get the document scrolling behind a full-viewport overlay.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
     return () => {
       cancelAnimationFrame(frame);
-      document.body.style.overflow = previousOverflow;
     };
   }, [open]);
 

@@ -35,6 +35,7 @@ import { ResourceEmbed } from "@/components/resources";
 import { Button, Tooltip } from "@/components/ui";
 import { isSafeUrl } from "@/lib/resource-embed";
 import { stripHtml } from "@/lib/html-text";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { wallTypeOf, type WallItem, type WallType } from "@/lib/wall-scope";
 import { Annotator } from "./Annotator";
 import styles from "./Lightbox.module.css";
@@ -293,7 +294,11 @@ export function Lightbox({
     return () => window.removeEventListener("keydown", onKey);
   }, [annotating, isDeck, goNext, goPrev, onClose]);
 
-  // ── Focus in, restore on close, lock body scroll ──────────────────────────
+  // Refcounted — a lightbox opens OVER the wall library, so the two must be
+  // closable in either order without stranding (lib/use-body-scroll-lock).
+  useBodyScrollLock();
+
+  // ── Focus in, restore on close ────────────────────────────────────────────
   useEffect(() => {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     let cancelled = false;
@@ -306,13 +311,10 @@ export function Lightbox({
         panel.querySelector<HTMLElement>("[data-lb-close]")?.focus();
       });
     });
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame1);
       cancelAnimationFrame(frame2);
-      document.body.style.overflow = prevOverflow;
       const prev = previousFocusRef.current;
       if (prev && typeof prev.focus === "function" && document.contains(prev)) {
         prev.focus();
