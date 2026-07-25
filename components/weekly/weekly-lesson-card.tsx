@@ -89,6 +89,11 @@ import {
 import { cycleStatus } from "@/components/lesson-card/status";
 import { TaskRow } from "@/components/lesson-card/task-row";
 import { RichTextEditor } from "@/components/rich-text";
+// The lesson → unit workspace pop-in (B5.5). Sanctioned direction in the
+// unit-chip barrel's own graph note (`weekly → unit-chip → year-v2 →
+// planner-v2 → ui`), so this import closes no cycle. Rendered ONLY when the
+// parent opts in via `showUnitChip` — see the prop's doc comment.
+import { UnitChip } from "@/components/unit-chip";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { usePlanner } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
@@ -209,6 +214,26 @@ export interface WeeklyLessonCardProps {
    * and supplies onPrev / onNext to step it.
    */
   deck?: WeeklyCardDeck;
+  /**
+   * Render the unit pop-in chip (<UnitChip>) at the top of the card body.
+   *
+   * OPT-IN, and default OFF, because this card has three live render parents
+   * and only ONE of them needs the affordance. <WeekColumns> — the PAPER Week
+   * frame — is the last v2 planner surface with no path from a lesson to its
+   * unit workspace, so it passes this. The other two are the v1 grid
+   * (GridCell / WeeklyGrid, reachable only with NEXT_PUBLIC_V2 OFF), whose
+   * fixed-height cells this row would push against and which is out of B5.5's
+   * scope. Defaulting off means turning it on for the paper frame changes
+   * nothing anywhere else.
+   *
+   * NOT a double-chip risk on the other Week frames: WeekA (glass), WeekC
+   * (color) and WeekEditBoard render their OWN tile markup with their own
+   * <UnitChip> — they import only `OpenLessonEditorContext` from this module,
+   * never <WeeklyLessonCard> itself. Verified across all render sites.
+   *
+   * Ignored in compact (drag-chip) density, which unmounts the body entirely.
+   */
+  showUnitChip?: boolean;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -260,6 +285,7 @@ export function WeeklyLessonCard({
   onEditLesson,
   onSaveTarget,
   deck,
+  showUnitChip = false,
 }: WeeklyLessonCardProps) {
   const { style, frame } = useTheme();
   const color = useSubjectColor(lesson.subject);
@@ -1195,6 +1221,25 @@ export function WeeklyLessonCard({
               // so a screen reader hears "Expand lesson" exactly once (the band).
               data-card-interactive={!expanded ? "true" : undefined}
             >
+              {/* ── Unit pop-in (opt-in — see the showUnitChip prop) ──────────
+                  Which unit this lesson belongs to, and the way into it. FIRST
+                  child of the body, so it renders in BOTH the collapsed and the
+                  expanded state: putting it in the collapsed-only `.footer`
+                  below would make the affordance disappear the moment a teacher
+                  expanded the card. It is deliberately NOT in the band — the
+                  band's fixed min-height + 1/2-line title clamp is what keeps
+                  every header in the column the same height, and a variable-
+                  width chip in there would break that uniformity.
+
+                  The chip stops its own click, so it never reaches the
+                  collapsed body's toggleExpand, and it renders nothing at all
+                  when the unit is absent or unresolvable. */}
+              {showUnitChip && (
+                <div className={styles.unitRow}>
+                  <UnitChip subjectId={lesson.subject} unit={lesson.unit} />
+                </div>
+              )}
+
               {/* Collapsed: preview text (fills the taller body). Expanded:
             full section rows. Double-click on the preview enters edit mode. */}
               {!expanded ? (

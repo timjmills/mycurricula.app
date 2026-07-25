@@ -172,19 +172,31 @@ for (const frame of ["glass", "paper", "color"]) {
     check(liveFrame === frame, `frame under test is ${frame} · ${label}`, liveFrame);
 
     const count = await page.locator(CHIP).count();
-    // KNOWN GAP, asserted rather than skipped: /weekly's paper frame is
-    // WeekColumns → WeeklyLessonCard → components/lesson-card, a card shared
-    // with the v1 grid, catch-up and archive. It is outside B5.5's file
-    // ownership, so it carries no unit affordance today. Asserting the gap
-    // keeps this probe honest AND fails loudly the day someone closes it
-    // without updating the expectation.
-    const knownGap = route === "/weekly" && frame === "paper";
+    // The paper Week frame (WeekColumns → WeeklyLessonCard) used to be a KNOWN
+    // GAP asserted at count === 0 — it delegates its whole tile to the shared
+    // card, which carried no unit affordance. Closed by giving that card an
+    // opt-in `showUnitChip` prop that only WeekColumns passes, so every frame
+    // now owes a chip and this branch is gone.
+    check(count > 0, `chip renders · ${label}`, `count=${count} hydrate=${hydrateMs}ms`);
+
+    // DOUBLE-CHIP GUARD — the specific regression the opt-in prop exists to
+    // avoid. WeekA/WeekC/WeekEditBoard render their own <UnitChip> in their own
+    // tile markup; had the chip gone into WeeklyLessonCard unconditionally (or
+    // had one of those frames also delegated to the card), a lesson would show
+    // TWO. One chip per lesson tile, on every frame.
+    const perLesson = await page.evaluate((sel) => {
+      const hosts = [...document.querySelectorAll('[data-planner-item^="lesson:"]')];
+      // Only tiles that actually host a chip — a lesson whose unit does not
+      // resolve legitimately renders none, and that is not a duplicate.
+      const counts = hosts
+        .map((h) => h.querySelectorAll(sel).length)
+        .filter((n) => n > 0);
+      return { hosts: hosts.length, withChip: counts.length, max: Math.max(0, ...counts) };
+    }, CHIP);
     check(
-      knownGap ? count === 0 : count > 0,
-      knownGap
-        ? `KNOWN GAP — no chip on the paper Week frame (WeekColumns) · ${label}`
-        : `chip renders · ${label}`,
-      `count=${count} hydrate=${hydrateMs}ms`,
+      perLesson.max <= 1,
+      `no lesson tile shows TWO chips · ${label}`,
+      JSON.stringify(perLesson),
     );
 
     if (count > 0) {
@@ -552,6 +564,22 @@ for (const route of ["/daily", "/weekly"]) {
     await page.waitForTimeout(900);
     const count = await page.locator(CHIP).count();
     check(count > 0, `chip renders in the expanded tile · weekly-edit`, `count=${count}`);
+
+    // Same double-chip guard as Pass 1. WeekEditBoard renders its OWN tile
+    // markup (it imports only OpenLessonEditorContext from weekly-lesson-card,
+    // never the card), so the card's new opt-in chip cannot reach it — this
+    // asserts that rather than assuming it.
+    const editPerLesson = await page.evaluate((sel) => {
+      const counts = [...document.querySelectorAll('[data-planner-item^="lesson:"]')]
+        .map((h) => h.querySelectorAll(sel).length)
+        .filter((n) => n > 0);
+      return { withChip: counts.length, max: Math.max(0, ...counts) };
+    }, CHIP);
+    check(
+      editPerLesson.max <= 1,
+      `no tile shows TWO chips · weekly-edit`,
+      JSON.stringify(editPerLesson),
+    );
 
     if (count > 0) {
       const raw = await page.evaluate(

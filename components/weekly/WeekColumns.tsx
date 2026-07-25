@@ -891,6 +891,14 @@ const ColumnLessonItem = React.memo(function ColumnLessonItem({
         onEditLesson={onEditLesson}
         onSaveTarget={onSaveTarget}
         dragHandleProps={dragHandleProps}
+        // B5.5 — the unit pop-in. This surface is the PAPER Week frame, and it
+        // was the last v2 planner canvas with no route from a lesson to its
+        // unit workspace (WeekA, WeekC and WeekEditBoard each render their own
+        // <UnitChip> in their own tile markup; this one delegates its whole
+        // tile to WeeklyLessonCard, so the opt-in has to be passed here).
+        // Deliberately NOT passed to the DragOverlay copy above — that renders
+        // density="compact", which unmounts the body the chip lives in.
+        showUnitChip
       />
     </div>
   );

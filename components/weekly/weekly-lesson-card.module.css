@@ -515,6 +515,26 @@
   background: var(--surface);
 }
 
+/* ── Unit pop-in row ─────────────────────────────────────────────────────── */
+/* Hosts <UnitChip> as the body's first child (opt-in via `showUnitChip`).
+   Layout only — the chip is the Button primitive's ghost pill and owns its own
+   fill, border, and ink, which already read correctly on this neutral
+   `--surface` body in both tones. No recolour class is passed.
+
+   `flex: 0 0 auto` because `.body` is a flex COLUMN whose collapsed preview
+   takes `flex: 1` (`.previewFill`): without it a tall preview in a short column
+   would compress this row and clip the chip. `align-items: center` stops the
+   chip stretching to the row's cross-axis height (a flex item's default
+   `align-self: stretch` would override the primitive's own 32px height).
+   `min-width: 0` lets the chip's `max-width: 100%` + label ellipsis actually
+   engage inside a narrow day column instead of widening it. */
+.unitRow {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
 /* Collapsed body fills the remaining card height so the card reaches the
    bottom of its fixed-height grid cell. Only applied when collapsed — the
    expanded body keeps its natural (content-driven) height. min-height: 0 so
