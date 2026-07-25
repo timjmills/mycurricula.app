@@ -6824,3 +6824,108 @@ base is a real in-flow trailing column — could not be measured above 900px,
 because the `[aria-label="Filters and view"]` trigger is **absent** on paper-Year
 at 1280 (`viewMode` is in-memory, `lib/app-state.tsx:307`, so the switcher is the
 only route). That may be its own finding; it is not something I chased.
+
+---
+
+## Tooltip occlusion-aware placement (fix-tooltip-occlusion)
+
+**Landed `e77ba90`** on master. Task #25 closed. Files: `components/ui/Tooltip.tsx`,
+`components/ui/Tooltip.module.css`, `components/chrome/ViewTitle.tsx`,
+`tests/tooltip-placement.test.ts`, `scripts/probe-tooltip-avoid.mjs`.
+`Tooltip.tsx` is no longer held open — the shared-checkout hazard is retired.
+
+### Option A held, but NOT by the mechanism the brief assumed
+
+The ruling ("deprioritise sides that overlap") was right to reject flipping, and
+the 29/64/80px room-above numbers are confirmed exact. But **side selection alone
+does not fix 375 either** — after viewport clamping every side overlaps
+something: `top` clamps to y=8 and covers the top bar *and the gear itself*,
+`left`/`right` clamp back over the trigger. Scoring would have picked a
+different wrong answer.
+
+What fixes it is **displacement**: keep the preferred side and slide the bubble
+*past* the region along its own axis. `slideClear()` pushes to
+`avoidRect.bottom + GAP`, bounded to 4 passes (so two stacked bars both clear)
+and abandoned if the slide leaves the viewport. Side-scoring is still there as
+the fallback — overlap **demotes, never forbids**, so a least-bad placement is
+always returned rather than nothing. `ny` is strictly monotonic per pass (a hit
+rect always has `bottom > ny`), so the loop cannot oscillate.
+
+**Selector, not ref** — `avoid=".views.console, .vt-menu"`. `ConsoleNav` has
+three mounts (home / compact / immersive bar) in a **sibling** subtree of the
+gear, so a ref would have to be threaded through ChromeShell → ChromeTopBar →
+ViewTitle, and it remounts on every route change. A measure-time
+`querySelectorAll` is always current; matching nothing degrades to the untouched
+default.
+
+### Before → after, measured live (real Chrome, iPhone emulation, same tree, same server)
+
+| Tier | nav covered before | after | bubble y | `data-displaced` |
+|---|---|---|---|---|
+| 375  | **83%** | **0%** | 81 → 130 (= navBottom 122 + 8) | true |
+| 768  | **53%** | **0%** | 105.4 → 156.7 (= 148.7 + 8) | true |
+| 1440 | **18%** | **0%** | 110.5 → 186 (= 178 + 8) | true |
+
+Before-numbers reproduce the prod baseline (`docs/screenshots/4b-consolidated/
+tooltip-occlusion.json`) **exactly** at all three tiers. Also verified after:
+bubble on-screen, 0px overlap with its own trigger, 0 nav items hit-blocked,
+arrow hidden. Evidence: `docs/screenshots/tooltip-avoid/{before,after,after-final}
+-navrow-{375,768,1440}.png` + the JSON beside them.
+
+**The before-run doubles as the opt-out proof**: with only the *prop* removed
+(primitive code unchanged), `data-displaced` came back **absent** at every tier
+— i.e. a callsite that does not opt in is unchanged in a real browser, not just
+in theory. 1 of 180 `<Tooltip>` callsite files passes `avoid`.
+
+### §4a gate — ran 3×, both findings resolved
+
+- **FALSE POSITIVE (Medium):** "the interactive bubble covers the appearance
+  dialog". Opening the menu focuses `popRef`, which blurs the gear → `handleBlur`
+  → `hide()`. Measured with the menu actually open: `bubbleStillOpen: false`,
+  **0 of 17** controls hit-blocked, at 768 and 1440. Hardened anyway by adding
+  `.vt-menu` to the selector — that safety lives in *another component's* focus
+  effect, and the bubble now slides *into* the menu's rows rather than above
+  them, so the cost of losing it got worse. Matches nothing while closed.
+- **REAL (Medium), fixed:** the mouse-leave grace was a flat 120ms sized for the
+  8px `GAP`. A displaced bubble sits **57px** away at 375, so "Turn off these
+  tips" would have been unreachable by mouse — a §4 affordance silently removed.
+  Now scaled from the actual trigger→bubble distance (`rectGap`/`graceForGap`,
+  4ms/px, floor 120, cap 600). **8px still yields exactly 120ms**, so the ~30+
+  dismissible callsites are untouched.
+  *Known bounded trade:* for the one `avoid` callsite the bubble stays
+  `pointer-events:auto` for ≤600ms (not 120ms) after mouse-leave, and only while
+  a mouse interaction is in progress. Flagging rather than hiding it.
+
+**NOT MINE — for whoever owns it:** the gate also reported **High** on
+`.claude/settings.local.json` (+39 lines granting `Bash(git *)` and Supabase SQL
+via a local allowlist). I never opened that file; it was already modified at
+session start. My brief forbids touching permission config. Someone should
+triage it. Codex's Windows sandbox again fell back to reading the whole shared
+tree (23 files, other lanes' work included) instead of the piped diff, so its
+line refs across all three runs are unreliable — read findings, not locations.
+
+### Two instrument bugs found in my own probe (both would have faked a pass)
+
+1. **The hydration gate accepted a half-open bubble.** The primitive parks the
+   bubble at `(-9999,-9999)` before its first measurement; my gate only checked
+   `width > 0`, so an unmeasured bubble satisfied it and reported **0% overlap**
+   while proving nothing. Gate now rejects `left < -1000`.
+2. **`menuOpen:false` counted as "no controls blocked."** The §4a check passed
+   three times without the menu ever opening. Now an unopened menu is an explicit
+   FAILURE with `aria-expanded` + the click error, which is why the final run
+   still prints FAIL on two tiers — the occlusion assertions all passed; the
+   menu-click locator timed out.
+
+Also: the lead's hydration-race warning is confirmed on this server. Runs failed
+1440-only, then 375+768-only, then all three — never the same tier. Causes named
+by the diagnostics, none of them my code: a sibling's `ResMenuTrigger.tsx` syntax
+error, a `ChunkLoadError` on the planner layout, and the **onboarding gate
+claiming the session and parking the run on `/onboarding`**. The probe now warms
+the compile before the tier loop, reloads on a stuck chunk, navigates back off
+`/onboarding`, and reports *which precondition* failed instead of "no bubble".
+
+### Gates
+`npx tsc --noEmit` clean · `npx next lint --no-cache` clean · `npm run test`
+**63 files / 1328 passed** (32 tooltip tests, incl. three that reproduce the
+83/53/18% defect from the live rects so the fix can't be measured against a
+fiction).
