@@ -26,3 +26,21 @@ export type {
   ExplorerMode,
   ExplorerPresentation,
 } from "./ExplorerShell";
+
+// The GLOBAL unit-workspace host (B5.1) — one provider in the planner layout
+// mounts one UnitExplorer, so any surface can open the workspace by calling
+// useUnitWorkspace().openUnitWorkspace(subjectId, unit) instead of mounting its
+// own copy. app/(planner)/layout.tsx imports the provider from
+// "@/components/year-v2/workspace-host" directly, so the layout does not pull
+// YearShell / TimelineYear into every planner route's bundle; view code that
+// already imports from this barrel can use these re-exports.
+export {
+  UnitWorkspaceProvider,
+  UnitWorkspaceHost,
+  useUnitWorkspace,
+  useUnitWorkspaceTarget,
+} from "./workspace-host";
+export type {
+  UnitWorkspaceActions,
+  UnitWorkspaceTarget,
+} from "./workspace-host";

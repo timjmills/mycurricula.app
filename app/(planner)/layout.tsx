@@ -19,6 +19,7 @@ import {
 } from "@/components/shell";
 import { ChromeShell } from "@/components/chrome";
 import { ComposerProvider } from "@/components/composer";
+import { UnitWorkspaceProvider } from "@/components/year-v2/workspace-host";
 import { V2 } from "@/lib/v2-flag";
 import styles from "./layout.module.css";
 
@@ -79,6 +80,35 @@ function PlannerChrome({ children }: { children: ReactNode }): ReactNode {
   return <ChromeShell>{children}</ChromeShell>;
 }
 
+/**
+ * The two singleton OVERLAY engines, kept together because they mount innermost
+ * for the same reason: each renders a host that needs every planner provider
+ * (usePlanner, the notebook/edit-mode state, both toast surfaces) in scope, and
+ * each wraps `children` so any surface can reach it imperatively. Both emit ZERO
+ * DOM until something opens them. Singleton-mount precedent: lib/undo-toast.tsx.
+ *
+ * • ComposerProvider (B4.0) — the Shared Composer engine. Surfaces open the
+ *   composer / resource menu through useComposer() (ResourcesPanel,
+ *   lesson-flow, LessonEditor) instead of declaring their own instances.
+ * • UnitWorkspaceProvider (B5.1) — the ONE global mount of the unit workspace
+ *   (<UnitExplorer> and everything B1–B3 built inside it). Surfaces open it with
+ *   useUnitWorkspace().openUnitWorkspace(subjectId, unit) rather than mounting
+ *   their own copy, which is how /daily and /weekly get a path to it at all.
+ *   It nests INSIDE ComposerProvider because the workspace's Lesson Planner
+ *   (components/lesson-flow) calls useComposer().
+ */
+function PlannerOverlayProviders({
+  children,
+}: {
+  children: ReactNode;
+}): ReactNode {
+  return (
+    <ComposerProvider>
+      <UnitWorkspaceProvider>{children}</UnitWorkspaceProvider>
+    </ComposerProvider>
+  );
+}
+
 // Planner shell — the chrome shared by every primary view (Weekly, Daily,
 // Subject, …). Routing picks which view renders in the canvas; this layout
 // supplies the top bar, the collapsible left filter panel, and the
@@ -130,15 +160,13 @@ export default function PlannerLayout({
                       ONE live instance — the weekly-schedule-state desync
                       lesson (lib/edit-mode-state.tsx header). */}
                   <EditModeProvider>
-                    {/* ComposerProvider (B4.0) — the Shared Composer singleton
-                        engine. Innermost so its ComposerHost has usePlanner +
-                        the toast contexts, and so it wraps `children` for
-                        future useComposer() callers. DORMANT this tranche: no
-                        surface opens the composer/menu, so it emits zero DOM
-                        and changes no behavior — latent wiring for the B4.3+
-                        host migrations. Singleton-mount precedent:
-                        lib/undo-toast.tsx. */}
-                    <ComposerProvider>
+                    {/* The singleton overlay engines — the Shared Composer
+                        (B4.0) and the global unit workspace (B5.1). Innermost
+                        so their hosts have usePlanner + the toast contexts, and
+                        so both wrap `children` for useComposer() /
+                        useUnitWorkspace() callers. See PlannerOverlayProviders
+                        above. */}
+                    <PlannerOverlayProviders>
                       {/* Skip-to-content (A11Y-004) — must be the first focusable element
                   in the DOM so keyboard users reach it before the top-bar chrome. */}
                       <a href="#main-content" className={styles.skipLink}>
@@ -236,7 +264,7 @@ export default function PlannerLayout({
                           </div>
                         </div>
                       </div>
-                    </ComposerProvider>
+                    </PlannerOverlayProviders>
                   </EditModeProvider>
                 </CatchupProvider>
               </UnitNotesProvider>
