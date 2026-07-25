@@ -184,6 +184,15 @@ export interface SectionProps {
   onBoard: (item: WallItem, fromLessonId?: string) => void;
   onModal: (item: WallItem) => void;
   onAddCard: (sectionId: string) => void;
+  /** Open the SHARED composer on this section's anchor lesson (B4.6). Distinct
+   *  from `onAddCard`: this attaches a real resource to the LESSON, where a
+   *  card is a wall-local sticky note. */
+  onAddResource: (sectionId: string) => void;
+  /** False when this section has no lesson behind it (a hand-made section), so
+   *  there is no destination for a resource. The Resource add renders disabled
+   *  with a tooltip that says why, rather than opening a composer that could
+   *  not commit anywhere. */
+  canAddResource: boolean;
   onAddSection: (after: WallSection) => void;
   onCommitCard: (item: WallItem) => void;
   onDropCard: (cardKey: string, sectionId: string, beforeKey?: string) => void;
@@ -217,6 +226,8 @@ export function Section({
   onBoard,
   onModal,
   onAddCard,
+  onAddResource,
+  canAddResource,
   onAddSection,
   onCommitCard,
   onDropCard,
@@ -344,20 +355,50 @@ export function Section({
             />
           ))}
           {!readOnly && (
-            <Tooltip
-              content="Add a resource or a note to this section"
-              tooltipId="rw-add-card"
-              side="top"
-            >
-              <button
-                type="button"
-                className={styles.addCard}
-                onClick={() => onAddCard(section.id)}
+            // TWO adds, because they write to two different places and a single
+            // "Add" could only ever do one of them (B4.6). "Resource" opens the
+            // SHARED composer (components/composer) and attaches a real resource
+            // to the section's anchor lesson — the same composer /daily, the
+            // lesson editor, and the lesson flow open. "Note" is the wall-local
+            // sticky the wall has always had: it lives in this wall's saved
+            // layout and never touches the lesson. The old single tile's tooltip
+            // already promised "a resource or a note"; only the note half
+            // existed.
+            <div className={styles.addCard}>
+              <Tooltip
+                content={
+                  canAddResource
+                    ? "Attach a file, link, or photo to this section's lesson"
+                    : "This section isn't tied to a lesson yet, so there's nothing to attach a resource to. Add a note instead."
+                }
+                tooltipId="rw-add-resource"
+                side="top"
               >
-                <IconPlus />
-                <span>Add</span>
-              </button>
-            </Tooltip>
+                <button
+                  type="button"
+                  className={styles.addBtn}
+                  onClick={() => onAddResource(section.id)}
+                  disabled={!canAddResource}
+                >
+                  <IconPlus />
+                  <span>Resource</span>
+                </button>
+              </Tooltip>
+              <Tooltip
+                content="Write a sticky note on this wall — it stays on the wall, not on the lesson"
+                tooltipId="rw-add-card"
+                side="top"
+              >
+                <button
+                  type="button"
+                  className={styles.addBtn}
+                  onClick={() => onAddCard(section.id)}
+                >
+                  <IconPlus />
+                  <span>Note</span>
+                </button>
+              </Tooltip>
+            </div>
           )}
           {items.length === 0 && readOnly && (
             <p className={styles.empty}>Nothing here yet.</p>

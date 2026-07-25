@@ -302,15 +302,25 @@ for (const [name, width] of [["375", 375], ["768", 768], ["1440", 1440]]) {
 }
 
 // ── 5. Console ─────────────────────────────────────────────────────────────
-// Split the console check: app-authored errors must be zero. A network failure
-// for the probe's OWN synthetic url (example.com, and the title-enrichment proxy
-// that fetches it) is an artefact of the test fixture, not a defect — but it is
-// reported so the distinction is auditable rather than assumed.
-// NARROW on purpose: only the probe's own synthetic url is excused. A bare
-// "Failed to load resource" is NOT excused — a filter that broad would hide a
-// real app error, which is how a probe starts manufacturing passes.
-const fixtureNoise = (t) => /example\.com|b46-probe-resource/i.test(t);
-const appErrors = consoleErrors.filter((t) => !fixtureNoise(t));
+// App-authored console errors must be zero. One class of message needs care:
+// staging a link makes the app call /api/og-preview to derive the card's title,
+// and with no outbound network that returns 502 for example.com. The browser
+// then logs a bare "Failed to load resource: … 502" carrying NO url, so a text
+// filter would either hide every such error (dishonest) or flag the fixture.
+//
+// So the exemption is EVIDENCE-GATED: the bare message is excused only when
+// every failing request observed this run is attributable to the probe's own
+// synthetic url. If anything unexplained fails, the exemption lapses and this
+// check fails — the probe cannot manufacture a pass for a failure it did not
+// account for.
+const FIXTURE = /example\.com|b46-probe-resource/i;
+const allBadAttributed =
+  badResponses.length > 0 && badResponses.every((r) => FIXTURE.test(r));
+const appErrors = consoleErrors.filter((t) => {
+  if (FIXTURE.test(t)) return false;
+  if (allBadAttributed && /Failed to load resource/i.test(t)) return false;
+  return true;
+});
 check(
   "no app-authored console errors through the flow",
   appErrors.length === 0,
@@ -318,7 +328,7 @@ check(
 );
 check(
   "every failing request is attributable to the probe fixture url",
-  badResponses.every((r) => /example\.com|b46-probe-resource|link-preview|resources\/preview/i.test(r)),
+  badResponses.every((r) => FIXTURE.test(r)),
   badResponses.slice(0, 6).join(" | ") || "(none)",
 );
 

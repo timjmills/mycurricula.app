@@ -3,12 +3,13 @@
 // ResourcesTab.tsx — the Unit Explorer's Resources tab body.
 //
 // Extracted verbatim from UnitExplorer.tsx (B1.0). Lists every resource attached
-// to the unit's lessons, with a safe-href guard on external links and per-row
-// provenance (which day it came from).
+// to the unit's lessons, gating external links through the canonical `isSafeUrl`
+// sink and carrying per-row provenance (which day it came from).
 
 import { type ReactNode } from "react";
 import { unitResources } from "@/lib/year-unit-aggregate";
-import { safeHref, dayShort } from "./helpers";
+import { isSafeUrl } from "@/lib/resource-embed";
+import { dayShort } from "./helpers";
 import styles from "../UnitExplorer.module.css";
 
 export function ResourcesTab({
@@ -27,7 +28,10 @@ export function ResourcesTab({
     <ul className={styles.aggList}>
       {resources.map((ref, i) => {
         const isNote = ref.resource.type === "notecard";
-        const href = isNote ? undefined : safeHref(ref.resource.url);
+        // The ONE sink gate (lib/resource-embed) — a url it rejects renders as
+        // plain text, never a live link.
+        const href =
+          !isNote && isSafeUrl(ref.resource.url) ? ref.resource.url : undefined;
         // Resources are NOT de-duplicated across lessons (a recurring anchor
         // chart legitimately repeats), so a composite key keeps each row stable.
         return (
