@@ -3585,3 +3585,48 @@ twice, look at the artifact before re-asserting.**
    by shape, or the `/daily?lesson=` deep link (10 callsites, far larger). Needs a USER call.
 5. `TimelineYear` is NOT retireable (flag-OFF `/year` + paper frame + sole home of standards
    coverage, year filters, lesson pane, subjects sidebar). `/subject` KEPT per USER.
+
+---
+
+## [Main/orchestrator 7.25 pt15] ✅ B5 REACHABILITY COMPLETE — every frame, every route
+
+Master `94e57fd`, 0/0 with origin, tree green. Since pt14: `f76bcae` (/daily + /weekly unit
+pop-in via a shared `components/unit-chip`) and `94e57fd` (the paper Week frame).
+
+**THE GAP IS CLOSED.** When this session started, everything B1–B3 built — the Unit Plan
+editor and the Assessments · Insights · Prep drawer — was reachable from exactly TWO places
+(/year glass|color, /planner). It is now reachable from **all three frames on all three
+planner routes**, verified live 9/9 with exactly one dialog and never zero.
+
+**Design decisions worth not re-litigating:**
+- `components/unit-chip` lives in its OWN folder, not `planner-v2` — placing it there closes
+  a cycle (`unit-chip → year-v2 → planner-v2`), the /teach TDZ crash shape.
+- The paper Week frame uses an **opt-in `showUnitChip` prop** on `WeeklyLessonCard`, passed
+  only by `WeekColumns`. WeekA/WeekC/WeekEditBoard render their own chip in their own markup,
+  so an unconditional chip would show TWO. The probe carries a per-lesson double-chip guard.
+- The chip inflates its OWN box to 44px rather than relying on Button's `::before` overlay —
+  Week tiles sit in an `overflow:auto` track that would clip it (the Kind-chip mechanism), and
+  a 44px overlay around a 28px button would reach past it and swallow lesson-title clicks.
+- `TimelineYear`'s `goUnit` in-page drill is UNTOUCHED; the workspace is an additional
+  sibling affordance. On the >900px all-scope grid the opener reveals on hover/focus because a
+  resting chip paints over the unit name mid-word on 20/20 cards — measured, not assumed.
+
+**ORCHESTRATOR ERROR #2, recorded because it nearly destroyed a lane:** a QA sweep measured
+the **DIRTY WORKING TREE**, saw a build agent's uncommitted paper-Week fix, and concluded the
+gap "never existed" and that my commit message was stale. I believed it and **stopped that
+agent** before running `git show HEAD:` — which said plainly the feature was not in the
+commit. It had finished; mid-edit it would have been lost. **A green live result from a dirty
+tree is not evidence about what shipped.** [[measure-head-not-dirty-tree]]
+
+**OPEN, carried forward:**
+1. **§4c flag-ON preview gate** — B1.7 + B2 + B3 write paths STILL unexercised against real
+   Supabase. This is the oldest debt in the wave.
+2. **MINOR (open by choice):** the first click after load can silently no-op — the opener is
+   in the DOM before React attaches its handler. Non-deterministic, every route, plain clicks
+   as well as Enter. Not data-affecting; "click, nothing, click again" is the shape.
+3. **B5.7 "the focus-lesson path" — AMBIGUOUS, needs a USER call.** `LessonModal` by shape, or
+   the `/daily?lesson=` deep link (10 callsites, far larger).
+4. Stale prose referencing the deleted `UnitDrawer` in `unit-tabs/helpers.ts:11,20` and
+   `UnitExplorer.tsx:117`.
+5. `Tooltip`: a focus-opened dismissible bubble keeps `pointer-events: auto` and swallows one
+   mouse click. Pre-existing, every `tooltipId` callsite; needs focus-then-mouse to reproduce.
