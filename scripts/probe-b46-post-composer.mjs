@@ -19,8 +19,21 @@
 //   5. The browser console stays clean, and 375 / 768 / 1440 do not
 //      horizontally scroll.
 //
-// The file path is load-bearing: `scripts/probe-4b-consolidated.mjs:635`
-// spawns it as its 4.7 step. Renaming or deleting it breaks that probe.
+// OWNERSHIP OF THE /post GATE, and why this probe MUTATES.
+//
+// `scripts/probe-4b-consolidated.mjs` no longer delegates here — it hand-rolls a
+// READ-ONLY 4.7 (its own comment explains why: it must not click anything that
+// writes). That is the right split, so this file is no longer load-bearing for
+// that probe and the two do not duplicate: the consolidated pass owns the
+// read-only seam check, and THIS probe owns the write path.
+//
+// It IS a write: clicking "Add note" runs `addCard` → `withFork` →
+// `ensurePersonal()`, which FORKS a preset into a "My …" wall. The blast radius
+// is one browser profile — `components/resource-wall-v2/wall-state.ts` persists
+// to localStorage only, with zero server calls ("Persisting to Supabase is out
+// of scope for 9a"), and Playwright's context is ephemeral. So it cannot touch a
+// school's data. It WOULD leave a forked wall behind in a real profile, so:
+// run this against a LOCAL dev server, never against production.
 //
 // Usage: CLAUDE_BYPASS_TOKEN=… node scripts/probe-b46-post-composer.mjs
 //        PROBE_BASE defaults to http://localhost:3099
@@ -38,6 +51,21 @@ requireToken({ repoRoot: process.cwd() });
 const BASE = process.env.PROBE_BASE ?? "http://localhost:3099";
 const OUT = path.resolve("docs/screenshots/b46-post-wall");
 await mkdir(OUT, { recursive: true });
+
+// Every observation goes through this. An unguarded `page.evaluate` throws
+// "Execution context was destroyed" the moment a sibling lane's save triggers an
+// HMR reload — which kills the run with ZERO output and leaks the Chrome
+// process. On a shared dev server that is the single most likely failure, and a
+// probe that dies silently is worse than one that reports a red line. On a
+// destroyed context it returns the caller's fallback, so the affected assertion
+// reports INCONCLUSIVE rather than taking the whole run down.
+async function safeEval(fn, fallback, arg) {
+  try {
+    return arg === undefined ? await page.evaluate(fn) : await page.evaluate(fn, arg);
+  } catch {
+    return fallback;
+  }
+}
 
 const failures = [];
 const notes = [];
@@ -146,7 +174,7 @@ async function switchToWeekPreset(attempts = 4) {
 check("wall switched to the This Week preset", await switchToWeekPreset());
 const sectionCount = await page.locator("section").count();
 check("week preset resolves real sections", sectionCount > 0, `sections=${sectionCount}`);
-await page.screenshot({ path: path.join(OUT, "01-wall-1440.png") });
+await page.screenshot({ path: path.join(OUT, "01-wall-1440.png") }).catch(() => {});
 
 // ── 1+2. The add affordance is note-only, and says so ──────────────────────
 // `addCard` is the class the RESTORED control renders with (Section.tsx:371).
@@ -163,32 +191,61 @@ check("section add button is labelled 'Add note'", nAdd > 0, `count=${nAdd}`);
 // allowing one was unsound: the one it allowed was the wall TOOLBAR's own "Add",
 // so if the toolbar button were renamed while a stale per-section "Add" came
 // back, the total would still be 1 and this would pass the regression.
-const staleAdds = await page.evaluate(() =>
-  [...document.querySelectorAll("section button")].filter(
-    (b) => (b.textContent || "").trim() === "Add",
-  ).length,
+//
+// The "page isn't blank" gate is read INSIDE the same evaluate as the
+// observation (§4a Medium, round 5). It used to reuse `sectionCount` sampled
+// tens of seconds earlier — so if the wall blanked AFTER that sample (the exact
+// hazard this probe has hit three times), the gate still said >0 while the DOM
+// was empty, and the absence assertions passed over a blank page. That is the
+// vacuity the gate exists to prevent, with one variable of indirection.
+const addProbe = await safeEval(
+  () => ({
+    sections: document.querySelectorAll("section").length,
+    staleAdds: [...document.querySelectorAll("section button")].filter(
+      (b) => (b.textContent || "").trim() === "Add",
+    ).length,
+  }),
+  { sections: 0, staleAdds: 0 },
 );
 check(
   "no bare 'Add' button remains inside the section grid",
-  // Gated on sections EXISTING. A "nothing bad found" assertion over an empty
-  // page is not a pass — and this probe has watched a sibling lane's broken
-  // file blank the wall mid-run three times. Without the gate, the greenest
-  // possible result is a page that renders nothing at all.
-  sectionCount > 0 && staleAdds === 0,
-  sectionCount > 0
-    ? `bare-Add buttons in sections=${staleAdds}`
+  addProbe.sections > 0 && addProbe.staleAdds === 0,
+  addProbe.sections > 0
+    ? `bare-Add buttons in sections=${addProbe.staleAdds}`
     : "INCONCLUSIVE — no sections rendered",
 );
 
-// NOT vacuous: this must FAIL when the button is missing, rather than pass on a
-// null title. An assertion that is satisfied by the control's absence tells you
-// nothing — that is how a probe reports green on a broken page.
-const tipBtn = page.locator('button[class*="addCard"]').filter({ hasText: /^Add note$/ }).first();
+// POSITIVE assertion, not a blacklist (§4a Medium, round 5). Two prior bugs:
+// it was satisfied by `tip === null`, and Tooltip drops the native `title=`
+// entirely when the id is dismissed or the global tips switch is off
+// (Tooltip.tsx:288, :453-455) and `rw-add-card` passes no `required` — so a
+// dismissed tooltip yielded `title=null` and PASSED having verified nothing.
+// Its regex was also a one-phrase blacklist that only caught the OLD string;
+// the copy e0eab58 actually shipped would have sailed through. This is the only
+// assertion covering the tooltip copy, which is half the substance of the
+// change, so it now demands the title exists and says the right things.
+const tipBtn = page
+  .locator('button[class*="addCard"]')
+  .filter({ hasText: /^Add note$/ })
+  .first();
 const tipBtnExists = (await tipBtn.count()) > 0;
 const tip = tipBtnExists ? await tipBtn.getAttribute("title").catch(() => null) : null;
+const tipSaysNotHere = typeof tip === "string" && /added here/i.test(tip);
+const tipWarnsAboutFork =
+  typeof tip === "string" && /stops picking up later lesson changes/i.test(tip);
+// Any authoring verb paired with the resource noun is a promise this surface
+// cannot keep — broader than the single phrase the old check looked for.
+const tipPromisesAuthoring =
+  typeof tip === "string" &&
+  /(add|attach|create|upload|new)[^.]{0,24}resource/i.test(tip);
 check(
-  "add tooltip does not promise resource-authoring on the wall",
-  tipBtnExists && (tip === null || !/add a resource/i.test(tip)),
+  "add tooltip states resources are NOT authored here",
+  tipBtnExists && tipSaysNotHere && !tipPromisesAuthoring,
+  tipBtnExists ? `title=${JSON.stringify(tip)}` : "add-note button not present",
+);
+check(
+  "add tooltip warns that adding a note forks the wall (it stops updating)",
+  tipWarnsAboutFork,
   tipBtnExists ? `title=${JSON.stringify(tip)}` : "add-note button not present",
 );
 
@@ -210,7 +267,7 @@ check(
   noteAdded,
   `cards ${cardsBefore} -> ${cardsAfter}`,
 );
-await page.screenshot({ path: path.join(OUT, "02-note-added-1440.png") });
+await page.screenshot({ path: path.join(OUT, "02-note-added-1440.png") }).catch(() => {});
 
 // ── 4. REGRESSION GUARD — no composer is reachable from this surface ───────
 //
@@ -221,65 +278,74 @@ await page.screenshot({ path: path.join(OUT, "02-note-added-1440.png") });
 // resource-AUTHORING trigger exists inside the section grid at all; only then
 // assert nothing is mounted.
 //
-// `sectionTriggers` deliberately excludes the wall TOOLBAR (which legitimately
+// `guard.triggers` deliberately excludes the wall TOOLBAR (which legitimately
 // has its own "Add" for sections / new walls) by scoping to <section>, and
 // excludes the card action row's "Send to a teaching board" — that is board
 // placement of an EXISTING resource, not authoring.
-const sectionTriggers = await page.evaluate(() => {
-  const out = [];
+//
+// ONE evaluate for the gate AND both observations, so the "page isn't blank"
+// check can never be read from a stale sample taken seconds earlier.
+const guard = await safeEval(() => {
+  const triggers = [];
   for (const sec of document.querySelectorAll("section")) {
     for (const b of sec.querySelectorAll("button")) {
       const text = (b.textContent || "").trim();
       const label = `${text} ${b.getAttribute("aria-label") ?? ""} ${b.getAttribute("title") ?? ""}`;
       // TWO shapes, because the regression this guards against was labelled
       // exactly "Resource" — a verb-then-noun regex alone would have missed the
-      // very button it exists to catch (§4a Medium):
-      //   (a) a bare "Resource" label, and
-      //   (b) an authoring verb paired with the resource noun.
-      // "Add note" and the card's board-send ("Send X to a teaching board") must
-      // NOT match either shape.
+      // very button it exists to catch (§4a Medium). "Add note" and the card's
+      // board-send ("Send X to a teaching board") must NOT match either shape.
       const bareResource = /^resources?$/i.test(text);
       const authoringVerb =
-        /\b(add|new|attach|upload|create)\b[^.]{0,24}\bresource/i.test(label);
-      if (bareResource || authoringVerb) {
-        out.push(text || label.trim().slice(0, 60));
-      }
+        /(add|new|attach|upload|create)[^.]{0,24}resource/i.test(label);
+      if (bareResource || authoringVerb) triggers.push(text || label.trim().slice(0, 60));
     }
   }
-  return out;
-});
+  return {
+    sections: document.querySelectorAll("section").length,
+    triggers,
+    modal: document.querySelectorAll(".cmp-modal").length,
+    scrim: document.querySelectorAll(".cmp-scrim").length,
+  };
+}, { sections: 0, triggers: [], modal: 0, scrim: 0 });
+const rendered = guard.sections > 0;
+const BLANK = "INCONCLUSIVE — no sections rendered";
 check(
   "no resource-authoring trigger exists in the wall's section grid",
-  sectionCount > 0 && sectionTriggers.length === 0,
-  sectionCount > 0
-    ? sectionTriggers.join(" | ") || "(none)"
-    : "INCONCLUSIVE — no sections rendered",
+  rendered && guard.triggers.length === 0,
+  rendered ? guard.triggers.join(" | ") || "(none)" : BLANK,
 );
-
-const composerCounts = await page.evaluate(() => ({
-  modal: document.querySelectorAll(".cmp-modal").length,
-  scrim: document.querySelectorAll(".cmp-scrim").length,
-}));
 check(
   "no composer modal on the wall (collection-only surface)",
-  sectionCount > 0 && composerCounts.modal === 0,
-  sectionCount > 0 ? `modal=${composerCounts.modal}` : "INCONCLUSIVE — no sections rendered",
+  rendered && guard.modal === 0,
+  rendered ? `modal=${guard.modal}` : BLANK,
 );
 check(
+  // Gated like its sibling (§4a Medium): ungated, this passed on a blank page,
+  // a bounced login, or a 500 — the three states it most needs to catch.
   "no composer scrim on the wall",
-  composerCounts.scrim === 0,
-  `scrim=${composerCounts.scrim}`,
+  rendered && guard.scrim === 0,
+  rendered ? `scrim=${guard.scrim}` : BLANK,
 );
 
 // ── 5. Responsive ──────────────────────────────────────────────────────────
 for (const [name, width] of [["375", 375], ["768", 768], ["1440", 1440]]) {
   await page.setViewportSize({ width, height: 900 });
   await page.waitForTimeout(2500);
-  const overflow = await page.evaluate(
+  // Fallback is null, NOT a number. A numeric fallback of -1 satisfied
+  // `overflow <= 0` and passed this assertion without measuring anything — the
+  // 1440 tier did exactly that on one run when an HMR reload destroyed the
+  // context. A fallback must never be a value that SATISFIES the check.
+  const overflow = await safeEval(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    null,
   );
-  check(`no page h-scroll at ${name}px`, overflow <= 0, `overflow=${overflow}px`);
-  await page.screenshot({ path: path.join(OUT, `03-wall-${name}.png`) });
+  check(
+    `no page h-scroll at ${name}px`,
+    typeof overflow === "number" && overflow <= 0,
+    overflow === null ? "INCONCLUSIVE — context destroyed mid-measure" : `overflow=${overflow}px`,
+  );
+  await page.screenshot({ path: path.join(OUT, `03-wall-${name}.png`) }).catch(() => {});
 }
 
 // ── Console ────────────────────────────────────────────────────────────────
@@ -300,8 +366,8 @@ console.log("\n".concat(notes.join("\n")));
 if (failures.length) {
   console.log("\n" + failures.join("\n"));
   console.log(`\nRESULT: ${failures.length} FAILED, ${notes.length} passed`);
-  await browser.close();
+  await browser.close().catch(() => {});
   process.exit(1);
 }
 console.log(`\nRESULT: all ${notes.length} assertions passed`);
-await browser.close();
+await browser.close().catch(() => {});

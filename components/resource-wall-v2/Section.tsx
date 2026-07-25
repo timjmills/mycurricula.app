@@ -361,8 +361,17 @@ export function Section({
             // inside its own scope. Copy that sends a teacher looking for a card
             // that cannot appear is the same class of lie as the promise this
             // change is fixing.
+            // THE SECOND SENTENCE EXISTS BECAUSE THE BUTTON CONTRADICTS THE
+            // FIRST. `onAddCard` → `withFork` → `ensurePersonal()`: on a preset,
+            // pressing this FORKS the wall into "My …" and sets `override` — the
+            // frozen layout that never picks up later lesson edits. So a teacher
+            // could read "they appear on the preset walls", add a note, attach a
+            // resource in the lesson editor, and never see it on the wall in
+            // front of them. The "Copied to My Walls" toast is the only signal
+            // and doesn't connect the two. Saying so here is the whole point of
+            // this change — the last clause that wasn't honest yet.
             <Tooltip
-              content="Write a note on this wall. Resources aren't added here — attach them in a lesson's editor and they appear on the preset walls that cover that lesson."
+              content="Write a note on this wall. Resources aren't added here — attach them in a lesson's editor and they appear on the preset walls covering that lesson. Adding a note also saves this wall to My Walls, and a saved wall stops picking up later lesson changes."
               tooltipId="rw-add-card"
               side="top"
             >
