@@ -17,7 +17,14 @@
 // Subject color comes from the ambient `.cp-subj <cls>` cascade set on the root
 // (--c bright / --cl tint / --cd deep). Tokens only — no hex.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Lesson, LessonStatus, Subject } from "@/lib/types";
 import { WEEK_DAYS } from "@/lib/mock";
 import { usePlanner } from "@/lib/planner-store";
@@ -130,6 +137,9 @@ export function YearLessonPane({
   const hasPrev = index > 0;
   const hasNext = index >= 0 && index < siblings.length - 1;
 
+  // Scopes the arrow-key handler below to this pane's own subtree.
+  const paneRef = useRef<HTMLElement | null>(null);
+
   const step = useCallback(
     (delta: number) => {
       if (index < 0) return;
@@ -141,19 +151,39 @@ export function YearLessonPane({
 
   // Arrow-key prev/next + Escape to close. Ignored while typing in a field so
   // the pane never hijacks keyboard input from a future inline editor.
+  //
+  // SCOPING (fix): the listener is on `window`, but the ARROW branches now
+  // require the keystroke to have originated inside this pane, or with nothing
+  // focused at all. Previously any ArrowLeft/Right pressed ANYWHERE on the page
+  // re-selected a lesson while the pane was open — arrowing a toolbar, a
+  // tablist, or a roving-radio group elsewhere on /year silently moved the
+  // pane's selection too. The `document.body` allowance keeps the common flow
+  // working: click a lesson, click nothing else, then arrow through the week.
+  //
+  // Escape is deliberately NOT scoped — dismiss-from-anywhere is the expected
+  // behaviour for a side pane, and narrowing it would break "click a card in
+  // the grid, press Escape".
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       const el = e.target as HTMLElement | null;
       const tag = el?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) return;
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const pane = paneRef.current;
+      const insidePane = !!pane && !!el && pane.contains(el);
+      const nothingFocused =
+        !el || el === document.body || el === document.documentElement;
+      if (!insidePane && !nothingFocused) return;
       if (e.key === "ArrowLeft" && hasPrev) {
         e.preventDefault();
         step(-1);
       } else if (e.key === "ArrowRight" && hasNext) {
         e.preventDefault();
         step(1);
-      } else if (e.key === "Escape") {
-        onClose();
       }
     }
     window.addEventListener("keydown", onKey);
@@ -182,6 +212,7 @@ export function YearLessonPane({
 
   return (
     <aside
+      ref={paneRef}
       className={`cp-subj ${subject.cls} ${styles.pane}`}
       aria-label={`Lesson detail: ${lesson.title}`}
       title="The selected lesson — overview, standards, resources, and progress. Editing happens in the Daily view."

@@ -81,7 +81,7 @@ export function WorkspaceSettings(): ReactNode {
           <PageHeader
             eyebrow="Settings"
             title="Workspace & Team"
-            subtitle="Your school's workspace — its name and notebooks — and the teachers who share it."
+            subtitle="Your workspace — its name and notebooks — and the teachers who share it."
           />
           <WorkspaceNameCard />
           <NotebooksCard />
@@ -252,13 +252,13 @@ function WorkspaceNameCard(): ReactNode {
       savedTick={savedTick}
       title={
         <Tooltip
-          content="Your school's workspace — the home every notebook and teammate belongs to. Its name shows in the sidebar for the whole team."
+          content="Your workspace — the home every notebook and teammate belongs to. Its name shows in the sidebar for everyone who shares it."
           side="bottom"
         >
           <span>Workspace</span>
         </Tooltip>
       }
-      hint="The school-wide workspace that holds every notebook and teammate."
+      hint="The workspace that holds every notebook and teammate."
     >
       <div className={styles.formRow}>
         <label htmlFor="workspace-name-input" className={styles.fieldLabel}>
@@ -275,7 +275,7 @@ function WorkspaceNameCard(): ReactNode {
             onBlur={commit}
             onKeyDown={onKeyDown}
             disabled={disabled}
-            placeholder="e.g. Al-Noor School"
+            placeholder="e.g. Al-Noor School, or Grade 5 Team"
             autoComplete="off"
             spellCheck={false}
             maxLength={60}
