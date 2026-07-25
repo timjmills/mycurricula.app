@@ -64,3 +64,14 @@ lib/home/insights.data.json
 
 # QA working artifacts (§4b Live QA Audit Gate output — per-pass, never committed)
 QA-REPORT.md
+QA-REPORT-*.md
+
+# Throwaway probe scripts. `scripts/` is NOT otherwise ignored, so an untracked
+# tmp probe is one `git add scripts/` away from being committed — and on
+# 2026-07-25 one of them held the production claude-login bypass token as a
+# literal. It had never been committed (no rotation needed), but the exposure
+# was real: this repo auto-deploys on push. Probes that are meant to last get a
+# `probe-` name and are reviewed like any other file; `tmp-` means throwaway and
+# is ignored here as defence in depth. This is a backstop, NOT a licence to
+# hard-code a secret in a tmp script — read it from the environment.
+scripts/tmp-*
