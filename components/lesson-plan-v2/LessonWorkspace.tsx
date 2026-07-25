@@ -321,11 +321,20 @@ const KIND_OPTIONS: Array<{
   value: KindChoice;
   label: string;
   title: string;
+  destructive?: boolean;
 }> = [
   {
     value: "none",
     label: "None",
-    title: "This lesson has no attached assessment.",
+    title:
+      "This lesson has no attached assessment. Choosing it clears the assessment's kind, title, purpose and notes.",
+    // "None" commits `{}` — it wipes all four assessment columns. Marking it
+    // destructive switches the WHOLE group's arrow keys to focus-only
+    // (components/ui/toggle-group-keys), so ArrowRight off "Summative" can no
+    // longer null a teacher's assessment in transit; Enter/Space or a click is
+    // then required to actually clear it. The override is group-wide and beats
+    // the group-level prop, so no callsite can opt back into that trap.
+    destructive: true,
   },
   {
     value: "unclassified",
@@ -435,6 +444,10 @@ function AssessmentSection({
           onChange={onKind}
           ariaLabel="Assessment kind"
           size="sm"
+          // CLAUDE.md §4 puts destructive actions on the always-on tooltip
+          // list. Without this, a teacher who has turned tips off gets no
+          // warning at all before the option that clears four fields.
+          tooltipRequired
         />
       </div>
 
