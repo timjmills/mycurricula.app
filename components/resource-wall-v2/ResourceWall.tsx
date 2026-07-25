@@ -40,7 +40,6 @@ import {
 
 import { Tooltip, UndoToast } from "@/components/ui";
 import { OpenInBoardDialog } from "@/components/boards";
-import { useComposer } from "@/components/composer";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { todayColumnIndex } from "@/lib/now-anchor";
@@ -241,11 +240,7 @@ export function ResourceWall({
 
   // ── The scope input (this file's job) ─────────────────────────────────────
 
-  const { lessons, units, getLesson } = usePlanner();
-  // The SHARED composer (B4.6). /post lives under app/(planner), so the
-  // singleton <ComposerHost> is already mounted above this tree — the wall
-  // opens it, it never renders one.
-  const { openComposer } = useComposer();
+  const { lessons, units } = usePlanner();
   const { week } = useAppState();
   const { days } = useSchoolWeek();
   const weekdays = useOrderedWeekdays();
@@ -492,109 +487,6 @@ export function ResourceWall({
     [withFork],
   );
 
-  // ── Add a REAL resource, through the shared composer (B4.6) ───────────────
-  //
-  // `addCard` above authors a wall-local sticky note. This is the other half:
-  // the section's anchor lesson gets an actual LessonResource, written by the
-  // ONE composer every other surface opens (components/composer — the singleton
-  // <ComposerHost> in app/(planner)/layout.tsx). The wall adds no composer of
-  // its own and no second URL sink; it only supplies the destination lesson.
-  //
-  // The anchor is the section's first RESOLVABLE lesson. `lessonIds` is what
-  // resolveWall populates; a section rehydrated from a SAVED wall carries only
-  // display fields (wall-state's parseSection), so the item-level lessonIds are
-  // the fallback. Every candidate is tried in order, not just the first (§4a
-  // Low): a saved wall can carry a stale leading id — for a lesson since
-  // deleted, or from another grade — while later candidates still resolve, and
-  // giving up on the first would disable the button on a section that has a
-  // perfectly good destination. A hand-made section resolves none of them: no
-  // destination, so the button renders disabled rather than opening a composer
-  // that could not commit anywhere.
-  const anchorLessonFor = useCallback(
-    (section: WallSection): Lesson | null => {
-      if (lessons.length === 0) return null;
-      for (const id of [
-        ...(section.lessonIds ?? []),
-        ...section.items.map((it) => it.lessonId),
-      ]) {
-        if (!id) continue;
-        const found = getLesson(id);
-        if (found) return found;
-      }
-      return null;
-    },
-    [getLesson, lessons.length],
-  );
-
-  /** Every lesson the wall is currently PROJECTING, so a commit message can
-   *  tell the truth about whether the new card lands in view. */
-  const wallLessonIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const s of sections) {
-      for (const id of s.lessonIds ?? []) ids.add(id);
-      for (const it of s.items) if (it.lessonId) ids.add(it.lessonId);
-    }
-    return ids;
-  }, [sections]);
-
-  const addResource = useCallback(
-    (sectionId: string) => {
-      const section = sections.find((s) => s.id === sectionId);
-      if (!section) return;
-      const lesson = anchorLessonFor(section);
-      if (!lesson) return;
-      // NOTE: no `initialSectionId`. A WallSection id is `lesson:…` / `day:…` /
-      // `unit:…` / `sec-…` (lib/wall-scope) — a DIFFERENT id space from a
-      // lesson's section ids. Passing it would route the commit at a section
-      // that does not exist. The composer defaults to "Whole lesson", which is
-      // also the routing `addCard` uses, and the teacher can re-route in the
-      // dialog.
-      openComposer({
-        lesson,
-        mode: "resource",
-        onCommitted: ({ count, lessonId }) => {
-          const n = `${count} resource${count === 1 ? "" : "s"}`;
-          // Name the DESTINATION the commit actually used, not the lesson the
-          // composer was launched from (§4a Medium). Routing is unlocked here on
-          // purpose, so a teacher can re-point the composer at a different
-          // lesson mid-dialog; naming the anchor would then be a lie.
-          const dest = getLesson(lessonId);
-          const where = dest?.title ?? lesson.title;
-          //
-          // WHERE THE CARD SHOWS UP, said plainly.
-          //
-          // A PRESET wall is a live projection: `presetSections` re-derives from
-          // `lessons` + `resolveResources` (whose `getSections` dep changes on
-          // any section write), and PostClient's `resourcesFor` unions section
-          // AND lesson-level rows — so whichever route the composer commits to,
-          // the card appears here by itself. But only if the destination lesson
-          // is in THIS wall's scope; re-routed to a lesson the wall isn't
-          // showing, it correctly won't appear, and we say so.
-          //
-          // A SAVED wall renders its own frozen `override` layout and, by
-          // design, does NOT track later edits to the lessons behind it — that
-          // is true of every other change to a lesson's resources, not just
-          // this one. We deliberately do NOT reconstruct which rows the composer
-          // just wrote in order to splice them in: `ResourceComposerCommit`
-          // reports a COUNT, never the created rows, so any reconstruction is a
-          // guess. Diffing the lesson's resources by content identity was tried
-          // and rejected under §4a — it drops a legitimate re-add whose identity
-          // already exists, and it misattributes a concurrent write (another
-          // tab, or realtime later) as "what you just added". Telling the
-          // teacher the truth beats showing them a card we inferred.
-          if (wallMode === "custom") {
-            say(`Added ${n} to ${where} — open a preset wall to see it here`);
-          } else if (wallLessonIds.has(lessonId)) {
-            say(`Added ${n} to ${where}`);
-          } else {
-            say(`Added ${n} to ${where} — that lesson isn't on this wall`);
-          }
-        },
-      });
-    },
-    [sections, anchorLessonFor, openComposer, say, wallMode, getLesson, wallLessonIds],
-  );
-
   const addSection = useCallback(
     (after?: WallSection) => {
       withFork((prev) => {
@@ -798,7 +690,6 @@ export function ResourceWall({
     onBoard: board,
     onModal: (item: WallItem) => setLight({ slides: [item], index: 0 }),
     onAddCard: addCard,
-    onAddResource: addResource,
     onAddSection: (after: WallSection) => addSection(after),
     onCommitCard: commitCard,
     onDropCard: moveCard,
@@ -1166,12 +1057,7 @@ export function ResourceWall({
           </p>
         ) : (
           sections.map((section) => (
-            <Section
-              key={section.id}
-              section={section}
-              canAddResource={anchorLessonFor(section) !== null}
-              {...sectionProps}
-            />
+            <Section key={section.id} section={section} {...sectionProps} />
           ))
         )}
         {!readOnly && sections.length > 0 && (
@@ -1207,12 +1093,7 @@ export function ResourceWall({
                 <IconX />
               </button>
             </div>
-            <Section
-              section={soloSection}
-              canAddResource={anchorLessonFor(soloSection) !== null}
-              {...sectionProps}
-              onSolo={() => setSolo(null)}
-            />
+            <Section section={soloSection} {...sectionProps} onSolo={() => setSolo(null)} />
           </div>
         </div>
       )}

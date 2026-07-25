@@ -226,15 +226,11 @@
   grid-auto-rows: 1fr;
 }
 
-/* The add tile is a CONTAINER now (B4.6), not a button: it holds the two adds
-   — Resource (the shared composer → the lesson) and Note (wall-local). The
-   dashed frame and the subject-tinted hover stay on the tile so the pair still
-   reads as one "add here" affordance; the press targets are the buttons. */
 .addCard.addCard {
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 6px;
+  gap: 4px;
   min-height: 120px;
   padding: 12px;
   border: 1.5px dashed color-mix(in srgb, var(--border) 90%, transparent);
@@ -243,6 +239,7 @@
   color: var(--ink-500);
   font-size: var(--t-12);
   font-weight: 600;
+  cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 .addCard.addCard:hover {
@@ -253,40 +250,6 @@
 .addCard.addCard svg {
   width: 18px;
   height: 18px;
-}
-
-/* Doubled to clear the `.cp-root button` (0,1,1) reset in tokens.css, which
-   would otherwise strip the padding/background/border off a single-class rule.
-   min-height 44px is the §4 touch-target floor (the wall is read-only on
-   phones, so tablet is the tightest tier that paints this). */
-.addBtn.addBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--r-md, 12px);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-.addBtn.addBtn:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--sc) 45%, transparent);
-  background: color-mix(in srgb, var(--sc) 12%, transparent);
-  color: var(--ink-800);
-}
-.addBtn.addBtn:focus-visible {
-  outline: 2px solid var(--sc);
-  outline-offset: 2px;
-}
-.addBtn.addBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .empty {
@@ -485,8 +448,7 @@
   .collapse.collapse,
   .act.act,
   .swatch.swatch,
-  .addCard.addCard,
-  .addBtn.addBtn {
+  .addCard.addCard {
     transition: none;
   }
   .swatch.swatch:hover {
