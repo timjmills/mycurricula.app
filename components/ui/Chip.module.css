@@ -82,20 +82,21 @@
   outline-offset: 2px;
 }
 
-/* ── Touch target — coarse pointer / phone / tablet (≤900px) ───────────── */
-/* Both arms are required: (pointer: coarse) catches touch devices ABOVE
-   900px (an iPad Pro in landscape is 1024px with a finger as its PRIMARY
-   pointer), while the width arm is the house pattern for a phone-width
-   window under a fine pointer. Same idiom as DayEditSplit /
-   UnitContextDrawer. See Button.module.css for the deliberate `pointer` vs
-   `any-pointer` gap — a trackpad-driven touchscreen laptop is NOT covered,
-   and changing that is a repo-wide call, not a per-file one.
+/* ── Touch target — any coarse pointer / phone / tablet (≤900px) ───────── */
+/* Both arms are required: (any-pointer: coarse) catches touch devices ABOVE
+   900px (an iPad Pro in landscape is 1024px and finger-driven), while the
+   width arm is the fallback for anything that reports pointer capabilities
+   badly. `any-pointer` rather than `pointer` because `pointer` describes only
+   the PRIMARY pointer — a touch laptop driven by a trackpad reports
+   `pointer: fine` and would never inflate. See Button.module.css for the full
+   reasoning, including why hover-affordance guards must NOT be widened the
+   same way.
 
    `.filter` renders as a <button>, so the padding declarations are DOUBLED
    (.filter.filter → 0,2,0) to beat the `.cp-root button { padding: 0 }`
    reset in tokens.css (0,1,1). Undoubled they were dead inside .cp-root —
    only min-height (which the reset does not touch) was landing. */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .filter.filter {
     min-height: 44px;
     padding-top: 10px;
@@ -156,7 +157,7 @@
    space (44px row height + inter-chip gap ≥ the overlay it wants), which is
    a layout decision that cannot be made in this file. The `removable`
    variant has zero callsites today, so nothing renders this. */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .removeBtn {
     width: 24px;
     height: 24px;

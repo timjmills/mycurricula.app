@@ -122,28 +122,35 @@
   border-radius: var(--r-md);
 }
 
-/* ── Hit-area inflation — coarse pointer / phone / tablet (≤900px) ───── */
+/* ── Hit-area inflation — any coarse pointer / phone / tablet (≤900px) ── */
 /* sm and md inflate to ≥44px via a transparent ::before overlay so the
    visual stays compact while the touch target meets WCAG 2.5.5.
 
    BOTH arms are required, and neither implies the other:
-   • (pointer: coarse) catches touch devices ABOVE 900px — an iPad Pro in
-     landscape is 1024px wide with a finger as its PRIMARY pointer. The
-     width-only form silently dropped inflation on every large tablet, i.e.
-     exactly the devices that need it most.
-   • (max-width: 900px) is the house pattern (Dock / planning-tabs /
-     day-v2 / DayEditSplit / UnitContextDrawer): a phone-width window is
-     treated as touch even under a fine pointer.
-   KNOWN GAP (deliberate): `pointer` describes only the PRIMARY pointer, so
-   a touch-screen laptop driven by a trackpad reports `pointer: fine` and is
-   NOT covered — it needs `any-pointer: coarse`. Not changed here, because
-   the five sibling files listed above all use `pointer`, and switching the
-   idiom is a repo-wide call (it would also inflate targets on mouse-driven
-   machines that merely have a touchscreen). Change all six together or none.
-   Same idiom as components/year-v2/drawer/UnitContextDrawer.module.css and
-   components/daily/DayEditSplit.module.css — keep them in step. */
+   • (any-pointer: coarse) catches touch devices ABOVE 900px — an iPad Pro in
+     landscape is 1024px wide and finger-driven. The width-only form silently
+     dropped inflation on every large tablet, i.e. exactly the devices that
+     need it most.
+   • (max-width: 900px) stays as the fallback for anything that reports its
+     pointer capabilities badly, and treats a phone-width window as touch
+     even under a fine pointer.
 
-@media (pointer: coarse), (max-width: 900px) {
+   ── WHY `any-pointer`, NOT `pointer` (2026-07-25 ruling) ────────────────
+   `pointer` describes only the PRIMARY pointer. On a touch laptop, or an
+   iPad with a trackpad attached, the primary pointer is FINE — so
+   `pointer: coarse` does not match and the inflation never fires, even
+   though the user is touching the screen with a finger. `any-pointer:
+   coarse` matches when ANY available pointer is coarse, which is exactly
+   the hybrid case. For a TOUCH-TARGET guard that is the correct question,
+   not a stylistic preference.
+
+   Do NOT copy this to a hover-affordance guard. Rules of the shape
+   `@media (hover: none), (pointer: coarse)` — revealing controls that are
+   otherwise hover-only — are asking a DIFFERENT question, and widening them
+   to `any-pointer` would pin those affordances permanently open on any
+   machine that merely has a touchscreen. */
+
+@media (any-pointer: coarse), (max-width: 900px) {
   .sm::before,
   .md::before {
     content: "";
