@@ -6695,3 +6695,132 @@ unconditional rule, and an unauthenticated control fabricates the difference.
   (`.claude/settings.local.json` permissions, `probe-4b-consolidated.mjs`
   tri-state). Relayed to the lead, not actioned here. Re-running with an
   explicit "review ONLY the stdin block" instruction fixed the scoping.
+
+---
+
+## fork-diff `.valueTag` Label role (#28) + `.uws` hybrid investigation (#27)
+
+### #28 — BUILD. Landed `d035fcc`.
+
+`.valueTag` 9.5px / 0.4px to `var(--t-11)` / `.09em`, per BUILD_STANDARD.md:320.
+`.09em` rather than a fixed px so the tracking scales with the size instead of
+drifting from it again. Live-verified: computed `11px` / `0.99px` / `700` /
+`uppercase`.
+
+**The AA comments were re-stated, and the reasoning corrected.** The lead's read
+— that they survive because the bump buys "more headroom" — reaches the right
+answer through a wrong premise. The bar did not move at all: WCAG's large-text
+allowance (3:1) starts at 24px, or 18.66px when bold, so 9.5px and 11px are both
+small text at 4.5:1. Headroom is identical; only the cited SIZE went stale. The
+comments now say that explicitly, so the next size tweak in this range cannot
+re-stale them. Ratios re-measured rather than inherited: **7.28:1** and
+**6.35:1**, matching what the comments always claimed.
+
+**Reflow, measured, and a judgement recorded.** The tag grows **+8.2px**. At
+375px that costs the longer of the two values **one extra line (3 to 4)**;
+768/1280 cost nothing. Nothing overflows, nothing clips, the text column still
+measures **253px** at phone width. I called that acceptable for role conformance
+— it is height on a vertically scrolling reading surface, not a break — and did
+NOT split the difference at 10px. The probe now BOUNDS it (no row may lose more
+than one line; column stays >=200px), so the judgement is a guard rail rather
+than a one-off opinion.
+
+**The finding that outgrew the brief: `ForkDiffPanel` HAS NO LIVE HOST.**
+
+- `ForkDiffPanel` is imported by exactly one component, `compare-to-master.tsx`.
+- `CompareToMaster` is mounted only by `weekly-lesson-card.tsx:1841`, behind
+  `compareOpen`.
+- `compareOpen` is set true only by `case "compare-master"` (`:1792`) — and
+  **nothing emits that action**. The live menu item (`context-menu.tsx:347`)
+  instead does `router.push('/daily?lesson=...&compare=1')` + `requestCompare()`.
+- **`?compare=1` has no reader. `COMPARE_REQUEST_EVENT` has no listener.**
+
+Verified live, not by grep alone — an absence claim fails open, so the probe runs
+**four controls** first (the menu opens; the item is really there; the click
+really navigates to /daily; /daily really hydrates with the lesson on screen) and
+only then asserts zero panels, plus a counterfactual that dispatches the event by
+hand and still gets zero. So a teacher who picks "Compare with Team Curriculum"
+is navigated to /daily and shown **no diff at all**.
+
+Restoring it is a feature change across surfaces this task does not own, so it is
+handed back, not bundled. **Codex independently flagged the same thing** as its
+only Medium and proposed fixing the consumer; kept and justified rather than
+actioned, per the standing scope ruling.
+
+`scripts/probe-fork-diff-label.mjs` therefore **exits RED on REACHABILITY by
+design**, and prints a closing note saying so — any OTHER red in it is a real
+regression. Because the panel cannot be rendered, its Part B measures the
+module's **real compiled classes** pulled from `document.styleSheets`, clearly
+labelled a cascade harness and not the live surface.
+
+**Instrument failure caught and fixed mid-run:** the first class resolver used an
+unanchored regex and silently built the harness out of `command-palette_panel`,
+`CountdownWidget_value` and `Tooltip_arrow` — producing reflow numbers for the
+wrong elements AND an absence check that measured the command palette. Now
+anchored to `fork-diff-panel_`, with an assertion that all 8 classes resolve and
+every one carries the prefix.
+
+Gates: `tsc` clean, `next lint` clean, `npm run test` **1324 passed / 0 failed**.
+One console error seen mid-probe (a React hydration mismatch in `WeeklyShell`)
+did **not** reproduce on a clean load — a separate control run measured **0
+errors** — so it is Fast-Refresh churn from a concurrent lane on the shared dev
+server, not this change, which is CSS-only and cannot move `useId`.
+
+### #27 — INVESTIGATION ONLY. `TimelineYear.module.css` NOT touched.
+
+Evidence: `scripts/probe-uws-hybrid.mjs` (`5689eb3`), screenshots in
+`docs/screenshots/uws-hybrid/`.
+
+**The premise needs correcting before the decision is made.** On paper-Year's
+DEFAULT tier (`data-hier="grid"`, `data-scope="all"`, 1280px) the chip is not
+40px:
+
+| | measured |
+|---|---|
+| chip, as shipped | **26x26**, `position: absolute`, **`opacity: 0`** at rest, **no `::after`** |
+| constraining card `.unode` | **74.1-88.1px** wide, ~97px tall |
+| same device below 900px | **44x44** — already compliant |
+| chips on screen | 52, all identical |
+
+Two things follow. The stylesheet's own comment (`:1946`) reasons from "cards
+measure ~95px" — **they measure 74-88px**, so any width argument built on 95px is
+~15% optimistic. And the real hybrid exposure is worse than the ticket says: a
+finger gets a **26px** target that is **invisible until a mouse hovers it**.
+
+**Why no emulation was needed** (and why two attempts failed first): `hasTouch`
+also flips `pointer` to coarse, and CDP `setEmulatedMedia` ignores `any-pointer`.
+It turns out not to matter — **no RULE queries `any-pointer`**; the only mention
+is the `:1937` rejection comment. Nothing distinguishes a hybrid from a
+fine-pointer desktop, so the fall-through cascade IS the hybrid's rendering.
+
+**What actually gives at 44px.** Because the chip is absolutely positioned, the
+answer is not what the ticket assumes: **title width change 0px, newly ellipsised
+0, no h-scroll.** It steals no layout. The cost is pure **overlap** — 44x44
+claims **27.1% of the card's area and 59.4% of its width** (at rest, 26px covers
+9.4%).
+
+**Options — consequences measured, not estimated. I am not picking one.**
+
+1. **Leave it; record the gap.** The `:1956` author's argument holds on its own
+   terms: a hybrid has a mouse, so the reveal fires and the path is not broken.
+   Cost: a hybrid teacher reaching with a finger gets a 26px target they cannot
+   see first. §4's 44px is violated for that user. Zero risk, zero work.
+2. **Extend ONLY the `::after` hit-area inflation to `any-pointer: coarse`** —
+   not the opacity, not the width. **Measured layout cost: zero** — painted size
+   unchanged at 26px, nothing moves, no overlap, and `elementFromPoint` at the
+   inflated corner resolves to the chip, so the area is genuinely live. This is
+   the idiom the `>=901+coarse` branch already uses for this same tier. It
+   threads the standing rejection rather than contradicting it: that rejection
+   was about *painting the chip over the title*, which this does not do.
+   Residual: the chip stays `opacity: 0` at rest, so this fixes **hittability,
+   not discoverability** — a touch user still cannot see what they are hitting.
+3. **Extend the coarse branch wholesale** (`opacity: 1` + `::after`) to
+   `any-pointer: coarse`. Fixes both hittability and visibility. Cost: the chip
+   becomes permanently visible on every hybrid, covering **9.4%** of a 74px card
+   — exactly the trade `:1956` weighed and declined.
+
+**Not reached, and reported as such:** the outline/list tier — where the 40px
+base is a real in-flow trailing column — could not be measured above 900px,
+because the `[aria-label="Filters and view"]` trigger is **absent** on paper-Year
+at 1280 (`viewMode` is in-memory, `lib/app-state.tsx:307`, so the switcher is the
+only route). That may be its own finding; it is not something I chased.
