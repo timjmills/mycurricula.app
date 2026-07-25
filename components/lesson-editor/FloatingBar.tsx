@@ -824,7 +824,7 @@ export function FloatingBar({
                 applyLink();
               } else if (e.key === "Escape") {
                 // Stop propagation so Esc cancels the link edit without also
-                // closing a hosting LessonModal.
+                // closing the dialog hosting the editor.
                 e.preventDefault();
                 e.stopPropagation();
                 cancelLink();

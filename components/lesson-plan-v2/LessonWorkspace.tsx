@@ -15,7 +15,7 @@
 // lazily forks; a Team-mode edit writes master — the top-bar toggle owns that
 // choice, exactly as the tab bodies already do). B2 adds NO Team/Personal
 // affordance here (PlanPage's original note: setSaveTarget "core" is a store
-// no-op; the explicit Push-to-Team button stays in LessonModal / DayEditSplit).
+// no-op; the explicit Push-to-Team button stays in DayEditSplit).
 //
 // SIMPLE / ADVANCED (B2.4): a header toggle. In Simple mode the advanced
 // surfaces (Builds & prep, Framework, and the Assessment purpose/notes fields)

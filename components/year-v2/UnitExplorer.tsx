@@ -22,6 +22,11 @@
 // lesson's plan is an IN-MODAL mode switch, not the old cross-route bounce to
 // `/daily?lesson=…` (that deep link still works from everywhere else).
 //
+// B5.7: that Lesson mode is now also an ENTRY point, not just a switch — a
+// `focusLessonId` mounts this component straight into it. It is what /weekly's
+// "Open in editor" opens, replacing the retired centered lesson-editor popup,
+// so it has to hold for lessons the unit roll-up cannot describe (see the prop).
+//
 // B1.0: the five tab bodies + the ProgressRing moved to ./unit-tabs (a pure
 // move — byte-identical render) so the B1 workspace can reuse them. Their shared
 // CSS still lives in UnitExplorer.module.css; the tab files import it from the
@@ -47,6 +52,7 @@ import {
 import { useRouter } from "next/navigation";
 import type { Lesson, SubjectId } from "@/lib/types";
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
+import { unitDisplayName } from "@/lib/unit-name";
 import { unitResources, unitStandards } from "@/lib/year-unit-aggregate";
 import {
   subjectUnitGroups,
@@ -109,6 +115,20 @@ export interface UnitExplorerProps {
    * modal: no rail, no expand toggle, byte-identical to before B1.4.
    */
   onUnitChange?: (subjectId: SubjectId, unit: string) => void;
+  /**
+   * B5.7 — open straight into LESSON mode on this lesson, instead of the unit
+   * roll-up. The lesson entry points (/weekly's "Open in editor", and anything
+   * that later replaces a lesson popup) pass it; the unit entry points (a unit
+   * chip, Year, the Hub) do not.
+   *
+   * Deliberately independent of `unit`: the Lesson Planner needs only the
+   * lesson, so this works for a lesson filed under no unit at all — which every
+   * in-app-created lesson is (`lib/planner-store` addLesson: "a fresh lesson
+   * starts unfiled"). When the unit does not resolve in the catalog the Unit
+   * mode switch is withheld rather than offering a roll-up of nothing; see
+   * `unitResolved` below.
+   */
+  focusLessonId?: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -198,6 +218,7 @@ export function UnitExplorer({
   unit,
   onClose,
   onUnitChange,
+  focusLessonId,
 }: UnitExplorerProps): ReactNode {
   const {
     lessons: allLessons,
@@ -210,8 +231,15 @@ export function UnitExplorer({
   const router = useRouter();
 
   const [tab, setTab] = useState<TabKey>("overview");
-  const [mode, setMode] = useState<ExplorerMode>("unit");
-  const [planLessonId, setPlanLessonId] = useState<string | null>(null);
+  // A lesson entry point (B5.7) mounts DIRECTLY in Lesson mode — seeded here
+  // rather than in an effect so the first paint is already the Lesson Planner
+  // (an effect would flash the unit roll-up, then swap).
+  const [mode, setMode] = useState<ExplorerMode>(
+    focusLessonId ? "lesson" : "unit",
+  );
+  const [planLessonId, setPlanLessonId] = useState<string | null>(
+    focusLessonId ?? null,
+  );
 
   // Workspace mode (B1.4): a rail + ⤢ expand toggle, enabled only when the host
   // owns unit navigation (`onUnitChange`). The presentation preference is always
@@ -281,6 +309,19 @@ export function UnitExplorer({
     [subjectById, units, subjectId, unit],
   );
 
+  // Does the unit actually exist in the catalog? `resolveUnitHeader` degrades a
+  // missing unit to its raw id rather than failing, which is right for a unit
+  // that merely left the catalog — but a lesson entry point (B5.7) can open on a
+  // lesson with NO unit (`unit === ""`, every freshly-created lesson) or one
+  // whose id the Supabase seam could not map back. There is no roll-up to show
+  // for those, so the Unit mode switch is withheld: the same guard
+  // `components/unit-chip` uses to decide whether a lesson has a unit worth
+  // opening, via the same helper, so the two can never disagree.
+  const unitResolved = useMemo(
+    () => unitDisplayName(units, subjectId, unit) !== null,
+    [units, subjectId, unit],
+  );
+
   // The unit's lessons + rollups — pure + memoized (recompute only when the
   // live lesson list changes, e.g. an edit or a mark-taught lands).
   const lessons = useMemo(
@@ -329,13 +370,61 @@ export function UnitExplorer({
     if (next === "unit") setPlanLessonId(null);
   }, []);
 
+  // ── The open target moved while we stayed mounted ────────────────────────
+  // The initial state above covers the ordinary case: an entry point opens the
+  // workspace from CLOSED, so this component mounts already on the right thing.
+  // This effect covers the other one — the host swapping the target while the
+  // workspace stays MOUNTED, which re-renders rather than remounts (the
+  // `onUnitChange` contract). No UI reaches it today (the workspace's own scrim
+  // covers every opener behind it, and Lesson mode paints no rail); it is here
+  // because `openUnitWorkspace` is exported for imperative callers, and BOTH
+  // halves below are silent-wrong-state bugs if left out:
+  //
+  //   • a focus arrives → show that lesson (else the target names a lesson the
+  //     workspace ignored);
+  //   • a target with NO focus → show the unit, dropping any pinned lesson
+  //     (else the header names one thing while the body plans another — §4a
+  //     Medium). This is exactly what the in-modal Unit switch does, so both
+  //     routes to the unit agree.
+  //
+  // The second branch fires for a same-unit re-assert too, not only when the
+  // unit moves. An earlier revision exempted that case to protect a teacher
+  // mid-lesson from the rail, which reports its active unit on every click —
+  // but Lesson mode paints NO rail (PlanPage builds its shell without one), so
+  // that state cannot arise, and the exemption only made "open this unit"
+  // sometimes not open it. If a later wave does give Lesson mode a rail, the
+  // rail must carry the focus rather than this effect regaining an exception.
+  const lastTargetRef = useRef({ subjectId, unit, focusLessonId });
+  useEffect(() => {
+    const prev = lastTargetRef.current;
+    if (
+      prev.subjectId === subjectId &&
+      prev.unit === unit &&
+      prev.focusLessonId === focusLessonId
+    ) {
+      return;
+    }
+    lastTargetRef.current = { subjectId, unit, focusLessonId };
+    switchedRef.current = true;
+
+    if (focusLessonId !== undefined) {
+      setPlanLessonId(focusLessonId);
+      setMode("lesson");
+    } else {
+      setPlanLessonId(null);
+      setTab("overview");
+      setMode("unit");
+    }
+  }, [subjectId, unit, focusLessonId]);
+
   // ── Subject-vanished-while-open guard ───────────────────────────────────
   // If the catalog / active notebook swaps and this subject disappears, every
   // subject-derived surface below (the `cp-subj` cascade, the gradient header,
   // the glyph) would throw on a missing record and take the whole Year view
-  // down. Close instead of painting a subject-less husk — LessonModal's
-  // deleted-while-open contract. The unmount cleanup restores the invoker's
-  // focus, so this is a real close, not a silent unmount.
+  // down. Close instead of painting a subject-less husk — the same
+  // deleted-while-open contract PlanPage applies to a vanished lesson. The
+  // unmount cleanup restores the invoker's focus, so this is a real close, not
+  // a silent unmount.
   useEffect(() => {
     if (header === null) onClose();
   }, [header, onClose]);
@@ -343,13 +432,20 @@ export function UnitExplorer({
   if (header === null) return null;
 
   // ── Lesson mode — the Lesson Planner over the same shell ─────────────────
+  //
+  // `onModeChange` is withheld when the unit does not resolve (B5.7), which
+  // does two things at once: the Unit | Lesson switch is not painted as a
+  // control that would land on an empty roll-up, and PlanPage's
+  // deleted-while-open guard falls through to `onClose` instead of bouncing
+  // into that same empty unit. Every unit entry point resolves, so this only
+  // ever fires for a lesson opened while unfiled.
   const planLesson = planLessonId ?? fallbackLessonId;
   if (mode === "lesson" && planLesson !== null) {
     return (
       <PlanPage
         lessonId={planLesson}
         onClose={onClose}
-        onModeChange={onModeChange}
+        onModeChange={unitResolved ? onModeChange : undefined}
         animateIn={!switchedRef.current}
       />
     );

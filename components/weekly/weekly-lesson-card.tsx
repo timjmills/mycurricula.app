@@ -106,19 +106,22 @@ export type {
   ContextActionPayload,
 } from "@/components/lesson-card/context-menu";
 
-// ── Open-in-editor seam (W3.8) ───────────────────────────────────────────────
+// ── Open-in-editor seam (W3.8; repointed B5.7) ───────────────────────────────
 // The expanded card body carries a minimal "Open in editor ⤢" affordance that
-// hands the lesson to the full <LessonModal> (components/lesson-editor). The
-// opener callback travels by CONTEXT rather than a prop because this card has
-// FOUR render parents on the Weekly canvas (grid/GridCell, grid/WeeklyGrid,
-// weekly/WeekColumns — the frame-B branch — and weekly/weekly-board) and
-// threading a new prop through all of them is exactly the churn a seam should
-// avoid. <WeeklyShell> provides the value (it owns the modal-open state); any
-// card rendered outside the provider sees `null` and simply hides the
-// affordance. Declared HERE (not in LessonModal.tsx) so the card never
-// imports from components/lesson-editor — keeping the card ↔ editor module
-// graph acyclic (the editor's own files may legitimately import weekly
-// primitives like SaveTargetDialog).
+// hands the lesson to the full editor. That editor is now the global unit
+// workspace's Lesson Planner (opened by <WeeklyShell>, which owns the seam) —
+// the same surface /year, /daily and the Planner Hub reach, replacing the
+// centered popup this seam originally fed. The card is unchanged by that: it
+// still just names a lesson and calls the opener. The opener callback travels
+// by CONTEXT rather than a prop because this card has FOUR render parents on
+// the Weekly canvas (grid/GridCell, grid/WeeklyGrid, weekly/WeekColumns — the
+// frame-B branch — and weekly/weekly-board) and threading a new prop through
+// all of them is exactly the churn a seam should avoid. <WeeklyShell> provides
+// the value; any card rendered outside the provider sees `null` and simply
+// hides the affordance. Declared HERE rather than beside the editor so the card
+// imports nothing from it — keeping the card ↔ editor module graph acyclic (the
+// editor's own files may legitimately import weekly primitives like
+// SaveTargetDialog).
 export const OpenLessonEditorContext = createContext<
   ((lessonId: string) => void) | null
 >(null);
@@ -1592,10 +1595,11 @@ export function WeeklyLessonCard({
                       Edit Template
                     </Button>
                     {/* W3.8 — week-expand host seam: hand off to the full
-                        lesson-editor modal. Deliberately MINIMAL — the card's
-                        existing expanded rows stay untouched this wave (their
-                        dirty-tracking + SaveTargetDialog interplay is subtle;
-                        full template-in-expand is a follow-up). Hidden when no
+                        lesson editor (B5.7: the unit workspace's Lesson
+                        Planner). Deliberately MINIMAL — the card's existing
+                        expanded rows stay untouched (their dirty-tracking +
+                        SaveTargetDialog interplay is subtle; full
+                        template-in-expand is a follow-up). Hidden when no
                         <OpenLessonEditorContext> provider is above. */}
                     {openLessonEditor && (
                       <Button
@@ -1606,7 +1610,7 @@ export function WeeklyLessonCard({
                           e.stopPropagation();
                           openLessonEditor(lesson.id);
                         }}
-                        tooltip="Open this lesson in the full editor window"
+                        tooltip="Open this lesson's full plan — every section, its standards, resources and assessment — right here, without leaving the week."
                       >
                         Open in editor <span aria-hidden="true">⤢</span>
                       </Button>

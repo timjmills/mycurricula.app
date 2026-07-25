@@ -4317,3 +4317,192 @@ the hung-send watchdog cases, the `staleUnitPatchKeys` retry guard, all six
 clear-to-NULL scalars (was 1 of 6), and a reverse column lock on
 `unit_assessments`. Fixed the hardcoded `MIGRATION_FILES[2]` false-guard by
 discovering the migration set from disk.
+
+---
+
+## B5.7 — focus-lesson retirement (build-b57-focuspop)
+
+**Ruling implemented:** "the focus-lesson path" = `components/lesson-editor/LessonModal.tsx`,
+the centered resizable popup. The `/daily?lesson=` deep link was NOT touched.
+
+**What shipped.** `/weekly`'s "Open in editor ⤢" now opens the GLOBAL unit workspace in its
+**Lesson mode** (`UnitExplorer` → `PlanPage` → `LessonWorkspace`) instead of a parallel popup.
+`LessonModal.tsx` + `LessonModal.module.css` + the barrel export are **deleted** — a full
+retirement, not a partial one. Callsite recon was confirmed against `HEAD` (`git show HEAD:`),
+not the working tree: exactly one render site (`WeeklyShell.tsx:1510`), reached from two
+consumers of `OpenLessonEditorContext` (`weekly-lesson-card`'s expanded footer and
+`WeekEditBoard`'s tile "Open"). Both repoint by changing the ONE context value the shell
+provides. `WeeklyShellV1` never had the seam, so flag-OFF is untouched. Sibling files in
+`components/lesson-editor/` (`LessonEditor`, `FloatingBar`, `SectionBlock`, `SectionMenu`) all
+survive — `DayEditSplit` and the Week cell expand still consume them.
+
+**THE HARD PROBLEM — unit-less lessons, with real numbers.** The workspace was unit-scoped;
+the popup was not. Answer: **option (a)** — the target gained `focusLessonId`, so the workspace
+opens on a LESSON and never needs a unit at all.
+
+- **Live census, /weekly paper frame, mock source: 30/30 lesson cards carry a resolvable unit
+  (100%).** The mock always files lessons (`lib/mock/lessons.ts:69` —
+  `unit: o.unit ?? UNITS[o.subject].id`).
+- **That 100% is a fixture artifact, and the real number is not 100%.** On Supabase,
+  `Lesson.unit` is the `units.id` UUID and `uuidToUnitSlug` is an identity map
+  (`supabase-source.ts:1065`), so a lesson resolves iff its `unit_id` is non-null AND its unit
+  row is in the loaded index. Two live failure modes: an authored lesson with
+  `unit_id IS NULL` → `unit: ""` (`supabase-source.ts:1468-1470`), and a master lesson whose
+  unit row is outside the index → raw UUID, absent from the catalog.
+- **The decisive fact: EVERY lesson created in-app starts unfiled.** `lib/planner-store.tsx:2841`
+  passes `unit: ""` with the comment "No unit yet — a fresh lesson starts unfiled." Routing the
+  editor through a unit would have dead-ended precisely the lessons a teacher just made.
+- **Honest limit on the live proof:** no live click reaches an unfiled lesson in THIS build,
+  because v2 has no lesson-create UI — `addLesson`'s only callsite is `AddLessonForm`, mounted
+  only by `DailyViewV1` (flag-OFF). So the unfiled path is proven by the new singleton tests +
+  the code trace above, not by a browser click. Worth flagging on its own: **v2 currently has
+  no way to create a lesson.**
+- Degradations built for it: `PlanPage` gives an unfiled lesson `siblings = [lesson]` (the
+  generic filter would have collected every OTHER unfiled lesson in the subject and labelled
+  them a unit, with an "n of N in sequence" to match); the unit crumb resolves through
+  `lib/unit-name` and **drops out entirely** when it can't (the old `?? lesson.unit` printed a
+  raw UUID — the exact leak of chrome-sweep MAJOR-1, newly reachable); and `UnitExplorer`
+  withholds `onModeChange` when the unit doesn't resolve, which both hides a switch that would
+  land on an empty roll-up and makes `PlanPage`'s deleted-while-open guard fall through to
+  `onClose` instead of bouncing into that same husk.
+
+**LessonModal contracts — kept, improved, dropped.**
+
+- **Escape ordering — KEPT, identical.** `ExplorerShell` uses the same window-bubble,
+  `defaultPrevented`-aware listener, and additionally `preventDefault()`s. The editor's inner
+  Esc consumers (`SectionMenu` capture-phase, `SectionBlock` rename, `FloatingBar` link) are
+  unchanged and still correct — their comments were repointed off the deleted file.
+- **Focus trap — IMPROVED.** `ExplorerShell`'s query excludes `[tabindex="-1"]` on every clause;
+  LessonModal's applied it to one. Its `getClientRects()` filter also keeps hidden rail/drawer
+  controls out of the trap boundary.
+- **No-close-on-background — KEPT, and FIXED WIDER.** `PlanPage`'s modal host never passed
+  `closeOnScrimClick`, so it defaulted to TRUE: a stray click closed the Lesson Planner while
+  the SAME dialog in Unit mode ignored it. Now `false`, matching `UnitExplorer` and the popup's
+  own "a scrim click mid-resize must never eat their work-in-progress".
+- **DROPPED: free-form `resize: both`.** The replacement is a fixed dialog (max 820px/92vh).
+  Not replaced by the ⤢ expand toggle either — `PlanPage` renders no `presentation`, so Lesson
+  mode always presents compact even when the teacher expanded the workspace. Pre-existing (B2),
+  now on a path more teachers will hit. **Follow-up, not fixed here** (it needs a new prop +
+  header button and would widen the diff across /year's shipped surface).
+
+**§4a Codex gate:** run three times. The first returned one **Medium** (a target swapped while
+the workspace stayed mounted left `mode==="lesson"` pinned to the old unit's lesson); fixed.
+The second returned a Medium on the same effect's remaining asymmetry. Its premise was verified
+before accepting — **Lesson mode paints no rail** (`PlanPage` builds its shell without one), so
+the "protect the teacher from the rail" exemption I had written guarded an unreachable state
+while making "open this unit" sometimes not open it. Simplified to: focus → lesson, no focus →
+unit. Third run: **NO BLOCKING ISSUES**.
+
+**§4b live gate — 52/52 assertions, real Chrome (`channel: "chrome"`) on :3099, mock source.**
+Asserted, not logged: exactly ONE `.ue-modal`/`.ue-scrim`; **zero `.lm-modal`/`.lm-scrim`
+anywhere**; opens in Lesson mode (`aria-label="Lesson planner — …"`); focus moves in and
+**restores to the opener**; the card stays expanded so one Esc = one close;
+`body.style.overflow` restored to its prior value; scroll position survives; pathname unchanged
+(pop-in, not navigation); a background click does NOT close it; the subtitle carries no empty
+crumb; and at 768/375 the dialog fits the viewport with zero document overflow. Zero console
+errors. Probe kept out of the repo (scratchpad) — say the word and it can land in `scripts/`.
+
+**FIRST-CLICK NO-OP (the open MINOR) — DIAGNOSED, and NOT cheaply fixable.** Measured, not
+guessed: `/weekly`'s SSR HTML already contains **30 lesson cards and 30 unit chips** (curl of
+the authed route), and on this dev server React does not finish hydrating for **~13s** — first
+card in DOM at **87ms**, first click that actually did something at **12,982ms**: a
+**12.9-second window** where a fully-painted control is inert and React never replays the
+click. So it is genuine pre-hydration latency, not a binding bug, and the "gate the control
+until hydrated" fix would show every teacher a disabled UI for those seconds. **Left alone,
+deliberately.** Two mitigating notes: this is the DEV bundle, and under Supabase the store
+starts empty, so the cards would not be in the SSR HTML at all and the window largely closes.
+The probe's `clickUntil` retry helper exists because of this — a single-click probe measures
+hydration and reports it as a broken control.
+
+**Also found, for other lanes:**
+
+- **The shared tree did not compile for a stretch** (`SchoolWeekSaveState.message`, then
+  `UnitAssessments.tsx` `WriteStalled`, plus a failing `security-definer-search-path` test) and
+  the dev server served a client bundle with `Invalid or unexpected token` — every click on
+  /weekly and /daily became a no-op. Several of my probe runs measured that, not the product.
+  Reported to the orchestrator mid-lane. **A red live result during a multi-lane wave is a
+  claim about the TREE first and the product second.**
+- A React `useId` mismatch on `WeeklyShell`'s aria-live region fires on a warm-page reload but
+  **also on `/year`**, whose tree this change cannot touch (the workspace host renders null
+  while closed) — and never on a cold load. Not attributable here; excluded from the probe's
+  console assertion by name and counted separately rather than swallowed.
+- `/weekly` has no "Open in editor" at ≤900px (narrow → `WeeklyList`) or in Grid/List/Schedule —
+  the same gap already tracked as the B5 reachability item. Unchanged by this lane; the popup
+  had exactly the same reach.
+- Dead CSS: `app/themes.css:1571/1594/1613/1625` still enrol `.lm-modal` / `.lm-scrim`, now
+  unreferenced. Not my file — left for whoever owns `themes.css`.
+- `lib/year-v2-data.ts:113` still cites "LessonModal's deleted-while-open guard". Not my file.
+
+### Class-sweep round 4 (fix-class-sweep) — commit `0eeb3af`
+
+**Ruling applied:** touch-target guards use `any-pointer: coarse`, not
+`pointer: coarse`. `pointer` describes only the PRIMARY pointer, so a touch
+laptop (or an iPad with a trackpad attached) reports `pointer: fine` and the
+44px inflation never fired despite a finger on the glass. `any-pointer`
+matches when ANY available pointer is coarse. For a touch-target guard that is
+the correct question, not a preference. Applied to `components/ui/Button.module.css`
+and `components/ui/Chip.module.css`.
+
+**SCOPE CORRECTION — it is 48 media queries across 40 files, not six.** My
+earlier "six files" was the handful I had cited as the house idiom; I had not
+counted the repo, and the ruling was made on my number. Corrected inventory,
+**categorised, because they are NOT interchangeable**:
+
+- **A — HOVER-AFFORDANCE guards (4). DO NOT WIDEN.**
+  `grid/WeeklyGrid.module.css:563` (mine — deliberately left alone),
+  `rename/InstanceRename.module.css:53`, `teach/left/TeachLeft.module.css:158`,
+  `teach/right/TeachRightPanel.module.css:41`. All `(hover: none), (pointer:
+  coarse)`; `hover: none` already does the work. Widening these pins hover-only
+  affordances **permanently open** on any machine that merely has a
+  touchscreen — a visible regression on exactly the population the ruling
+  helps. WeeklyGrid's block sets `opacity: 1` on `.subjectReorder`; its
+  touch-target half is now covered by the Button change anyway, so leaving it
+  is both correct and sufficient.
+- **B — touch-target guards with NO width fallback (20 rules / 11 files).**
+  Highest urgency — on a hybrid these currently do nothing at all.
+  `app/chrome.css:1763` · `daily/DailyView.module.css:1857` ·
+  `lesson-editor/lesson-editor.module.css:139,178,213,258,285,396` +
+  `FloatingBar.module.css:244` · `resource-wall-v2/ResourceWall.module.css:290,323,352`,
+  `Section.module.css:175`, `WallLibrary.module.css:77,104,170,341` ·
+  `weekly/WeekEditBoard.module.css:394` · `year-v2/YearC.module.css:128` ·
+  `year/YearConstellation.module.css:132`.
+- **C — touch-target guards that already pair with a width arm (~24 files).**
+  Lower urgency (the width arm still catches phones) but inconsistent until
+  changed. Note `week-v2/WeekC.module.css:385` uses `max-width: 1023px`, not 900.
+
+**Do B first, then C, never A — and check each rule's INTENT rather than
+sed the string.** Category A is exactly the trap a blanket replace would spring.
+
+**Verification.** Live in real Chrome under any-pointer emulation at 1024px:
+**8/8** — Chip `.filter` min-height 44px / padding 10px 13px, Button `.sm`
+`::before` 44px, plus a fine@1280 control confirming no inflation. **Honest
+caveat:** the real-element arm matched **0** buttons on this run (it found 4
+previously), so it passed vacuously; the load-bearing evidence is the synthetic
+pair mounted inside a real `.cp-root` under the real cascade.
+
+**Codex §4a — two Mediums, shipped anyway, both surfaced to the lead:**
+1. Inflated hit areas can overlap adjacent compact controls on a mouse-driven
+   touchscreen desktop. Inherent to the ruling; direction is the safe one.
+2. **The sharper one, and it is new information:** Chip `.filter` changes
+   **VISIBLE layout** (`min-height` + `padding`), not merely an invisible hit
+   area. Until the other 40 files follow, a touchscreen desktop can show 44px
+   filter chips beside 36px lookalikes. I had called the remaining files a
+   "consistency nit" in an earlier message — for Chip specifically that was
+   **wrong**, and it makes sequencing B+C more urgent than I framed it.
+   Alternatives offered to the lead: sequence B+C now, or revert just the Chip
+   `.filter` half to `pointer` while keeping Button's invisible-hit-area half
+   on `any-pointer`.
+
+**Lane closed.** Four commits: `5317880`, `e9cc673`, `6a6abf6`, `0eeb3af`.
+
+**Routed, not mine, still open:**
+- `weekly/weekly-lesson-card.tsx:1553` — button labelled **"Add section"**
+  fires `add-to-todo`; `:1589` — **"Edit Template"** fires `print`. Live v2
+  surface, both inert, both **mislabelled**. The trap: `print` is on the
+  cheapest-to-wire list, so implementing it makes "Edit Template" start
+  printing. **Re-point these BEFORE wiring either action.**
+- `onboarding/steps/grade-step.tsx:44-63` — ArrowLeft with nothing selected
+  commits grade "12" (no `-1` guard; it does not use `useRovingRadio`).
+- The B/C `any-pointer` files above.
+- The §4b interaction test for the `YearLessonPane` arrow scoping — recorded
+  by the lead as **unverified**, folded into the consolidated live pass.

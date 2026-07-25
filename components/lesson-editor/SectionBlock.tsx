@@ -238,9 +238,9 @@ export const SectionBlock = memo(function SectionBlock({
               e.currentTarget.blur();
             } else if (e.key === "Escape") {
               // W3.8 gate fix: cancel the rename and CONSUME the key —
-              // preventDefault + stopPropagation per the modal's contract,
-              // so Esc mid-rename can never bubble up and close the
-              // hosting LessonModal (nor commit the draft via the blur —
+              // preventDefault + stopPropagation per the innermost-first
+              // contract, so Esc mid-rename can never bubble up and close the
+              // dialog hosting the editor (nor commit the draft via the blur —
               // the ref guards that path).
               e.preventDefault();
               e.stopPropagation();

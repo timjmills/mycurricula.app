@@ -131,11 +131,15 @@ import { WeekGridSkeleton } from "./WeekGridSkeleton";
 // all (see renderGridPanel).
 import { WeekA, WeekC } from "@/components/week-v2";
 import { WeekEditBoard } from "./WeekEditBoard";
-// W3.8 — the lesson-editor popup + the context that carries its opener down
-// to every WeeklyLessonCard (grid, columns, and board parents alike — see
-// the seam note in weekly-lesson-card.tsx).
-import { LessonModal } from "@/components/lesson-editor";
+// W3.8 — the context that carries the lesson-editor opener down to every
+// WeeklyLessonCard (grid, columns, and board parents alike — see the seam note
+// in weekly-lesson-card.tsx). B5.7 repointed what it opens: the global unit
+// workspace's Lesson mode, not the retired centered popup.
 import { OpenLessonEditorContext } from "./weekly-lesson-card";
+import {
+  getUnitWorkspaceTarget,
+  useUnitWorkspace,
+} from "@/components/year-v2/workspace-host";
 import { useAppState } from "@/lib/app-state";
 import {
   WeeklyScheduleProvider,
@@ -580,20 +584,32 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // untouched. See components/ui/PlannerEmpty for the same fix on other surfaces.
   const gridDataState = usePlannerDataState();
 
-  // ── W3.8 — lesson-editor modal state ─────────────────────────────────
-  // The shell owns which lesson (if any) is open in the full-editor popup.
+  // ── W3.8 seam, B5.7 destination — "Open in editor" ───────────────────
   // The opener travels DOWN via <OpenLessonEditorContext> (provided around
   // the whole body below) so every WeeklyLessonCard — under WeeklyGrid,
   // WeekColumns, or the board — reaches it without per-parent prop
-  // threading. The modal renders ONCE, inside this shell root, so
-  // PlannerProvider / useAppState are in scope for its store calls.
-  const [modalLessonId, setModalLessonId] = useState<string | null>(null);
-  const openLessonEditor = useCallback((id: string): void => {
-    setModalLessonId(id);
-  }, []);
-  const closeLessonEditor = useCallback((): void => {
-    setModalLessonId(null);
-  }, []);
+  // threading. What it OPENS changed in B5.7: the shell no longer hosts a
+  // lesson popup of its own. It calls the global unit-workspace host, which
+  // mounts the same Lesson Planner every other surface uses, so /weekly's
+  // editor is the one editor — with the unit rail, the Assessments ·
+  // Insights · Prep drawer, and B2's full lesson body — instead of a
+  // parallel popup that had none of them.
+  //
+  // The lesson is looked up for its subject + unit, which scope the
+  // workspace. A lesson with NO unit still opens: `focusLessonId` is what
+  // the workspace keys on, and the unit only decides whether it can also
+  // offer the unit roll-up. An id with no live lesson opens nothing rather
+  // than an empty dialog — it can only mean the row was archived from
+  // another surface between render and click.
+  const { openUnitWorkspace } = useUnitWorkspace();
+  const openLessonEditor = useCallback(
+    (id: string): void => {
+      const lesson = lessons.find((l) => l.id === id);
+      if (!lesson) return;
+      openUnitWorkspace(lesson.subject, lesson.unit, lesson.id);
+    },
+    [lessons, openUnitWorkspace],
+  );
   const router = useRouter();
   // W3.6 — the v2 frame axis picks the Week GRID traversal (see
   // renderGridPanel): Frame B (paper) reads the week as day columns
@@ -957,23 +973,30 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   //    to the week aggregate. Listens on the document so it fires even when
   //    focus is inside the grid or the rail.
   //
-  //    W3.8 innermost-first guard: while the lesson-editor modal is open,
-  //    Esc belongs to the modal (its window-level listener closes it) —
-  //    this document listener runs FIRST (document before window) and used
-  //    to ALSO deselect on the same keypress, collapsing the expanded card
-  //    and unmounting the "Open in editor" opener before the modal's
-  //    focus-restore could target it (the gate's Esc-falls-to-body bug).
-  //    Skipping while the modal is open keeps one Esc = one close.
+  //    W3.8 innermost-first guard, B5.7 repointed: while the lesson editor
+  //    is open, Esc belongs to it (ExplorerShell's window-level listener
+  //    closes it) — this document listener runs FIRST (document before
+  //    window) and would ALSO deselect on the same keypress, collapsing the
+  //    expanded card and unmounting the "Open in editor" opener before the
+  //    dialog's focus-restore could target it (the W3.8 gate's
+  //    Esc-falls-to-body bug). Skipping while it is open keeps one Esc =
+  //    one close.
+  //
+  //    Read at EVENT time from the workspace singleton rather than
+  //    subscribed with `useUnitWorkspaceTarget()`: subscribing would
+  //    re-render this whole shell — the grid, the rail, every card — each
+  //    time the workspace opens or closes, to answer a question only this
+  //    keydown asks.
   useEffect(() => {
     const handleKeyDown = (e: globalThis.KeyboardEvent): void => {
-      if (modalLessonId !== null) return;
+      if (getUnitWorkspaceTarget() !== null) return;
       if (e.key === "Escape" && selectedLessonId !== null) {
         setSelectedLessonId(null);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [modalLessonId, selectedLessonId, setSelectedLessonId]);
+  }, [selectedLessonId, setSelectedLessonId]);
 
   // ── Column drag handlers ──────────────────────────────────────────────
   const handleColumnDragStart = useCallback((e: DragStartEvent): void => {
@@ -1500,15 +1523,10 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
               : undefined
           }
         />
-
-        {/* ── W3.8 — lesson-editor popup ──────────────────────────────────
-          Rendered once, host-owned. Closes ONLY via its Exit button or
-          Esc (the scrim deliberately has no click-to-close — locked
-          scope). Conditional mount keeps its focus-capture/restore
-          lifecycle tied to open/close. */}
-        {modalLessonId !== null && (
-          <LessonModal lessonId={modalLessonId} onClose={closeLessonEditor} />
-        )}
+        {/* B5.7 — no lesson popup is mounted here any more. "Open in
+            editor" calls the global unit-workspace host (mounted once in
+            app/(planner)/layout.tsx), which renders the dialog above every
+            planner route. One mount, one focus trap, one scroll lock. */}
       </div>
     </OpenLessonEditorContext.Provider>
   );

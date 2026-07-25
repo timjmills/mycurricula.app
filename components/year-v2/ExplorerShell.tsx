@@ -154,8 +154,8 @@ export interface ExplorerShellProps<K extends string = string> {
 
 // All keyboard-reachable elements inside the panel — the focus-trap query.
 //
-// Every clause excludes `[tabindex="-1"]`, which LessonModal's otherwise-identical
-// query applies only to its `[tabindex]` clause. That matters HERE because this
+// Every clause excludes `[tabindex="-1"]` — not just the `[tabindex]` clause, as
+// the usual copy of this query does. That matters HERE because this
 // modal's tablist uses ROVING tabindex: the inactive tabs are enabled,
 // non-disabled <button>s that Tab cannot reach. Without the exclusion they'd
 // match `button:not([disabled])`, so the trap's first/last boundary could land on

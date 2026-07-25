@@ -12,7 +12,8 @@
      on Paper.
    • z-index 9999 instead of the mock's 4200 — the house layer the editor's
      own floating toolbar already uses (rich-text-editor.module.css), above
-     the LessonModal scrim (chrome.css z:170) and the appearance menus (150).
+     the editor dialog's scrim (chrome.css z:170) and the appearance menus
+     (150).
    • A dark-TONE variant (mock defect #5): the v2 chrome tone axis, dual-
      scoped exactly like app/chrome.css (`:root[data-tone="dark"]` for the
      app-wide host + `.home[data-tone="dark"]` for the home surface).

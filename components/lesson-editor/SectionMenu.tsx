@@ -20,9 +20,10 @@ import styles from "./lesson-editor.module.css";
 // ── Shared dismissal hook ────────────────────────────────────────────────
 // Closes a popover on pointerdown outside `ref` and on Escape. The Escape
 // listener registers in the CAPTURE phase and stops propagation so closing
-// a menu never also closes the hosting LessonModal (which listens for
-// Escape in the bubble phase — C's contract: the modal closes ONLY via
-// Exit or Esc, and a menu's Esc must be consumed first).
+// a menu never also closes the dialog hosting the editor (ExplorerShell
+// listens for Escape in the bubble phase on `window` — the innermost-first
+// contract: one Esc closes one thing, and a menu's Esc must be consumed
+// first).
 export function useDismissableMenu(
   open: boolean,
   onClose: () => void,

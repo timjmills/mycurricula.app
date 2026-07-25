@@ -43,8 +43,14 @@ import {
 /** The imperative surface consumers reach through `useUnitWorkspace()`. */
 export interface UnitWorkspaceActions {
   /** Open the workspace on a unit — or switch the open workspace to another
-   *  unit, which never closes or remounts it. */
-  openUnitWorkspace: (subjectId: SubjectId, unit: string) => void;
+   *  unit, which never closes or remounts it. Pass `focusLessonId` (B5.7) to
+   *  open it on a LESSON instead: the same workspace, mounted in its Lesson
+   *  mode with that lesson pinned. Works for a lesson with no unit. */
+  openUnitWorkspace: (
+    subjectId: SubjectId,
+    unit: string,
+    focusLessonId?: string,
+  ) => void;
   /** Close the workspace (no-op when it is already closed). */
   closeUnitWorkspace: () => void;
 }
@@ -136,6 +142,7 @@ export function UnitWorkspaceHost(): ReactNode {
     <UnitExplorer
       subjectId={target.subjectId}
       unit={target.unit}
+      focusLessonId={target.focusLessonId}
       onClose={closeUnitWorkspace}
       onUnitChange={openUnitWorkspace}
     />

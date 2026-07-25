@@ -16,10 +16,11 @@
 // components/catchup-v2/modal-state.ts, which solves the same hazard at two
 // entry points.
 //
-// The open state is a TARGET, not a boolean: the workspace is always scoped to
-// a (subject, unit) pair, and the rail navigates between units WITHOUT closing —
-// the host re-renders with a new target rather than remounting (UnitExplorer's
-// `onUnitChange` contract).
+// The open state is a TARGET, not a boolean: the workspace is scoped to a
+// (subject, unit) pair — optionally focused on ONE lesson within it (B5.7) —
+// and the rail navigates between units WITHOUT closing: the host re-renders
+// with a new target rather than remounting (UnitExplorer's `onUnitChange`
+// contract).
 //
 // SSR-safe: module scope touches no `window` / `document`, and the subscriber
 // hook returns the closed default on the server and on the first client paint,
@@ -36,8 +37,25 @@ import type { SubjectId } from "@/lib/types";
 export interface UnitWorkspaceTarget {
   subjectId: SubjectId;
   /** The unit identifier as it appears on `Lesson.unit` (a slug, e.g. "u-m3") —
-   *  the same value <UnitExplorer unit=…> takes. */
+   *  the same value <UnitExplorer unit=…> takes. May be `""` for a lesson that
+   *  is not filed under any unit (see `focusLessonId`). */
   unit: string;
+  /**
+   * B5.7 — open the workspace ON A LESSON rather than on the unit: the
+   * workspace mounts straight into its Lesson mode (the Lesson Planner) with
+   * this lesson pinned, instead of the unit roll-up.
+   *
+   * This is what makes the workspace a complete replacement for the retired
+   * centered lesson-editor popup. That popup worked for ANY lesson, including
+   * one with no unit at all — and unfiled lessons are not an edge case: EVERY
+   * lesson created in-app starts unfiled (`lib/planner-store` addLesson passes
+   * `unit: ""`, which the Supabase source maps to a null `unit_id`). So a
+   * lesson entry point cannot be routed through a unit: it would strand exactly
+   * the lessons a teacher just made. The Lesson Planner needs only the lesson,
+   * so it opens regardless; the unit is carried alongside purely so the
+   * workspace can offer the Unit ⇄ Lesson switch when one resolves.
+   */
+  focusLessonId?: string;
 }
 
 let target: UnitWorkspaceTarget | null = null;
@@ -57,20 +75,33 @@ export function getUnitWorkspaceTarget(): UnitWorkspaceTarget | null {
  * point calls (a Day card's unit name, a Week chip, Year, the Hub), and the
  * `onUnitChange` handler the rail navigates through.
  *
- * Re-opening the unit ALREADY open keeps the existing target object, so a repeat
- * click emits nothing: subscribers keep their identical value and every memo
- * derived from the target survives. That matters for the rail, which reports the
- * active unit on every click including the one already showing.
+ * `focusLessonId` (B5.7) opens it on a LESSON instead: same workspace, mounted
+ * in Lesson mode with that lesson pinned. Omit it for the unit roll-up.
+ *
+ * Re-opening the SAME target keeps the existing object, so a repeat click emits
+ * nothing: subscribers keep their identical value and every memo derived from
+ * the target survives. That matters for the rail, which reports the active unit
+ * on every click including the one already showing. `focusLessonId` is part of
+ * that identity — re-opening the unit the rail is already on, from a LESSON
+ * entry point, has to switch the workspace into Lesson mode, so it is a real
+ * change even though the unit did not move.
  */
-export function openUnitWorkspace(subjectId: SubjectId, unit: string): void {
+export function openUnitWorkspace(
+  subjectId: SubjectId,
+  unit: string,
+  focusLessonId?: string,
+): void {
   if (
     target !== null &&
     target.subjectId === subjectId &&
-    target.unit === unit
+    target.unit === unit &&
+    target.focusLessonId === focusLessonId
   ) {
     return;
   }
-  target = { subjectId, unit };
+  target = focusLessonId
+    ? { subjectId, unit, focusLessonId }
+    : { subjectId, unit };
   emitTarget();
 }
 

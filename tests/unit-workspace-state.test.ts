@@ -100,6 +100,64 @@ describe("open target", () => {
   });
 });
 
+describe("lesson focus (B5.7)", () => {
+  it("carries the focused lesson on the target", () => {
+    openUnitWorkspace("math", "u-m3", "m-12-0");
+    expect(getUnitWorkspaceTarget()).toEqual({
+      subjectId: "math",
+      unit: "u-m3",
+      focusLessonId: "m-12-0",
+    });
+  });
+
+  it("opens a lesson with NO unit", () => {
+    // The case that decides whether the workspace can replace a lesson popup:
+    // every in-app-created lesson starts unfiled (planner-store addLesson
+    // passes `unit: ""`). If this could not open, "Open in editor" would dead-
+    // end on exactly the lessons a teacher just made.
+    openUnitWorkspace("writing", "", "new-lesson-1");
+    expect(getUnitWorkspaceTarget()).toEqual({
+      subjectId: "writing",
+      unit: "",
+      focusLessonId: "new-lesson-1",
+    });
+  });
+
+  it("omits the key entirely for a unit open", () => {
+    // Not `focusLessonId: undefined` — the absent key is what tells the host
+    // to render the unit roll-up, and it keeps the unit-entry target shape
+    // byte-identical to before B5.7.
+    openUnitWorkspace("math", "u-m3");
+    expect("focusLessonId" in (getUnitWorkspaceTarget() ?? {})).toBe(false);
+  });
+
+  it("re-opening the SAME lesson keeps the same target object", () => {
+    openUnitWorkspace("math", "u-m3", "m-12-0");
+    const first = getUnitWorkspaceTarget();
+    openUnitWorkspace("math", "u-m3", "m-12-0");
+    expect(getUnitWorkspaceTarget()).toBe(first);
+  });
+
+  it("switching lessons WITHIN the open unit replaces the target", () => {
+    // The identity check has to include the lesson: without it, opening a
+    // second lesson in the unit already on screen would no-op and the
+    // workspace would silently keep showing the first one.
+    openUnitWorkspace("math", "u-m3", "m-12-0");
+    const first = getUnitWorkspaceTarget();
+    openUnitWorkspace("math", "u-m3", "m-12-1");
+    expect(getUnitWorkspaceTarget()).not.toBe(first);
+    expect(getUnitWorkspaceTarget()?.focusLessonId).toBe("m-12-1");
+  });
+
+  it("opening the unit itself drops a focus the target was carrying", () => {
+    // Rail navigation calls the 2-arg form. Landing on the unit a lesson was
+    // focused in must show the unit, not silently keep the lesson.
+    openUnitWorkspace("math", "u-m3", "m-12-0");
+    openUnitWorkspace("math", "u-m3");
+    expect(getUnitWorkspaceTarget()?.focusLessonId).toBeUndefined();
+  });
+});
+
 describe("single-renderer election", () => {
   it("hands out unique ids", () => {
     const a = nextUnitWorkspaceHostId();

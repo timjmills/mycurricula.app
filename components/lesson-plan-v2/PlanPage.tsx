@@ -19,14 +19,19 @@
 // `usePlanner().setSaveTarget(id, "core")` is a store NO-OP, so a "save to Team"
 // affordance here would tell the teacher their edit reached the whole team when
 // nothing was written. Editing autosaves through the store's lazy-fork path;
-// the explicit Push-to-Team button stays where it works, in LessonModal /
-// DayEditSplit.
+// the explicit Push-to-Team button stays where it works, in DayEditSplit.
+//
+// B5.7 made this an ENTRY point as well as a mode: /weekly's "Open in editor"
+// opens the workspace straight onto a lesson here, replacing the retired
+// centered popup. So it must hold for lessons no unit describes — see
+// `siblings` and `unitName` below.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanner } from "@/lib/planner-store";
-import { unitLessons, resolveUnitHeader } from "@/lib/year-v2-data";
+import { unitLessons } from "@/lib/year-v2-data";
+import { unitDisplayName } from "@/lib/unit-name";
 import {
   ExplorerShell,
   type ExplorerMode,
@@ -95,18 +100,23 @@ export function PlanPage({
   const lesson = getLesson(activeId);
   const subject = lesson ? subjectById[lesson.subject] : undefined;
 
-  // The unit's lessons drive the picker + the "n of N in sequence" stat. Both
-  // degrade to a single-lesson list when the lesson has no catalog unit.
+  // The unit's lessons drive the picker + the "n of N in sequence" stat.
+  //
+  // An UNFILED lesson (`unit === ""`) is not in a sequence at all, and every
+  // in-app-created lesson starts that way (`lib/planner-store` addLesson). Left
+  // to the generic filter it would collect every OTHER unfiled lesson in the
+  // subject — unrelated lessons from unrelated weeks — and present them as this
+  // lesson's unit, with a "7 of 23 in sequence" to match. It stands alone
+  // instead. A non-empty unit id that merely isn't in the catalog is NOT this
+  // case: those lessons do share a real unit row, so they still group.
   const siblings = useMemo(
-    () => (lesson ? unitLessons(allLessons, lesson.subject, lesson.unit) : []),
-    [allLessons, lesson],
-  );
-  const header = useMemo(
     () =>
       lesson
-        ? resolveUnitHeader(subjectById, units, lesson.subject, lesson.unit)
-        : null,
-    [subjectById, units, lesson],
+        ? lesson.unit
+          ? unitLessons(allLessons, lesson.subject, lesson.unit)
+          : [lesson]
+        : [],
+    [allLessons, lesson],
   );
 
   // ── Deleted-while-open guard ────────────────────────────────────────────
@@ -148,7 +158,12 @@ export function PlanPage({
   const seqIndex = siblings.findIndex((l) => l.id === activeId);
   const seqLabel = seqIndex >= 0 ? `${seqIndex + 1}/${siblings.length}` : `1/1`;
   const standardCode = lesson.standards[0] ?? "—";
-  const unitName = header?.name ?? lesson.unit;
+  // `null` when the lesson is unfiled or its unit id doesn't resolve — the
+  // subtitle then omits the crumb entirely. The old `?? lesson.unit` fallback
+  // printed the raw id, which under Supabase is a UUID: exactly the leak
+  // `lib/unit-name` exists to prevent (chrome sweep MAJOR-1), and B5.7 made it
+  // reachable by letting an unfiled lesson open this surface directly.
+  const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
 
   // ── Embedded host — chromeless scrolling workspace ──────────────────────
   // Passes `showMeta`: the embedded host has no shell header/subtitle/stat strip,
@@ -199,19 +214,29 @@ export function PlanPage({
       }
       subtitle={
         <>
-          {subject.name} ·{" "}
-          {onModeChange ? (
-            <button
-              type="button"
-              className={styles.unitLink}
-              onClick={() => onModeChange("unit")}
-            >
-              {unitName}
-            </button>
-          ) : (
-            unitName
-          )}{" "}
-          · {LESSON_STATUS_LABEL[status]}
+          {subject.name}
+          {/* The unit crumb drops out entirely for an unfiled lesson — an empty
+              segment between two separators reads as a missing word, and a raw
+              unit id reads as a bug. Subject and status still orient the
+              teacher. */}
+          {unitName ? (
+            <>
+              {" · "}
+              {onModeChange ? (
+                <button
+                  type="button"
+                  className={styles.unitLink}
+                  onClick={() => onModeChange("unit")}
+                >
+                  {unitName}
+                </button>
+              ) : (
+                unitName
+              )}
+            </>
+          ) : null}
+          {" · "}
+          {LESSON_STATUS_LABEL[status]}
         </>
       }
       headerRight={
@@ -228,6 +253,15 @@ export function PlanPage({
       }
       mode="lesson"
       onModeChange={onModeChange}
+      // NEVER close on a background click — the same rule UnitExplorer states
+      // for the unit side of this dialog, which until now Lesson mode did not
+      // follow: a stray click behind the SAME modal closed it in one mode and
+      // not the other. This body is an editor. B2's fields debounce and B5.7
+      // made this the surface /weekly's "Open in editor" opens, replacing a
+      // popup whose header called out exactly this hazard ("a scrim click
+      // mid-resize must never eat their work-in-progress"). ✕ and Escape both
+      // still close, so nothing is trapped.
+      closeOnScrimClick={false}
       onClose={handleClose}
       body={body}
       footer={

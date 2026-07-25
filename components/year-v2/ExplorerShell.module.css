@@ -54,7 +54,7 @@
 .modal {
   /* 100% resolves to the scrim's PADDED grid cell (viewport − 2×24px), so the
      modal never overflows the 24px scrim margin on phones — the "9px clip at
-     375" trap that a flat 96vw hits (LessonModal's proven fix). The 820px cap
+     375" trap that a flat 96vw hits. The 820px cap
      still wins on wide viewports. */
   width: min(820px, 100%);
   max-height: 92vh;
