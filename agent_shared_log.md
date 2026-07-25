@@ -4864,3 +4864,585 @@ Also seen while probing, for whoever owns them:
 baseline is stale — other lanes have added suites since). §4a Codex gate run four
 times under `--sandbox read-only` with the diff piped via stdin; closed with one
 refuted High and no outstanding legitimate Medium-or-above in these files.
+
+### Addendum — fix-tooltip-and-sweep (close-out)
+
+Both Tooltip commits survived the concurrent traffic and are intact at HEAD (`pointerEngaged`,
+`tooltipPointerPolicy`, `handleBubbleMouseDown` all present; verified with `git show HEAD:`).
+
+**A collision worth knowing about, since it broke a probe for everyone.** The auth-hop refactor
+(`798e7e7` / `7354c97`) rewrote the login block inside `scripts/probe-tooltip.mjs` — a file
+another lane owned — but did **not** add the matching
+`import { bypassLogin } from "./lib/auth.mjs";`. The probe died at runtime with
+`ReferenceError: bypassLogin is not defined`. `node --check` does NOT catch this: a missing
+binding is a runtime error, not a syntax error, so a syntax check passes on a file that cannot
+run. I repaired the import (and dropped the now-dead token read); it went in with that lane's
+own commit. **`scripts/probe-4b-consolidated.mjs` is still broken the same way** — it calls the
+helper with no import. Untracked, not my file, so flagging rather than touching it. Sweep for
+this whenever a shared helper is extracted: `grep -L 'lib/auth.mjs' $(grep -l bypassLogin scripts/probe-*.mjs)`.
+
+**Probe reliability.** Whichever section ran FIRST kept failing — a different one each run — as
+it paid /weekly's cold compile plus the 11–16s store hydrate out of its own budget on a shared
+server. Added a `warmRoute()` that pays that once up front. Under heavy contention (two probe
+processes at once) sections still flake; **every check has passed on a quiet server**, and the
+two defect-specific checks — a full delivered click on the page for a focus-opened bubble, and
+the pre-fix A/B denying that same element the same click — passed on three separate runs.
+
+**A near-miss worth recording.** One run reported the `required` (Personal/Team) tooltip failing
+to open, which would have been a real regression in the safety-critical always-on tooltip. Before
+reporting it I checked whether the buttons were even there: all four chrome buttons present and
+visible, and `required` passed on the next clean run. It was probe contention. **A live FAIL on a
+loaded shared dev server is a hypothesis, not a finding** — re-run it alone before it goes in a
+report. [[dev-hydration-audit-trap]]
+
+**Job 2 status, stated honestly:** the three audit lanes I dispatched (data layer / editor UI /
+shell+host) did not return findings before this lane closed. What is reported above under JOB 2
+is what I verified MYSELF at HEAD, and it is NOT a complete B1–B5 sweep. Unswept ground I did not
+reach: the `unit_assessments` migrations (GRANT/REVOKE vs policy coverage, `SECURITY DEFINER`
+search_path, WITH CHECK), draft-loss on dismissal across the B2/B3 editors, and the B5 host
+lifecycle. Treat those as UNAUDITED, not clean.
+
+### Addendum 2 — the three audit lanes landed; I validated before passing anything on
+
+All three returned complete. **Validating them against CURRENT HEAD (`125f57f`) rather than the
+`21e511d` they pinned changed the verdict on five findings** — four already fixed, one refuted.
+Passing the raw lists on would have sent lanes to re-fix landed work, which is the incident this
+repo has already had twice.
+
+**ALREADY FIXED — do not re-fix:**
+- The sweep's only CRITICAL (ToggleGroup arrow-keys wrapping from "Summative" past "None" and
+  nulling all four assessment columns) is closed by `e7e169c` (primitive: any group holding a
+  `destructive` option switches to focus-only arrows) + `f3609bc` (the Kind callsite opts in).
+- The related HIGH (clicking the ALREADY-ACTIVE option fires `onChange` → `hasContent` true →
+  spurious lazy fork) is closed by the same work: `select` at HEAD is documented "Never fires for
+  the option that is already active."
+- `PlanPage` missing `closeOnScrimClick={false}` — the B5.7 lane landed it; HEAD:264 has it.
+- The data lane's own C1 (zero-lesson grade discards catalog) and H6 (non-settling send wedges a
+  queue key) were fixed in a concurrent lane's uncommitted work; that lane re-checked and said so.
+
+**REFUTED:** `ToggleGroup.tsx:181` referencing an undefined `styles.optionLabel` — the class IS
+defined in the module CSS at HEAD (1 use, 1 definition).
+
+**PREMISE STALE, finding needs re-derivation:** the shell lane's H3 (two live `aria-modal` dialogs
+via `HubDocHost` mounting `UnitExplorer` outside the election) rests on "`closeUnitWorkspace` has
+ZERO callers outside the host folder". False at HEAD — `HubDocHost.tsx:83,115` calls it precisely
+to close the global workspace before opening its own. The scroll-lock refcount issue may survive
+that; the two-dialogs-at-once repro probably does not.
+
+**CONFIRMED OPEN at HEAD (verified myself, not taken on trust):**
+- **HIGH — `fork-diff-panel.tsx:200-213` "Propose to Team" proposes nothing.** It is
+  `setEditMode("master"); onClose();`. Same family as the save-target dialog and the removed
+  Push-to-Team — the *fourth* instance of the documented `§5.2` hazard.
+- **HIGH — `workspace-state.ts:110-131` the open target survives provider unmount.** Module-level
+  `target`, cleared only by an explicit `closeUnitWorkspace()`; `useUnitWorkspaceTarget` re-reads
+  it in its mount effect. Leave the (planner) group with the workspace open (→ /settings, /teach)
+  and it resurrects on return, over a surface it was never opened from. Nothing closes on
+  navigation, so Android Back navigates the route *underneath* the dialog.
+
+The editor lane's extension of the save-target finding is the sharpest thing in the three reports
+and I confirmed the mechanism: **the dialog is decorative in BOTH branches.** `editLesson` already
+persisted the edit before the dialog opened, and `saveTargetRef` is re-derived from `editMode` on
+every render, so no per-lesson save target is read at persist time. Repairing the reducer alone
+would not make the button work.
+
+**Method note for whoever reads the raw lane reports:** all three pinned `21e511d` and audited for
+hours while six lanes committed on top. Their line numbers are `21e511d`; mine are HEAD; we
+diverge by ~10 lines in `supabase-source.ts` and agree exactly on 1438/1472/1523. Every finding in
+those reports needs a HEAD re-check before routing, not just the five above.
+
+### Addendum 3 — keyboard dismissal: the proposed fix is insufficient, and half of it would regress the fix just landed
+
+Measured in a STATIC page (no dev server, no app — these are browser semantics, so :3099's
+contention is irrelevant). Script: scratchpad `probe-kbd-mechanics.mjs`.
+
+```
+Q1  Tab from #trigger lands on: #after  → portal is NOT next in tab order
+Q1b reaching #dismiss took 4 Tab presses from the trigger
+Q2  #dismiss computed pointer-events: none — keyboard activation fired: ["dismiss","dismiss"]
+Q3  elementFromPoint over #dismiss returns: BODY
+```
+
+**Q2 is the important one: keyboard activation fires `click` straight through
+`pointer-events: none`.** Keyboard activation is not hit-tested. So making the bubble
+pointer-interactive on keyboard-open — half of the proposed shape — buys keyboard users
+NOTHING and re-opens the click-swallow this lane just closed. Do not do it.
+
+**Q1 kills the other half on its own terms:** the bubble is portaled to `document.body`, so
+sequential focus reaches it only after every focusable between the trigger and the end of the
+document (4 hops in a 6-element page; in the app, hundreds). And `handleBlur` unmounts it on the
+first of those hops. A `relatedTarget` blur guard is therefore **necessary but not sufficient** —
+shipped alone it is dead code, because nothing can ever move focus into the bubble.
+
+**The only missing piece is REACH, and the obvious way to get it is worse than the bug.**
+Capturing Tab on the trigger would insert an extra tab stop after **every one of the ~328
+`tooltipId` callsites** — a keyboard user crossing the top bar would hit
+Search → "Turn off these tips" → To-dos → "Turn off these tips" → … Doubling the keyboard journey
+app-wide is a heavier a11y cost than the Low it fixes.
+
+**The viable design** is a key on the trigger that calls `dismiss()` directly — no focus movement,
+no tab-order change, no pointer-policy change, ~6 lines. Two things gate it, which is why this
+lane did not ship it unilaterally:
+1. **Key choice is an i18n hazard here.** `Alt+Shift+*` is the Windows keyboard-layout switch and
+   `Ctrl+Alt+*` is AltGr — both actively hostile on the Arabic layouts this deployment's first
+   school uses. Recommendation: **`Shift+Escape`** — Escape already means "close this tip", so
+   "close it for good" is a natural escalation, and it uses no printable key, so it is
+   layout-independent.
+2. **The handler MUST go through the existing `composeHandler`.** `ToggleGroup` options are
+   wrapped in `<Tooltip>` and own their arrow-key navigation; a naively injected `onKeyDown` would
+   clobber it — the exact surface where `e7e169c`/`f3609bc` just closed a data-loss Critical.
+   That interaction needs a live keyboard run, which tonight's server cannot give.
+
+Discoverability comes free: the bubble text is already the accessible description via
+`aria-describedby`, so a hint reads to screen-reader users and sighted keyboard users alike.
+
+### Class-sweep round 5 (fix-class-sweep) — commit `d0f7600`
+
+Two findings handed back by the B5.7 lane, both in `components/lesson-plan-v2/**`.
+
+**§4b precondition.** Verified at HEAD `23fc5ac` (the audit's line numbers came
+from `21e511d`, and HEAD moved twice more during the pass); all three target
+files CLEAN before editing; all reads via `git show HEAD:`.
+
+**H6 — `.section { overflow: hidden }` clipped every popover in the embedded
+editor. FIXED.** Confirmed the containment chain at HEAD:
+`LessonWorkspace.tsx:136` renders `<section className={styles.section}>` and
+`:752` mounts `<LessonEditor>` directly inside it, so `.menuPop` / `.colorPop`
+(`position: absolute`, z-index 40), PresetMenu's 230×320 `.presetMenu` and
+SectionMenu's Rename / Duplicate / **Delete** were all clipped.
+
+Chose the smaller of the lead's two candidates after establishing **what the
+clip was for**: `.section` has an 18px radius and `.secHead`'s hover fill would
+square off its top corners — and `.secBody` has no background of its own (just
+a `border-top`), so nothing else depended on it. The header now rounds itself,
+with an `[aria-expanded="false"]` variant for the collapsed state where the
+header IS the whole section. Cheaper than portalling, and the menus keep their
+normal DOM/focus order.
+
+**MEDIUM #8 — the mode switch discarded the expand state. FIXED.**
+`ExplorerShell.tsx:197` defaults `presentation = "modal"`; `UnitExplorer` passes
+it, `PlanPage` did not, and PlanPage's `headerRight` was just a status tag. So
+expanding the workspace and then clicking Lesson Planner snapped back to the
+820px dialog **with no ⤢ to undo it** — recoverable only by returning to Unit
+mode. Threads `useWorkspacePresentation()` (called above the `missing` /
+`embedded` early returns — hooks cannot be conditional) and renders the toggle
+beside the status tag.
+
+**Gates.** Codex §4a on the exact diff — **NO BLOCKING ISSUES**, asked
+specifically about descendants escaping the radius once the clip is gone, the
+reliability of the `aria-expanded` selector, `calc(var(--r-lg) - 1px)` with a
+non-px token, stacking-context consequences, the conditional-hook question, and
+whether any path can reach `presentation: "full"` with no control to unset it.
+`tsc` clean · eslint clean · **1221 passed / 68 todo / 0 failed**.
+
+**§4b live — real Chrome, paper frame, 1440px: 5/5.**
+- ⤢ present in Lesson mode (`aria-label="Expand to the full workspace"`).
+- Toggling it moves the dialog **820px → 1440px** (the behaviour, not just the
+  control).
+- Popover measured **106px visible of 106px layout = 100%**, and `.section` is
+  **gone from the clipping-ancestor chain** — the remaining entries are
+  `ExplorerShell_body` (`auto/auto`) and `ExplorerShell_modal` (`hidden/hidden`).
+- No page errors.
+
+**Scope honesty:** the measured popover was the **106px ⋯ menu, not the
+200–320px preset menu**. ExplorerShell's `.body` (`overflow-y: auto`, :270) and
+`.card` (`overflow: hidden` + 32px radius, :68) still bound the dialog, so a
+TALL menu opening near the bottom edge is now **scroll-reachable rather than
+fully visible**. Portalling the popovers to body with fixed positioning (the
+StandardsPicker idiom) is the complete fix; it needs the lesson-editor `.tsx`
+files, which this lane does not own. Recorded in the CSS comment at the fix site.
+
+**Probe lessons worth keeping (four dead ends before a green run):**
+1. **`/weekly` on the DEFAULT glass frame renders `WeekA`, which has no
+   `weekly-lesson-card` and therefore no "Open in editor".** That opener
+   (`weekly-lesson-card.tsx:1615`) only exists on the **paper** frame
+   (`WeeklyShell:1305` → `WeekColumns`). Same trap as `/year`: the frame axis
+   decides which component tree exists, so a probe must seed the frame
+   (`mc-theme-axes` cookie + `mycurricula:user:theme-frame` in localStorage)
+   before asserting a component is missing.
+2. **A synthetic `dispatchEvent(new MouseEvent("click"))` selected the card but
+   never expanded it; a real Playwright `.dblclick()` did.** Card expansion is
+   double-click (`WeekColumns` handleSelect vs the force-open path). Drive real
+   pointer events, and try click → dblclick → Enter rather than assuming.
+3. The opener lives inside `{expanded && …}` — so the probe must expand first.
+4. A mid-run `ERR_CONNECTION_REFUSED` was **another lane restarting the dev
+   server** (new PID on 3099), not a defect. Checked the port before concluding
+   anything, and did not start a competing server.
+
+---
+
+## Overlay + a11y audit fixes (fix-overlay-audit)
+
+Six audit findings against `master` **`c1190f7`**. Verified against HEAD, not the tree —
+three other lanes were saving into this checkout throughout, and the dev server on :3099
+serves their uncommitted work.
+
+```
+git rev-parse --short HEAD                          -> c1190f7
+git diff HEAD --stat -- components lib app          -> 23 files, ALL other lanes'
+git show HEAD:components/hub-v2/HubDocHost.tsx      -> the reviewed text
+```
+
+**FIXED (5).**
+
+1. **HubDocHost's un-elected `<UnitExplorer>` — kept the Hub's no-rail contract.**
+   Routing it through `openUnitWorkspace()` is a dead end: `UnitWorkspaceHost` passes
+   `onUnitChange` UNCONDITIONALLY and `UnitExplorer:219` derives `workspaceEnabled` from
+   exactly that prop, so anything through the host gets the rail + expand toggle by
+   construction. Suppressing it needs new props on two files this lane does not own. So
+   HubDocHost holds the invariant itself — *while its explorer is open, the global target is
+   null* — via a closing effect plus a render gate. The gate is what fixes the body-scroll
+   half: it puts the global unmount and the Hub mount in SEPARATE commits, and React runs
+   all destroys before all creates, so the global teardown restores `overflow` before this
+   shell captures it. **No ExplorerShell edit was needed.**
+2. **Paper-Year `.uws` hover-only on touch** — new `@media (min-width: 901px) and
+   (pointer: coarse)` block. Did NOT adopt the <=900px branch wholesale: that sends the chip
+   `position: static`, and all-scope cards measure **86px live** (the design comment says
+   95px), so a 44px column would leave ~42px for the unit name. The chip stays absolute and
+   26px PAINTED, and earns its target from an `inset: -10px` ::after. **-10, not -9:** at -9
+   the live measurement was 43x43, because the chip sits at `top/right: 4px` in a flex-sized
+   card and can start on a fractional pixel. A target specified AT the minimum measures
+   under it.
+3. **Day EDIT had no unit affordance** — `<UnitChip>` replaces `<span>{sel.unit ||
+   "Planned"}</span>` in `DayEditSplit`'s meta row (a raw id when set, the non-word
+   "Planned" when not), matching WeekEditBoard's placement.
+4. **Single-key nav behind a modal** — `isModalOpen()` bails on
+   `[role="dialog"][aria-modal="true"]`, placed BELOW the Cmd-K branch so the palette can
+   still toggle shut. `aria-modal="false"` popovers (InstanceRename) deliberately
+   unaffected.
+5. **Two stale comments** (`year-v2/index.ts`, `YearShell.tsx`). The third
+   (`workspace-state.ts`) was routed to the lead as text — not my file.
+
+**DROPPED / CORRECTED (4) — the audit was wrong on these:**
+
+- **The HIGH's repro is NOT reachable today.** "Open a unit doc in the Hub while the global
+  dialog survives" cannot happen: `.ue-scrim` is `position: fixed; inset: 0; z-index: 600`
+  with a painted background and no `pointer-events: none`, so /planner is unreachable while
+  one is open, and the focus trap blocks the keyboard route. The *structural* claim is real
+  and the fix is worth having — it is a guard for when B5 widens reachability — but it is a
+  latent hazard, not a live bug. **Nothing on /planner calls the opener at all** (the only
+  three callsites are `unit-chip`, `YearShell`, `TimelineYear`).
+- **The Cmd-Z half of the LOW is mis-filed.** `lib/use-keyboard-shortcuts.ts` does not
+  handle Cmd-Z — its header says so and means it. Undo lives in
+  `components/shell/global-shortcuts.tsx`. It is also arguably CORRECT there: inside the
+  unit workspace a teacher IS looking at planner data, so undo is not invisible.
+- **`getUnitWorkspaceTarget` is not exported from the `year-v2` barrel**, only from
+  `workspace-host/index.ts`. Consumed solely by `tests/unit-workspace-state.test.ts`.
+- **`.uws` cards are 86px, not 95px** — the design comment's measurement has drifted.
+
+**Section 4a — Codex `0.144.4`, read-only sandbox, diff piped via stdin** (never staged: the
+index is shared and a bare `git add` once swept a sibling's 91 files). Three findings, all
+acted on:
+
+- **HIGH, legitimate, FIXED.** My gate read `useUnitWorkspaceTarget()`, which is SSR-lagged
+  BY DESIGN — null on the first client render even when a workspace is open. The gate was
+  blind on exactly the render that matters. Now
+  `subscribedTarget ?? getUnitWorkspaceTarget()`: the hook supplies reactivity, the getter
+  supplies first-render truth, and it fails safe in the racy direction. Safe here because
+  the subtree cannot exist at hydration (PlannerHub's `docs` starts empty).
+- **LOW, legitimate, FIXED — and my own comment had asserted the opposite.** `.deMeta span`
+  is a DESCENDANT selector and `Button` renders `<span class="label">` inside
+  (`Button.tsx:178`), so the inert-pill fill/padding/radius painted a second pill INSIDE the
+  chip. Now `.deMeta > span`, in both tone rules.
+- **MEDIUM, dismissed with reasons, recorded in code.** Cmd-K can still open the palette
+  over a dialog. Pre-existing; the Cmd-K branch's own comment says a modifier chord is
+  unambiguous INTENT (which is why it works inside text inputs). Fixing it means threading
+  palette state through the hook's public options — another surface's API.
+- **Re-review HIGH, knowingly left open.** The guard is a check, not a reservation: a
+  same-commit interleave could still mount both. The proper fix is atomic arbitration plus
+  `useSyncExternalStore` inside `workspace-state.ts` — **a file this lane may not edit** —
+  and belongs with the refcounted body-scroll-lock work (task #16). Unreachable meanwhile,
+  for the "nothing on /planner calls the opener" reason above. Recorded in the file header.
+
+**Section 4b live — `scripts/probe-overlay-audit.mjs`** (new, untracked; real Chrome via
+`channel: "chrome"`, :3099). **32/32, ALL PASS, exit 0** in one clean run — though it took
+several attempts to GET a clean run, because the shared dev server was unusable in stretches
+(see below).
+
+```
+[fine]   opacity=0 - position=absolute - grid/all - 52 openers
+[coarse] pointer:coarse=true - opacity=1 - hit=45x45 painted=26x26
+         card width fine=86px coarse=86px  (static-column damage NOT inflicted)
+[day-edit] inEdit=true chips=1 - chip opens EXACTLY ONE dialog
+[shortcuts] nav SUPPRESSED behind dialog - Cmd-K still opens palette - Escape closes
+            - nav RESUMES -> /weekly
+[hub]    {"dialogs":1,"scrims":1,"rails":0,"expandToggles":0,"overflow":"hidden"}
+         - 52 unit cards - no-rail contract holds
+```
+
+**THREE probe bugs caught before they became false evidence — all of the "green while
+measuring the wrong thing" family. Worth internalising:**
+
+1. **A one-shot Playwright click races hydration.** It fires as soon as the button is
+   VISIBLE, i.e. on SSR HTML. The Edit toggle no-op'd, the page stayed in VIEW mode — where
+   DayA/B/C render one chip PER LESSON — and a `chips >= 1` assertion went **GREEN on 6
+   view-mode chips**, testing a surface the change never touched. Now every mode-changing
+   click polls React's own acknowledgement (`aria-pressed` / `aria-current`) and retries,
+   and the assertion is `inEdit && chips === 1`.
+2. **`[class*="railLayout"]` is not the rail.** ExplorerShell applies that wrapper when a
+   rail **OR a drawer** is supplied, and the Hub legitimately has the B3 drawer — so it
+   reported `rails: 1` with no rail on screen. The rail's own accessible name
+   (`nav[aria-label="Unit and lesson navigator"]`) reports 0, correctly.
+3. **`[class*="expandBtn"]` is not the expand toggle.** The B3 drawer toggle reuses that
+   exact class (`UnitExplorer.tsx:573`, `data-ue-drawer-toggle`). Match the accessible name.
+
+**A hashed CSS-module class is a LAYOUT hint, not a semantic marker. Assert on the
+accessible name.**
+
+**ENVIRONMENT — :3099 was not continuously usable, and it was not my code.**
+`components/year-v2/drawer/AssessmentsPanel.tsx` was saved mid-edit with a JSX syntax error
+(`Expected '</', got 'jsx text'`), and every route pulling the planner layout served SSR
+HTML with `document.body.innerText.length === 0` for 40s+. Later, repeated
+`ChunkLoadError: Loading chunk app/(planner)/layout failed (missing: .../layout.js)` and
+`pageerror: Invalid or unexpected token` — a `.next` clobbered mid-serve. **Both look
+exactly like the false "SSR hang" that cost a day.** The tell that it is not your code: even
+a raw JS `.click()` does nothing, because React never attached. Console-error assertions now
+exclude these BY NAME and always print the raw list, so noise is never silently swallowed.
+
+Working-tree gates at the time of writing, **none in my files**: `tsc` red in
+`lib/planner-store.tsx` / `lib/use-school-week.ts` / two `tests/planner-*.test.ts`; `lint`
+red with a parse error in `lib/planner-store.tsx`; `npm run test` 1125 passed / 2 failed in
+`tests/planner-doc-replay.test.ts` (a completion-event `patch` -> `status` reshape). My
+files were clean on every gate that completed.
+
+**FOR THE LEAD:**
+1. `workspace-state.ts` comment text (routed by message) — the election covers HOSTS, not
+   rendered dialogs, and cannot see HubDocHost.
+2. Task #16 (refcounted body-scroll lock) is **wider than ExplorerShell**: `CatchUpModal`,
+   `LessonModal`, `ResourceComposer`, `Lightbox`, `NotecardFullscreen`, `SchedulePanel`,
+   `command-palette` and `app/settings/layout.tsx` all capture/restore
+   `body.style.overflow` independently. Any two overlapping in the wrong order strand the
+   page unscrollable.
+3. Task #23 (`pointer:` -> `any-pointer:`): this new rule is a deliberate **category A** — a
+   hybrid laptop reports `pointer: fine`, can hover, and already reaches the chip; widening
+   would paint it over the unit title for every hybrid user to fix a path that is not broken
+   for them.
+
+## Onboarding persistence + school-week (fix-onboarding-persist)
+
+**§4b precondition.** Measured tree: HEAD at start `c030e7e`, HEAD at commit-time `6f0e737`
+(moved under me by sibling lanes); my work landed as **`6b9eabb`**. The dev server on
+**:3099** serves the WORKING TREE, which carried ~325 dirty files from seven lanes — every
+finding below was re-verified against my own files, and two transient failures I hit
+(an `Invalid or unexpected token` chunk parse on `/settings`, and one red run of
+`tests/subjects-personal-visibility.test.ts`) were **other lanes mid-save**, confirmed by a
+clean reload / re-run. I never claimed a behaviour without re-checking it after a clean load.
+
+### The reader/writer map (verified at HEAD, not off disk)
+
+**SCHOOL WEEK — before this change, two stores.**
+
+| Where | Direction | Store |
+|---|---|---|
+| `lib/planner/supabase-source.ts:163-231` `resolveSchoolWeek` | READ | **`schools.school_week`** (DB) — the day-index to weekday bridge for every lesson |
+| `lib/use-school-week.ts` `useSchoolWeek` | READ + WRITE | **localStorage** `mycurricula:team:school-week-days` |
+| `app/settings/calendar/page.tsx:505` | WRITE (`setDays`) | via the hook, so localStorage |
+| `components/onboarding-v2/steps/schedule-step.tsx:95` | WRITE (`setDays`) | via the hook, so localStorage |
+| 15 read-only consumers: `app/(planner)/schedule/page.tsx:31`, `app/settings/page.tsx:129`, `app/settings/schedule/page.tsx:386`, `components/catchup-v2/CatchUpModal.tsx:382`, `components/chrome/ChromeClock.tsx:113`, `components/daily/DailyView.tsx:178`, `components/daily/DayEditSplit.tsx:181`, `components/daily/NowLine.tsx:103`, `components/daily/TodayJumpButton.tsx:52`, `components/grid/WeeklyGrid.tsx:280`, `components/resource-wall-v2/ResourceWall.tsx:245`, `components/schedule/ScheduleColumn.tsx:73`, `components/schedule/ScheduleDayPane.tsx:91`, `components/schedule/SchedulePanel.tsx:115`, `components/week-v2/WeekA.tsx:127`, `components/week-v2/WeekC.tsx:134`, `components/weekly/WeekColumns.tsx` | READ | via the hook |
+| `supabase/migrations/20260518102823_initial_schema.sql:190` | schema | `school_week weekday[] not null default array['sun','mon','tue','wed','thu']` |
+
+**The finding is confirmed and was a live bug.** The lead's framing was right.
+
+**SCHEDULE / ROTATION — one store, and the comments oversold it.**
+
+| Where | Direction | Store |
+|---|---|---|
+| `lib/use-schedule-settings.ts` `useScheduleRotation` | R/W | localStorage `mycurricula:team:schedule-rotation` |
+| `lib/use-schedule-settings.ts` `useScheduleBlocks` | R/W | localStorage `mycurricula:user:schedule-blocks` |
+| `app/settings/schedule/page.tsx` | WRITE | via those hooks |
+| onboarding schedule step | WRITE | `data.rotation` only, then a one-time lazy seed |
+
+There is **no rotation column or table**. `time_blocks` exists in the schema but nothing reads
+or writes it from the client.
+
+### FIX 1 — school-week split-brain: **CLOSED, and it needed no migration**
+
+`schools.school_week` has existed since the initial schema; `authenticated` already holds
+SELECT **and UPDATE** on `schools` (verified read-only against prod via
+`information_schema.role_table_grants`), and `schools_write USING/WITH CHECK
+is_school_admin(id)` is the real gate. `auth_teacher_school_id()` and `is_school_admin(uuid)`
+are both EXECUTE-granted to `authenticated`. So the DB is now the single source of truth and
+localStorage drops to a cache. **No DDL was authored and nothing was applied.**
+
+New `lib/school-week-remote.ts` (read/write/scope seam) and `lib/school-week-settle.ts` (a
+pure, node-tested decision leaf). School resolution **mirrors `supabase-source` branch for
+branch** (MULTI_WORKSPACE goes through `auth_teacher_school_id()`, else `teachers.school_id`) —
+resolving a different school here would have rebuilt the same bug one layer down.
+
+A refused write is **reported, never swallowed**: PostgREST returns zero rows (not an error)
+when RLS filters an UPDATE, so the write asks for its row back and treats an empty result as
+"you are not a workspace admin".
+
+**Eight adversarial rounds.** Codex found real defects in every one of the first seven — this
+is not a thing that is correct on the first try:
+
+- **R1** out-of-order writes; a stale read clobbering a newer edit; a rejected week surviving in
+  the cache; an unscoped module cache; finishing while denied.
+- **R2** the write resolving its workspace at execution rather than click time; an in-flight
+  read/write settling into the wrong workspace; a superseded SUCCESS not recording what the DB
+  now held.
+- **R3** a read overwriting `remoteState` after a successful write; a consumer mounting mid-read
+  accepting a stale response; the unscoped localStorage cache used as a rollback target; **the
+  abort timeout falsely claiming "nothing was changed"** — it cannot know that.
+- **R4** a **cold-start write-queue deadlock** (High); the scope derived from the
+  freshness-gated week read; an unverified cache painted on the deployed path; save state stuck
+  at "saving" after a switch.
+- **R5-R7** unbounded re-resolution inside the save path; cross-tab cache adoption; a cache
+  REMOVAL event resetting an unrelated tab; an in-flight read surviving a refresh.
+- **R8: `NO BLOCKING ISSUES`.**
+
+Also fixed en route: **same-tab fan-out**. `storage` fires only on OTHER tabs, so persistent
+chrome (`ChromeClock`) and any already-mounted surface went stale until a full reload. A custom
+event now mirrors every persisted change to siblings in this tab.
+
+The misleading scope comments are corrected: `use-schedule-settings.ts` now says plainly that a
+`team:` prefix records the *intended* model, not the delivered one.
+
+### FIX 2 — the gate outliving its data: **partly closed, and I want a decision**
+
+After Fix 1 the map is **3 of 5 steps durable** (workspace goes to `rename_workspace`;
+schedule/week to `schools.school_week`; appearance to `teacher_preferences`), up from 2.
+
+**Courses and Year cannot be closed in this lane, and the wizard is not the defect.** Settings
+→ Subjects is localStorage — its own header says "localStorage-backed today" — and
+`use-academic-year` / `use-holidays` / `use-school-months` are all localStorage. Re-offering the
+wizard on a new device would make a teacher redo work that *still* would not persist. So I did
+**not** stop stamping `onboarded_at`; I made the claim honest instead:
+
+- `localOnly` was hardcoded `true` (stale: four things already reached the account). It now
+  derives from `isPlannerSupabaseConfigured()`.
+- New `ONBOARDING_PERSISTENCE` map: every recap row states where it actually lands, and the rows
+  that will not travel are named together. Lockstep-tested against the rows the summary renders.
+- The **School week row contradicts its own static caption** when the DB refused the write.
+  `saveState` is shared across hook instances precisely so the summary can see a write the
+  schedule step issued three steps earlier.
+- Finishing is **blocked while a team-wide write is in flight**, bounded by a 15s abort so it can
+  never trap anyone. A *refused* write does not block: the week has already rolled back to what
+  the DB holds, so nothing is unpersisted — the teacher simply is not an admin.
+
+**DECISION NEEDED:** closing courses and year properly means a `team_settings` table (or
+per-school columns) plus rewiring 4-6 hooks and their Settings surfaces. That is a wave, it needs
+DDL I must not apply, and it fixes Settings and the wizard together. **I authored no migration**
+per your timestamp-collision warning — say the word and I will.
+
+### FIX 3 — wording and discoverability: **both done**
+
+- `startScreenTour()` navigates to `/home` and nothing else. The button said "Take the tour" and
+  promised "a quick guided tour of each screen". Relabelled **"Go to Home"**; the seam's header
+  now reads **seam shipped, tour commissioned**.
+- `/onboarding`'s only in-app link was inside the keyboard-shortcuts overlay. Added a **"Setup
+  guide"** tile to `/settings`. Re-entry with a finished record now **restarts at step 1**,
+  keeping every saved answer — landing on "You're all set!" was a dead end for the one thing a
+  returning teacher comes to do.
+
+### Files touched outside my set (flagging as asked)
+
+`app/settings/calendar/page.tsx` + `page.module.css` (the school-week card has to report a
+refused write) and `app/settings/page.tsx` (the Setup-guide tile). Also `lib/onboarding-v2-shape.ts`
+and `lib/onboarding-v2-state.tsx` — the wizard's own core, clean at HEAD when I took them.
+
+### Verification (verbatim)
+
+- `npx tsc --noEmit` — clean for my files. The only errors are in `lib/planner-store.tsx`,
+  another lane's, mid-edit.
+- `npx next lint --no-cache` — `✔ No ESLint warnings or errors`
+- `npm run test` — `Test Files  59 passed (59)` / `Tests  1221 passed | 68 todo (1289)`
+- Live in real Chrome at :3099. Already-mounted `/weekly` grid:
+  `["Mon","Tue","Wed","Thu","Fri","Sat"]` then `["Sun","Wed"]` on a same-tab change with **no
+  reload and no navigation** (a 2-day week — the 5-day assumption is nowhere), then
+  `["Sun","Mon","Tue","Wed","Thu"]` on cache-clear. A rapid double preset change converges on
+  the last choice. At 375 / 768 / 1440, `documentElement.scrollWidth === innerWidth` at every
+  tier; weekday chips 44px; the longest copy (the RLS-denied message) fits at 375 with
+  `scrollWidth === clientWidth`. Console 0 errors.
+- Screenshots: `docs/screenshots/onboarding-persist/`
+
+### Left open — please read these
+
+1. **The DB path is UNPROVEN LIVE.** `.env.local` sets no `NEXT_PUBLIC_PLANNER_USE_SUPABASE`, so
+   :3099 is the **prototype path** — every live result above exercises the localStorage branch.
+   The `schools.school_week` read/write, the RLS denial, and the deployed-path summary branch all
+   need the **§4c flag-ON gate (task #11)**. I did not restart the server or touch env: one
+   server, seven lanes.
+2. **Orchestration tests are pure-only** (34 assertions across the settlement and scope leaves).
+   The network boundary — zero-row denial, the write queue, the abort — is not unit-tested; it
+   needs a mocked Supabase client. Codex kept this as a standing Medium and I agree it is real.
+3. **Pre-existing, on surfaces I touched.** Every `SettingsCard` hint column collapses to roughly
+   one word per line at 375px (visible in
+   `docs/screenshots/onboarding-persist/calendar-schoolweek-375.png`) — systemic to the card, not
+   to my change. And the wizard footer's `Back` / `Go to Home` are **40px** tall at 375
+   (`size="md"`), under the 44px rule — pre-existing, and adjacent to task #23.
+4. **Deliberate trade-off.** On the deployed path the cached week is no longer painted before its
+   scope is verified, so a brief default-week paint precedes the first server read. Chosen over
+   showing another tenant's week confidently. A scope-keyed cache written at sign-in would
+   restore the fast paint without reopening it.
+
+---
+
+## B5.7b — reachability + three false-success controls (build-b57-focuspop)
+
+Second commit from this lane, `ab06913`, on top of B5.7 (`d19169b`).
+
+**The reachability gap is closed, and the fix is one component.** `<UnitChip>` now
+renders in `components/list/ListRow`, which `WeeklyList` and `DailyList` both use. That
+single placement covers /weekly at ≤900px (where `showList = isNarrow || viewMode === "list"`
+is decided BEFORE the frame branch, so EVERY frame renders the list), /weekly's List toggle at
+any width, and /daily's List mode. Unconditional rather than opt-in — unlike
+`WeeklyLessonCard`'s `showUnitChip`, no ListRow host renders a unit affordance of its own, so
+there is no double-chip hazard, and the chip's own catalog guard means an unfiled lesson simply
+keeps the row it had.
+
+**Live proof, 29/29 assertions, real Chrome:** the List row opens exactly one workspace dialog
+at **375 (glass, paper)** and **768 (glass, color)**; chip measures **72×44** on phone and
+**88×44** on tablet (≥44px floor); zero document overflow; dialog inside the viewport at both
+widths; and **Enter and Space both open the workspace without the row also navigating**.
+
+**Three controls that lied, all removed under the same standing ruling.**
+1. The `SaveTargetDialog`'s **"Team Curriculum"** button — labelled "Updates the shared plan
+   for the whole team" with a "Shared" badge, reachable on any real inline edit, no `editMode`
+   gate, and the store's `case "setSaveTarget": if (action.target !== "personal") return doc;`
+   made it identical to Personal. Fourth instance of the §5.2 hazard; `6324fe8` had already
+   deleted the equivalent "Push to Team". **Removing it does not change what happens to the
+   edit** — `editLesson` persisted before the dialog opened, and both remaining paths call
+   `setSaveTarget(id, "personal")`, which is what sets the fork cue.
+2. The dialog's **"Cancel — dismiss without saving"** — dismissal was never a discard (the host
+   treats it as the Personal save). Now "Close", with copy that describes the confirmation it
+   actually is. Caught by the §4a gate, not by me.
+3. **"Add section"** (emitted `add-to-todo`) and **"Edit Template"** (emitted `print`) in the
+   expanded weekly card. Inert today, but `print` is on the cheapest-to-restore list, and
+   wiring it would have made a button labelled "Edit Template" start printing. The callsite
+   comment — re-point BEFORE implementing, never after — is the actual deliverable.
+
+**Two bugs found while fixing those.**
+- **The workspace target outlived its provider.** Module-level `target`, nothing cleared it, so
+  leaving the planner route group tore down the provider with the target still set — and
+  returning re-read it and popped the workspace open unbidden, on an abandoned unit, for the
+  rest of the session. Provider now clears on unmount and on any pathname change (so Back moves
+  the route and takes the dialog with it). Deliberately NOT in `releaseUnitWorkspaceHost` —
+  hosts are transiently absent during a re-election and clearing there would close the
+  workspace on an ordinary re-render. Two tests pin that split.
+- **`ListRow`'s key handler swallowed its own nested controls.** It fired on any bubbled
+  Enter/Space with no target check and `preventDefault()`s Space — which is exactly how a
+  native button activates. **This predates the chip:** the completion checkbox has always been
+  a nested `<button>`, so Space on it toggled nothing and navigated to /daily instead. Now only
+  the row's own activation counts, and `UnitChip` stops the two activation keys itself.
+
+**Gates.** §4a Codex, three rounds → **NO BLOCKING ISSUES**. It caught the keyboard bug and the
+"Cancel" mislabel; both fixed. One Medium **declined with reasons**: nested interactive content
+inside `div[role="button"]`. The pattern predates this diff, the file documents the tradeoff,
+and the proposed fix restructures a primitive shared by two surfaces — routed to the a11y lane
+rather than done here. tsc + lint clean on these paths; full suite green (1220).
+
+**Probe lesson, again.** The first run reported "Enter on the chip does not open the workspace"
+while Space passed one second later. Not a bug — the hydration gate polled for the chip's
+PRESENCE, and the rows are server-rendered, so the chip exists ~90ms in while React needs ~13s.
+**Prove interactivity with a real click before testing keys**; presence in the DOM is not
+readiness.
+
+**Not in this commit:** `components/lesson-plan-v2/PlanPage.tsx` — another lane is mid-edit on
+the expand-state fix (MEDIUM #8), so it is deliberately excluded. The assessment-wipe Critical
+(`destructive: true`) is already on master via `f3609bc` from the ToggleGroup lane.
+
+**Handed back, not attempted:** H6 (`.section{overflow:hidden}` clipping the LessonEditor
+popovers), M3 (the "Not set" no-op), MEDIUM #7 (unit-vanished husk), MEDIUM #8, and the four
+Lows. One correction to M5: the "deleted vs not loaded" shape did **not** survive into the
+replacement — `LessonModal` is gone and `PlanPage`'s guard is a different one; `DayEditSplit`
+still has it and is another lane's.
