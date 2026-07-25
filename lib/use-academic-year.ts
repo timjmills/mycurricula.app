@@ -25,7 +25,11 @@
 //   1. Initial state = the heuristic defaults (sensible North-American
 //      academic year). Server-rendered HTML matches the first client render
 //      so no hydration mismatch.
-//   2. A post-mount effect syncs from localStorage.
+//   2. A post-mount effect syncs from localStorage, falling back ONCE to the
+//      onboarding wizard's answer (see `seedFromOnboarding`) before the
+//      heuristic. Without that bridge the wizard's year step was collected and
+//      dropped on the same device — the three sibling settings hooks all had
+//      such a bridge and this one did not.
 //   3. `storage` event listener picks up cross-tab changes — so a teacher
 //      with /year and /settings open in two tabs sees consistent state.
 //
@@ -167,6 +171,70 @@ function readEnd(): Date | null {
   }
 }
 
+// ── One-time seed from the onboarding wizard ──────────────────────────────
+//
+// The wizard's year step asks for the school year's start and end dates and
+// writes them into the onboarding record (`data.yearStart` / `data.yearEnd`)
+// — and NOTHING read them. Three sibling settings hooks bridge that record to
+// their live keys on first read (`use-schedule-settings` for rotation,
+// `use-subject-settings` for the subject roster, `use-default-template` for
+// the lesson template); this hook had no such bridge, so a teacher typed their
+// academic year during setup and it was silently discarded. Not on a second
+// device — on the SAME device, immediately. The Roadmap and Progression then
+// ran against the North-American heuristic default regardless of what was
+// entered.
+//
+// Same contract as `seedRotationFromOnboarding`: consulted ONLY when the team
+// keys are unset, and the seed persists them, so from then on Settings owns the
+// value and re-running the wizard never overwrites a deliberate edit.
+
+/** The onboarding wizard's persistence key (lib/onboarding-v2-shape.ts).
+ *  Read once for the seed; never written from here. */
+const ONBOARDING_KEY = "mycurricula:onboarding";
+
+/**
+ * The wizard's captured academic year, or null when there is no usable
+ * record. Both endpoints must be present and parseable — a half-filled step
+ * (start typed, end blank) seeds nothing rather than pairing one real date
+ * with a heuristic guess, which would look deliberate but be invented.
+ */
+function seedFromOnboarding(): { start: Date; end: Date } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ONBOARDING_KEY);
+    if (raw == null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const data = (parsed as { data?: unknown }).data;
+    if (typeof data !== "object" || data === null) return null;
+    const { yearStart, yearEnd } = data as {
+      yearStart?: unknown;
+      yearEnd?: unknown;
+    };
+    if (typeof yearStart !== "string" || typeof yearEnd !== "string") {
+      return null;
+    }
+    const start = isoToDate(yearStart);
+    const end = isoToDate(yearEnd);
+    if (start == null || end == null) return null;
+    return { start, end };
+  } catch {
+    return null;
+  }
+}
+
+/** Persist both endpoints. Shared by the setters and the seed so there is one
+ *  place that knows both keys are written together. */
+function persistPair(start: Date, end: Date): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY_START, dateToIso(start));
+    window.localStorage.setItem(STORAGE_KEY_END, dateToIso(end));
+  } catch {
+    // Storage disabled / quota exceeded — state still updates in-memory.
+  }
+}
+
 // ── Validation / normalization ────────────────────────────────────────────
 
 /**
@@ -234,10 +302,26 @@ export function useAcademicYear(): UseAcademicYearResult {
   const [start, setStartState] = useState<Date>(() => defaultStart());
   const [end, setEndState] = useState<Date>(() => defaultEnd(defaultStart()));
 
-  // Post-mount: read stored values, fall back to heuristic defaults.
+  // Post-mount: stored values, else the wizard's answer, else the heuristic.
+  //
+  // The seed only fires when NEITHER key is set, so it can never overwrite a
+  // deliberate Settings edit — and it persists what it adopts, so it is
+  // genuinely one-time (see seedFromOnboarding).
   useEffect(() => {
     const storedStart = readStart();
     const storedEnd = readEnd();
+
+    if (storedStart == null && storedEnd == null) {
+      const seeded = seedFromOnboarding();
+      if (seeded != null) {
+        const norm = normalizePair(seeded.start, seeded.end);
+        setStartState(norm.start);
+        setEndState(norm.end);
+        persistPair(norm.start, norm.end);
+        return;
+      }
+    }
+
     const nextStart = storedStart ?? defaultStart();
     const nextEnd = storedEnd ?? defaultEnd(nextStart);
     const { start: ns, end: ne } = normalizePair(nextStart, nextEnd);
@@ -265,13 +349,7 @@ export function useAcademicYear(): UseAcademicYearResult {
       const { start: ns, end: ne } = normalizePair(next, end);
       setStartState(ns);
       setEndState(ne);
-      if (typeof window === "undefined") return;
-      try {
-        window.localStorage.setItem(STORAGE_KEY_START, dateToIso(ns));
-        window.localStorage.setItem(STORAGE_KEY_END, dateToIso(ne));
-      } catch {
-        // Storage disabled / quota — state still updates in-memory.
-      }
+      persistPair(ns, ne);
     },
     [end],
   );
@@ -281,13 +359,7 @@ export function useAcademicYear(): UseAcademicYearResult {
       const { start: ns, end: ne } = normalizePair(start, next);
       setStartState(ns);
       setEndState(ne);
-      if (typeof window === "undefined") return;
-      try {
-        window.localStorage.setItem(STORAGE_KEY_START, dateToIso(ns));
-        window.localStorage.setItem(STORAGE_KEY_END, dateToIso(ne));
-      } catch {
-        // ignore
-      }
+      persistPair(ns, ne);
     },
     [start],
   );

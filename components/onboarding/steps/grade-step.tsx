@@ -44,12 +44,19 @@ export function GradeStep(): ReactNode {
   // next/previous chip so the group behaves like a radio group.
   function handleGroupKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
     const currentIndex = GRADE_OPTIONS.findIndex((o) => o.value === data.grade);
+    // NOTHING SELECTED YET (`findIndex` → -1). Wrapping from -1 lands on
+    // index 12 — "grade 12" — so a teacher who pressed Left before choosing
+    // anything had a grade picked for them, and it committed. Both arrow
+    // directions start at the FIRST option instead: an unselected group has no
+    // "previous", so the only sensible first move is to enter it at the start.
+    const hasSelection = currentIndex !== -1;
     let nextIndex: number | null = null;
     if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      nextIndex = (currentIndex + 1) % GRADE_OPTIONS.length;
+      nextIndex = hasSelection ? (currentIndex + 1) % GRADE_OPTIONS.length : 0;
     } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      nextIndex =
-        (currentIndex - 1 + GRADE_OPTIONS.length) % GRADE_OPTIONS.length;
+      nextIndex = hasSelection
+        ? (currentIndex - 1 + GRADE_OPTIONS.length) % GRADE_OPTIONS.length
+        : 0;
     }
     if (nextIndex === null) return;
     e.preventDefault();
