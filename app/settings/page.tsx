@@ -363,6 +363,21 @@ function OverviewBody(): ReactNode {
               scope="personal"
               summary={summaries.catchup}
             />
+            {/* DISCOVERABILITY. /onboarding was reachable by URL and from
+                exactly one in-app link — inside the keyboard-shortcuts
+                overlay, where nobody looks for "redo my setup". That matters
+                more than it sounds: finishing the wizard stamps
+                teachers.onboarded_at, so it never re-runs on its own, and a
+                teacher who signs in on a second device gets the defaults with
+                no route back to the thing that would fix them. This tile is
+                that route. */}
+            <OverviewCard
+              href="/onboarding"
+              glyph={SECTION_ICONS.workspace({ size: 20 })}
+              label="Setup guide"
+              scope="personal"
+              summary="Walk through first-time setup again — your current answers are kept"
+            />
           </div>
         </section>
       </div>

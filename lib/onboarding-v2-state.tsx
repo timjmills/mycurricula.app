@@ -8,11 +8,29 @@
 // React-free leaf lib/onboarding-v2-shape.ts (so it is unit-testable in node);
 // this module is only the client wiring around it.
 //
-// Persistence is localStorage-only today (no backend seam here yet), under the
-// SAME `mycurricula:onboarding` key + `{ stepIndex, data, finished }` shape the
-// v1 wizard used, so the three live seeders keep reading it (see the shape
-// module's header). Phase 1B replaces the storage behind these setters with a
-// Supabase write; the hook API is stable across that migration.
+// ── WHERE THE ANSWERS GO (the flag and the data are stored at different
+//    grains, so read this before assuming the record here is the whole story)
+// This provider's own record is localStorage, under the SAME
+// `mycurricula:onboarding` key + `{ stepIndex, data, finished }` shape the v1
+// wizard used, so the three live seeders keep reading it (see the shape
+// module's header). But it is NOT the only destination: several steps write
+// through to their real home as the teacher answers them —
+//   • workspace   → rename_workspace() RPC          (schools.name)
+//   • schedule    → useSchoolWeek()                 (schools.school_week)
+//   • appearance  → the theme provider              (teacher_preferences)
+//   • finish()    → mark_onboarded() RPC            (teachers.onboarded_at)
+// while courses, rotation, the school year and the lesson template stay in the
+// record here — which means they stay on THIS BROWSER.
+//
+// That asymmetry matters because `onboarded_at` is account-scoped: once it is
+// stamped the wizard never runs again, on any device, whether or not the
+// config it was meant to capture came along. The gate is still the right
+// signal (it stops a teacher being re-interrogated every time they sign in on
+// something new), but it must not be the only thing a teacher hears — so the
+// summary step names each answer's real home via `ONBOARDING_PERSISTENCE`, and
+// Settings offers a re-run entry point. Closing the remaining gaps needs the
+// team-settings backend, which the matching Settings surfaces are waiting on
+// too; the wizard is inheriting that limit, not creating it.
 
 import {
   createContext,
@@ -60,10 +78,22 @@ interface OnboardingV2ContextValue {
    *  content until then so a flash of default state never paints. */
   hydrated: boolean;
   /**
-   * HONEST-PERSISTENCE FLAG. The wizard's config — and the `finished` flag —
-   * persist to THIS browser's localStorage ONLY; nothing reaches the backend
-   * yet. The summary step uses this to keep its "all set" copy honest. Flips
-   * to false once Phase 1B wires onboarding through Supabase.
+   * HONEST-PERSISTENCE FLAG — true when NOTHING the wizard collects reaches a
+   * server, i.e. the prototype path where Supabase is not configured.
+   *
+   * It used to be hardcoded `true`, which had gone stale: the workspace name
+   * (rename_workspace), the appearance (teacher_preferences), the school week
+   * (schools.school_week) and the onboarded flag itself (onboarded_at) all
+   * reach the account on the deployed path. Meanwhile subjects, rotation, the
+   * school year and the lesson template still do not — so a blanket flag
+   * cannot describe the truth in either direction. `ONBOARDING_PERSISTENCE`
+   * (lib/onboarding-v2-shape.ts) carries the per-answer detail the summary
+   * shows; this flag only distinguishes "nothing syncs at all" from "some of
+   * it does".
+   *
+   * Derived from the same gate the remote read/write use, so it cannot drift
+   * from what actually happens. Build-time env, identical on server and
+   * client, so it is hydration-safe.
    */
   localOnly: boolean;
 }
@@ -99,8 +129,14 @@ export function OnboardingV2Provider({
     const saved = readV2Persist();
     if (saved) {
       setData(saved.data);
-      setStepIndex(saved.stepIndex);
       setFinished(saved.finished);
+      // Resume mid-run where they left off. But a teacher who ALREADY
+      // finished and is back on /onboarding came here on purpose — from the
+      // Settings entry point, or on a new device where the answers did not
+      // follow them — and dropping them on "You're all set!" would be a dead
+      // end for the one thing they came to do. Restart at step 1 instead,
+      // keeping every saved answer so it is a review, not a re-type.
+      setStepIndex(saved.finished ? 0 : saved.stepIndex);
     }
     setHydrated(true);
   }, []);
@@ -160,7 +196,7 @@ export function OnboardingV2Provider({
       finished,
       finish,
       hydrated,
-      localOnly: true,
+      localOnly: !isPlannerSupabaseConfigured(),
     }),
     [stepIndex, data, update, next, back, goTo, finished, finish, hydrated],
   );

@@ -4,7 +4,10 @@ import {
   ONBOARDING_V2_STEPS,
   SKIPPABLE_V2_STEPS,
   ONBOARDING_STORAGE_KEY,
+  ONBOARDING_PERSISTENCE,
+  ONBOARDING_PERSISTENCE_BY_LABEL,
   defaultV2Data,
+  deviceLocalAnswers,
   normalizeV2Persist,
   computeNeedsOnboarding,
   weekdaysForV2Preset,
@@ -157,5 +160,72 @@ describe("onboarding-v2 first-run matrix", () => {
     // before this gate existed.
     expect(computeNeedsOnboarding(false, null, false)).toBe(true); // not finished → needs
     expect(computeNeedsOnboarding(true, null, false)).toBe(false); // finished → done
+  });
+});
+
+// ── Persistence disclosure ─────────────────────────────────────────────────
+// The wizard stamps teachers.onboarded_at when it finishes, so it never runs
+// again on any device — while several of its answers live only in this
+// browser's localStorage. The summary discloses that per answer, and these
+// tests guard the two ways the disclosure can silently rot: a recap row whose
+// label no longer matches an entry (the caption vanishes), and an answer
+// quietly reclassified as durable when its storage has not moved.
+
+describe("onboarding-v2 persistence disclosure", () => {
+  /** The labels SummaryStep renders as recap rows, in order. Kept here so a
+   *  renamed row fails this test instead of losing its caption in silence. */
+  const SUMMARY_ROW_LABELS = [
+    "Workspace",
+    "Subjects",
+    "School week",
+    "Rotation",
+    "School year",
+    "Lesson template",
+  ] as const;
+
+  it("has an entry for every recap row the summary renders", () => {
+    for (const label of SUMMARY_ROW_LABELS) {
+      expect(
+        ONBOARDING_PERSISTENCE_BY_LABEL.get(label),
+        `no persistence entry for recap row "${label}"`,
+      ).toBeDefined();
+    }
+  });
+
+  it("indexes every entry exactly once (no duplicate labels)", () => {
+    expect(ONBOARDING_PERSISTENCE_BY_LABEL.size).toBe(
+      ONBOARDING_PERSISTENCE.length,
+    );
+  });
+
+  it("classifies only the answers with a real server home as 'account'", () => {
+    // Workspace  → rename_workspace() RPC   (schools.name)
+    // School week→ useSchoolWeek()          (schools.school_week)
+    // Appearance → theme sync               (teacher_preferences)
+    const account = ONBOARDING_PERSISTENCE.filter(
+      (n) => n.where === "account",
+    ).map((n) => n.label);
+    expect(account.sort()).toEqual(
+      ["Appearance", "School week", "Workspace"].sort(),
+    );
+  });
+
+  it("names the answers that will NOT follow a teacher to another device", () => {
+    // These four still write localStorage — and so do their Settings surfaces,
+    // which is why the wizard inherits the gap rather than causing it. Moving
+    // one to a server row should flip its entry here in the same change.
+    expect(deviceLocalAnswers().map((n) => n.label)).toEqual([
+      "Subjects",
+      "Rotation",
+      "School year",
+      "Lesson template",
+    ]);
+  });
+
+  it("gives every entry a non-empty caption for the recap", () => {
+    for (const note of ONBOARDING_PERSISTENCE) {
+      expect(note.detail.trim().length, `empty detail for "${note.label}"`)
+        .toBeGreaterThan(0);
+    }
   });
 });

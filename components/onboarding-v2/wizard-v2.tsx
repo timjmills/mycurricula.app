@@ -9,8 +9,10 @@
 // navigation.
 //
 // The wizard is WORKSPACE-FIRST (the locked product model): workspace → courses
-// → schedule → year → appearance → summary. It ends with a choice — "Take the
-// tour" (the startScreenTour() stub) or "Start planning" (→ /weekly). Escape is
+// → schedule → year → appearance → summary. It ends with a choice of landing
+// spot — "Go to Home" (through the startScreenTour() seam, which today only
+// navigates to /home; the guided tour itself is commissioned, not shipped) or
+// "Start planning" (→ /weekly). Neither label promises a tour. Escape is
 // intentionally a NO-OP: this is a first-run gate, so an accidental Escape must
 // not drop the teacher out of setup (they leave via the finish buttons; their
 // progress is resumable regardless).
@@ -26,6 +28,7 @@ import { useOnboardingV2 } from "@/lib/onboarding-v2-state";
 import { SKIPPABLE_V2_STEPS } from "@/lib/onboarding-v2-shape";
 import type { OnboardingV2StepId } from "@/lib/onboarding-v2-shape";
 import { startScreenTour } from "@/lib/screen-tour";
+import { useSchoolWeek } from "@/lib/use-school-week";
 import { Button } from "@/components/ui";
 import { WorkspaceStep } from "./steps/workspace-step";
 import { CoursesStep } from "./steps/courses-step";
@@ -63,6 +66,11 @@ export function OnboardingWizardV2(): ReactNode {
   const router = useRouter();
   const { stepIndex, stepId, totalSteps, next, back, goTo, finish, hydrated } =
     useOnboardingV2();
+  // The school-week save state is shared across hook instances, so the footer
+  // sees the write the schedule step issued three steps ago (see the note on
+  // the finish buttons for why that gates finishing).
+  const { saveState: weekSaveState } = useSchoolWeek();
+  const weekSaving = weekSaveState.status === "saving";
 
   // Focus the step-counter on step change so screen-reader + keyboard users
   // land at the top of the new step.
@@ -179,19 +187,45 @@ export function OnboardingWizardV2(): ReactNode {
                 <div className={styles.spacer} />
                 {isSummary ? (
                   <>
+                    {/* FINISH IS GATED ON THE IN-FLIGHT TEAM WRITE. Finishing
+                        stamps teachers.onboarded_at, which permanently stops
+                        the wizard re-offering itself — so it must not race a
+                        school-week save that has not resolved. Bounded by the
+                        seam's own 15s abort, so this can never trap a teacher.
+                        A REFUSED save does not block: the week has already
+                        rolled back to the value the database holds, so nothing
+                        is unpersisted — the teacher simply is not an admin, and
+                        the recap above says so. */}
+                    {/* HONEST LABEL. This used to read "Take the tour" and
+                        promise "a quick guided tour of each screen" — but
+                        startScreenTour() is a seam, not a tour: it navigates to
+                        /home and nothing else (lib/screen-tour.ts). The label
+                        now describes what actually happens. When the real tour
+                        lands it replaces the seam's body without changing this
+                        callsite, and the label can promise a tour then. */}
                     <Button
                       variant="secondary"
                       size="md"
+                      disabled={weekSaving}
                       onClick={() => finishTo(() => startScreenTour(router))}
-                      tooltip="Finish setup and take a quick guided tour of each screen."
+                      tooltip={
+                        weekSaving
+                          ? "Hold on — your school week is still saving for the team."
+                          : "Finish setup and land on your Home dashboard."
+                      }
                     >
-                      Take the tour
+                      Go to Home
                     </Button>
                     <Button
                       variant="primary"
                       size="lg"
+                      disabled={weekSaving}
                       onClick={() => finishTo(() => router.push("/weekly"))}
-                      tooltip="Finish setup and jump straight into your weekly planner."
+                      tooltip={
+                        weekSaving
+                          ? "Hold on — your school week is still saving for the team."
+                          : "Finish setup and jump straight into your weekly planner."
+                      }
                     >
                       Start planning
                     </Button>

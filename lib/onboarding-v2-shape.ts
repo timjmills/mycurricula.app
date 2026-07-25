@@ -75,6 +75,78 @@ export const SKIPPABLE_V2_STEPS: ReadonlySet<OnboardingV2StepId> = new Set([
 /** localStorage key — DELIBERATELY the same as the v1 wizard (see header). */
 export const ONBOARDING_STORAGE_KEY = "mycurricula:onboarding";
 
+// ── Where each answer actually lands ──────────────────────────────────────
+//
+// The wizard sets `teachers.onboarded_at` when it finishes, so it never runs
+// again — on ANY device. But only some of what it collects is stored where a
+// second device can see it. Before this map existed the summary said one
+// blanket "saved on this device for now", which was wrong in both directions:
+// it undersold the answers that DO reach the account, and it implied the rest
+// were merely awaiting a sync that would pick them up.
+//
+// So the recap names each answer's real home. A teacher who set up on a laptop
+// and opens the app on a phone can see exactly what they will need to redo,
+// instead of meeting a planner that believes it is configured and is not.
+//
+// The device-local entries are NOT a wizard defect — the matching Settings
+// surfaces (Settings → Subjects, Settings → Calendar's year/holidays, Settings
+// → Schedule's rotation) write the same localStorage keys, so setting them
+// "properly" in Settings is exactly as device-local. The fix is a team-settings
+// backend; until it exists, disclosure is the honest interim.
+
+/** Where a collected answer is stored. `account` survives a device change. */
+export type OnboardingPersistence = "account" | "device";
+
+export interface OnboardingPersistenceNote {
+  /** How the summary names this answer (matches its recap row). */
+  label: string;
+  where: OnboardingPersistence;
+  /** Where it lands, for the recap's per-row caption. */
+  detail: string;
+}
+
+/**
+ * One entry per thing the wizard collects, in recap order. Keep in lockstep
+ * with the rows SummaryStep renders — a row without an entry silently loses
+ * its disclosure, which is the failure mode this map exists to prevent.
+ */
+export const ONBOARDING_PERSISTENCE: readonly OnboardingPersistenceNote[] = [
+  {
+    label: "Workspace",
+    where: "account",
+    detail: "saved to your account",
+  },
+  {
+    label: "Subjects",
+    where: "device",
+    detail: "this browser only",
+  },
+  {
+    label: "School week",
+    where: "account",
+    detail: "saved for your whole team",
+  },
+  { label: "Rotation", where: "device", detail: "this browser only" },
+  { label: "School year", where: "device", detail: "this browser only" },
+  {
+    label: "Lesson template",
+    where: "device",
+    detail: "this browser only",
+  },
+  { label: "Appearance", where: "account", detail: "saved to your account" },
+] as const;
+
+/** Fast lookup for the summary's per-row caption. */
+export const ONBOARDING_PERSISTENCE_BY_LABEL: ReadonlyMap<
+  string,
+  OnboardingPersistenceNote
+> = new Map(ONBOARDING_PERSISTENCE.map((note) => [note.label, note]));
+
+/** The answers that will NOT follow a teacher to another device. */
+export function deviceLocalAnswers(): OnboardingPersistenceNote[] {
+  return ONBOARDING_PERSISTENCE.filter((n) => n.where === "device");
+}
+
 /** The persisted record shape. Identical to the v1 `PersistShape` so a
  *  flag-flip in either direction reads a tolerable record. */
 export interface OnboardingV2Persist {

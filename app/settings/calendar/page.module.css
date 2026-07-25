@@ -47,6 +47,28 @@
   max-width: 64ch;
 }
 
+/* Write-outcome line for the school week. The week is the one team setting
+   that persists to the DATABASE (`schools.school_week`), so a save can be
+   refused — only a workspace admin may change it. Silence after a refused
+   write is what let the UI and the planner disagree, so the outcome is
+   always stated. Tokens only; readable in both tones. */
+.saveNote {
+  margin: 8px 0 0;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  line-height: 1.5;
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+.saveNoteError {
+  color: var(--ink);
+  background: var(--danger-tint);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  font-weight: 500;
+}
+
 /* Doubled: `.cp-root input` (0,1,1) resets font/color on raw inputs —
    a single class (0,1,0) silently loses those declarations. */
 .textInput.textInput {

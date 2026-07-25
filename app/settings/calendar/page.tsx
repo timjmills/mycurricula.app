@@ -12,10 +12,20 @@
 //   4. Holidays           — non-instruction dates (Eid, Spring Break, etc.)
 //                           that hide lessons on the Year view. TEAM-scoped.
 //
-// "Team-scoped" means every teacher on the grade-level team sees the
-// same value. Persistence today is localStorage under `mycurricula:team:*`;
-// the rows migrate to a Supabase `team_settings` row when the backend
-// lands.
+// "Team-scoped" means every teacher on the grade-level team SHOULD see the
+// same value — but only one of these four actually delivers that today:
+//
+//   • School week   → the DATABASE (`schools.school_week`), the column the
+//                     planner derives its day columns from. Genuinely shared,
+//                     genuinely team-scoped, and admin-gated by RLS. Section 3
+//                     reports the write outcome because it can be refused.
+//   • Months, year  → localStorage under `mycurricula:team:*`. The prefix
+//     dates, holidays  records the INTENDED scope; the storage is per-browser,
+//                     so nothing is shared with teammates or with the same
+//                     teacher's other device. They migrate to a server row
+//                     when the team-settings backend lands.
+//
+// Do not read a `team:` key name as evidence a value is shared.
 //
 // Tooltip rule (CLAUDE.md §4): every interactive control carries an
 // onboarding-voice tooltip. Inputs use `title=`; Buttons use the
@@ -40,6 +50,7 @@ import {
   detectSchoolWeekPreset,
   useSchoolWeek,
   type SchoolWeekPresetKey,
+  type SchoolWeekSaveState,
   type Weekday,
 } from "@/lib/use-school-week";
 import { useHolidays, type Holiday } from "@/lib/use-holidays";
@@ -502,7 +513,7 @@ function AcademicYearSection(): ReactNode {
 // regardless of which weekday that is.
 
 function SchoolWeekSection(): ReactNode {
-  const { days, setDays } = useSchoolWeek();
+  const { days, setDays, saveState } = useSchoolWeek();
   const selected = useMemo(() => new Set(days), [days]);
   const activePreset = useMemo(() => detectSchoolWeekPreset(days), [days]);
 
@@ -611,8 +622,52 @@ function SchoolWeekSection(): ReactNode {
           least one column to render. Existing lessons map by index: a lesson on
           day 0 stays on day 0, even if that weekday changes.
         </p>
+        <SchoolWeekSaveNote state={saveState} />
       </fieldset>
     </SettingsCard>
+  );
+}
+
+/**
+ * States the outcome of a school-week write.
+ *
+ * The week is the one team setting backed by the database
+ * (`schools.school_week` — the column the planner derives its day columns
+ * from), so a write can be REFUSED: only a workspace admin may change a
+ * setting that moves everyone's grid. Reporting that is the point — a
+ * refused write used to look identical to a successful one, which is how the
+ * settings UI and the planner ended up disagreeing. `aria-live` so the
+ * outcome reaches a screen reader too; there is no Save button to announce it.
+ */
+function SchoolWeekSaveNote({
+  state,
+}: {
+  state: SchoolWeekSaveState;
+}): ReactNode {
+  if (state.status === "idle") return null;
+
+  const isError = state.status === "denied" || state.status === "failed";
+  // Sequential checks rather than a ternary chain so the compiler narrows the
+  // union down to the two members that carry `message`.
+  let text: string;
+  if (state.status === "saving") {
+    text = "Saving for the team…";
+  } else if (state.status === "saved") {
+    text = "Saved — every teacher on the team now plans against this week.";
+  } else if (state.status === "local") {
+    text = "Saved on this device.";
+  } else {
+    text = state.message;
+  }
+
+  return (
+    <p
+      className={`${styles.saveNote} ${isError ? styles.saveNoteError : ""}`}
+      role="status"
+      aria-live="polite"
+    >
+      {text}
+    </p>
   );
 }
 

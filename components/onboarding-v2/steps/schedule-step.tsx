@@ -2,15 +2,23 @@
 
 // schedule-step.tsx — v2 onboarding step 3: school week + rotation cycle.
 //
-// Two TEAM-wide schedule decisions the whole grade-level team plans against:
+// Two schedule decisions. They do NOT persist the same way, and the step says
+// so rather than implying both survive a device change:
+//
 //   1. School week — which weekdays the school runs. Driven through the LIVE
-//      useSchoolWeek() hook so the choice actually applies (writes the
-//      `mycurricula:team:school-week-days` key), and mirrored into the
-//      onboarding data so the summary + any v1 read stay in sync.
+//      useSchoolWeek() hook, which writes `schools.school_week` — the same
+//      column the planner derives its day columns from. This one is really
+//      team-wide and really durable. The write can be REFUSED (only a
+//      workspace admin may change it), so the outcome is reported inline; a
+//      teacher who joined someone else's workspace learns that here instead
+//      of discovering later that the grid ignored them. Also mirrored into the
+//      onboarding record so the summary + any v1 read stay in sync.
 //   2. Rotation cycle — weekly / A-B / N-day. Written into data.rotation +
 //      data.cycleLength ONLY; lib/use-schedule-settings.ts lazily seeds the
-//      team rotation key from that record the first time a schedule surface
-//      mounts (the one-time seed), so we deliberately don't double-write it.
+//      rotation key from that record the first time a schedule surface mounts
+//      (the one-time seed), so we deliberately don't double-write it. That key
+//      is localStorage, so rotation lives on THIS BROWSER only — Settings →
+//      Schedule has the same limit, so this is inherited, not introduced.
 //
 // The detailed per-weekday TIME editor is a larger surface that already exists
 // in Settings → Schedule; rather than duplicate it here we link to it. Both
@@ -25,7 +33,10 @@ import {
   WEEKDAY_ORDER,
   WEEKDAY_LABEL_LONG,
 } from "@/lib/use-school-week";
-import type { Weekday } from "@/lib/use-school-week";
+import type {
+  SchoolWeekSaveState,
+  Weekday,
+} from "@/lib/use-school-week";
 import {
   CYCLE_LENGTH_MIN,
   CYCLE_LENGTH_MAX,
@@ -81,6 +92,20 @@ const ROTATION_OPTIONS: readonly ToggleOption<Rotation>[] = [
   },
 ] as const;
 
+/**
+ * Teacher-facing text for a school-week write outcome. Sequential checks (not
+ * a ternary chain) so the compiler narrows to the members carrying `message`.
+ */
+function schoolWeekSaveText(state: SchoolWeekSaveState): string {
+  if (state.status === "saving") return "Saving for the team…";
+  if (state.status === "saved") {
+    return "Saved — your whole planner now uses these days.";
+  }
+  if (state.status === "local") return "Saved on this device.";
+  if (state.status === "idle") return "";
+  return state.message;
+}
+
 /** Map the detected school-week preset onto the three wizard choices. */
 function presetChoice(days: Weekday[]): WeekPresetChoice {
   const detected = detectSchoolWeekPreset(days);
@@ -92,7 +117,7 @@ function presetChoice(days: Weekday[]): WeekPresetChoice {
 export function ScheduleStep(): ReactNode {
   const router = useRouter();
   const { data, update } = useOnboardingV2();
-  const { days, setDays } = useSchoolWeek();
+  const { days, setDays, saveState } = useSchoolWeek();
 
   const choice = presetChoice(days);
 
@@ -120,10 +145,12 @@ export function ScheduleStep(): ReactNode {
     }
   };
 
-  // ASYMMETRY (chosen): the school week writes its OWN live team key via
-  // setDays above, but rotation writes ONLY the onboarding record — it
-  // deliberately defers to use-schedule-settings' one-time lazy seed of the
-  // team rotation key, so the wizard never double-writes it.
+  // ASYMMETRY (chosen): the school week writes straight through to
+  // `schools.school_week` via setDays above, but rotation writes ONLY the
+  // onboarding record — it defers to use-schedule-settings' one-time lazy seed
+  // of the rotation key, so the wizard never double-writes it. The two are
+  // therefore durable to different degrees (server vs. this browser), which
+  // the note below states rather than leaving for the teacher to discover.
   const rotation = data.rotation;
   const cycleLength = data.cycleLength;
   const setRotation = (r: Rotation): void => update({ rotation: r });
@@ -167,6 +194,19 @@ export function ScheduleStep(): ReactNode {
               </Chip>
             ))}
           </div>
+        )}
+        {saveState.status !== "idle" && (
+          <p
+            className={
+              saveState.status === "denied" || saveState.status === "failed"
+                ? styles.fieldError
+                : styles.fieldHint
+            }
+            role="status"
+            aria-live="polite"
+          >
+            {schoolWeekSaveText(saveState)}
+          </p>
         )}
       </div>
 
@@ -215,6 +255,11 @@ export function ScheduleStep(): ReactNode {
             </div>
           </>
         )}
+        <p className={styles.fieldHint}>
+          Rotation is saved on this browser for now — you may need to set it
+          again on another device. Settings &rarr; Schedule is where you change
+          it.
+        </p>
       </div>
 
       <div className={styles.divider} />

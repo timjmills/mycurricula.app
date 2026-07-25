@@ -2,18 +2,29 @@
 
 // use-schedule-settings — schedule & rotation configuration state.
 //
-// Two independent pieces of schedule configuration live here, mirroring
-// the SSR-safe localStorage pattern in `lib/use-school-week.ts`
-// (SSR default → post-mount localStorage sync → `storage`-event
-// cross-tab sync → normalizing setters):
+// ── SCOPE HONESTY (read this before trusting a "TEAM-scoped" label) ───
+// Rotation is team-scoped BY INTENT and per-browser IN FACT. It is
+// stored in localStorage under a `mycurricula:team:*` key, and
+// localStorage cannot deliver team scope: two teachers on the same team
+// see different values, and one teacher sees different values on their
+// laptop and their phone. The prefix records the intended model, not the
+// delivered one. Closing the gap needs a server home (a `team_settings`
+// row, or a `schools` column like the school week's) — until then,
+// treat every value in this module as advisory per-device configuration.
+// `lib/use-school-week.ts` is the one team setting that HAS converged:
+// it now reads and writes `schools.school_week`, the column the planner
+// derives its day columns from. This module has no such column yet.
 //
-//   1. ROTATION — TEAM-scoped. Whether the timetable repeats weekly
-//      ("none"), alternates A/B day plans ("ab"), or rotates on an
-//      N-day cycle ("cycle", 2–10 instructional days). CLAUDE.md §1
-//      mandates rotation support independent of the calendar week —
-//      never assume a weekly-only cycle. Team-scoped because the whole
-//      grade-level team plans against the same rotation pattern.
-//      Stored under `mycurricula:team:schedule-rotation`.
+// Two independent pieces of schedule configuration live here, sharing
+// the SSR-safe pattern (SSR default → post-mount localStorage sync →
+// `storage`-event cross-tab sync → normalizing setters):
+//
+//   1. ROTATION — team-scoped by intent (see above); stored per browser.
+//      Whether the timetable repeats weekly ("none"), alternates A/B day
+//      plans ("ab"), or rotates on an N-day cycle ("cycle", 2–10
+//      instructional days). CLAUDE.md §1 mandates rotation support
+//      independent of the calendar week — never assume a weekly-only
+//      cycle. Stored under `mycurricula:team:schedule-rotation`.
 //
 //      ONE-TIME SEED: the onboarding wizard already collects rotation +
 //      cycle length (lib/onboarding-state.tsx, `data.rotation` /
@@ -71,10 +82,11 @@ export const DEFAULT_ROTATION: RotationSettings = {
 };
 
 /**
- * localStorage key. Rotation is TEAM-scoped — the whole grade-level team
- * plans against one rotation pattern, like the school week. Team-scoped
- * settings live under `mycurricula:team:*` and migrate to a
- * `team_settings` row when Supabase lands.
+ * localStorage key. The `team:` prefix records the INTENDED scope — the
+ * whole grade-level team plans against one rotation pattern — but the
+ * stored value is per-browser, so nothing about it is actually shared
+ * (see the module header). It migrates to a server row when the
+ * team-settings backend lands.
  */
 const ROTATION_STORAGE_KEY = "mycurricula:team:schedule-rotation";
 

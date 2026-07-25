@@ -1,14 +1,17 @@
-// screen-tour.ts — the guided-tour entry point (Wave 12c STUB).
+// screen-tour.ts — the guided-tour entry point. SEAM SHIPPED, TOUR
+// COMMISSIONED — there is no tour yet, and nothing here should be described as
+// if there were.
 //
-// The onboarding wizard ends with a choice: "Take the tour" or "Start
-// planning". The tour itself — a guided walkthrough of each major screen — is a
-// SEPARATE slice commissioned next, so this is only the seam the wizard calls.
+// What exists: this function, and a wizard button wired to it. What does not
+// exist: a guided walkthrough of any screen. `startScreenTour()` navigates to
+// /home — the natural first stop of a future tour — and does nothing else. The
+// tour proper is a SEPARATE slice, commissioned next.
 //
-// For now `startScreenTour()` just navigates to /home (the natural first stop
-// of any future tour) using the Next.js router the caller passes in. When the
+// Because of that, the wizard's second exit is labelled "Go to Home", not
+// "Take the tour": a label may only promise what the code delivers. When the
 // real tour lands it replaces the body of this function (opening the first
-// coach-mark, tracking tour state, etc.) WITHOUT changing this signature, so
-// the wizard's "Take the tour" button never has to change.
+// coach-mark, tracking tour state, etc.) WITHOUT changing this signature, and
+// the label can be revisited in the same change.
 
 /**
  * The slice of the Next.js app router this seam needs — just `push`. A local
