@@ -598,11 +598,40 @@ exact values at **every device width (phone 375–414 · tablet 768–834 · des
 mockup > V2 Framework.md > design-system CSS > plan). A surface that works but
 diverges from the handoff is a finding.
 
+**MANDATORY — record which tree you measured, before you measure it.** A
+browser renders the **working tree**, not a commit. This repo routinely has
+several agents writing to one checkout behind one dev server, so a live
+result carries no information about what shipped unless it says so. On
+2026-07-25 a live sweep measured a concurrent lane's uncommitted edits,
+concluded a documented gap "had never existed", and a build lane was stopped
+on the strength of it — `git show HEAD:<file>` would have settled it in
+seconds.
+
+Every live QA pass therefore opens with a **precondition block** in its
+report:
+
+```bash
+git rev-parse --short HEAD          # the commit you are claiming about
+git diff HEAD --stat -- components lib app   # must be empty, or say it isn't
+git show HEAD:<path-under-test> | grep -c <marker>   # is the feature IN the commit?
+```
+
+- A pass over a **dirty** tree is still useful — it just has to be labelled
+  "working tree, dirty" and must not be reported as evidence about a commit.
+- To make a claim **about a commit**, measure that commit — a clean checkout
+  or a worktree. Do **not** `git stash` here (this repo's untracked
+  `Documents/` makes that a foot-gun).
+- **Never stop, revert, or overwrite another lane's work on a live report
+  alone.** Confirm against `HEAD` first; an agent stopped mid-edit can lose
+  work that is not recoverable.
+
 **Operational notes.**
 
 - Start the dev server if one isn't already running; use a port ≥3010 when
   another session may own 3000, and never run `npm run build` while
-  `next dev` is running (it clobbers `.next`).
+  `next dev` is running (it clobbers `.next`). **One dev server per repo** —
+  concurrent servers contend for one `.next` and manufacture false findings
+  (a 22.8 s compile starvation once read as "SSR hang, 0 bytes").
 - For auth flows, sign in via the claude-login bypass (see
   `docs/5.24.26 claude-access.md`; localhost needs
   `PROVISIONING_MODE=individual` in `.env.local`).

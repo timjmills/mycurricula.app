@@ -114,7 +114,7 @@ export interface UnitExplorerProps {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Strip a "Unit N · " / "List N · " lead-in so the header can bold the prefix
- *  and lighten the remainder (mirrors TimelineYear/UnitDrawer's splitUnitName). */
+ *  and lighten the remainder (mirrors TimelineYear's splitUnitName). */
 function splitUnitName(name: string): { prefix: string; rest: string } {
   const idx = name.indexOf("·");
   if (idx === -1) return { prefix: "", rest: name.trim() };

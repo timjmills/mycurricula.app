@@ -8,7 +8,7 @@ import type { Lesson } from "@/lib/types";
 import type { DayStatus } from "@/lib/day-status";
 
 /** Weekday short labels keyed by `Lesson.day` (0 = Sunday); out-of-range → "Day N".
- *  Self-contained (mirrors UnitDrawer) so the modal needs no week-config import. */
+ *  Deliberately self-contained so the tab bodies need no week-config import. */
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 export function dayShort(day: number): string {
   return DAY_SHORT[day] ?? `Day ${day + 1}`;
@@ -17,8 +17,8 @@ export function dayShort(day: number): string {
 /** Safe href guard — a resource URL can come from free text / imported rows, so
  *  an unsafe scheme (javascript:, data:, …) yields plain text, not a live link.
  *  Allows http(s)/blob: and same-origin root-relative paths; rejects
- *  protocol-relative and backslash tricks. (Copied from UnitDrawer.safeHref,
- *  which mirrors the canonical isSafeUrl.) */
+ *  protocol-relative and backslash tricks. Mirrors the canonical sink gate,
+ *  `isSafeUrl` in lib/resource-embed.ts — keep the two in step. */
 export function safeHref(url: string | undefined): string | undefined {
   if (!url) return undefined;
   if (/^(https?|blob):/i.test(url)) return url;
