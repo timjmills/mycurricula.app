@@ -6929,3 +6929,89 @@ the compile before the tier loop, reloads on a stuck chunk, navigates back off
 **63 files / 1328 passed** (32 tooltip tests, incl. three that reproduce the
 83/53/18% defect from the live rects so the fix can't be measured against a
 fiction).
+
+---
+
+## Onboarding gate — VERIFIED, not a defect (#34, fix-tooltip-occlusion)
+
+**Verdict: EXPECTED behaviour. The gate never claims an onboarded session.**
+It is a **localhost-only QA-harness artifact**, not a product finding, and not a
+regression of #22. I raised the original observation; this disproves it as a
+defect. Probe: `scripts/probe-onboarding-gate.mjs` (read-only; no DB write, no
+RPC — non-GET Supabase aborted).
+
+### The two cases, run back to back in one context
+
+| | localhost:3099 | prod (mycurricula.app) |
+|---|---|---|
+| live code path *(observed, not assumed)* | **prototype** (0 `teachers` REST calls) | **deployed** (1 `teachers` REST call) |
+| fresh context, **no** stored state | **→ /onboarding at 10.0s** | **stays on /year** (30s) |
+| completion state stored (`finished:true`) | **stays on /year** (30s) | stays on /year (30s) |
+
+**That table is the whole answer.** A session *with* completion state is never
+sent to the wizard — the defect case does not occur. Only a genuinely fresh,
+no-state context is, which is correct.
+
+### Why the two environments differ (and why only one bites QA)
+
+`isPlannerSupabaseConfigured()` (`lib/planner/source.ts:415`) needs
+`NEXT_PUBLIC_PLANNER_USE_SUPABASE === "1"`. **`.env.local` sets neither that flag
+nor `NEXT_PUBLIC_V2`** — and it is the only env file in the repo. So localhost
+runs the **prototype** path, where `computeNeedsOnboarding` falls back to the
+per-device localStorage flag (`lib/onboarding-v2-shape.ts:303`). **A fresh
+Playwright context is un-onboarded by definition**, so it is *correctly* sent to
+the wizard. Prod runs the **deployed** path, where the account-scoped
+`teachers.onboarded_at` wins and the local flag is ignored entirely — which is
+why a fresh context there is *not* redirected.
+
+Not bypass-specific either: the trigger is a **fresh context**, not
+`PROVISIONING_MODE=individual`. The bypass is incidental.
+
+### Why it presented as intermittent, and why that mattered
+
+The redirect fires from a `useEffect` after hydration — measured at **10.0s**,
+squarely inside this dev server's 5–17s hydration window. Probes finish their
+work in exactly that window, so it is a genuine race: sometimes the measurement
+lands first, sometimes the redirect does. Tier-independent, load-correlated —
+which is exactly the profile my tooltip runs showed (failed 1440-only, then
+375+768-only, then all three). **A run yanked to `/onboarding` produces the
+identical element-not-found signature as a real regression on the target route**,
+so it fails toward reporting a defect that isn't there.
+
+### Proposed harness fix — one line, NOT built (verification lane)
+
+Seed the flag before the first navigation, so a probe context looks like a
+returning teacher instead of a new one:
+
+```js
+await ctx.addInitScript(() => {
+  localStorage.setItem(
+    "mycurricula:onboarding",
+    JSON.stringify({ stepIndex: 0, data: {}, finished: true }),
+  );
+});
+```
+
+Verified working (that exact payload is pass 2 above). `addInitScript` runs
+before page scripts on every navigation, so it beats the gate's effect. Natural
+home is `scripts/lib/auth.mjs` so every probe inherits it — but that file is
+currently modified by another lane, so I did not touch it. **On prod this is
+inert** (deployed path ignores the flag), so it is safe to apply unconditionally.
+
+### Not a #22 regression
+
+`lib/onboarding-v2-state.tsx`, `lib/onboarding-v2-remote.ts` and
+`components/shell/first-run-redirect.tsx` are **unchanged since `6b9eabb`** —
+#22's own commit. Observed behaviour matches the documented matrix exactly, in
+both environments.
+
+### One INFERRED observation, explicitly unverified
+
+On the deployed path the redirect also cannot fire until after hydration **plus**
+an async Supabase round-trip. So a **genuinely new** teacher on prod should see
+the planner briefly before being bounced to the wizard — which sits awkwardly
+with `first-run-redirect.tsx`'s claim that it "never flash-bounces" (true of a
+*guess*, not of the delay). **I did not measure this**: it needs an account with
+`onboarded_at IS NULL`, and creating or mutating one is a DB write I will not
+make. Flagging as a possible small UX wart for whoever owns first-run, not as a
+finding.
