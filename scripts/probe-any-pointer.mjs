@@ -135,12 +135,20 @@ const EXPECTED_BARE_POINTER = new Map([
   ["components/rename/InstanceRename.module.css", { count: 1, why: "cat A — hover affordance" }],
   ["components/teach/left/TeachLeft.module.css", { count: 1, why: "cat A — hover affordance" }],
   ["components/teach/right/TeachRightPanel.module.css", { count: 1, why: "cat A — hover affordance" }],
-  // Category A by authorial ruling — its comment considered and rejected
-  // `any-pointer` because a trackpad touch laptop still hovers and still
-  // reaches the chip.
+  // Category A by authorial ruling, for the REVEAL only — its comment
+  // considered and rejected `any-pointer` for the chip's `opacity`, because a
+  // trackpad touch laptop still hovers and still reaches the chip, so painting
+  // it permanently there would mask the unit title to fix a working path.
+  // That guard is still bare and must stay bare. The file ALSO carries a
+  // separate `(min-width: 901px) and (any-pointer: coarse)` block holding only
+  // the `::after` hit-area inflation, which paints nothing and costs no layout
+  // — a different question with a different answer. It is deliberately not in
+  // REQUIRED_WIDENED: its condition is not one of the CANONICAL_WIDENED rename
+  // forms (it is a new block, not a renamed one), so listing it would fail 0.6,
+  // and this file legitimately keeps a bare guard, which would fail 0.5.
   [
     "components/year/TimelineYear.module.css",
-    { count: 1, why: "cat A — any-pointer explicitly rejected in-file" },
+    { count: 1, why: "cat A — any-pointer rejected for the REVEAL (hit area widened separately)" },
   ],
   // Mixed A+C — a 44px floor sharing a block with a hover reveal. Widening
   // wholesale would pin the reveal open; splitting is a component decision.
@@ -406,6 +414,83 @@ async function main() {
     offForm.length
       ? `non-canonical condition (may exclude coarse-only devices): ${offForm.join("; ")}`
       : `all ${CANONICAL_WIDENED.size} accepted forms only`,
+  );
+
+  // ── 0.7 — the SPLIT-GUARD file, which neither list above can express ──────
+  //
+  // TimelineYear carries BOTH dispositions at once: a bare `pointer: coarse`
+  // block (the reveal + width arms, correctly narrow — widening them would
+  // paint the chip over the unit title for every hybrid user) and a separate
+  // `any-pointer: coarse` block holding ONLY the ::after hit-area inflation
+  // (which paints nothing and costs no layout, so it can widen safely).
+  //
+  // It fits neither list: REQUIRED_WIDENED asserts a file has NO bare guard
+  // (0.5) and that every widened condition is one of the canonical RENAME
+  // forms (0.6) — this is a new block, not a rename. EXPECTED_BARE_POINTER
+  // only counts bare guards and is blind to the widened one entirely. So
+  // without this gate the ::after rule could be deleted, or have `opacity: 1`
+  // / `width: 44px` smuggled into it, and every other assertion here would
+  // still pass while hybrid users silently returned to a 26px target (or the
+  // title-masking regression the bare guard exists to prevent).
+  const SPLIT_FILE = "components/year/TimelineYear.module.css";
+  const splitSrc = readFileSync(path.join(root, SPLIT_FILE), "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  const WIDENED_COND = "@media (min-width: 901px) and (any-pointer: coarse)";
+  const at = splitSrc.indexOf(WIDENED_COND);
+  // Brace-match the block body rather than regexing it: the body contains a
+  // nested rule, so a lazy `\{([^}]*)\}` would stop at the INNER closing brace
+  // and silently validate only the first declaration.
+  let body = null;
+  if (at !== -1) {
+    let depth = 0;
+    for (let i = splitSrc.indexOf("{", at); i < splitSrc.length; i++) {
+      if (splitSrc[i] === "{") depth++;
+      else if (splitSrc[i] === "}" && --depth === 0) {
+        body = splitSrc.slice(splitSrc.indexOf("{", at) + 1, i);
+        break;
+      }
+    }
+  }
+  assert(
+    "0.7a the split-guard file still declares the widened ::after block",
+    body !== null,
+    body === null ? `MISSING from ${SPLIT_FILE}: "${WIDENED_COND}"` : WIDENED_COND,
+  );
+  const selOk =
+    body !== null && /\[data-hier="grid"\]\[data-scope="all"\][^{]*\.uws[^{]*::after\s*\{/.test(body);
+  // -10px, not the -9px that lands exactly on 44: the chip sits at top/right
+  // 4px inside a flex-sized card, so its rect can start on a fractional pixel
+  // and a target specified AT the minimum measures 43.x live. Pinned, because
+  // "close enough" is what put it under the floor last time.
+  const insetOk = body !== null && /inset:\s*-10px/.test(body);
+  assert(
+    "0.7b it inflates the all-scope grid chip's ::after by the measured -10px",
+    selOk && insetOk,
+    body === null
+      ? "block missing (see 0.7a)"
+      : selOk && insetOk
+        ? "selector + inset intact"
+        : `selector ${selOk ? "ok" : "MIS-SCOPED"}, inset ${insetOk ? "ok" : "NOT -10px — a target at the bare minimum measures 43.x live"}`,
+  );
+  // The load-bearing half: this block must stay HIT-AREA ONLY. `opacity` here
+  // would paint the chip permanently on every touch laptop — precisely the
+  // regression the bare guard was kept narrow to avoid.
+  const smuggled =
+    body === null
+      ? []
+      : ["opacity", "width", "min-height", "height"].filter((p) =>
+          new RegExp(`(^|[;{\\s])${p}\\s*:`).test(body),
+        );
+  assert(
+    "0.7c NOTHING but the hit area rode in — no opacity/width smuggled into the widened block",
+    body !== null && smuggled.length === 0,
+    body === null
+      ? "block missing (see 0.7a)"
+      : smuggled.length
+        ? `REGRESSION: ${smuggled.join(", ")} inside "${WIDENED_COND}" would apply to every hybrid user`
+        : "hit area only",
   );
 
   const totalWidened = [...REQUIRED_WIDENED.keys()].reduce(

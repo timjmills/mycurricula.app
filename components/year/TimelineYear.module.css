@@ -1966,12 +1966,60 @@
        above would win over the tier's `height: 26px` and inflate it. */
     min-height: 0;
   }
-  /* 26px chip → 46px hit area, painted size unchanged. −10px, not the −9px
-     that lands exactly on 44: the chip sits at top/right 4px inside a
-     flex-sized card, so its rect can start on a fractional pixel and a target
-     specified AT the minimum measures 43.x live (probe-overlay-audit.mjs read
-     43×43 at −9px). The floor needs margin, not arithmetic that only just
-     clears it. */
+  /* The ::after hit-area inflation that used to live here now sits in the
+     `any-pointer: coarse` block directly below — it is the one arm of this
+     tier that a hybrid device also needs. Everything above stays keyed to
+     `pointer: coarse` for the reasons in the comment at the top of this
+     block. */
+}
+
+/* ── The hit area only, widened to hybrids ────────────────────────────────
+   Same ≥901px tier as the block above, but keyed to `any-pointer: coarse`
+   so it ALSO covers the device that block deliberately excludes: a touch
+   laptop / tablet-with-trackpad, which reports `pointer: fine` (its primary
+   input hovers) alongside `any-pointer: coarse` (a finger is attached too).
+
+   THE TWO ARMS ANSWER DIFFERENT QUESTIONS, WHICH IS WHY THEY TAKE DIFFERENT
+   KEYS. The reveal arm asks "can this teacher DISCOVER the chip?" — and a
+   hybrid has a mouse, so `.unode:hover` already fires and discovery was
+   never the broken half on that device class. Painting the chip permanently
+   for hybrids would mask the unit title on nearly every card (the 20-of-20
+   overlap evidence at the wide-timeline tier above) to fix a path that
+   already works for them. That ruling stands; this does not disturb it.
+
+   This arm asks the other question — "once revealed, can a FINGER hit it?"
+   On a hybrid the real gesture is hover with the mouse, THEN tap with the
+   hand, and only the tap fails: the chip paints 26px against the ≥44px floor
+   (CLAUDE.md §4), on cards measuring 74–88px.
+
+   An inset ::after is the arm that can widen safely because it PAINTS
+   NOTHING AND COSTS NO LAYOUT. The chip is `position: absolute`, so the
+   pseudo-element steals nothing from the flex row: unit-title width delta
+   0px, nothing newly ellipsised, no horizontal scroll. Its only cost is
+   invisible overlap in the card's top-right corner — the same trade the
+   block above already accepted for pure-touch devices, and here there is no
+   competing hybrid-user harm to weigh it against.
+
+   26px chip → 46px hit area, painted size unchanged. −10px, not the −9px
+   that lands exactly on 44: the chip sits at top/right 4px inside a
+   flex-sized card, so its rect can start on a fractional pixel and a target
+   specified AT the minimum measures 43.x live (probe-overlay-audit.mjs read
+   43×43 at −9px). The floor needs margin, not arithmetic that only just
+   clears it.
+
+   `any-pointer: coarse` is a strict superset of `pointer: coarse`, so the
+   pure-touch devices the block above serves keep this rule unchanged.
+
+   VERIFYING THIS: three of the four ways to emulate a coarse pointer are
+   wrong, and two of them fake a pass. Playwright `hasTouch` and CDP
+   `setTouchEmulationEnabled` both produce a PHONE (`pointer: coarse`), which
+   the block above already matched — pre/post are identical. CDP
+   `setEmulatedMedia {pointer}` is silently ignored. Only launching Chrome
+   with `--blink-settings=availablePointerTypes=6,primaryPointerType=4`
+   produces the hybrid. Assert `any-pointer: coarse` TRUE **and**
+   `max-width: 900px` FALSE in the same observation, or the ≤900px arm
+   supplies the pass instead. */
+@media (min-width: 901px) and (any-pointer: coarse) {
   .root[data-hier="grid"][data-scope="all"] .uws.uws::after {
     content: "";
     position: absolute;
