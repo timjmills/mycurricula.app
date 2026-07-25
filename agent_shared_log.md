@@ -4506,3 +4506,361 @@ pair mounted inside a real `.cp-root` under the real cascade.
 - The B/C `any-pointer` files above.
 - The §4b interaction test for the `YearLessonPane` arrow scoping — recorded
   by the lead as **unverified**, folded into the consolidated live pass.
+
+---
+
+## HANDOFF — touch-target guards: `pointer: coarse` → `any-pointer: coarse`
+
+*Written 2026-07-25 by fix-class-sweep. Deliberately deferred by the lead; task
+#23. Self-contained — you do not need the conversation that produced it.*
+
+### The bug
+
+`pointer` describes only the **PRIMARY** pointer. A touch laptop, or an iPad
+with a trackpad attached, reports `pointer: fine`. So `@media (pointer: coarse)`
+**does not match**, and the 44px touch-target inflation never fires — even with
+a finger on the glass. Measured symptom: an iPad Pro in landscape (1024px)
+getting 26–34px targets.
+
+`any-pointer: coarse` matches when **any** available pointer is coarse, which is
+exactly the hybrid case. For a touch-target guard that is the correct question,
+not a style preference.
+
+**Already done (reference implementation):** `components/ui/Button.module.css`
+and `components/ui/Chip.module.css`, commit `0eeb3af`. Button's header comment
+carries the full reasoning and the category-A warning — read it first.
+
+### Why this was deferred, not skipped
+
+The gap is **pre-existing** — an improvement, not a regression fix, and it has
+been real for months. Category B spans `lesson-editor`, `resource-wall-v2`,
+`weekly` and `year-v2` — files owned by lanes that were mid-verification with
+Criticals pending. Folding a cross-cutting CSS pass into those diffs would have
+delayed a data-loss fix to improve iPad ergonomics.
+
+### ⚠ THE TRAP — read every rule's INTENT; never sed the string
+
+The same media feature is used for **two opposite purposes** in this repo. A
+blanket find-and-replace ships a visible regression on the exact population this
+fix is for.
+
+### Category A — HOVER-AFFORDANCE guards. **NEVER CHANGE THESE.**
+
+| file:line |
+|---|
+| `components/grid/WeeklyGrid.module.css:563` |
+| `components/rename/InstanceRename.module.css:53` |
+| `components/teach/left/TeachLeft.module.css:158` |
+| `components/teach/right/TeachRightPanel.module.css:41` |
+
+All are `@media (hover: none), (pointer: coarse)`, and they **reveal controls
+that are otherwise hover-only** (e.g. WeeklyGrid sets `opacity: 1` on
+`.subjectReorder`). Widening these to `any-pointer` pins those affordances
+**permanently open on any machine that merely has a touchscreen** — every touch
+laptop. `hover: none` is already doing the work, so the change buys nothing and
+costs a visible defect.
+
+Their touch-target *sizing* needs are already met by the shared `Button`
+primitive's `::before` inflation, which is now on `any-pointer`. Leave them.
+
+### Category B — touch-target guards with **NO width fallback**. Do these FIRST.
+
+**More urgent than C**: with no `max-width` arm, these do **nothing at all** on
+a hybrid device today. 20 rules / 11 files.
+
+| file:line |
+|---|
+| `app/chrome.css:1763` |
+| `components/daily/DailyView.module.css:1857` |
+| `components/lesson-editor/lesson-editor.module.css:139, 178, 213, 258, 285, 396` |
+| `components/lesson-editor/FloatingBar.module.css:244` |
+| `components/resource-wall-v2/ResourceWall.module.css:290, 323, 352` |
+| `components/resource-wall-v2/Section.module.css:175` |
+| `components/resource-wall-v2/WallLibrary.module.css:77, 104, 170, 341` |
+| `components/weekly/WeekEditBoard.module.css:394` |
+| `components/year-v2/YearC.module.css:128` |
+| `components/year/YearConstellation.module.css:132` |
+
+Check each is genuinely a touch-target rule before changing it — B was
+separated from A mechanically (absence of `hover: none`), so confirm intent.
+
+### Category C — already paired with a width arm. Lower urgency, do after B.
+
+The width arm still catches phones, so these are inconsistent rather than
+broken. 27 rules.
+
+`components/catchup-v2/CatchUpModal.module.css:369` ·
+`components/daily/DayEditSplit.module.css:515` ·
+`components/daily/dock/Dock.module.css:725` ·
+`components/daily/planning-tabs/planning-tabs.module.css:615` ·
+`components/day-v2/day-v2.module.css:824` ·
+`components/hub-v2/browse/browse.module.css:299` ·
+`components/hub-v2/hub.module.css:533, 540` ·
+`components/lesson-plan-v2/plan-page.module.css:153` ·
+`components/lesson-plan-v2/tabs/tabs.module.css:417` ·
+`components/onboarding-v2/steps/steps-v2.module.css:331` ·
+`components/planner-v2/atoms.module.css:241` ·
+`components/standards/standards-picker.module.css:392` ·
+`components/teach-v2/BoardSwitcher.module.css:121` ·
+`components/teach-v2/BoardTimer.module.css:78` ·
+`components/teach-v2/LessonRail.module.css:157` ·
+`components/teach-v2/SlideFilmstrip.module.css:158` ·
+`components/teach-v2/TeachV2Shell.module.css:284` ·
+`components/teach-v2/WritingBar.module.css:228` ·
+`components/unit-chip/UnitChip.module.css:68` ·
+**`components/week-v2/WeekC.module.css:385` — OUTLIER: `max-width: 1023px`, not
+900. Preserve that width; do not normalise it while you are in there.** ·
+`components/year-v2/ExplorerShell.module.css:288` ·
+`components/year-v2/UnitExplorer.module.css:50, 711` ·
+`components/year-v2/UnitWorkspaceRail.module.css:233` ·
+`components/year-v2/YearA.module.css:199` ·
+`components/year-v2/drawer/UnitContextDrawer.module.css:105`
+
+Note two orderings exist in the codebase — `(pointer: coarse), (max-width: …)`
+and `(max-width: …), (pointer: coarse)`. Equivalent; don't churn them.
+
+### Known consequence to weigh (Codex §4a, accepted and shipped)
+
+Some of these rules change **VISIBLE layout**, not just an invisible hit area —
+`Chip .filter` sets `min-height: 44px` **and** `padding: 10px`. So while this is
+half-applied, a touchscreen desktop can show 44px chips beside 36px lookalikes.
+That is the argument for finishing B+C in one pass rather than trickling.
+
+Second, inherent to the ruling: inflated hit areas can overlap adjacent compact
+controls on a mouse-driven touchscreen desktop. Accepted — the direction is the
+safe one — but do not add a 44px `::before` to a control packed tightly against
+a destructive neighbour without checking overlap. (That is why
+`Chip .removeBtn` was deliberately left at 24px with a comment rather than
+inflated; see that file.)
+
+### ⚠ VERIFICATION — a desktop resize does NOT reproduce this
+
+**`any-pointer` emulates differently from `pointer`, and neither is reproduced
+by resizing a desktop window.** A `pointer`-based run does **not** carry over —
+re-verify from scratch.
+
+Use a coarse-pointer emulation context, ~1024px wide, and assert
+`matchMedia("(any-pointer: coarse)").matches === true` **and**
+`matchMedia("(max-width: 900px)").matches === false` — that combination *is* the
+iPad-Pro-landscape condition, and without asserting it you may be measuring a
+plain narrow viewport and proving nothing.
+
+```js
+await browser.newContext({
+  viewport: { width: 1024, height: 768 },
+  isMobile: true, hasTouch: true, deviceScaleFactor: 2,
+});
+```
+
+Then measure the **real hit area** with `document.elementFromPoint` probing
+outward from each target's centre — not `getComputedStyle`. A correctly-declared
+44px `::before` can still be clipped by an ancestor, and a CSS read cannot see
+that. Two traps that already cost time here:
+
+- **Exclude `disabled` controls.** `Tooltip` wraps a disabled child in an
+  event-catching `span.disabledWrapper` **by design**, so a disabled button
+  hit-tests at ~1px. WCAG 2.5.5 exempts disabled controls; including them
+  manufactures findings.
+- **Mount a synthetic sample inside a real `.cp-root`** as well as measuring
+  on-page elements. The on-page arm can match zero elements depending on what
+  has rendered and then pass **vacuously**; the synthetic pair is the
+  load-bearing evidence because it exercises the real cascade — including
+  `.cp-root button { padding: 0 }`, which silently strips single-class module
+  padding (double the class: `.foo.foo`).
+
+A working probe of this exact shape is described in the round-4 entry above.
+
+---
+
+## ToggleGroup + drawer a11y fixes (fix-toggle-drawer)
+
+Landed as `e7e169c` on master. Files: `components/ui/ToggleGroup.{tsx,module.css}`,
+new `components/ui/toggle-group-keys.ts`, `components/year-v2/drawer/**`, new
+`tests/toggle-group-keys.test.ts` (19 assertions), new
+`scripts/probe-toggle-drawer.mjs`.
+
+**§4b precondition.** Started at `c1190f7`. My owned files were CLEAN in the
+working tree throughout (`git status --short` on them was empty at start), so
+every measurement below is of this lane's change and nothing else's. The rest of
+the tree was dirty across six lanes; every claim about another lane's file came
+from `git show HEAD:<path>`. [[measure-head-not-dirty-tree]]
+
+### The Critical is only HALF closed — the other half is a one-line callsite change
+
+`ToggleGroup` now carries `ToggleOption.destructive`. One destructive option
+anywhere in a group forces **focus-only arrow navigation** for the whole group
+(arrows move focus, Enter/Space/click commits), overriding the new
+`selectOnFocus` prop so a callsite cannot opt back into the trap. Defaults are
+unchanged, so all ~30 existing callsites behave exactly as before.
+
+This is deliberately the scoped fix the fix-class-sweep lane argued for in the
+entry above ("committing on arrow is not wrong in itself. It is wrong when a
+reachable option is destructive"). `use-roving-radio.ts` is untouched and stays
+correct.
+
+**But no production callsite is marked yet.** The real one is
+`components/lesson-plan-v2/LessonWorkspace.tsx` `KIND_OPTIONS` — another lane's
+file. Until its `"none"` option gets `destructive: true`, ArrowRight from
+"Summative" still wraps onto "None" and still clears all four assessment
+columns. Exact change routed to the orchestrator; it is one property, no import,
+no element change.
+
+`AssessmentsPanel` and `UnitAssessments` KIND_OPTIONS are **Not set / Formative /
+Summative** — no destructive member, unaffected, unchanged. (A Codex pass pointed
+its Critical at `AssessmentsPanel.tsx:305`; that is misdirected.)
+
+### Contrast — method and numbers
+
+Canvas-resolved to painted sRGB bytes, formula sanity-checked at
+white-on-black = **21.0** before any number was believed. Do not scrape
+`getComputedStyle` colours: `rgb()` is 0-255 but `color(srgb ...)` is 0-1 floats,
+and this repo's tokens resolve through `color-mix` — conflating them inflates
+ratios, and inflation *manufactures passes*. [[contrast-probe-colour-parsing]]
+
+| surface | before | after |
+|---|---|---|
+| inactive segment label, light tone | `--muted` #908fa3 on `--hairline` #f4f2ec = **2.82:1** | `--ink-500` #57566b on #f4f2ec = **6.36:1** |
+| inactive segment label, dark tone | #8d8ba4 on #282737 = **4.43:1** | #b4b2c8 on #282737 = **7.07:1** |
+| active chip (unchanged) | — | 8.37:1 light / 8.83-8.93:1 dark |
+| drawer `.roEmpty` / `.rowTitleEmpty` / `.entryMissing` / placeholders | `--ink-400` **3.16:1** on `--surface` (light) | `--ink-500` **7.12:1** |
+
+Left alone deliberately: `.chev` and the `--ink-400` focus rings (non-text, 3:1
+bar, measured 3.16) and `.moveBtn:disabled` (disabled controls are exempt from
+1.4.3).
+
+**Tone is DERIVED, and that nearly cost a whole run.** `data-theme` does not move
+it — the axes cookie's `bg`/`glass` fields do. `photo` + `dim=normal` derives
+`data-tone=dark`, so `theme=clear` and `theme=night` both measured DARK. A sweep
+that varies only the theme measures one tone twice and reports a clean pass while
+the failing tone goes unvisited. Use `bg=wash` (+ `glass=light`) for the light arm.
+
+### M7 touch targets
+
+`(pointer: coarse), (max-width: 900px)` — the arm the sibling modules
+(`UnitContextDrawer.module.css`, `DayEditSplit.module.css`) already use. Verified
+under real coarse-pointer emulation at **1024** (the iPad-Pro-landscape case the
+width test missed: chips are 26-34px visually) and at 375, `::before` 44x44 with
+a passing `elementFromPoint` hit test.
+
+`ToggleGroup.module.css` is now a **seventh** file in the repo-wide
+`pointer:` vs `any-pointer:` question the entry above raised — fold it into that
+sweep rather than changing it alone. Hit-test only elements with
+`getClientRects().length`: a collapsed rail's 0x0 chips otherwise produce
+phantom failures (they cost me two).
+
+### Write-path timeouts (M6) — waiting is bounded, writing is NOT
+
+Four Codex passes converged here, and the conclusion is worth carrying:
+**`lib/planner` has no abort seam, so any deadline on the write itself trades a
+visible hang for silent data loss.** Deadlining a row's send releases its queue
+slot while the request is still live; the next patch goes out and, if they land
+out of order, the server keeps the OLDER text. Same for the barrier — proceeding
+with a delete or reorder while a patch is in flight is the exact race the barrier
+exists to prevent. My first cut did both and Codex was right to reject it.
+
+What landed instead:
+
+- **Reads** are bounded (10s) — no more permanent skeleton, and because
+  `inFlightWrites` is module-global, that hang previously blocked EVERY unit for
+  the rest of the session.
+- **Mutations refuse rather than race.** `drained()` requires this instance's
+  queue to drain AND `inFlightWrites` to be empty; otherwise the delete/reorder
+  is abandoned, the editor is handed back (`busy` released), and the teacher is
+  told. Nothing is issued against a snapshot known to be suspect.
+- **No timed eviction from `inFlightWrites`.** An earlier cut dropped entries
+  after 15s so later reads would not keep paying the barrier — but that set is
+  also what tells a mutation an earlier write is still live, so the eviction made
+  it lie. Entries leave only on settle.
+- **A read that outran the barrier repairs itself**: it waits for the writes to
+  land, then re-reads. Response ordering is already safe — the repair re-enters
+  through the effect (`reloadTick`), whose cleanup sets the previous generation's
+  `alive = false` before the second read is issued, so the stale response cannot
+  apply on top of the fresh one. (A Codex pass flagged this as High; refuted with
+  that mechanism.)
+
+Still open, and **not fixable inside the drawer folder alone**: a write that never
+settles leaves delete/reorder refused for that session. The real fix is an abort
+signal or a row-version/sequence check at the `lib/planner` seam — worth pairing
+with whatever the serial-write-queue lane lands.
+
+### Other fixes
+
+- **H1** a save failing after the pane left the screen reported via `setError` on
+  a dead — or `display:none` — component, i.e. `console.error` only. Failures now
+  route to the app-level `useConsequenceToast` when `!alive || !visible`; the
+  provider outlives every teardown (pane switch, "Open lesson", close, unit
+  switch). Note the second half of that condition: closing the drawer does NOT
+  unmount the pane, so `setError` "worked" while painting where nobody could see.
+- **M1 + a Codex High** the revert signal was a bare counter, so row A's failure
+  wiped row B's open editor mid-keystroke. Now one counter **per row**
+  (`Record<string, number>`) — a single `{id, n}` value was not enough either,
+  because two failures in the same React batch collapse to the last updater.
+- **M2** a Kind change moves the row to another group's `<ul>`, unmounting the
+  editor and dropping focus to `<body>`; restored via the unit half's rAF idiom.
+- **M4** the lesson half now carries a scope badge — "Team content" / "Your copy"
+  — beside the unit half's. They have opposite blast radii and looked identical.
+- **L4/L5/L12/L15** `role="note"` on focusable badges; all three panes open at h3
+  (they were h3/h4/none); focus rings get the card radius (a square ring inside a
+  `border-radius` + `overflow:hidden` card loses its corners); the wrong
+  `var(--ink-500, #6e6c82)` fallbacks removed (`#6e6c82` is not `--ink-500` in
+  either tone, and `#1c1b2e` is `--ink`'s LIGHT value — near-black text had it
+  ever fired on a dark panel).
+
+Refuted: **L8** (both `relatedTarget` containment checks are correct — left
+alone) and the `InsightsPanel.tsx:140` half of **L4** (an `<h3 tabIndex={0}>` has
+an implicit `heading` role; only the bare `<span tabIndex={0}>` at :217 needed
+one).
+
+Residual, not fixed and not in the brief: removing a lesson assessment also drops
+focus to `<body>` (the row leaves the list entirely), which needs a decision
+about where focus should land.
+
+### The no-op-click change touches ~30 callsites — here is the audit
+
+`onChange` no longer fires for the already-active option. Every callsite handler
+was read: all are plain setters. **One** has a same-value side effect —
+`components/appearance/subject-colors.tsx` `switchScope` also runs
+`setEditingSubject(null)`, so re-clicking the lit scope chip no longer closes an
+open subject editor. Judged incidental rather than an affordance. School-week
+presets are safe (weekdays are only editable while `weekPreset === "custom"`, so
+an active preset can never drift out of sync and need re-applying).
+
+### §4b could not reach the drawer — and why
+
+`ToggleGroup` was verified live on `/weekly`'s real segmented controls. The
+**drawer's own** surfaces (M4 badge, L5 heading tiers, M9 drawer text) were NOT
+verified live: **the unit workspace does not mount in the current shared tree.**
+Evidence — the chip receives `pointerdown`/`mousedown`/`click` (so this is not
+the tooltip click-swallow), the URL does not change, and zero `.ue-modal` nodes
+appear, on `/weekly` and `/year`, with and without a programmatic `.click()`.
+Needs a re-run once the workspace path is restored:
+`node scripts/probe-toggle-drawer.mjs` covers it and degrades to a recorded SKIP
+rather than a vacuous pass.
+
+Also seen while probing, for whoever owns them:
+
+- The dev server on 3099 twice served a **torn `.next` chunk** —
+  `app/(planner)/layout.js` failed to parse ("Invalid or unexpected token") at
+  the `DockLayout` module, while `components/daily/dock/DockLayout.tsx` was clean
+  at HEAD with no source corruption. Every page went dead. Touching any file in
+  the chunk forces an HMR recompile and heals it; it recurred later from another
+  save. If a lane sees "all clicks do nothing", fetch the chunk and check it
+  parses before bisecting code. [[dev-server-foot-guns]]
+- React **hydration mismatch** on `/weekly`: `WeeklyShell`'s `srOnly` `useId`
+  (`_R_15esndjlill5rllb_` vs `_R_4lritmemaml5rllb_`) and the Shoutbox composer
+  input's `style={{}}`. Both other lanes' dirty files.
+- Working-tree breakage that reddened the shared gate:
+  `lib/planner/supabase-source.ts` referencing an undefined `patchHasContent`
+  (with `tests/track-b-workspace-fields.test.ts` failing on it),
+  `lib/use-school-week.ts` (`SchoolWeekSaveResult`), and 8 type errors across the
+  new `tests/planner-completion-gate.test.ts` / `tests/planner-doc-replay.test.ts`
+  (`"not-done"` vs `"not_done"`, kind `"exit"`, `taughtAt` in a patch type,
+  `LessonResource` casts missing `type`). All clean at HEAD.
+
+### Verification
+
+`npx tsc --noEmit` clean for these files; `npx next lint --no-cache` clean;
+`npm run test` **57 files, 1179 passed / 68 todo / 0 failed** (the lead's 193/16
+baseline is stale — other lanes have added suites since). §4a Codex gate run four
+times under `--sandbox read-only` with the diff piped via stdin; closed with one
+refuted High and no outstanding legitimate Medium-or-above in these files.
