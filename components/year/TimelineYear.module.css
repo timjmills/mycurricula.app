@@ -1924,6 +1924,61 @@
   }
 }
 
+/* ── Coarse pointer: the opener must never be hover-only ──────────────────
+   The all-scope grid tier above hides `.uws` at rest and reveals it on
+   `.unode:hover`. The comment there claims "touch never meets it" because
+   ≤900px force-switches to the list outline — which holds only if every touch
+   device is ≤900 CSS px. An iPad Pro in landscape is 1366. On that device the
+   primary pointer cannot hover, so the reveal never fires and /year-on-paper's
+   ONLY route to the unit workspace is invisible.
+
+   WIDTH IS THE WRONG KEY; POINTER TYPE IS THE RIGHT ONE. `pointer: coarse`
+   means the PRIMARY input cannot hover — exactly the devices the reveal fails.
+   `any-pointer: coarse` was considered and rejected: it also matches a
+   trackpad-driven touch laptop, which reports `pointer: fine`, still hovers,
+   and therefore still reaches the chip. Widening to it would paint the chip
+   over the unit title for every hybrid-device teacher to fix a path that is
+   not broken for them.
+
+   WHAT THIS DOES NOT DO: it does not adopt the ≤900px branch wholesale. That
+   branch sends the chip `position: static`, back into the flex row as a real
+   trailing column — harmless there (it is a one-paint guard before `isNarrow`
+   swaps to the outline), ruinous here, where the all-scope cards measure ~95px
+   and a 44px column would leave ~50px for the unit name. The chip therefore
+   stays absolutely positioned and 26px PAINTED (zero width cost, same as the
+   hover reveal), and earns its ≥44px touch target (CLAUDE.md §4) from an inset
+   ::after instead. The trade that buys: a 44px zone in the card's top-right
+   corner opens the workspace rather than drilling in. On a card this size some
+   overlap is unavoidable, and the drill keeps the other ~70% of the card.
+
+   The resting `opacity: 0` for FINE pointers is deliberate and stays untouched
+   — see the tier's own comment above for why a partial fade cannot rescue it. */
+@media (min-width: 901px) and (pointer: coarse) {
+  /* Outline rows + subject-scope cards: 40px → a real 44px target. */
+  .uws.uws {
+    width: 44px;
+    min-height: 44px;
+  }
+  .root[data-hier="grid"][data-scope="all"] .uws.uws {
+    /* Permanently visible: there is no hover to reveal it. */
+    opacity: 1;
+    /* The chip stays 26×26 PAINTED. Without this reset the 44px min-height
+       above would win over the tier's `height: 26px` and inflate it. */
+    min-height: 0;
+  }
+  /* 26px chip → 46px hit area, painted size unchanged. −10px, not the −9px
+     that lands exactly on 44: the chip sits at top/right 4px inside a
+     flex-sized card, so its rect can start on a fractional pixel and a target
+     specified AT the minimum measures 43.x live (probe-overlay-audit.mjs read
+     43×43 at −9px). The floor needs margin, not arithmetic that only just
+     clears it. */
+  .root[data-hier="grid"][data-scope="all"] .uws.uws::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   /* Phone + tablet: the workspace opener is a real ≥44px touch target

@@ -63,6 +63,32 @@ function isTextInput(target: EventTarget | null): boolean {
   return ce !== null && ce !== "false";
 }
 
+/**
+ * Returns true when a modal dialog is on screen.
+ *
+ * WHY THIS IS SEPARATE FROM `isTextInput`. That guard asks "is the teacher
+ * TYPING?"; this one asks "is the teacher looking at something else?". A modal
+ * covers the route behind it, so a bare `1` / `2` / `3` / `4` / `[` / `]` / `T`
+ * / `g c` navigates a surface nobody can see — the dialog stays up over a route
+ * that silently changed underneath it, and closing it lands the teacher
+ * somewhere they never asked to go. Focus does not have to be in a field for
+ * that: a tab button, a lesson row, or the close button inside the unit
+ * workspace are all non-text targets that reach the switch below.
+ *
+ * `aria-modal="true"` is the right key BECAUSE it is the same attribute that
+ * tells assistive tech the rest of the page is inert — a dialog claiming it
+ * should not also let the rest of the page take keystrokes. It deliberately
+ * does NOT match the app's non-modal popovers (`ChromeQuote`,
+ * `components/rename/InstanceRename` — which sets `aria-modal="false"`
+ * explicitly), where the page behind stays live and its shortcuts should too.
+ *
+ * Every dialog in the app mounts conditionally, so presence in the DOM is
+ * openness; none are left mounted-but-hidden.
+ */
+function isModalOpen(): boolean {
+  return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
+}
+
 export function useKeyboardShortcuts({
   onOpenPalette,
   onOpenShortcuts,
@@ -98,6 +124,31 @@ export function useKeyboardShortcuts({
 
       // All remaining shortcuts are suppressed inside text inputs.
       if (inText) return;
+
+      // …and while a modal dialog is up. Everything past this point is a
+      // single-key ROUTE or WEEK change, which is exactly what must not fire
+      // behind a dialog the teacher is reading.
+      //
+      // POSITION IS LOAD-BEARING — deliberately BELOW the ⌘K branch, because
+      // the palette is itself an aria-modal dialog and checking first would
+      // make it impossible to toggle shut with the same chord that opened it.
+      //
+      // Two consequences, both weighed rather than overlooked:
+      //   • `?` no longer TOGGLES the shortcuts overlay shut, since that
+      //     overlay is aria-modal too. Acceptable: it still closes on Escape,
+      //     its ✕ and a scrim click, and the top-bar "?" button drives the same
+      //     toggle state. Stacking it ON TOP of an open modal would be the same
+      //     mistake this guard exists to stop, in a smaller form.
+      //   • ⌘K can still open the palette over another dialog (§4a Medium,
+      //     dismissed with reasons). That is pre-existing behaviour this guard
+      //     did not introduce, and it matches the ⌘K branch's own rationale: a
+      //     modifier chord is unambiguous INTENT, which is why it is allowed
+      //     inside text inputs too. A stray `2` is a slip; ⌘K is a decision.
+      //     Suppressing it properly would mean threading the palette's open
+      //     state through this hook's public options so the chord could tell
+      //     "close me" from "open me over something else" — a public API change
+      //     to a surface outside this change's scope.
+      if (isModalOpen()) return;
 
       // Ignore any shortcut combined with a modifier key (no accidental
       // ⌘1, Alt-/, etc.) — those are OS / browser reserved combinations.

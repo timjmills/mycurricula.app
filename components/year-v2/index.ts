@@ -2,9 +2,13 @@
 // folder (`@/components/year-v2`), never a deep file.
 //
 // YearShell is the /year frame router (glass → YearA · paper → the legacy
-// TimelineYear · color → YearC), and hosts the shared Unit Explorer modal for
-// the glass + color frames. UnitExplorer + its data helpers are built by
-// Builder A (UnitExplorer.tsx / lib/year-v2-data.ts).
+// TimelineYear · color → YearC), and NOTHING MORE — it stopped hosting a Unit
+// Explorer modal in ee34749 (B5.3). All three frames now call the ONE global
+// opener instead; the workspace is mounted once by UnitWorkspaceProvider in
+// app/(planner)/layout.tsx, above the frame branch, which is why switching
+// frames leaves an open workspace standing (the user-locked 2026-07-24
+// decision). UnitExplorer + its data helpers are built by Builder A
+// (UnitExplorer.tsx / lib/year-v2-data.ts).
 //
 // ExplorerShell (Wave 7) is the dialog chrome UnitExplorer and the Lesson
 // Planner (components/lesson-plan-v2/PlanPage) both render into. PlanPage

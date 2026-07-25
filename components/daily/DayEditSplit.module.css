@@ -446,10 +446,25 @@
   font-weight: 700;
   color: var(--muted, #6e6c82);
 }
-.deMeta span {
+/* DIRECT CHILD, not a descendant: the inert pills are the only `<span>`s that
+   are children of `.deMeta`, but the <UnitChip> beside them is a Button, and
+   Button renders its text in an inner `<span class="label">` (Button.tsx:178).
+   A descendant selector paints THAT span with this pill's grey fill, 4px 10px
+   padding and pill radius — a second pill nested inside the chip's own ghost
+   pill. (The Tooltip around the chip adds no wrapper here; it only wraps in a
+   span on the disabled path, which this callsite is not — but the button's own
+   label span is enough to hit.) */
+.deMeta > span {
   background: rgba(127, 127, 150, 0.1);
   padding: 4px 10px;
   border-radius: var(--r-pill, 999px);
+}
+/* FIT ONLY (UnitChip supplies its own look). `.deMeta` is a flex ROW, so its
+   default `align-items: stretch` would pull the chip to the tallest pill's
+   height; center it on the cross axis instead. Doubled per the `.cp-root
+   button` (0,1,1) reset convention. */
+.deMetaUnit.deMetaUnit {
+  align-self: center;
 }
 
 /* ── Dark tone ──────────────────────────────────────────────────────────── */
@@ -501,8 +516,10 @@
 :global(.home[data-tone="dark"]:not([data-glass="light"])) .teamBanner {
   background-color: rgb(30, 30, 48);
 }
-:global(:root[data-tone="dark"]:not([data-glass="light"])) .deMeta span,
-:global(.home[data-tone="dark"]:not([data-glass="light"])) .deMeta span {
+/* Direct child, for the same reason as the light-tone rule above — otherwise
+   this repaints <UnitChip>'s inner Button label span in dark tone too. */
+:global(:root[data-tone="dark"]:not([data-glass="light"])) .deMeta > span,
+:global(.home[data-tone="dark"]:not([data-glass="light"])) .deMeta > span {
   background: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.82);
 }

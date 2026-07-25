@@ -34,11 +34,23 @@
 // in the planner layout, ABOVE the frame branch, so re-routing glass ⇄ paper ⇄
 // color re-renders the view underneath an untouched workspace.
 //
-// DEAD-BRANCH NOTE (for the lead): TimelineYear still contains its own
-// `frame === "color"` swap to YearConstellation (TimelineYear.tsx ~:640 /
-// :840). With YearShell branching the color frame to <YearC/> here,
-// TimelineYear only ever renders on the PAPER path, so that internal color
-// swap is unreachable dead logic — flagged for a follow-up cleanup.
+// NOT-DEAD-BRANCH NOTE (this corrects an earlier claim in this header that the
+// branch was unreachable dead logic — it is only unreachable FLAG-ON):
+// TimelineYear keeps its own `frame === "color"` swap to YearConstellation
+// (`showConstellation`, TimelineYear.tsx :696, rendered :898). With
+// NEXT_PUBLIC_V2 ON this shell branches the color frame to <YearC/> before
+// TimelineYear mounts, so the internal swap never fires. With the flag OFF
+// there is no shell at all — app/(planner)/year/page.tsx renders
+// <TimelineYear/> directly — and the swap is the live color-frame Year in the
+// rollback build. Deleting it would silently gut the rollback path, which is
+// the whole point of the flag. It goes when the flag does, not before.
+//
+// FLAG-OFF REACHABILITY (worth knowing before touching the paper Year): under
+// the flag the paper Year is the ONLY route to the unit workspace anywhere in
+// the app. `DailyViewV1` and `WeeklyShellV1` mount no <UnitChip> and never call
+// the opener, so TimelineYear's per-unit-card ⤢ button carries it alone — which
+// is why that button's discoverability (`.uws`, TimelineYear.module.css) is
+// load-bearing rather than a nicety.
 
 import { useMemo, type ReactNode } from "react";
 import { usePlanner } from "@/lib/planner-store";

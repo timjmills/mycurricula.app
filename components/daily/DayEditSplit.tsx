@@ -90,6 +90,7 @@ import { todayColumnIndex } from "@/lib/now-anchor";
 import { getDayBlocks, minuteOfDay } from "@/lib/schedule-data";
 import { lessonTime, dateForWeekDay } from "@/lib/mock";
 import { LessonEditor } from "@/components/lesson-editor";
+import { UnitChip } from "@/components/unit-chip";
 import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
 import { RichTextEditor } from "@/components/rich-text";
 import { PaneSplitter } from "./PaneSplitter";
@@ -550,7 +551,22 @@ export function DayEditSplit({
                   <span>Standard {sel.standards[0]}</span>
                 )}
                 <span>{subj.name}</span>
-                <span>{sel.unit || "Planned"}</span>
+                {/* Was `<span>{sel.unit || "Planned"}</span>` — a raw unit id
+                    when set, and the word "Planned" (not a unit, and not
+                    information) when not. Day EDIT was the last v2 planner
+                    surface with no route to the unit workspace: DayA/B/C carry
+                    the chip but DailyView mounts them in VIEW mode only, and
+                    Week EDIT already has one (WeekEditBoard), so the two edit
+                    surfaces disagreed and the only way through was to toggle
+                    back to View. Same shared control, same placement idiom as
+                    WeekEditBoard's expanded tile body — it renders nothing when
+                    the catalog can't resolve the id, so the meta row simply
+                    loses a line rather than showing a slug. */}
+                <UnitChip
+                  subjectId={sel.subject}
+                  unit={sel.unit}
+                  className={styles.deMetaUnit}
+                />
               </div>
               <LessonEditor lessonId={sel.id} host="day-pane" />
             </div>
