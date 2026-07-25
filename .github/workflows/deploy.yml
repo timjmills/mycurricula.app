@@ -35,10 +35,25 @@ on:
       - master
   workflow_dispatch:
 
-# Cancel an in-flight deploy when a newer push arrives on the same ref.
+# QUEUE deploys; never cancel one. `cancel-in-progress: true` is right for a
+# preview branch and wrong for an auto-deploying production branch, because it
+# converts push pressure into DEPLOY STARVATION — silently.
+#
+# Observed 2026-07-25: a deploy takes ~2.5 min and master was taking a push
+# every ~2-3 min during an agent-team session. Every push killed the running
+# build, so the pipeline could only land a commit during a >=3-minute gap in
+# pushes. Seven consecutive runs: one success, six cancelled. Production sat
+# frozen on an hours-old commit for ~20 minutes while `master` moved eight
+# commits ahead — and nothing failed, nothing alerted. A cancelled run is a
+# grey tick, not a red one, so the dashboard looked fine.
+#
+# With `false`, deploys serialise instead. Each one deploys a superset of the
+# last, so a burst costs some redundant build minutes and then drains. That is
+# a far better failure mode than prod quietly ceasing to move: slow and correct
+# beats fast and stalled.
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
