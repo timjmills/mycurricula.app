@@ -74,8 +74,14 @@
 /* W2-B3 — when the bubble carries the "Turn off these tips" mini-link, the
    bubble must accept pointer events so the user can move from the trigger
    onto the bubble and click the link. Without this the base
-   `pointer-events: none` swallows the click. Used only on tooltips with a
-   tooltipId AND required !== true — every other bubble stays inert. */
+   `pointer-events: none` swallows the click.
+
+   Applied only when the tooltip has a tooltipId AND required !== true AND a
+   mouse interaction is in progress (the cursor has entered the trigger) —
+   see tooltipPointerPolicy() in Tooltip.tsx. A bubble opened by FOCUS alone
+   stays inert: there is no cursor travelling to the link, and an interactive
+   rectangle parked over the page for as long as a control holds focus eats
+   the next click aimed at whatever is underneath it. */
 .tooltip.interactive {
   pointer-events: auto;
 }

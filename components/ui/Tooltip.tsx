@@ -30,6 +30,23 @@
 //   120ms fade by default. Under prefers-reduced-motion the transition is
 //   removed so show/hide is instant.
 //
+// Pointer-events on the bubble (the focus-open click-swallow):
+//   The bubble is `pointer-events: none` by default so it can never capture a
+//   click meant for the content underneath. The ONE exception is the
+//   dismissible bubble's "Turn off these tips" mini-link, which the user has
+//   to be able to click — so those bubbles flip to `pointer-events: auto`.
+//   That exception used to key off `showDismissLink` alone, which is a
+//   PROP-derived constant: every dismissible tooltip was interactive however
+//   it opened. A tooltip opens on focus too, and focus has no cursor — so
+//   tabbing to (or clicking) a control left a click-eating rectangle parked
+//   over the page for as long as the control held focus. The next mousedown
+//   inside it landed on the bubble, the trigger blurred, the bubble
+//   unmounted, and the mouseup landed elsewhere — no click event, one input
+//   silently eaten.
+//   The bubble is therefore interactive only while a MOUSE interaction is in
+//   progress (`pointerEngaged`, below) — the only situation in which the link
+//   is reachable anyway.
+//
 // Disabled-button quirk (Lane Q m7):
 //   Chromium suppresses pointer events on disabled <button> elements, so
 //   mouseenter/mouseleave never fire on the disabled child and the styled
@@ -99,6 +116,58 @@ export interface TooltipProps {
 }
 
 type Side = NonNullable<TooltipProps["side"]>;
+
+// ── Bubble pointer policy ────────────────────────────────────────────────────
+
+/** Inputs the bubble's pointer/dismiss-link policy is derived from. */
+export interface TooltipPointerInput {
+  /** The `required` prop — high-consequence, always-on tooltips. */
+  required: boolean;
+  /** The `tooltipId` prop — undefined means "never dismissible". */
+  dismissalId: string | undefined;
+  /**
+   * True while a mouse interaction is in progress on this tooltip: the
+   * cursor has entered the trigger and no close has run since. False for a
+   * bubble opened purely by focus (keyboard tab, programmatic focus) —
+   * there is no cursor on its way to the link, so the bubble must not
+   * intercept clicks.
+   */
+  pointerEngaged: boolean;
+}
+
+/** What the bubble renders and whether it swallows pointer events. */
+export interface TooltipPointerPolicy {
+  /** Render the inline "Turn off these tips" mini-link. */
+  showDismissLink: boolean;
+  /** Give the bubble `pointer-events: auto` (the `.interactive` class). */
+  interactive: boolean;
+}
+
+/**
+ * Decide whether the portaled bubble accepts pointer events.
+ *
+ * The bubble must be inert by default — it is a floating rectangle over the
+ * page, and anything it captures is a click the teacher meant for the UI
+ * underneath. It earns `pointer-events: auto` only when BOTH hold:
+ *
+ *   1. It carries the "Turn off these tips" link (dismissible + not
+ *      `required`) — otherwise there is nothing in it to click; and
+ *   2. a mouse interaction is in progress (`pointerEngaged`) — otherwise
+ *      there is no cursor that could reach the link, and interactivity buys
+ *      nothing while costing a swallowed click.
+ *
+ * Exported for tests: this repo's vitest gate is node-environment (no DOM
+ * renderer), so the contract is pinned on the pure decision rather than on a
+ * rendered tree.
+ */
+export function tooltipPointerPolicy({
+  required,
+  dismissalId,
+  pointerEngaged,
+}: TooltipPointerInput): TooltipPointerPolicy {
+  const showDismissLink = !required && dismissalId !== undefined;
+  return { showDismissLink, interactive: showDismissLink && pointerEngaged };
+}
 
 // Native `title=` is only meaningful for plain-string content — the OS tooltip
 // cannot render a React node. When `content` is a string we mirror it so touch
@@ -199,6 +268,16 @@ export function Tooltip({
   // Whether the current open was triggered by hover (vs focus).
   // Used to conditionally suppress on touch devices in CSS.
   const [byHover, setByHover] = useState(false);
+  // Whether a mouse interaction is in progress — set the moment the cursor
+  // enters the trigger, cleared by every close. Deliberately NOT the same
+  // flag as `byHover`: `byHover` records how the current open BEGAN (and so
+  // flips to false when a hovered trigger is clicked and takes focus),
+  // whereas the dismiss link must stay clickable across exactly that
+  // transition. It also has to stay true through the 120ms grace period
+  // below, while the cursor crosses the gap between trigger and bubble —
+  // going inert mid-flight would stop the bubble's own mouseenter from ever
+  // firing and close it out from under the cursor.
+  const [pointerEngaged, setPointerEngaged] = useState(false);
 
   // W2-B3 dismissibility. The hook is SSR-safe (initial render = NOT
   // dismissed) so it cannot cause a hydration mismatch in the trigger
@@ -240,13 +319,20 @@ export function Tooltip({
     clearDelay();
     setOpen(false);
     setPlacement(null);
+    // A close ends the mouse interaction: the next open has to earn
+    // interactivity again by the cursor entering the trigger.
+    setPointerEngaged(false);
   }, []);
 
   // "Turn off these tips" handler. Only available to non-required tooltips
   // that opted in to dismissibility (have a dismissalId). Hides the bubble
   // immediately and writes the id to localStorage so subsequent opens are
   // suppressed.
-  const showDismissLink = !required && dismissalId !== undefined;
+  const { showDismissLink, interactive } = tooltipPointerPolicy({
+    required,
+    dismissalId,
+    pointerEngaged,
+  });
   const handleDismissClick = useCallback(
     (e: ReactMouseEvent<HTMLButtonElement>): void => {
       e.preventDefault();
@@ -288,6 +374,11 @@ export function Tooltip({
 
   const handleMouseEnter = () => {
     clearDelay();
+    // The cursor is on the trigger — from here on the bubble may accept
+    // pointer events (see tooltipPointerPolicy). Set it before the delay
+    // elapses so a bubble already open from focus becomes clickable the
+    // moment the mouse arrives, not `delay` ms later.
+    setPointerEngaged(true);
     delayTimer.current = setTimeout(() => show(true), delay);
   };
 
@@ -314,6 +405,19 @@ export function Tooltip({
   const handleBubbleMouseLeave = () => {
     clearDelay();
     hide();
+  };
+
+  // Pressing inside the bubble must not move focus. Once the trigger holds
+  // focus — the teacher clicked the control, or tabbed to it and then reached
+  // for the mouse — a mousedown on the "Turn off these tips" link blurs the
+  // trigger, `handleBlur` hides the bubble, and the link unmounts BEFORE the
+  // mouseup. No click event is ever delivered, so the tip is never actually
+  // dismissed: the bubble just vanishes and comes straight back on the next
+  // hover. Suppressing the mousedown default keeps focus on the trigger, so
+  // the bubble survives long enough for the click to land (and the teacher's
+  // keyboard position is preserved, which is the better a11y outcome anyway).
+  const handleBubbleMouseDown = (e: ReactMouseEvent<HTMLDivElement>): void => {
+    e.preventDefault();
   };
 
   // Focus opens immediately (no delay) — keyboard users should not wait.
@@ -445,20 +549,27 @@ export function Tooltip({
         open && placement ? styles.visible : "",
         byHover ? styles.hoverOnly : "",
         // Switch the bubble to pointer-events:auto only when the dismiss
-        // link is present — otherwise the bubble must stay non-interactive
-        // so it doesn't capture clicks intended for content underneath.
-        showDismissLink ? styles.interactive : "",
+        // link is present AND a mouse interaction is in progress — otherwise
+        // the bubble must stay non-interactive so it doesn't capture clicks
+        // intended for content underneath. A focus-opened bubble has no
+        // cursor heading for the link, so it stays inert.
+        interactive ? styles.interactive : "",
       ]
         .filter(Boolean)
         .join(" ")}
       style={positionStyle}
       onMouseEnter={showDismissLink ? handleBubbleMouseEnter : undefined}
       onMouseLeave={showDismissLink ? handleBubbleMouseLeave : undefined}
+      onMouseDown={showDismissLink ? handleBubbleMouseDown : undefined}
     >
       {content}
       {/* W2-B3: inline "Turn off these tips" mini-link. Shown only when the
           tooltip opted in to dismissibility (has a tooltipId) and is NOT
-          required. Visually unobtrusive — small, dimmed, single line. */}
+          required. Visually unobtrusive — small, dimmed, single line.
+          Rendered whenever the tooltip is dismissible, including while the
+          bubble is inert (focus-opened): the link is inert with it, but
+          keeping it mounted means the bubble does not resize and re-place
+          itself under the cursor the instant the mouse reaches the trigger. */}
       {showDismissLink && (
         <button
           type="button"
