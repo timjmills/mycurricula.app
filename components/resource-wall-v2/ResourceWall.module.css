@@ -287,7 +287,7 @@
   color: var(--ink-900);
   box-shadow: 0 1px 3px rgba(12, 11, 20, 0.12);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .viewBtn.viewBtn {
     min-height: 44px;
   }
@@ -320,7 +320,7 @@
   border-color: var(--chrome-accent, var(--brand-500));
   color: var(--ink-900);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .iconBtn.iconBtn {
     width: 44px;
     height: 44px;
@@ -349,7 +349,7 @@
   width: 15px;
   height: 15px;
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .addBtn.addBtn {
     min-height: 44px;
   }

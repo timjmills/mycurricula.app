@@ -128,8 +128,10 @@
 }
 /* Natural hit area is 64px × ~59px (40 disc + 7 gap + label) — already ≥44px
    both axes. The coarse-pointer guard documents the CLAUDE.md §4 contract and
-   protects it if the geometry ever shrinks (chrome.css precedent). */
-@media (pointer: coarse) {
+   protects it if the geometry ever shrinks (chrome.css precedent).
+   `any-pointer`, not `pointer`: the latter is only the PRIMARY pointer, so a
+   touch laptop / trackpad iPad never matched. */
+@media (any-pointer: coarse), (max-width: 900px) {
   .node.node {
     min-width: 44px;
     min-height: 44px;

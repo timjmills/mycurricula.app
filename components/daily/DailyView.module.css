@@ -1853,8 +1853,10 @@
 
 /* ≥44px hit area on coarse pointers (CLAUDE.md §4 touch-target floor) —
    the 10px vertical padding lands ~40px with a mouse, which is fine for
-   fine pointers but short of the touch floor. */
-@media (pointer: coarse) {
+   fine pointers but short of the touch floor. `any-pointer`, not `pointer`:
+   the latter describes only the PRIMARY pointer, so a touch laptop or an iPad
+   with a trackpad reports `fine` and never inflated. See Button.module.css. */
+@media (any-pointer: coarse), (max-width: 900px) {
   .addLessonRow.addLessonRow {
     min-height: 44px;
   }

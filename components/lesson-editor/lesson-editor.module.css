@@ -136,7 +136,7 @@
   background: color-mix(in oklab, var(--ink-500) 16%, transparent);
   color: var(--ink-700);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .menuBtn.menuBtn {
     min-width: 44px;
     min-height: 44px;
@@ -175,7 +175,7 @@
 .menuItem.menuItem:focus-visible {
   background: color-mix(in oklab, var(--ink-500) 12%, transparent);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .menuItem.menuItem {
     min-height: 44px;
   }
@@ -210,7 +210,7 @@
   flex: 0 0 auto;
   background: var(--rc);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   /* Keep the 14px dot but grow the hit area to 44px via a transparent halo. */
   .colorDot.colorDot {
     position: relative;
@@ -255,7 +255,7 @@
   outline: 2px solid var(--ink-700);
   outline-offset: 1px;
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .swatch.swatch {
     width: 28px;
     height: 28px;
@@ -282,7 +282,7 @@
   background: color-mix(in oklab, var(--chrome-accent) 16%, transparent);
   color: var(--chrome-accent);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .tintToggle.tintToggle {
     min-height: 44px;
   }
@@ -393,7 +393,7 @@
   opacity: 1;
   background: color-mix(in oklab, var(--rc) 20%, transparent);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .chipRemove.chipRemove {
     min-width: 32px;
     min-height: 32px;

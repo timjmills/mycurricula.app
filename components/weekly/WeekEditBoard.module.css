@@ -390,8 +390,9 @@
    buttons all get ≥44px hit areas; the compact desktop sizes stay for
    mouse/trackpad, where small precise targets are fine. The grip's negative
    vertical margin keeps the header strip visually compact while its hit box
-   spans the full 44px. */
-@media (pointer: coarse) {
+   spans the full 44px. `any-pointer`, not `pointer` — the latter describes only
+   the PRIMARY pointer, so a touch laptop / trackpad iPad never inflated. */
+@media (any-pointer: coarse), (max-width: 900px) {
   .grip {
     width: 44px;
     height: 44px;

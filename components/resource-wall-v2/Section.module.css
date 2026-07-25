@@ -172,7 +172,9 @@
   width: 16px;
   height: 16px;
 }
-@media (pointer: coarse) {
+/* ≥44px touch targets (§4). `any-pointer`, not `pointer` — the latter is only
+   the PRIMARY pointer, so a touch laptop / trackpad iPad never inflated. */
+@media (any-pointer: coarse), (max-width: 900px) {
   .act.act {
     width: 44px;
     height: 44px;

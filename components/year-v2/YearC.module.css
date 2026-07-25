@@ -124,8 +124,10 @@
   font: inherit;
 }
 /* Natural hit area is 64×~59px — already ≥44px; the coarse-pointer guard
-   documents + protects the contract if the geometry ever shrinks. */
-@media (pointer: coarse) {
+   documents + protects the contract if the geometry ever shrinks.
+   `any-pointer`, not `pointer`: the latter is only the PRIMARY pointer, so a
+   touch laptop / trackpad iPad never matched. */
+@media (any-pointer: coarse), (max-width: 900px) {
   .node.node {
     min-width: 44px;
     min-height: 44px;

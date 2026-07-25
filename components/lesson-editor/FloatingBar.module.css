@@ -241,8 +241,11 @@
 }
 
 /* ── Coarse-pointer targets (§4: ≥44px on touch) ─────────────────────── */
+/* `any-pointer`, not `pointer`: `pointer` describes only the PRIMARY pointer,
+   so a touch laptop — or an iPad with a trackpad — reports `fine` and none of
+   this fired with a finger on the glass. See Button.module.css for the ruling. */
 
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .fbar {
     gap: 2px;
     padding: 6px 8px;

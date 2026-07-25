@@ -74,7 +74,7 @@
   color: var(--ink-900);
   box-shadow: 0 1px 3px rgba(12, 11, 20, 0.12);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .tab.tab {
     min-height: 44px;
   }
@@ -101,7 +101,7 @@
   width: 16px;
   height: 16px;
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .close.close {
     width: 44px;
     height: 44px;
@@ -167,7 +167,7 @@
   color: var(--ink-900);
   box-shadow: 0 1px 3px rgba(12, 11, 20, 0.12);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .scopeBtn.scopeBtn {
     min-height: 44px;
   }
@@ -338,7 +338,7 @@
   width: 16px;
   height: 16px;
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .present.present {
     min-height: 44px;
   }
