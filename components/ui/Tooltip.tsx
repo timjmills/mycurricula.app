@@ -9,6 +9,14 @@
 //   the trigger's getBoundingClientRect() on each show, with auto-flip
 //   when the preferred side would overflow the viewport.
 //
+// Occlusion (the `avoid` prop):
+//   Fitting on screen is not the same question as not covering anything.
+//   A top-bar control preferring `bottom` always opens over the row beneath
+//   it — for the appearance gear that row is the console nav, 83% of it
+//   buried at 375px. `avoid` names a region by CSS selector; placement then
+//   slides the bubble past it and, failing that, picks the side that covers
+//   least of it. Opt-in: without the prop, placement is unchanged.
+//
 // Touch devices (@media (hover: none)):
 //   The styled hover bubble is suppressed (a touch has no hover state and
 //   long-press of a custom portal is non-native + fiddly). Instead — per
@@ -113,6 +121,25 @@ export interface TooltipProps {
    * tooltips — the only escape hatch is to stop hovering.
    */
   required?: boolean;
+  /**
+   * CSS selector naming a region the bubble should not cover — typically
+   * chrome the teacher navigates by. Opt-in: without it, placement is
+   * byte-identical to every pre-prop callsite.
+   *
+   * `side` asks "does the bubble fit on screen?"; this asks "does it cover
+   * anything that matters?". A top-bar control preferring `bottom` will
+   * always open over the row beneath it, and on this app's chrome that row
+   * is the console nav — 83% of it buried at 375px when the appearance gear
+   * takes focus. Naming the nav lets the placement slide the bubble clear of
+   * it (and, failing that, pick the side that covers least of it).
+   *
+   * A SELECTOR rather than a ref, deliberately: the region is usually in a
+   * sibling subtree that would otherwise have to be plumbed through the
+   * shell, and it remounts on route changes — only a measure-time lookup is
+   * ever current. Matching nothing is not an error; it degrades to the
+   * default placement.
+   */
+  avoid?: string;
 }
 
 type Side = NonNullable<TooltipProps["side"]>;
@@ -180,20 +207,168 @@ function nativeTitleFor(content: ReactNode): string | undefined {
 // ── Position calculation ─────────────────────────────────────────────────────
 
 const GAP = 8; // px gap between trigger and tooltip bubble
+const MARGIN = 8; // px minimum gap between the bubble and the viewport edge
 
-interface Placement {
+/**
+ * The subset of DOMRect the placement math reads. Declared structurally so the
+ * pure function below can be unit-tested with plain objects — this repo's
+ * vitest gate is node-environment, where DOMRect does not exist. A real
+ * DOMRect satisfies it, so callers pass getBoundingClientRect() directly.
+ */
+export interface RectLike {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+export interface Placement {
   x: number;
   y: number;
   side: Side;
+  /**
+   * True when the bubble was pushed off its natural anchor to clear an
+   * `avoid` region. The arrow is hidden in that state (Tooltip.module.css) —
+   * it would otherwise point at empty space instead of at the trigger.
+   */
+  displaced: boolean;
 }
 
-function computePlacement(
-  triggerRect: DOMRect,
-  tooltipRect: DOMRect,
+/** Area of the intersection of two rects, in px². 0 when they don't touch. */
+function overlapArea(a: RectLike, b: RectLike): number {
+  const w = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+  const h = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+  return w * h;
+}
+
+/** A rect of `size`'s dimensions positioned at (x, y). */
+function rectAt(x: number, y: number, size: RectLike): RectLike {
+  return {
+    left: x,
+    top: y,
+    right: x + size.width,
+    bottom: y + size.height,
+    width: size.width,
+    height: size.height,
+  };
+}
+
+/** The bubble's natural top-left for a side, before clamping. */
+function anchorFor(
+  side: Side,
+  triggerRect: RectLike,
+  tooltipRect: RectLike,
+): { x: number; y: number } {
+  switch (side) {
+    case "top":
+      return {
+        x: triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2,
+        y: triggerRect.top - tooltipRect.height - GAP,
+      };
+    case "bottom":
+      return {
+        x: triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2,
+        y: triggerRect.bottom + GAP,
+      };
+    case "left":
+      return {
+        x: triggerRect.left - tooltipRect.width - GAP,
+        y: triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2,
+      };
+    case "right":
+      return {
+        x: triggerRect.right + GAP,
+        y: triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2,
+      };
+  }
+}
+
+/**
+ * Push a candidate FURTHER along its own axis until it clears every `avoid`
+ * rect it intersects.
+ *
+ * This is the half of the fix that actually moves the needle. Side selection
+ * alone cannot help a top-bar control: the occlusion is vertical, the gap
+ * between the appearance gear and the console nav is ~15px against a bubble
+ * ~74px tall, and every alternative side either fails its fit test or lands
+ * back on the same chrome after viewport clamping. Sliding the bubble down
+ * past the nav costs one hidden arrow and clears the region completely.
+ *
+ * Bounded to 4 passes: clearing one bar can slide the bubble onto a second
+ * (an immersive bar stacked above a nav row), and a pathological avoid set
+ * must not be able to spin here.
+ *
+ * A slide that would leave the viewport is abandoned — the clamp would drag
+ * the bubble straight back onto the region, and an off-screen bubble teaches
+ * nobody anything. The caller's scoring then treats this side on its merits.
+ */
+function slideClear(
+  x: number,
+  y: number,
+  side: Side,
+  size: RectLike,
+  avoid: readonly RectLike[],
+  viewport: { width: number; height: number },
+): { x: number; y: number } {
+  if (avoid.length === 0) return { x, y };
+  let nx = x;
+  let ny = y;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const rect = rectAt(nx, ny, size);
+    const hits = avoid.filter((r) => overlapArea(rect, r) > 0);
+    if (hits.length === 0) break;
+    if (side === "bottom") {
+      ny = Math.max(...hits.map((r) => r.bottom)) + GAP;
+    } else if (side === "top") {
+      ny = Math.min(...hits.map((r) => r.top)) - size.height - GAP;
+    } else if (side === "right") {
+      nx = Math.max(...hits.map((r) => r.right)) + GAP;
+    } else {
+      nx = Math.min(...hits.map((r) => r.left)) - size.width - GAP;
+    }
+  }
+  // Check only the axis that moved: the other one is still the natural anchor
+  // and may legitimately sit outside the margin (a centred bubble wider than
+  // the space beside its trigger), where the caller's clamp handles it.
+  const ok =
+    side === "top" || side === "bottom"
+      ? ny >= MARGIN && ny + size.height <= viewport.height - MARGIN
+      : nx >= MARGIN && nx + size.width <= viewport.width - MARGIN;
+  return ok ? { x: nx, y: ny } : { x, y };
+}
+
+/**
+ * Choose where the bubble opens.
+ *
+ * WITHOUT `avoid` (every callsite that has not opted in) this is the original
+ * algorithm, unchanged: take the first side with enough VIEWPORT space, else
+ * the preferred one, then clamp on-screen.
+ *
+ * WITH `avoid` the question changes from "does this fit on screen?" to "does
+ * this cover anything that matters?" — the gap that made a top-bar tooltip
+ * bury the console nav. Each side is positioned, slid clear of the avoid
+ * region where that is possible, clamped, and then SCORED by how much of the
+ * avoid region (plus its own trigger — a bubble that hides the control you
+ * are on is the same failure) it still covers. Lowest score wins.
+ *
+ * Overlap DEMOTES, it never forbids: if every side covers something, the
+ * least-bad one is still returned. A tooltip that vanishes is worse than one
+ * that overlaps.
+ *
+ * Exported for tests — the repo's vitest gate is node-environment, so the
+ * geometry is pinned on this pure function rather than on a rendered tree.
+ */
+export function computePlacement(
+  triggerRect: RectLike,
+  tooltipRect: RectLike,
   preferred: Side,
+  viewport: { width: number; height: number },
+  avoid: readonly RectLike[] = [],
 ): Placement {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const vw = viewport.width;
+  const vh = viewport.height;
 
   // Available space on each side (px from trigger edge to viewport boundary)
   const space: Record<Side, number> = {
@@ -217,36 +392,132 @@ function computePlacement(
     preferred,
     ...fallbackOrder.filter((s) => s !== preferred),
   ];
-  const chosen = order.find((s) => space[s] >= required[s]) ?? preferred;
 
-  let x = 0;
-  let y = 0;
+  // Clamp to viewport with an 8px margin
+  const clamp = (x: number, y: number): { x: number; y: number } => ({
+    x: Math.max(MARGIN, Math.min(x, vw - tooltipRect.width - MARGIN)),
+    y: Math.max(MARGIN, Math.min(y, vh - tooltipRect.height - MARGIN)),
+  });
 
-  switch (chosen) {
-    case "top":
-      x = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
-      y = triggerRect.top - tooltipRect.height - GAP;
-      break;
-    case "bottom":
-      x = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
-      y = triggerRect.bottom + GAP;
-      break;
-    case "left":
-      x = triggerRect.left - tooltipRect.width - GAP;
-      y = triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
-      break;
-    case "right":
-      x = triggerRect.right + GAP;
-      y = triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
-      break;
+  if (avoid.length === 0) {
+    const chosen = order.find((s) => space[s] >= required[s]) ?? preferred;
+    const a = anchorFor(chosen, triggerRect, tooltipRect);
+    const { x, y } = clamp(a.x, a.y);
+    return { x, y, side: chosen, displaced: false };
   }
 
-  // Clamp to viewport with 8px margin
-  const MARGIN = 8;
-  x = Math.max(MARGIN, Math.min(x, vw - tooltipRect.width - MARGIN));
-  y = Math.max(MARGIN, Math.min(y, vh - tooltipRect.height - MARGIN));
+  interface Candidate extends Placement {
+    score: number;
+    fits: boolean;
+  }
+  let best: Candidate | null = null;
 
-  return { x, y, side: chosen };
+  for (const side of order) {
+    const a = anchorFor(side, triggerRect, tooltipRect);
+    const natural = clamp(a.x, a.y);
+    const slid = slideClear(a.x, a.y, side, tooltipRect, avoid, viewport);
+    const { x, y } = clamp(slid.x, slid.y);
+    const rect = rectAt(x, y, tooltipRect);
+    const score =
+      avoid.reduce((sum, r) => sum + overlapArea(rect, r), 0) +
+      overlapArea(rect, triggerRect);
+    const fits = space[side] >= required[side];
+    const candidate: Candidate = {
+      x,
+      y,
+      side,
+      displaced: x !== natural.x || y !== natural.y,
+      score,
+      fits,
+    };
+    // Strictly better score wins; on a tie prefer the side that genuinely
+    // fits the viewport (an unclamped bubble sits where its arrow says it
+    // does). Earlier candidates hold ties otherwise, so `preferred` and the
+    // historical fallback order still decide.
+    if (
+      best === null ||
+      candidate.score < best.score ||
+      (candidate.score === best.score && candidate.fits && !best.fits)
+    ) {
+      best = candidate;
+    }
+    if (score === 0 && fits) break; // nothing can beat clear + unclamped
+  }
+
+  // `order` is never empty, so `best` is always set; the fallback keeps the
+  // types honest without an assertion. Returned field-by-field so the
+  // scoring bookkeeping (`score` / `fits`) cannot leak into the public
+  // Placement — callers compare these objects.
+  if (best === null) {
+    return { x: MARGIN, y: MARGIN, side: preferred, displaced: false };
+  }
+  return {
+    x: best.x,
+    y: best.y,
+    side: best.side,
+    displaced: best.displaced,
+  };
+}
+
+/**
+ * Resolve an `avoid` selector to live rects at MEASURE time — never cached.
+ *
+ * The regions this guards are chrome: the console nav mounts in three
+ * different hosts (home / compact / immersive bar) and remounts on every
+ * route change, so a rect captured once is stale by the next view.
+ *
+ * Both failure modes degrade to "no avoid region", i.e. exactly the
+ * pre-existing placement: a selector that matches nothing, and a selector
+ * that is syntactically invalid. Neither may take the tooltip down.
+ */
+function readAvoidRects(selector: string): RectLike[] {
+  if (typeof document === "undefined") return [];
+  let nodes: ArrayLike<Element>;
+  try {
+    nodes = document.querySelectorAll(selector);
+  } catch {
+    return [];
+  }
+  const out: RectLike[] = [];
+  for (const el of Array.from(nodes)) {
+    const r = el.getBoundingClientRect();
+    // A display:none node reports an all-zero rect; it occludes nothing.
+    if (r.width > 0 && r.height > 0) out.push(r);
+  }
+  return out;
+}
+
+const NO_AVOID: readonly RectLike[] = [];
+
+// ── Trigger→bubble crossing time ─────────────────────────────────────────────
+
+/** Historical grace period: enough to cross the default 8px GAP. */
+const GRACE_MIN_MS = 120;
+/** Ceiling, so a cursor that wandered off does not leave the bubble hanging. */
+const GRACE_MAX_MS = 600;
+
+/** Shortest distance between two axis-aligned rects (0 when they touch). */
+export function rectGap(a: RectLike, b: RectLike): number {
+  const dx = Math.max(0, Math.max(a.left - b.right, b.left - a.right));
+  const dy = Math.max(0, Math.max(a.top - b.bottom, b.top - a.bottom));
+  return Math.hypot(dx, dy);
+}
+
+/**
+ * How long to keep a dismissible bubble alive after the cursor leaves the
+ * trigger, so it can reach the "Turn off these tips" link.
+ *
+ * The flat 120ms this replaces was sized for the 8px GAP. A DISPLACED bubble
+ * (slid clear of an `avoid` region) can sit ~57px away — at 375px the gear's
+ * bubble now opens below the console nav — and a deliberate-but-unhurried
+ * cursor cannot cross that before the close fires, which would quietly make
+ * the dismiss link unreachable by mouse (CLAUDE.md §4 affordance).
+ *
+ * ~250px/s is a slow, realistic short-move speed, hence 4ms per px. The floor
+ * keeps every non-displaced callsite on exactly its historical 120ms.
+ */
+export function graceForGap(gapPx: number): number {
+  return Math.min(GRACE_MAX_MS, Math.max(GRACE_MIN_MS, Math.round(gapPx * 4)));
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -258,6 +529,7 @@ export function Tooltip({
   children,
   tooltipId: dismissalId,
   required = false,
+  avoid,
 }: TooltipProps) {
   const tooltipId = useId();
   const triggerRef = useRef<HTMLElement>(null);
@@ -299,9 +571,15 @@ export function Tooltip({
     if (!triggerRef.current || !tooltipRef.current) return;
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const tooltipRect = tooltipRef.current.getBoundingClientRect();
-    const p = computePlacement(triggerRect, tooltipRect, preferredSide);
+    const p = computePlacement(
+      triggerRect,
+      tooltipRect,
+      preferredSide,
+      { width: window.innerWidth, height: window.innerHeight },
+      avoid ? readAvoidRects(avoid) : NO_AVOID,
+    );
     setPlacement(p);
-  }, [preferredSide]);
+  }, [preferredSide, avoid]);
 
   const show = useCallback(
     (fromHover: boolean) => {
@@ -352,6 +630,23 @@ export function Tooltip({
     }
   }, [open, updatePlacement]);
 
+  // Re-measure while open — but ONLY on the occlusion-aware path. The avoid
+  // region moves when the chrome reflows (a resize) or when a scroll container
+  // shifts it, and a stale rect would put the bubble straight back on top of
+  // it. Plain tooltips keep the historical single-measurement behaviour
+  // exactly: no listeners, no extra layout reads.
+  useEffect(() => {
+    if (!open || !avoid) return;
+    const onMove = (): void => updatePlacement();
+    const scrollOpts = { capture: true, passive: true } as const;
+    window.addEventListener("resize", onMove);
+    window.addEventListener("scroll", onMove, scrollOpts);
+    return () => {
+      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onMove, { capture: true });
+    };
+  }, [open, avoid, updatePlacement]);
+
   // Escape key closes the tooltip.
   useEffect(() => {
     if (!open) return;
@@ -390,8 +685,17 @@ export function Tooltip({
     // (.tooltip:hover) cancels the timer; mouse-leave on the bubble
     // triggers the close. Without this defer the bubble closes the instant
     // the cursor enters the 8px gap between trigger and bubble.
+    //
+    // The defer is measured from the ACTUAL trigger→bubble distance: a bubble
+    // displaced clear of an `avoid` region sits far further away than the 8px
+    // GAP this was originally sized for, and a flat 120ms would put its
+    // dismiss link out of mouse reach. Non-displaced bubbles land on the
+    // floor, i.e. the historical 120ms exactly.
     if (showDismissLink) {
-      delayTimer.current = setTimeout(() => hide(), 120);
+      const t = triggerRef.current?.getBoundingClientRect();
+      const b = tooltipRef.current?.getBoundingClientRect();
+      const grace = t && b ? graceForGap(rectGap(t, b)) : GRACE_MIN_MS;
+      delayTimer.current = setTimeout(() => hide(), grace);
       return;
     }
     hide();
@@ -544,6 +848,10 @@ export function Tooltip({
       ref={tooltipRef}
       role="tooltip"
       data-side={placement?.side ?? preferredSide}
+      // Slid clear of an `avoid` region: the bubble no longer touches its
+      // trigger, so the arrow is hidden (Tooltip.module.css) rather than left
+      // pointing at whatever the bubble was moved past.
+      data-displaced={placement?.displaced ? "true" : undefined}
       className={[
         styles.tooltip,
         open && placement ? styles.visible : "",

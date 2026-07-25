@@ -155,6 +155,25 @@ export function ViewTitle(): ReactNode {
           content="Appearance — theme, frame & background (applies to the whole app)"
           side="bottom"
           tooltipId="viewtitle-style-gear"
+          // The gear sits in the top bar directly above the console nav, with
+          // ~15px between them and a bubble ~74px tall — so a bottom-opening
+          // tooltip used to bury the whole route switcher (83% of it at
+          // 375px). Naming the nav lets the primitive slide the bubble clear.
+          // `.views.console` is ConsoleNav's root (components/chrome/
+          // Console.tsx); the selector covers all three of its mounts (home,
+          // the compact bar, the immersive bar) without the shell having to
+          // thread a ref across sibling subtrees.
+          //
+          // `.vt-menu` is defence in depth for the appearance popover below.
+          // Opening it moves focus into the dialog, which blurs the gear and
+          // closes this bubble — verified live, 0 of 17 menu controls
+          // hit-blocked at 768 and 1440. But that safety lives in ANOTHER
+          // component's focus effect, and the bubble now slides down into the
+          // menu's rows rather than sitting above them, so the consequence of
+          // losing it got worse. Naming the menu makes the overlap
+          // structurally impossible instead of merely currently-absent. It
+          // matches nothing while the menu is closed, so it costs nothing.
+          avoid=".views.console, .vt-menu"
         >
           {/* Bare <button>: `.vt-cogbtn` is the complete handoff recipe; the ui
               Button primitive's `.btn` base would fight it (same reasoning as

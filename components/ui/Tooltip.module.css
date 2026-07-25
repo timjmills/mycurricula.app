@@ -142,6 +142,16 @@
   /* Arrow is a 6px equilateral-ish triangle */
 }
 
+/* Displaced bubbles have no arrow. When the `avoid` prop slides the bubble
+   past a region it must not cover (the console nav under the top-bar
+   appearance gear), it no longer touches its trigger — an arrow there would
+   point at the thing the bubble was moved off, which reads as a bug. A
+   detached bubble reads as a deliberate offset. See computePlacement() /
+   slideClear() in Tooltip.tsx. */
+.tooltip[data-displaced="true"] .arrow {
+  display: none;
+}
+
 /* Arrow for side="top": points downward, sits at the bottom of the bubble */
 .tooltip[data-side="top"] .arrow {
   bottom: -5px;
