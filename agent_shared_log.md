@@ -7015,3 +7015,83 @@ with `first-run-redirect.tsx`'s claim that it "never flash-bounces" (true of a
 `onboarded_at IS NULL`, and creating or mutating one is a DB write I will not
 make. Flagging as a possible small UX wart for whoever owns first-run, not as a
 finding.
+
+---
+
+## First-run "never flash-bounces" — the claim is FALSE as written (fix-tooltip-occlusion)
+
+Follow-up to #34, on the inference I flagged but did not assert. **It is real,
+it is bounded, and the comment is the part that needs fixing.** Measured without
+any database write. Probe: `scripts/probe-firstrun-flash.mjs`.
+
+### 1. What the code actually guarantees
+
+`useFirstRunRedirect` (`lib/onboarding-v2-state.tsx:255`) runs in a `useEffect`,
+so on the DEPLOYED path the earliest it can decide is:
+
+> hydration → `supabase.auth.getUser()` → `GET /rest/v1/teachers?select=onboarded_at`
+> → `computeNeedsOnboarding` → `router.replace("/onboarding")`
+
+Every one of those is after first paint and after React attaches. The planner is
+therefore **necessarily rendered and interactive before the gate can fire** — not
+by accident but by construction.
+
+### 2. Measured (prod, `onboarded_at` stubbed to null in flight)
+
+| marker | ms |
+|---|---|
+| nav links hit-testable | 551 |
+| React attached (genuinely interactive) | **827** |
+| redirect to /onboarding | **2931** |
+| **interactive planner before the bounce** | **2104ms** |
+
+17 consecutive samples on `/year` with the full 6-link console nav, then the
+bounce. **Control (`--stub=off`, identical instrument): no redirect in 45s**, so
+the instrument is not manufacturing it.
+
+**No DB write.** The gate's only input is the `onboarded_at` value, so the probe
+rewrites that field in the RESPONSE BODY of the real GET. Real client code, real
+never-onboarded branch, no row touched, context discarded. Non-GET Supabase is
+aborted throughout, so `mark_onboarded` cannot fire even on the wizard.
+*Faithfulness, not overclaimed:* this reproduces the gate's input exactly; it
+does not reproduce everything else about a new account (empty workspace), which
+could shift paint timing. **The ORDER is exact; the 2.1s is representative, not
+a bound.**
+
+### 3. Is the comment accurate? — true of something NARROWER than it reads
+
+Both copies (`first-run-redirect.tsx:13`, `onboarding-v2-state.tsx:246`) say the
+no-op-while-unresolved rule means it "never flash-bounces". The premise is
+correct and genuinely valuable — **it never bounces on a guess, and never
+bounces-then-returns**. But "flash-bounce" in ordinary use means *the user sees
+the wrong page briefly, then gets thrown off it*, and that is precisely what
+happens: 2.9s of planner, 2.1s of it interactive. The comment names the wrong
+property. Same stale-provenance class we have been clearing all day.
+
+### 4. Severity: real, above cosmetic, below urgent
+
+Not cosmetic — the teacher can **click** during the window, and `router.replace`
+discards whatever they started with no back-button recovery. But it is
+**once ever, per new teacher, with no data loss** (nothing meaningful is
+creatable in 2s, and non-GET writes are what onboarding stamps anyway).
+
+### 5. Proposals — NOT built, lead's call
+
+1. **Comment fix (minimum, and I would do this regardless).** Replace "so it
+   never flash-bounces" with what it guarantees: *never redirects on an
+   unresolved answer — no bounce-and-return, no race with the bypass login* —
+   and record that a never-onboarded teacher sees the planner for ~3s first.
+2. **Optional code fix, only if the window is judged to matter:** decide
+   server-side (middleware or the `(planner)` layout) so a new teacher never
+   receives planner HTML, or mirror `onboarded_at` into a cookie for an instant
+   server-side read with the DB row still authoritative.
+3. **The tempting wrong answer:** holding the planner behind a resolving state
+   until the answer arrives. That taxes **every returning teacher on every load**
+   to fix a first-load-only case. Do not.
+
+### Secondary, pre-existing, not the gate's fault
+
+`navHittable` at **551ms** but React attached at **827ms** — a **276ms window
+where the console nav is clickable and inert**, on every load, for everyone.
+Same pre-hydration class as the Tools-popover zero-items mystery. Recorded, not
+raised as a finding.
