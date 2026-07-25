@@ -170,12 +170,38 @@
 }
 
 /* ── Collapsible section ────────────────────────────────────────────────────── */
+/* NO `overflow: hidden` HERE — it clipped every popover in the embedded
+   <LessonEditor>.
+ *
+ * This section hosts <LessonEditor> (LessonWorkspace's "Lesson flow" section),
+ * whose menus are `position: absolute` children: `.menuPop`, `.colorPop`,
+ * PresetMenu's `.presetMenu` (230px wide, up to 320px tall) and SectionMenu's
+ * Rename / Duplicate / DELETE. The preset menu opens from `.footer` — the last
+ * row — with only 16px of `.secBody` padding beneath it, so roughly 12px of a
+ * 200–320px menu was visible. "Load preset" was unusable, and a Delete you
+ * cannot see is worse than one you cannot reach.
+ *
+ * The clip only ever existed so `.secHead`'s hover fill would respect this
+ * element's `border-radius` — `.secBody` has no background of its own (just a
+ * `border-top`), so nothing else needed it. So the header rounds ITSELF below
+ * and the clip is gone. Smaller than portalling, and it keeps the popovers in
+ * the normal DOM/focus order.
+ *
+ * ⚠ Do not "restore" this, and do not add `overflow-y`/`overflow-x` here
+ * either: per CSS Overflow §3 a non-visible value on ONE axis computes the
+ * other to `auto`, so a single-axis clip would silently re-clip these menus.
+ *
+ * KNOWN REMAINING CLIPS (not this file's to fix): ExplorerShell's `.card`
+ * (`overflow: hidden` + 32px radius) still bounds the dialog, and `.body`
+ * scrolls. So a menu opening near the dialog's bottom edge is now
+ * scroll-reachable rather than fully visible. Portalling the popovers to body
+ * with fixed positioning (the StandardsPicker idiom) is the complete fix; it
+ * needs the lesson-editor .tsx files, not CSS. */
 .section {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface);
   min-width: 0;
-  overflow: hidden;
 }
 
 /* Header button — doubled to beat `.cp-root button` (restores padding/bg). */
@@ -191,6 +217,19 @@
   text-align: left;
   color: var(--ink-900);
   min-height: 48px;
+  /* Rounds ITS OWN corners now that `.section` no longer clips (see the note
+     there). Open: only the top corners — `.secBody` sits below and supplies the
+     bottom ones via `.section`'s own radius. `-1px` so the fill meets the
+     section's 1px border instead of leaving a hairline of background showing
+     through the curve. */
+  border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
+}
+/* Collapsed: the header IS the whole section, so it rounds all four corners —
+   otherwise its hover fill would square off the bottom two and poke out of the
+   section's rounded edge. `aria-expanded` is already on the button, so this
+   needs no extra class. */
+.secHead.secHead[aria-expanded="false"] {
+  border-radius: calc(var(--r-lg) - 1px);
 }
 .secHead.secHead:hover {
   background: color-mix(in srgb, var(--c, var(--ink-500)) 6%, var(--surface));

@@ -68,6 +68,59 @@
   border-radius: var(--r-8, 7px);
 }
 
+/* ── Header right cluster — ⤢ presentation toggle + status tag ──────────── */
+/* Mirrors UnitExplorer's `.headerCluster` / `.expandBtn` so the SAME control
+   sits in the same place in both modes of the same dialog — the point of the
+   fix is that switching Unit ⇄ Lesson no longer strands a teacher in the
+   compact dialog with no way back out. */
+.headerCluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Doubled (0,2,0) so the fill/border survive `.cp-root button`'s reset. */
+.expandBtn.expandBtn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill, 999px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.expandBtn.expandBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.expandBtn.expandBtn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+.expandBtn svg {
+  width: 17px;
+  height: 17px;
+}
+/* `any-pointer`, not `pointer` — a touch laptop reports a FINE primary pointer,
+   so `pointer: coarse` would never fire here. See components/ui/Button.module.css
+   for the full reasoning. Doubled to match the doubled base above (a
+   single-class @media override would lose to `.expandBtn.expandBtn`). */
+@media (any-pointer: coarse), (max-width: 900px) {
+  .expandBtn.expandBtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .expandBtn.expandBtn {
+    transition: none;
+  }
+}
+
 /* Taught / Planned tag in the header's right cluster. */
 .tag {
   flex: 0 0 auto;

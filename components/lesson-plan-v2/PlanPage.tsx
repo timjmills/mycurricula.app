@@ -36,7 +36,8 @@ import {
   ExplorerShell,
   type ExplorerMode,
 } from "@/components/year-v2/ExplorerShell";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
+import { useWorkspacePresentation } from "@/lib/workspace-prefs";
 import {
   LESSON_STATUS_LABEL,
   LESSON_STATUS_SHORT,
@@ -44,6 +45,40 @@ import {
 } from "./lesson-status";
 import { LessonWorkspace } from "./LessonWorkspace";
 import styles from "./plan-page.module.css";
+
+/** ⤢ expand / collapse glyphs for the presentation toggle (maximize-2 /
+ *  minimize-2). Drawn white on the gradient header via `.expandBtn`.
+ *
+ *  Deliberately duplicated from UnitExplorer's private `ExpandGlyph` rather
+ *  than shared: that copy is a local, unexported function in a file this lane
+ *  does not own, and hoisting it to a shared module would mean editing it.
+ *  Two paths of SVG is the cheaper duplication. If a third copy ever appears,
+ *  promote it to components/ui instead of adding another. */
+function ExpandGlyph({ full }: { full: boolean }): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {full ? (
+        <>
+          <path d="M4 14h6v6M20 10h-6V4" />
+          <path d="M14 10l7-7M10 14l-7 7" />
+        </>
+      ) : (
+        <>
+          <path d="M15 3h6v6M9 21H3v-6" />
+          <path d="M21 3l-7 7M3 21l7-7" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 // ── Props ─────────────────────────────────────────────────────────────────
 
@@ -149,6 +184,20 @@ export function PlanPage({
     duplicateLesson(activeId);
   }, [duplicateLesson, activeId]);
 
+  // The workspace presentation (compact dialog ⇄ full-bleed) is a SHARED
+  // preference, not a per-mode one — UnitExplorer reads the same hook. Until
+  // this was threaded, Lesson mode passed no `presentation` at all, so
+  // ExplorerShell fell back to its "modal" default: a teacher who expanded the
+  // workspace in Unit mode and then switched to Lesson mode was snapped back to
+  // the 820px dialog, with no ⤢ in this header to undo it — the only way back
+  // was to return to Unit mode. B5.7 made that the MAIN path (/weekly's "Open
+  // in editor" now opens Lesson mode), so it stopped being an edge case.
+  // Unconditional, above the `missing` / `embedded` early returns — the
+  // embedded host has no shell chrome and ignores it, but hooks cannot be
+  // conditional.
+  const { presentation, toggle: togglePresentation } =
+    useWorkspacePresentation();
+
   if (missing) {
     return embedded ? (
       <div className={styles.empty}>This lesson is no longer in the plan.</div>
@@ -240,10 +289,36 @@ export function PlanPage({
         </>
       }
       headerRight={
-        <span className={`${styles.tag} ${done ? styles.tagDone : ""}`}>
-          {LESSON_STATUS_SHORT[status]}
-        </span>
+        <div className={styles.headerCluster}>
+          <Tooltip
+            content={
+              presentation === "full"
+                ? "Collapse back to the compact dialog."
+                : "Expand to the full workspace — more room for the lesson flow."
+            }
+            tooltipId="pp-expand"
+            side="bottom"
+          >
+            <button
+              type="button"
+              className={styles.expandBtn}
+              aria-pressed={presentation === "full"}
+              aria-label={
+                presentation === "full"
+                  ? "Collapse to a dialog"
+                  : "Expand to the full workspace"
+              }
+              onClick={togglePresentation}
+            >
+              <ExpandGlyph full={presentation === "full"} />
+            </button>
+          </Tooltip>
+          <span className={`${styles.tag} ${done ? styles.tagDone : ""}`}>
+            {LESSON_STATUS_SHORT[status]}
+          </span>
+        </div>
       }
+      presentation={presentation}
       statStrip={
         <>
           <Stat value={seqLabel} label="in sequence" />
