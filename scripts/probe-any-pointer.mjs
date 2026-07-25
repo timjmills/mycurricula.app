@@ -152,8 +152,10 @@ const EXPECTED_BARE_POINTER = new Map([
     "components/week-v2/WeekC.module.css",
     { count: 1, why: "mixed A+C — reveals .addBtn (opacity 0 at rest)" },
   ],
-  // Genuine category C, but outside this lane's ownership.
-  ["components/ui/ToggleGroup.module.css", { count: 1, why: "cat C — not owned by this lane" }],
+  // NOTE: components/ui/ToggleGroup.module.css was listed here as "not owned by
+  // this lane". Ownership was granted after the C commit and it is now widened,
+  // so it has moved to REQUIRED_WIDENED. It appeared in NEITHER handoff list
+  // because it landed in e7e169c, after the categorisation was written.
   // NOTE: components/composer/ResMenu.module.css was on this list — it arrived
   // mid-sweep as a new bare guard in another lane's work. That lane widened it
   // itself, so it is deliberately NOT listed: if their change is reverted, this
@@ -217,6 +219,11 @@ const REQUIRED_WIDENED = new Map([
   ["components/year-v2/UnitWorkspaceRail.module.css", 1],
   ["components/year-v2/YearA.module.css", 1],
   ["components/year-v2/drawer/UnitContextDrawer.module.css", 1],
+  // Follow-up, after the lead granted ownership: ToggleGroup was in neither
+  // handoff list (it landed in e7e169c, post-categorisation) and is the
+  // primitive the rest of the tier inherits from, so leaving it bare would have
+  // been the worst single omission.
+  ["components/ui/ToggleGroup.module.css", 1],
   // Reference implementation — 0eeb3af, not this lane's but part of the tier
   ["components/ui/Button.module.css", 1],
   ["components/ui/Chip.module.css", 2],

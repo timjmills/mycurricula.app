@@ -393,10 +393,34 @@
   opacity: 1;
   background: color-mix(in oklab, var(--rc) 20%, transparent);
 }
+/* The chip's remove button is DESTRUCTIVE, so it owes the full §4 44px floor —
+   32px was short of it, and widening the guard to `any-pointer` only spread a
+   sub-minimum target to more devices.
+
+   44px was checked against the hazard that keeps some remove buttons small
+   (components/ui/Chip.module.css pins its own `.removeBtn` at 24px for exactly
+   this reason): a destructive control inflated until it laps the NEXT item's
+   destructive control deletes the wrong thing. Measured over a matrix of label
+   lengths (down to empty) and container widths (down to 180px, forcing three
+   rows), no two tap rectangles intersect — but the margin is thinner than it
+   looks and it is VERTICAL, not horizontal. Between wrapped rows the 44px
+   targets are disjoint by only **8px** (48px chip height + 4px row gap − 44px
+   target). Horizontally the tightest is 24px, with an empty label.
+
+   So: shrinking `.chips` gap, or growing this button past 48px, is what breaks
+   it — not adding more chips or longer labels. The horizontal axis has room;
+   the vertical axis does not.
+
+   Cost is +12px of chip height on touch (36 → 48), the same visible-on-touch
+   trade every other rule in this file's tier makes.
+   Evidence: scripts/probe-chipremove.mjs — asserts on rectangle intersection
+   (not centre distance, which is the wrong geometry for axis-aligned targets)
+   and exits non-zero on regression. Both failure paths verified to actually
+   fail. */
 @media (any-pointer: coarse), (max-width: 900px) {
   .chipRemove.chipRemove {
-    min-width: 32px;
-    min-height: 32px;
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 

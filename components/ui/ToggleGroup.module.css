@@ -64,13 +64,20 @@
 
 /* ── Touch-target inflation — any touch device, plus phone / tablet ──── */
 /* Visual stays compact; ::before expands the hit area to ≥44px.
-   `(pointer: coarse)` carries the rule past the 900px width test: a tablet in
+   The pointer arm carries the rule past the 900px width test: a tablet in
    landscape (an iPad Pro is 1024px) is a finger-driven device that would
    otherwise get the bare 26px / 34px chip. Width alone is not a proxy for
    touch — the sibling drawers already pair the two the same way
-   (UnitContextDrawer.module.css, DayEditSplit.module.css). */
+   (UnitContextDrawer.module.css, DayEditSplit.module.css).
 
-@media (pointer: coarse), (max-width: 900px) {
+   `any-pointer`, NOT `pointer` — and that distinction is what makes the
+   sentence above TRUE rather than merely intended. `pointer` reports only the
+   PRIMARY pointer, so an iPad Pro with a trackpad, or any touch laptop, reports
+   `pointer: fine`; this rule never fired on exactly the 1024px landscape tablet
+   it names. See components/ui/Button.module.css for the full ruling, including
+   why hover-affordance guards must NOT be widened the same way. */
+
+@media (any-pointer: coarse), (max-width: 900px) {
   .md .option::before,
   .sm .option::before {
     content: "";
