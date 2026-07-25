@@ -3630,3 +3630,690 @@ tree is not evidence about what shipped.** [[measure-head-not-dirty-tree]]
    `UnitExplorer.tsx:117`.
 5. `Tooltip`: a focus-opened dismissible bubble keeps `pointer-events: auto` and swallows one
    mouse click. Pre-existing, every `tooltipId` callsite; needs focus-then-mouse to reproduce.
+
+## Tooltip fix + Track-B defect sweep (fix-tooltip-and-sweep)
+
+Two commits on master: `63ec7cf` (the fix) and `6f0e737` (probe hardening). Files touched:
+`components/ui/Tooltip.tsx`, `components/ui/Tooltip.module.css`,
+`tests/tooltip-pointer-policy.test.ts`, `scripts/probe-tooltip.mjs`. Nothing else — the
+concurrent lanes' uncommitted edits in `components/ui/` were left untouched (path-scoped
+`git commit -- <paths>`).
+
+**JOB 1 — the Tooltip bug was TWO bugs, not one.**
+
+1. The reported one. The bubble's `pointer-events: auto` came from `showDismissLink`, which
+   is PROP-derived (`!required && tooltipId !== undefined`) — a constant. So every dismissible
+   tooltip was interactive **however it opened**, and a tooltip opens on focus too. Focus has
+   no cursor, so tabbing to (or merely clicking) such a control parked a click-eating rectangle
+   over the page for as long as the control held focus. The next mousedown inside it hit the
+   bubble, the trigger blurred, the bubble unmounted, and the mouseup landed elsewhere — no
+   click event, one silently eaten input. Fixed by gating interactivity on a new
+   `pointerEngaged` state (cursor entered the trigger; cleared by every close).
+
+   **Deliberately NOT keyed on the existing `byHover` flag.** `byHover` records how the current
+   open BEGAN and flips to false the moment a hovered trigger is clicked — the naive fix would
+   take the dismiss link inert mid-gesture, exactly when the teacher is reaching for it. The
+   probe has a dedicated check for that (`hover→click`).
+
+2. **A second defect the probe found: the dismiss link could not be clicked at all once the
+   trigger held focus.** mousedown on "Turn off these tips" blurred the trigger → `handleBlur`
+   → `hide()` → the bubble unmounted BEFORE the mouseup, so no click was ever delivered.
+   Measured: `dismissed: null` and the bubble gone. The tip vanished and came straight back on
+   the next hover. Fixed by suppressing the mousedown default inside the bubble, which keeps
+   focus on the trigger (also the better a11y outcome).
+
+Unchanged by design and verified live: `required: true` still ignores dismissal AND the global
+off switch and still renders no link; the native `title=` touch mirror; `aria-describedby`;
+reduced-motion; SSR safety (the portal only renders while `open`, so first paint is untouched).
+No callsite anywhere passes JSX into `content`, so the dismiss link is the only interactive
+element a bubble has ever had — the change cannot strand anything else.
+
+**Verification.** `npx tsc --noEmit` clean · `npx next lint --no-cache` clean · `npm run test`
+51 files / 1046 passed. §4a Codex gate ran sandboxed (`--sandbox read-only`, diff piped on
+stdin), no Critical/High; its one actionable Medium — that a boolean unit test cannot cover the
+DOM/event sequence — is answered by landing `scripts/probe-tooltip.mjs` as real coverage.
+§4b live in real Chrome: **20/20** on a healthy server, then **15/17** on a degraded one where
+both failures were the hover section timing out (the same hover path passed in the
+hover-then-click section of that very run). The pre-fix A/B is event-level, not just
+`elementFromPoint`: with `.interactive` re-added, `DIV.cp-compact-console` is DENIED the exact
+click it received when the fix was active.
+
+**A note for the next lane that writes a probe.** Two of my own checks would have passed
+VACUOUSLY on an unhydrated page — "no bubble after the tap" and "the dismissible tooltip is
+suppressed" both expect zero bubbles, which is also what a dead page shows. Both now prove the
+listeners are attached before judging. Hardened in `6f0e737`.
+
+**ENVIRONMENT — the shared dev server on 3099 was unusable for most of this lane's runtime.**
+`/login` and `/weekly` timing out at 30–180s, `/auth/claude-login` past 240s, and one
+`ChunkLoadError: Loading chunk app/(planner)/weekly/page failed` that wiped the hydrated DOM
+(the known `.next`-clobber shape). It recovered twice and went back down. Any §4b run in this
+window can produce false findings — an unhydrated page is indistinguishable from "the control
+does nothing" and from "zero results".
+
+**JOB 2 — findings I verified MYSELF at HEAD (the three audit lanes' reports are separate).**
+
+- **HIGH — the save-target dialog's "Team Curriculum" choice is a no-op.** Same defect class as
+  the "Push to Team" button deleted in `6324fe8`, still shipped on /weekly.
+  `save-target-dialog.tsx:146` `onChoose("core")` → `weekly-lesson-card.tsx:1873` →
+  `WeeklyGrid.tsx:713` / `WeekColumns.tsx:508` → `planner-store.tsx:960-961`, where
+  `case "setSaveTarget": if (action.target !== "personal") return doc;` discards it. The button
+  is labelled "Team Curriculum", carries the `--core-mode` weighted-warning styling, and the
+  file's own header says it exists so the teacher knows whether the change reaches "the plan
+  every team member sees". There is **no `editMode` gate** — it fires in Personal mode too.
+  Claim limited to what I proved: choosing Team differs in NO way from choosing Personal while
+  the UI says it does. NOT claimed: that the edit is discarded (the edit was already applied by
+  `editLesson` before the dialog opened; I did not trace persistence).
+  **I did not touch these files — another lane owns them.**
+- **LOW — `buildLesson` has FIVE callsites, not four.** 1438/1472 (list-hydrate: master and
+  authored) and 2810/2880 (`reloadLesson`/`reloadAuthoredLesson`) all spread
+  `...trackBArgsFromRow(...)`, so B2's Track-B fields DO round-trip after a mutation — the
+  four-callsite trap is CLOSED. The fifth, `createLesson` (~1951), omits it. Harmless today
+  (the insert writes none of those columns; `buildLesson` defaults them to `undefined`) but it
+  is the exact shape of the trap for whoever next gives one of those columns a DB default.
+  `mapUnitRow` is clean: two callsites, and `updateUnitFields` returns `reloadUnit` — a
+  confirm-only read-back.
+- **LOW / latent — `lib/tooltip-dismissal.ts` has no same-tab fan-out.** `storage` events only
+  fire in OTHER tabs, so `resetAll()` / `setGlobalOff()` update only the calling hook instance;
+  every other mounted `<Tooltip>` keeps stale state until it remounts. Currently NOT
+  user-visible: I checked, and the Appearance page that owns those controls has zero
+  `tooltipId` tooltips of its own, and route changes remount everything else. It becomes a real
+  bug the moment someone adds a dismissible tooltip beside those controls, or moves the toggle
+  into the planner chrome. Fix is ~15 lines (a module-level listener set notified on write).
+  Reported rather than fixed: it is a distinct feature from the assigned defect.
+
+**MEASUREMENT DISCIPLINE.** Two files I read for the dialog finding — `weekly-lesson-card.tsx`
+and `planner-store.tsx` — were DIRTY. Every claim above was re-verified with
+`git show HEAD:<path>` before being written down. [[measure-head-not-dirty-tree]]
+
+---
+
+## Class-sweep fixes (fix-class-sweep)
+
+Commit `5317880` — `components/lesson-card/context-menu.tsx`,
+`components/ui/Button.module.css`, `components/ui/Chip.module.css`.
+
+**§4b precondition.** Started at `c1190f7`; three commits landed mid-lane
+(`63ec7cf` tooltip, `c030e7e`, `e8f403f`) — none touched my owned files
+(`git diff --name-only c1190f7..HEAD -- <owned>` empty). Tree DIRTY: 59 files,
++2814/-1388 across six lanes. Every code claim below verified with
+`git show HEAD:<path>`; every live measurement is labelled **working tree,
+dirty** and is evidence about the tree, not about a commit.
+
+### 1. "Delete from Team Curriculum" — REMOVED (with a severity CORRECTION)
+
+Confirmed inert at HEAD: the item fired `"delete"`, and
+`git grep 'action === "delete"' / 'case "delete"'` across `components/ lib/ app/`
+returns **nothing** — in the working tree as well as at HEAD.
+
+**The brief overstated the severity, and the correction matters.** It said the
+item "appears only in the exact mode where a teacher would believe the
+consequence is team-wide". It appeared in **no** mode. `isMaster` is never
+threaded: both callsites (`lesson-card.tsx:755`, `weekly-lesson-card.tsx:1756`)
+omit the prop, there are no spread props, so it defaulted `false` and the
+`...(isMaster ? [...] : [])` spread produced nothing. This was **latent dead
+code, not a live user-facing hazard** — which is also exactly why it survived:
+nobody saw it. It would have gone live the first time any host passed
+`isMaster`. Removed anyway, per the standing ruling.
+
+Removed: the row, and the `"delete"` member of the exported `ContextAction`
+union (no consumer anywhere; single app, not a published library; tsc clean).
+Left a `DELETE-REMOVED` comment naming the four things that must exist before
+it returns.
+
+### 2. Menu emits vs handler accepts — the FULL comparison
+
+The menu can emit **14** actions. Two more items are self-contained and emit
+nothing (`Open in Daily` and `Compare with Team Curriculum` both `router.push`;
+`Copy link` uses `useCopyLink`). Union members `open-daily`, `compare-master`,
+`move`, `reset-to-master` are never emitted by the menu (`move` and
+`reset-to-master` are emitted by other card chrome and ARE consumed).
+
+Host A — `components/grid/WeeklyGrid.tsx:667` (the file the brief named).
+`GridCell` is a verified pure pass-through (lines 211, 353); `lesson-card.tsx`
+intercepts only `mark-status`.
+
+| Emitted | WeeklyGrid |
+|---|---|
+| `mark-status`, `duplicate` | HANDLED |
+| `relocate`, `bump`, `save-template`, `skip-quick`, `add-resource`, `add-to-todo`, `see-standards`, `restore-master`, `copy-to-personal`, `print`, `archive` | **UNHANDLED (11)** |
+| `delete` | was unhandled — now removed |
+
+**So delete was not the only gap — it was 1 of 12.** BUT `WeeklyGrid` is
+mounted only by `WeeklyShellV1`, i.e. only under `NEXT_PUBLIC_V2=0`. It is the
+rollback path, not what teachers use.
+
+Host B — the LIVE v2 path (`weekly-lesson-card.tsx:1762` switch →
+`WeekColumns.tsx:464`, which accepts only `duplicate`/`move`/`mark-status`).
+The card itself handles `mark-status`, `skip-quick`, `bump`, `duplicate`,
+`relocate`, `restore-master`, `reset-to-master`, `compare-master`, `archive`.
+
+**Still inert on the surface teachers actually use: `Add resource…`,
+`Add to to-do list`, `See standards`, `Print this lesson`, `Save as template`,
+`Copy to my personal`** — six always-visible items (no `hidden` gate on any of
+them) that close the menu and do nothing. `save-template` and
+`copy-to-personal` are forwarded to a host that has no branch for them;
+`save-template` carries a TODO admitting it is a stub. `print` has no handler
+anywhere (the working `/weekly/print` and `/year/print` routes are not wired to
+it). NOT fixed — reported, per instructions. Fixing needs handler work in
+`components/weekly/**`, another lane's files.
+
+### 3. `/home` false empty — **the finding is WRONG, on two independent counts**
+
+- `components/home/rows.tsx` is **not on the live path**.
+  `app/(planner)/home/page.tsx` is `V2 ? <HomeConsole/> : <HomeV1/>`, and
+  `lib/v2-flag.ts` is `process.env.NEXT_PUBLIC_V2 !== "0"` — default ON, with
+  no override in `.env.local`. `rows.tsx` renders only under the flag-OFF
+  rollback build.
+- **There is no hydrate window to be wrong during.** `rows.tsx` reads
+  `lib/home/today.ts`, which is synchronous filters over module-level static
+  mock imports (`LESSONS`, `TODOS`, `notesForDay`, `shoutboxForDay`,
+  `getDayBlocks`). No fetch, no promise, no loading state — so there is nothing
+  for `usePlannerDataState`/`PlannerEmpty` to consult. Adding them would be
+  wrong without first switching the data source, and `lib/home/today.ts` is
+  outside my ownership.
+
+Measured anyway (working tree, dirty), both passes polled *past* first paint so
+"never" is a claim about a window containing the paint:
+
+| pass | painted | polled to | "No lessons scheduled today" | `rows_*` markers |
+|---|---|---|---|---|
+| cold | 34,961ms | 50,157ms | **NEVER** | never |
+| warm | 4,727ms | 19,902ms | **NEVER** | never |
+
+Served SSR HTML independently confirms it: `grep -c` for `rows_row__` /
+`rows_lesson__` / the literal string = **0 / 0 / 0**. Rendered body text is the
+v2 console ("Welcome, Lena · Day Today · Week This week · Year Curricular
+plan…").
+
+The "five secondary panels" do not exist either: `components/home/**` contains
+exactly four empty states (`No blocks scheduled today.`, `Nothing due today.`,
+`No lessons scheduled today.`, `No messages or notes today.`), all static-mock.
+There is no "No standards tagged" in `components/home` at all. The one in my
+ownership, `lesson-card/parts.tsx:413`, takes `codes: string[]` off an
+already-loaded lesson — correct by construction.
+
+### 4. Touch targets — FIXED, plus two more defects found while verifying
+
+`Button.module.css:128` and `Chip.module.css:73` confirmed at HEAD: 44px
+inflation gated on `@media (max-width: 900px)` with no coarse arm. Both now use
+the house idiom `@media (pointer: coarse), (max-width: 900px)`
+(DayEditSplit / UnitContextDrawer). Verified by **live hit test**
+(`elementFromPoint` probing outward from centre — not a CSS read), coarse@1024
+vs a fine@1280 control:
+
+```
+COARSE@1024  coarse=true  maxw900=false        FINE@1280  coarse=false
+Chip.filter  44px hit  minH=44 padT=10 padL=13   Chip.filter  36px  padT=5 padL=13
+Button.sm    32px visual -> 44px HIT             Button.sm    32px visual -> 32px hit
+REAL Button.sm x4 on /weekly: all 44px HIT       REAL x4: all 32px
+8/8 assertions passed
+```
+
+Two extra defects, same files, both fixed:
+- **`.chip`'s documented 13px side padding was being stripped to 0** by
+  `.cp-root button { padding: 0 }` (0,1,1 beats 0,1,0) — measured `padL: 0px`
+  live at *both* widths. The touch `padding-top/bottom` was dead for the same
+  reason; only `min-height` was landing. Both now DOUBLED (`.filter.filter`).
+  [[cp-root-button-reset-trap]]
+- **`.removeBtn`'s rule claimed "reach 44px" while setting 24px.** Corrected
+  the comment, not the number: a 44px `::before` centred on a 16px glyph in a
+  36px pill reaches ~14px into the label and the neighbouring chip, so a mis-tap
+  becomes a *removal*. Left a TODO — the callsite must reserve real space, and
+  the `removable` variant has zero callsites today.
+
+**A probe artifact worth recording:** my first run flagged the `Today` button at
+**1px** hit height. It is `disabled` (already on the current week) and
+`Tooltip` wraps disabled children in an event-catching `span.disabledWrapper`
+**by design** (HEAD `Tooltip.tsx:591`, `childDisabled` branch). Not a defect —
+WCAG 2.5.5 exempts disabled controls. **A touch-target probe must exclude
+disabled controls or it manufactures findings.**
+
+### 5. Arrow-key candidates — all CLEAN, zero real bugs
+
+35 files under `components/**`/`lib/**` handle arrows at HEAD (excluding
+`ToggleGroup`). Intersecting with destructive/clearing labels gives 9 real
+candidates. Every one verified by reading HEAD:
+
+| file | arrow behaviour | verdict |
+|---|---|---|
+| `shell/command-palette.tsx:422` | `setActiveIndex` only; `Enter` runs `results[i].action()`; **clamps**, no wrap | CLEAN — the reference idiom |
+| `teach/board/editor/BoardEditor.tsx:291,380` | nudges the selected widget x/y (`onMoveStep`) / resizes; delete is a separate key | CLEAN |
+| `daily/ResourcesPanel.tsx:665` | `items[next]?.focus()` | CLEAN |
+| `resources/ResourceCardFace.tsx:719` | `items[next]?.focus()` | CLEAN |
+| `composer/ResMenu.tsx:162` | `items[next]?.focus()` | CLEAN |
+| `daily/rt-toolbar/RtToolbar.tsx:290` | `next.focus()` | CLEAN |
+| `lesson-editor/FloatingBar.tsx:575` | `next.focus()` | CLEAN |
+| `lesson-templates/template-section-editor.tsx` | **false positive** — the only match is `<ArrowDownIcon />`, a reorder icon; no arrow handler exists | CLEAN |
+| `appearance/use-roving-radio.ts:88` (drives theme-quick-switch) | **commits + wraps** (`onSelect(nextValue)`, `% count`) | COMMITS-BUT-BENIGN |
+
+`use-roving-radio` is the one that shares ToggleGroup's shape, and it is **not**
+a bug: its options are theme/style/palette ids ("Clear" and "Off" are *theme
+names*, not clearing actions), and selection-follows-focus is the **correct
+WAI-ARIA radiogroup pattern** for instant-apply preferences — the hook says so
+and is right.
+
+**Which sharpens the ToggleGroup finding for that lane:** committing on arrow is
+not wrong in itself. It is wrong when a reachable option is destructive or
+irreversible. The fix should be scoped to that, not a blanket move to
+Enter-to-commit — and `command-palette.tsx:422` (clamp + Enter) is the in-repo
+model if a full change is wanted.
+
+### Gates
+
+`npx tsc --noEmit` exit 0 · `npx next lint --no-cache` "No ESLint warnings or
+errors" · `npm run test` **1131 passed / 68 todo / 0 failed** (55 files).
+§4a Codex gate run (`codex exec --sandbox read-only`, diff piped via stdin).
+Findings triaged, not rubber-stamped: two Mediums **disproved** against the full
+files (`isMaster` still referenced at lines 297/318; no `"delete"` consumer
+repo-wide) — Codex had only the diff. One Medium **accepted and fixed** (the
+`.removeBtn` overlap hazard above — it was right, and I had been about to ship
+it). One Medium **held with justification**: `(pointer: coarse)` misses
+trackpad-driven touchscreen laptops, which want `any-pointer: coarse`. That gap
+is **pre-existing, not introduced** — HEAD's width-only query covered nothing
+above 900px at all, so this change strictly widens coverage.
+
+### For the lead
+
+1. **`(pointer: coarse)` vs `(any-pointer: coarse)` is a repo-wide call.** Six
+   files share the idiom; four are other lanes'. Changing two of six is worse
+   than the gap. Decide once, change all six, and weigh that `any-pointer`
+   inflates hit areas beyond the visual on mouse-driven touchscreen desktops.
+2. **Six inert menu items remain on the LIVE v2 weekly surface** (§2 above).
+   Same class as the delete item, non-destructive. Needs a ruling: wire them, or
+   hide them until they work.
+3. The Tooltip item in the previous section's open list can be closed —
+   `63ec7cf` landed it.
+
+**MEASUREMENT DISCIPLINE.** `weekly-lesson-card.tsx`, `WeeklyShell.tsx`,
+`Tooltip.tsx` and `planner-store.tsx` were all DIRTY while I read them; every
+claim above came from `git show HEAD:`. The dev server on 3099 serves six lanes'
+mixed work — the warm `/home` pass landed on another lane's onboarding wizard,
+which is why the cold pass is the one quoted. [[measure-head-not-dirty-tree]]
+
+### Class-sweep round 2 (fix-class-sweep) — commit `e9cc673`
+
+**§4b precondition.** Base `5317880`. `components/year/YearLessonPane.tsx` and
+`components/settings/workspace-settings.tsx` were both CLEAN at HEAD before I
+touched them. Tree still dirty across seven lanes. All reads via
+`git show HEAD:`.
+
+**1. `YearLessonPane` arrow leak — FIXED.** The handler was on `window`,
+filtered only by INPUT/TEXTAREA/contentEditable, so any ArrowLeft/Right
+anywhere on the page re-selected a lesson while the pane was open. Arrow
+branches now require the keystroke to originate inside the pane or with nothing
+focused. Escape left unscoped on purpose (dismiss-from-anywhere is expected for
+a side pane; scoping it would break "click a card, press Escape").
+
+**Reachability correction — it is NOT rollback-only, and it reads like it is.**
+`app/(planner)/year/page.tsx` is `V2 ? <YearShell/> : <TimelineYear/>`, which
+looks v1-only. But `YearShell` renders `TimelineYear` **on its paper frame**
+(its own header says so). Anyone auditing /year off the router gate alone will
+mis-classify this pane — and I nearly did.
+
+**2. Workspace copy — FIXED.** Four strings said "Your school's workspace" /
+"The school-wide workspace" to what may be a solo teacher. Reworded; the name
+placeholder now carries both shapes ("e.g. Al-Noor School, or Grade 5 Team").
+No fourth role noun introduced — the file already used "workspace admin" and
+that stays the only term. Repo-wide check: the only other "school admin"
+survivor is a code comment in `app/api/standards/frameworks/route.ts:9`, not
+user-facing.
+
+**3. `DefaultNotebookCard` arrow-wrap clearing — NOT fixed, decision pending
+with the lead.** Confirmed at HEAD. But the framing needs narrowing:
+`AUTO_OPTION` is at index **0**, so ArrowLeft/Up from the first notebook is an
+**adjacent step onto a labelled radio option** — normal ARIA, not a defect. The
+only unintended commit is the **wrap**: ArrowRight/Down off the last notebook
+circles to index 0 and clears the stored preference. Neither suggested
+callsite-only fix works — dropping the sentinel from `values` makes "Automatic"
+keyboard-unreachable (an a11y regression), and the `%` lives in the hook.
+Proposed a `wrap?: boolean` option defaulting **true**, so the other six
+callsites are untouched. Awaiting the go-ahead; not touching a shared hook
+mid-wave without it. LOW severity, fully recoverable by re-picking.
+
+**4. Correction to the sweep, in the sweep's favour — `grade-step.tsx` is a
+REAL find and I initially dismissed it.** I assumed it used `useRovingRadio`
+and was therefore protected by that hook's `currentIndex === -1 ? 0` guard. It
+does **not** — `components/onboarding/steps/grade-step.tsx:44-63` has its own
+inline handler with **no guard**. With nothing selected, `currentIndex` is `-1`
+and ArrowLeft computes `(-1 - 1 + 14) % 14 = 12` → silently selects grade
+**"12"** (verified: 14 options, index 12 is `{ value: "12" }`). Minor and
+recoverable, but it is a real defect on the onboarding path and it belongs to
+the onboarding lane, not me. **Routing it rather than fixing it.**
+
+**Gates.** Codex §4a on this exact diff — **NO BLOCKING ISSUES**. `tsc` exit 0,
+eslint clean, **1147 passed / 68 todo / 0 failed**.
+
+**Live-verification limit — stated because it is a gap, not a pass.** The §4b
+behavioural check on the arrow scoping did **not** complete. Reaching
+`YearLessonPane` needs a paper-frame subject → unit → week → lesson drill; I
+seeded the frame (cookie + localStorage, `data-frame=paper` confirmed) and
+hydration succeeded (112 `TimelineYear_*` controls), but three attempts stalled
+at the unit level — week cards never appeared inside a 24s poll while the shared
+dev server was answering /year in **67 seconds**. No component-render harness
+exists here (all 55 test files are pure logic) and adding one means new
+dependencies, which CLAUDE.md forbids. **So this fix rests on review + static
+gates, and the interaction test is outstanding.** Worth re-running when the
+server is quiet.
+
+**Also outstanding from round 1, unchanged:** the `(pointer: coarse)` vs
+`(any-pointer: coarse)` repo-wide decision, and the six inert menu items on the
+live v2 weekly surface.
+
+---
+
+## B4.5 + B4.6 — composer wiring (build-b45-b46-composer)
+
+**§4b precondition block:**
+
+```
+$ git rev-parse --short HEAD          # at start of lane
+c1190f7
+$ git diff HEAD --stat -- components lib app
+(empty — clean tree at start)
+$ git show HEAD:components/year-v2/unit-tabs/ResourcesTab.tsx | grep -c "openComposer\|useComposer"
+0                                     # the workspace tab had NO composer wiring
+$ grep -rn "openResMenu\|ResMenu" components app lib | grep -v "^components/composer/"
+components/chrome/ChromeAccountMenu.tsx:14  (comment only)
+components/chrome/ChromeContext.tsx:123     (comment only)
+```
+
+**Shipped: `e0eab58` — B4.6's /post half. B4.5 is BLOCKED. B4.6's Teach half is
+not applicable.** Detail below; the honest scope differs from the plan line.
+
+### What B4.5/B4.6 actually turned out to be
+
+The plan's one line ("Track-B workspace wiring; /post + Teach") implies three
+migrations of existing hand-rolled flows. Recon says otherwise:
+
+- **B4.5 — not a migration, a net-new affordance.** `unit-tabs/ResourcesTab.tsx`
+  is a 62-line **read-only `<ul>`**. There is no resource-add flow in the unit
+  workspace to migrate; the work is to *add* one, wired to the singleton from
+  day one. **Blocked**: `ComposerOpenOptions` requires a concrete `Lesson`
+  (`ResourceComposerProps.lesson` is non-optional — it drives routing and the
+  Lesson picker's week scope), and the tab receives only
+  `resources: UnitResourceRef[]`. Deriving a lesson from `resources[0].lessonId`
+  fails in exactly the case that matters — the EMPTY tab. Needs one line at
+  `components/year-v2/UnitExplorer.tsx:636` (`lessons` is already in scope
+  there), a file owned by another lane. Escalated; not built.
+
+- **B4.6 /post — real, and shipped.** The wall's per-section "Add" created a
+  wall-LOCAL notecard (`ResourceWall.tsx addCard` -> `override` -> localStorage
+  `cc_customwalls`), never a lesson resource, while its tooltip already promised
+  "Add a resource or a note". Now two adds: **Resource** -> the shared composer
+  on the section's anchor lesson; **Note** -> the sticky, unchanged.
+
+- **B4.6 Teach — NOT APPLICABLE, and I recommend recording it as such rather
+  than forcing it.** Two independent reasons:
+  1. **Structural.** `/teach` is route group `(teach)`;
+     `app/(teach)/layout.tsx` mounts AppState/Planner/ConsequenceToast only.
+     `ComposerProvider` is never mounted, so `useComposer()` throws.
+  2. **Semantic, and the stronger reason.** `teach-v2/WritingBar.tsx:144`'s
+     "Resource" popover does not *create* a resource — it picks an **existing**
+     lesson resource and emits a board intent
+     `{type:"addResource", pageId, resource, canvas:{x,y,w}}`, placing it on the
+     board page. Different verb, different target, different store. The composer
+     would sit *beside* that popover, not replace it.
+
+### Two findings other lanes may care about
+
+1. **SECURITY (fixed here).** `unit-tabs/helpers.ts`'s local `safeHref` claimed
+   in its own comment to "mirror the canonical sink gate `isSafeUrl`" — it had
+   drifted: **no `SMUGGLE_CHARS` check**. `"/<TAB>/evil.com"` satisfies its
+   `^\/(?![/\\])` arm (the char after the slash is a tab, so the negative
+   lookahead holds); the browser strips the tab BEFORE parsing and resolves the
+   href to `//evil.com`. **An open redirect on the workspace Resources tab**,
+   off teacher-supplied/imported resource urls. Verified by running both guards
+   side by side — 3 smuggling inputs accepted by `safeHref`, all 3 rejected by
+   `isSafeUrl`. Deleted; `ResourcesTab` (its only caller) now calls `isSafeUrl`.
+   **Durable lesson: a comment saying "keep the two in step" is not a mechanism.**
+
+2. **The B4.1 ResMenu singleton has ZERO production callsites.** 364 lines +
+   `openResMenu`/`closeResMenu` + the `resMenuOpenUrl` sink +
+   `tests/composer-foundation.test.ts` coverage — and the only matches outside
+   `components/composer/` are two *comments* citing it as a pattern. Either wire
+   it (`/post`'s Card action row is the natural first consumer) or delete it.
+   Tracked as its own task; not in my scope.
+
+### Gates
+
+**§4a Codex — `NO BLOCKING ISSUES` after 4 rounds**, all under
+`--sandbox read-only` with the diff piped on stdin. Findings fixed, not waved:
+- R1 Medium — mirroring a commit into a saved wall by content identity drops a
+  legitimate re-add whose identity already exists.
+- R2 Medium — the same diff misattributes a **concurrent** write (another tab,
+  realtime later) as "what you just added".
+- **Root cause of both: `ResourceComposerCommit` reports a COUNT, never the
+  created rows.** The clean fix is widening that contract — an edit to the
+  composer ENGINE, which this wave may not touch. So I **removed the
+  reconstruction entirely** rather than ship a guess. A preset wall re-projects
+  by itself (verified: `getSections` is `useCallback(..., [present.sections])`, so
+  `resourcesFor` -> `resolveResources` -> `presetSections` all re-derive, and
+  `PostClient.resourcesFor` unions section + lesson-level rows, so *either*
+  composer route surfaces); a saved wall is told plainly where the resource
+  landed. **If a later wave wants the card spliced into a saved wall, widen
+  `ResourceComposerCommit` first — do not re-derive it.**
+- R3 Medium — the toast named the *launch* lesson, but routing is unlocked, so a
+  teacher can re-point mid-dialog. Now names the commit's real `lessonId` and
+  states whether it is in this wall's scope.
+- R3 Low — the anchor resolver tried only the first candidate id; a saved wall
+  with one stale leading id disabled a button that had a valid destination. Now
+  tries every candidate.
+
+**Static:** `tsc --noEmit` 0 · `next lint --no-cache` 0 ·
+`vitest` **1168 passed / 68 todo / 0 failed**.
+
+**§4b live — 25/25 assertions, real Chrome (`channel: "chrome"`), localhost:3099.**
+`scripts/probe-b46-post-composer.mjs`. Covers: exactly **one `.cmp-modal` + one
+`.cmp-scrim`** on open AND on re-open (the host is not remounted), the Link ->
+stage -> Publish round-trip with the card landing on the live preset wall
+(**cards 34 -> 35**), Escape teardown, clean console, 375/768/1440 with no
+page-level h-scroll. Screenshots in `docs/screenshots/b46-post-composer/`;
+`02-composer-open-1440.png` shows the composer routed to Math · Fractions ·
+"Equivalent fractions warm-up" · **Whole lesson**, and `05-wall-768.png` shows
+the published card plus the toast naming the real destination lesson.
+
+### Probe-writing traps this lane hit — worth not repeating
+
+The first five probe runs produced **false failures**. Every one was the harness
+or the environment, never the app:
+- A sibling lane's **`AssessmentsPanel.tsx` was syntactically broken on disk**
+  mid-run; the compile error flooded the console and all 15 assertions failed.
+  It was already fixed by the time I read the file.
+- `[Fast Refresh] performing full reload` from sibling saves ate clicks; one run
+  reset the wall to the empty default preset mid-flow (**cards 34 -> 0**).
+- `ChunkLoadError: app/(planner)/layout` — **not** a clobbered `.next`: the file
+  was present, 24 MB, being rewritten as the browser requested it.
+- **Fixed sleeps are the enemy here.** `ComposerHost` lazy-loads
+  ResourceComposer via `next/dynamic({ssr:false})`, so the FIRST open pays a
+  chunk fetch that a 3s wait misses -> a run reported `modal=0` on a composer
+  that did open. Wait on `.cmp-modal`, never a timer. Same for hydration: I
+  polled a **read-only** signal (`aria-expanded` present) after a click-based
+  poll fought the real switcher and produced a false negative.
+- **Assert structure, not derived text.** "The card appeared" checked for the
+  raw url; the composer derives the card's *title* from it, so a correct render
+  failed. `[data-view][data-kind]` card-count before/after is the honest signal.
+- **`button[class*="ddBtn"]` also matches `addBtn`** (substring). Use `_ddBtn__`.
+- The console check **evidence-gates** its one exemption: the bare
+  "Failed to load resource: ... 502" (from `/api/og-preview` fetching the probe's
+  synthetic `example.com` url, which has no outbound network) is excused ONLY
+  when every failing request that run is attributable to that fixture url. A
+  plain text filter would have hidden real errors.
+
+**Ownership note:** `components/year-v2/unit-tabs/OverviewTab.tsx` was edited by
+another lane while this lane owned `unit-tabs/**`. Left untouched and excluded
+from my commit and my §4a diff.
+
+### Class-sweep round 3 (fix-class-sweep) — commit `6a6abf6`
+
+**§4b precondition.** Base `e9cc673`. `use-roving-radio.ts`,
+`workspace-settings.tsx`, `context-menu.tsx` all CLEAN at HEAD before editing.
+Tree still dirty across seven lanes; all reads via `git show HEAD:`.
+
+**1. Six inert menu items — HIDDEN** (lead's ruling: hide, do not wire).
+`Save as template`, `Add resource…`, `Add to to-do list`, `See standards`,
+`Print this lesson`, `Copy to my personal`. An `INERT-HIDDEN` block in
+`context-menu.tsx` records the verification (every `onContextAction` consumer
+enumerated) and what each would take to restore. Cheapest three to wire later:
+**See standards** (needs only the navigation `Open in Daily` already does),
+**Print** (a single-lesson route beside the working `/weekly/print` and
+`/year/print`), **Copy to my personal** (the forking model already lazy-forks
+via `setSaveTarget`; the host just never calls it). WeeklyGrid's 11 unhandled
+actions left alone by decision — that path exists to be a faithful rollback.
+
+**2. `useRovingRadio` gains `wrap?: boolean`** (default **true**, so the six
+appearance/filter callsites are byte-identical). `DefaultNotebookCard` passes
+`false`. The header note explains the *distinction*, not just the flag: the
+adjacent ArrowLeft onto the index-0 `__auto__` sentinel is normal ARIA and
+must keep working; only the forward-wrap off the last option is unintended.
+Written that way so nobody later "fixes" follows-focus for all seven callsites.
+
+**3. NEW FINDING — two live buttons whose labels and actions disagree.**
+`components/weekly/**` (not mine — routed to the lead, not fixed):
+
+- `weekly-lesson-card.tsx:1553` — button labelled **"Add section"**, tooltip
+  "Add a new section to this lesson's flow…" → fires
+  `onContextAction?.("add-to-todo", lesson.id)`
+- `weekly-lesson-card.tsx:1589` — button labelled **"Edit Template"**, tooltip
+  "Edit the underlying lesson template…" → fires
+  `onContextAction?.("print", lesson.id)`
+
+Both sit in the expanded lesson-card footer on the **live v2 weekly surface**,
+and both are inert today for the same reason the menu items were. **Hiding the
+menu items did not close these two** — the card chrome fires the same actions
+independently.
+
+This shape is worse than the menu was. The six hidden items were
+dead-but-honest. These are dead **and mislabelled**, so today they cost a
+no-op click — but the moment anyone implements `print` or `add-to-todo` (and
+`print` is on the cheapest-three list above), "Edit Template" starts printing
+and "Add section" starts writing a to-do. **The follow-up ticket must
+re-point these two callsites BEFORE either action is implemented, not after.**
+Whoever picks up the wiring has no reason to go looking for them.
+
+**Gates.** Codex §4a on the exact diff — **NO BLOCKING ISSUES** (it was asked
+specifically about the clamped index arithmetic at both ends and `count===1`,
+the default preserving the six callsites, and whether anything keys off the
+removed items' presence — positional assumptions, aria/count assertions, the
+divider-collapse logic). eslint clean, **1175 passed / 68 todo / 0 failed**.
+`tsc` clean for these files; the tree's one error is
+`lib/use-school-week.ts:589` (`SchoolWeekSaveResult` undefined) — onboarding
+lane, mid-edit, not mine.
+
+**Closed this round:** `/home` — **not a defect**, per the lead. `rows.tsx`
+reads `lib/home/today.ts`, synchronous filters over module-level static
+imports: no fetch, no promise, no loading state to represent. Wiring
+`usePlannerDataState` in would gate static mock data on an unrelated store's
+hydrate — a skeleton with no reason to exist, then data that didn't come from
+the store it waited on. Recorded here so it is not re-filed. (The real issue
+there, out of scope and on the rollback path, is that `/home` reads a mock
+helper at all.)
+
+**Still open:** the `(pointer: coarse)` vs `(any-pointer: coarse)` repo-wide
+decision (six files, four other lanes'); `grade-step.tsx:44-63` ArrowLeft with
+nothing selected → grade "12" (onboarding lane); and the outstanding §4b
+interaction test for the `YearLessonPane` scoping, which needs a quiet server.
+
+## Planner data-layer fixes (fix-planner-datalayer)
+
+**Landed as `519b42c` on master** (path-scoped commit; the sibling lane's staged
+`toggle-group-keys` files were left untouched). 20 files, +2661/−161.
+
+**Critical — confirmed and fixed.** A zero-lesson grade discarded the catalog it
+had just fetched: `hydrate` dispatched a bare `setHydration:"empty"` and
+returned, dropping the successfully-read subjects/units/standards.
+`setCatalog` is defined but dispatched NOWHERE in the repo (verified by grep), so
+hydrate was the only path in and nothing put them back — no subjects, no units,
+an unreachable B1–B3 unit workspace, and `DailyView`'s quick-add silently
+no-oping on `subjects[0]`. Now dispatches the full `hydrate` with the fetched
+catalog + `hydration:"empty"`, which `plannerDataStateFromHydration` maps to
+`"settled"`, so surfaces render "no lessons yet" rather than a stuck skeleton.
+
+**All 6 Highs closed** (undo/redo persistence via a new pure diff
+`lib/planner/doc-replay.ts`; the four non-persisting mutators, which needed a new
+`unarchiveLesson` source verb on the contract + both sources; the hung-send queue
+wedge, now watchdogged; `retryFailedUnitWrite`'s stale-revert, now baseline-
+guarded; `OverviewTab`'s gap count; and the SECURITY DEFINER migration, AUTHORED
+ONLY). **All Mediums closed too**, except the two noted below.
+
+**Authored, NOT applied** — `supabase/migrations/20260730120000_security_definer_search_path_backfill.sql`.
+The audit found **38** functions with a bare `set search_path = public`, not the
+5 flagged: the whole invite/notebook/teach/section/framework/course-sharing
+surface, plus the tenancy helpers. `is_claude_admin()` is correctly EXCLUDED — it
+uses `set search_path to ''`, which is *stricter* than pg_temp-last, and a
+blanket sweep would have weakened it. Catalog-driven (`oid::regprocedure`), so no
+signature is transcribed by hand; matches only `search_path=public` exactly, so
+it is idempotent and cannot clobber a bespoke path. **No DB access of any kind
+was performed by this lane.**
+
+**One finding partially wrong, corrected on the record:** the §4a reviewer
+claimed a cleared `standardIds` would leave the DB holding the old uuid. It would
+not — `updateLesson` falls back to `resolveCodesToStandardIds` when only
+`standards` is present. The assignment was made unconditional anyway (it costs
+nothing and removes the ambiguity), but the described failure does not occur.
+
+**§4a gate: 8 rounds, ending NO BLOCKING ISSUES.** Rounds 1–5 surfaced real
+defects I had introduced and fixed (replay patches sitting in a different serial
+queue lane from direct edits — an edit and its undo could race; `status` +
+`reasonNotDone` split across lanes when they are one read-modify-write row;
+`clearFailed` deleting a baseline a still-coalesced write needed, then the
+mirror-image false-stale when it was never re-captured). Round 7 caught that both
+my SQL verification query and my lock test tested pg_temp *presence* rather than
+pg_temp *last* — `search_path = pg_temp, public` would have passed both.
+
+**Two knowingly accepted, documented in-code, NOT silently dropped:**
+1. The queue watchdog ABANDONS a hung send rather than cancelling it (no
+   `AbortSignal` exists across the Next server-action boundary), so a bounded
+   window allows a stale late commit. Strictly better than the permanent, total,
+   silent edit loss it replaces. Real fix = thread an AbortSignal through
+   `plannerDispatch`.
+2. Replay reuses the target of a lesson's LAST write, not each history entry's
+   own, so undos reaching back past a Personal/Team flip can fork where master
+   was meant. Exact for the first undo after a flip (the realistic case); the
+   residual error direction is the safe one. Real fix = stamp `saveTarget` onto
+   every `HistoryEntry`, which is a reducer + action-shape change.
+
+**Deferred, needs YOUR call — three items I would not guess at:**
+- `restoreLesson` is deliberately NOT replayed. The diff cannot clear fork
+  lineage, so replaying it writes master's text INTO the personal copy and leaves
+  the fork standing: a "Modified" pill after reload and a lesson that no longer
+  follows Team updates — a NEW wrong state. The honest fix is a source verb that
+  DELETES the personal copy, which for a snapshot-less fork discards the
+  teacher's own edits. That is destructive and is a product decision.
+- `setSaveTarget(id,"personal")` still paints `modified`/`isPersonal` with no
+  write. Same question underneath: what should "copy to personal" persist when
+  the copy is identical to master? Left exactly as it was.
+- Persist failures are still `console.error`-only. The seam needs a bridge
+  component under `components/shell/` (ConsequenceToastProvider mounts as a CHILD
+  of PlannerProvider), which is outside my file ownership. Send me the word and
+  I'll hand you the store-side signal to wire.
+
+**§4b live pass: BLOCKED, and I am not calling it done.** The shared dev server
+on 3099 serves five lanes' uncommitted work. `/year` rendered correctly with my
+diff in the tree at 07:34 (310 lessons, subjects, stats, no planner console
+errors) — that much is real evidence the store changes don't break the flag-OFF
+boot. But the unit workspace could not be opened: `AssessmentsPanel.tsx` had a
+JSX syntax error at that moment, then the client bundle threw "Invalid or
+unexpected token", then `/weekly` started returning 404 to the authed browser
+(the `.next`-clobbered signature) and navigations began timing out at 60s with
+the server taking 16.7s to answer. I did not start a second server and did not
+restart theirs. **The Gaps-card change needs a live re-check once the tree
+compiles.** Static proof meanwhile: `UnitExplorer` is the only renderer of
+`OverviewTab` and already calls `usePlanner()` in the same subtree, so the added
+hook cannot throw; the predicate is byte-identical to the one already passed to
+`InsightsPanel`.
+
+**Verification, verbatim:** `npx tsc --noEmit` clean; `npx next lint --no-cache`
+→ `✔ No ESLint warnings or errors`; `npm run test` → **57 files, 1179 passed,
+68 todo, 0 failed**. (The brief's "193 passed / 16 todo" baseline is stale — the
+suite was 1110/68 before this lane; +69 tests here.) Other lanes' in-flight tsc
+errors seen and excluded: `settings/calendar`, `schedule-step`,
+`use-school-week`, `UnitAssessments.tsx`, `AssessmentsPanel.tsx`.
+
+**New tests (+69):** `planner-doc-replay` (the diff + write-lane split),
+`planner-completion-gate` (completion never forks), `planner-mock-move` (the
+cross-week bug + the new unarchive verb), `security-definer-search-path` (the
+migration locks + a `pinsPgTempLast` helper that rejects `pg_temp, public`), plus
+the hung-send watchdog cases, the `staleUnitPatchKeys` retry guard, all six
+clear-to-NULL scalars (was 1 of 6), and a reverse column lock on
+`unit_assessments`. Fixed the hardcoded `MIGRATION_FILES[2]` false-guard by
+discovering the migration set from disk.
