@@ -24,6 +24,29 @@
 //   4. The failure path has been SEEN to fail — `--selftest` proves the
 //      redaction on a real thrown navigation error, rather than asserting it.
 //
+// THE ONE SHAPE THIS MODULE CANNOT COVER — read before assuming you are safe.
+//
+// A caller that registers CONTEXT-LEVEL request interception *before*
+// authenticating sees the login navigation itself:
+//
+//     await ctx.route("**/*", (route) => {
+//       log(route.request().url());   // ← contains ?token=… ; outside our reach
+//       route.continue();
+//     });
+//     await bypassLogin(ctx, …);      // the hop this handler now observes
+//
+// The handler runs in the caller's process on the caller's own context, so
+// nothing here can redact it. No probe does this today on a context it also
+// authenticates (probe-4b-consolidated routes a context, but takes its auth
+// from `authedStorageState`, which builds a separate one). It is named here
+// because this module's existence invites callers to assume the token is
+// handled for them — and a security boundary that overstates its coverage is
+// worse than one that names its edge.
+//
+// If you must route and authenticate on the SAME context: pass every
+// `request.url()` you log through the exported `redact()`, or authenticate on a
+// throwaway context first and carry the storageState across.
+//
 // USAGE
 //   import { bypassLogin, redact, requireToken } from "./lib/auth.mjs";
 //   const ctx = await browser.newContext();
@@ -97,12 +120,21 @@ export async function bypassLogin(context, opts = {}) {
     next = "/weekly",
     timeout = 60000,
     settleMs = 1500,
-    // /auth/claude-login is a cold route in dev and compiles on first hit. With
-    // several lanes sharing one dev server that has been measured well past a
-    // minute, so a single-shot hop fails the whole probe on a compile queue
-    // rather than on a defect. Retrying is the difference between an
-    // environment blip and a lost run.
-    retries = 3,
+    // DEFAULT 1 — one attempt, fail fast. Opt in to retries per callsite.
+    //
+    // This defaulted to 3 when the hop was centralised, which silently changed
+    // six probes that had always failed fast. `probe-b46-post-composer` passes
+    // `timeout: 240000`: against a wedged server it reported failure in 4
+    // minutes and would now take 12 to say the same thing — and any wrapper
+    // with a shorter timeout kills it mid-run, so it reports NOTHING, which is
+    // strictly worse than a fast failure. Slow-to-surface failure is the same
+    // error this repo keeps paying for: an environment problem that looks like
+    // a defect for longer than it needs to.
+    //
+    // `probe-tooltip` genuinely earned a retry — /auth/claude-login is a cold
+    // dev route whose first compile has been measured past a minute under
+    // concurrent-lane load — so it passes `retries: 3` at its own callsite.
+    retries = 1,
     token = requireToken({ repoRoot: opts.repoRoot ?? process.cwd() }),
   } = opts;
 

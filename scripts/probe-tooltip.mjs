@@ -58,7 +58,12 @@ const browser = await chromium.launch({ channel: "chrome" });
 // ── One authenticated storage state, reused by every context ────────────────
 const auth = await browser.newContext();
 {
-  // The hop (and its retry-on-cold-compile) lives in scripts/lib/auth.mjs.
+  // The hop lives in scripts/lib/auth.mjs. `retries: 3` is passed HERE, not
+  // taken from a default: /auth/claude-login is a cold dev route whose first
+  // compile has been measured past a minute with several lanes sharing one dev
+  // server, and this probe would otherwise lose a whole run to a compile queue.
+  // Every other probe fails fast (the helper defaults to a single attempt), so
+  // a slow server surfaces as a slow server quickly rather than after 3×.
   await bypassLogin(auth, {
     base: BASE, next: "/weekly", timeout: 180000, settleMs: 2500, retries: 3,
   });
@@ -163,6 +168,28 @@ async function openByHover(page, sel) {
   return false;
 }
 
+// ── Warm the route ──────────────────────────────────────────────────────────
+// Whichever section ran FIRST kept failing, in a different position each run:
+// it was paying /weekly's cold dev compile plus the planner store's own
+// 11–16s hydrate out of its own budget, on a server shared with other agents.
+// That is an environment cost, not a signal about the tooltip, so pay it once
+// here in a throwaway context and let every section start against a warm route.
+async function warmRoute() {
+  const ctx = await makeContext();
+  const page = await ctx.newPage();
+  const t0 = Date.now();
+  try {
+    await openWeekly(page);
+    const ok = await openByFocus(page, SEARCH);
+    console.log(
+      `  (warm-up: /weekly ${ok ? "live" : "NOT live"} after ${Math.round((Date.now() - t0) / 1000)}s)`,
+    );
+  } catch {
+    console.log("  (warm-up: /weekly did not come up — sections will report it)");
+  }
+  await ctx.close();
+}
+
 // What does the browser say is painted at this point?
 const elementAt = (page, x, y) =>
   page.evaluate(
@@ -211,6 +238,8 @@ const runSection = async (name, fn) => {
 };
 
 // ── 1 + 2. Focus-open: inert now, swallowing with the pre-fix class ─────────
+await warmRoute();
+
 await runSection("focus-open", async () => {
   const ctx = await makeContext();
   const page = await ctx.newPage();
