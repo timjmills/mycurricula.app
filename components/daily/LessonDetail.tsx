@@ -87,7 +87,7 @@
 //   completion— cycleStatus() calls onToggleComplete (never forks).
 // UI-only state (titleEditing, draftTitle) stays local — not persisted.
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   ReactNode,
@@ -99,10 +99,15 @@ import { instantiateSections } from "@/lib/lesson-flow";
 import { LESSON_TEMPLATES } from "@/lib/lesson-templates";
 import type { LessonTemplate } from "@/lib/lesson-templates";
 import { useConsequenceToast } from "@/lib/consequence-toast";
+import {
+  COMPARE_REQUEST_EVENT,
+  type CompareRequestDetail,
+} from "@/lib/fork-diff";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip } from "@/components/ui";
+import { ForkDiffPanel } from "@/components/lesson-card";
 import { LessonAgendaNav } from "./LessonAgendaNav";
 import { PlanningTabs } from "./planning-tabs";
 import type { PlanningTabsHandle } from "./planning-tabs";
@@ -257,6 +262,76 @@ export function LessonDetail({
   // element's first child) and the container the agenda navigator
   // scrollspies and scrolls.
   const cellRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Fork diff (UX roadmap item 01) ────────────────────────────────────
+  // The "Compare with Team Curriculum" ⋯ item routes HERE — the spec puts
+  // the diff inline in this body, not in an overlay (compare-to-master.tsx
+  // is a legacy host retained only so an older callsite compiles).
+  //
+  // Two arrival paths, because neither covers the other:
+  //
+  //   WARM — the menu item is already on /daily, or the App Router hasn't
+  //   committed the URL yet (it does so only after the RSC round-trip, so
+  //   reading location right after the push is racy). context-menu.tsx
+  //   dispatches COMPARE_REQUEST_EVENT alongside its push for exactly this
+  //   case; a mounted LessonDetail for that lesson acts on it immediately.
+  //
+  //   COLD — a deep link or refresh on /daily?lesson=<id>&compare=1, where
+  //   no event ever fires because nothing dispatched one in this document.
+  //
+  // Read via window.location rather than useSearchParams: this is a deep
+  // client component, and useSearchParams would drag a Suspense boundary
+  // in (the reasoning lib/fork-diff.ts already records for the event).
+  // Safe in an effect — the URL is settled by the time one runs.
+  //
+  // No gating here beyond the id match: ForkDiffPanel returns null on its
+  // own when there is no master snapshot (:120) or the mode isn't personal
+  // (:127). Duplicating those would be a second copy to drift.
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  useEffect(() => {
+    const onCompare = (e: Event): void => {
+      const detail = (e as CustomEvent<CompareRequestDetail>).detail;
+      if (detail?.lessonId === lesson.id) setCompareOpen(true);
+    };
+    window.addEventListener(COMPARE_REQUEST_EVENT, onCompare);
+    return () => window.removeEventListener(COMPARE_REQUEST_EVENT, onCompare);
+  }, [lesson.id]);
+
+  // AUTHORITATIVE, not additive — it assigns rather than only setting true.
+  // DailyViewV1 renders <LessonDetail> WITHOUT a key (:1466), so selecting a
+  // different lesson reuses this instance and every piece of state survives.
+  // A set-only-true version would leave the diff open across that switch and
+  // silently show lesson B's diff to someone who asked about lesson A.
+  const syncCompareFromUrl = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    setCompareOpen(
+      params.get("compare") === "1" && params.get("lesson") === lesson.id,
+    );
+  }, [lesson.id]);
+
+  useEffect(() => {
+    syncCompareFromUrl();
+    // popstate too, not just lesson.id (§4a M2). The menu's router.push adds
+    // a history entry, so Back returns to the same lesson WITHOUT ?compare=1
+    // — same lesson.id, so a lesson-keyed effect alone never re-runs and the
+    // panel sits open contradicting the address bar.
+    window.addEventListener("popstate", syncCompareFromUrl);
+    return () => window.removeEventListener("popstate", syncCompareFromUrl);
+  }, [syncCompareFromUrl]);
+
+  // Closing drops the deep-link param, so re-selecting this lesson (or a
+  // refresh) doesn't reopen a diff that was just dismissed — the effect above
+  // would otherwise read `compare=1` again and re-assign true. replaceState,
+  // not router.replace: no RSC round-trip and no re-render for a URL tidy-up.
+  const closeCompare = useCallback(() => {
+    setCompareOpen(false);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("compare")) {
+      url.searchParams.delete("compare");
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
 
   // ── Narrow-workspace measurement ──────────────────────────────────────
   // The agenda navigator stacks above the flow when the detail column is
@@ -570,6 +645,13 @@ export function LessonDetail({
       <div className={detailStyles.body} ref={cellRef}>
         <RtToolbar />
         <div className={detailStyles.column}>
+          {/* ── Fork diff — inline, above the title ────────────────────
+              First thing in the column, because a teacher only gets here
+              by asking "what did I change?" — the answer should not be
+              below the fold. */}
+          {compareOpen && (
+            <ForkDiffPanel lesson={lesson} onClose={closeCompare} />
+          )}
           {/* ── Title — hero ───────────────────────────────────────────
               Double-click-to-edit (or Enter / F2 on the focused text).
               Commits on blur, cancels on Escape — the WeeklyLessonCard
