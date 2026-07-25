@@ -1632,9 +1632,32 @@ export function ResourceComposer({
   const showNote = isNotecardMode || items.length > 0;
   const showNotePicker = !isNotecardMode && items.length > 1 && noteItem != null;
 
-  // Routing (Subject · Unit · Lesson · Section) — the footer's "file-to +
-  // wall column" control. RoutingField/RouteSelect are unchanged; only their
-  // home moved from the body into the footer.
+  // Routing (Subject · Unit · Lesson · Section) — the footer's "Destination"
+  // control. RoutingField/RouteSelect are unchanged; only their home moved from
+  // the body into the footer.
+  //
+  // WHAT THIS IS NOT (comment corrected 2026-07-25; it previously called this a
+  // "file-to + wall column" control, which describes the 7.21 handoff's design,
+  // NOT this code — a future engineer could read that and wire against a
+  // capability that does not exist):
+  //
+  //  • It is a four-level NARROWING PATH to one lesson, not a choice of what to
+  //    file to. Subject and Unit are FILTERS — `unitId` only scopes
+  //    `lessonOptions` (see the memo above). The only real destination choice is
+  //    Section vs "Whole lesson", which is why the commit path has exactly two
+  //    terminal writes (`addSectionResource` / `editLesson`) and no unit branch.
+  //  • There is NO wall-column select. `LessonResource` has no `wall` field,
+  //    `toResource` never sets one, and lib/wall-scope.ts groups /post by
+  //    lesson/subject/day/unit reading only `type` and `label`.
+  //
+  // The handoff specifies both (ph-composer.jsx:57 `canUnit=!!req.unitId`;
+  // :155-163 a file-to select — "This lesson" / "Whole unit" — plus a wall-column
+  // select over Resources · Differentiation · Do Now · Homework · Notes ·
+  // Assessment; ph-app.jsx:240 stamps `wall: r.wall || ''`). Closing that gap is
+  // a WAVE, not a wiring change: it needs a `wall` field on LessonResource, a
+  // `resources` field on Unit (which has none) so "Whole unit" has somewhere to
+  // go, a UnitPatch widening, a store action, a DB column, the two selects here,
+  // and /post reading the column. Not authorised as of this comment.
   const routingField = (
     <RoutingField
       labels={labels}
@@ -1962,7 +1985,10 @@ export function ResourceComposer({
           )}
         </div>
 
-        {/* ── Footer: session badge · routing (file-to + wall) ────────── */}
+        {/* ── Footer: session badge · Destination routing ──────────────
+            NOT "file-to + wall" — there is no wall-column select and no
+            unit destination here; see the routingField comment above for
+            what the handoff specifies and what building it would take. */}
         {!allToolsOpen && (
           <footer className={styles.foot}>
             {showSessionBadge && (
