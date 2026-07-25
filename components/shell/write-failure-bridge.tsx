@@ -33,15 +33,48 @@ import { useEffect, useRef } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { useConsequenceToast } from "@/lib/consequence-toast";
 
-/** Human copy per failed verb. Deliberately plain: the teacher needs to know
- *  WHAT did not save and WHERE it was going, not the verb's internal name. */
-const WHAT_FAILED: Record<string, string> = {
-  updateLesson: "lesson edit",
-  updateUnitFields: "unit plan edit",
-  setSections: "lesson layout change",
-  move: "lesson move",
-  archive: "lesson removal",
-  unarchive: "lesson restore",
+/**
+ * Per-verb copy: WHAT did not save, and WHAT THE TEACHER WILL ACTUALLY SEE on
+ * reload. The second half has to be per-verb, and getting it wrong is not a
+ * cosmetic slip — it is this component telling the specific lie it exists to
+ * prevent.
+ *
+ * The optimistic reducer state and the server state disagree in DIFFERENT
+ * DIRECTIONS depending on the verb:
+ *   • an edit / layout change is on screen and nowhere else → it disappears;
+ *   • a MOVE is on screen in the new slot → the card returns to the OLD slot,
+ *     it does not vanish;
+ *   • an ARCHIVE already removed the lesson from every surface, and the row is
+ *     still there → the lesson COMES BACK.
+ * One sentence for six verbs said "it's still on screen, but it will be gone if
+ * you reload" for all of them — both clauses false for archive, and the wrong
+ * outcome for move.
+ */
+const FAILED_COPY: Record<string, { what: string; consequence: string }> = {
+  updateLesson: {
+    what: "lesson edit",
+    consequence: "It’s still on screen, but it will be gone if you reload.",
+  },
+  updateUnitFields: {
+    what: "unit plan edit",
+    consequence: "It’s still on screen, but it will be gone if you reload.",
+  },
+  setSections: {
+    what: "lesson layout change",
+    consequence: "It’s still on screen, but it will be gone if you reload.",
+  },
+  move: {
+    what: "lesson move",
+    consequence: "The lesson will go back to where it was if you reload.",
+  },
+  archive: {
+    what: "lesson removal",
+    consequence: "The lesson will come back if you reload.",
+  },
+  unarchive: {
+    what: "lesson restore",
+    consequence: "The lesson will be hidden again if you reload.",
+  },
 };
 
 export function WriteFailureBridge(): null {
@@ -57,13 +90,22 @@ export function WriteFailureBridge(): null {
     if (lastWriteFailure.id <= shownIdRef.current) return;
     shownIdRef.current = lastWriteFailure.id;
 
-    const what = WHAT_FAILED[lastWriteFailure.op] ?? "change";
+    const copy = FAILED_COPY[lastWriteFailure.op];
+    const what = copy?.what ?? "change";
     const where =
-      lastWriteFailure.scope === "team"
-        ? " for the Team Curriculum"
-        : "";
+      lastWriteFailure.scope === "team" ? " for the Team Curriculum" : "";
+
+    // A TIMEOUT IS NOT A FAILURE, and must not be phrased as one. The request
+    // was abandoned rather than cancelled, so it may still commit — and the
+    // documented hazard is that it commits AFTER the next write, putting the
+    // NEWER edit at risk, not this one. Any sentence that predicts what a reload
+    // will show would be inventing a certainty nobody has. So it says what is
+    // actually known, and what to do about it.
     showConsequence({
-      message: `Your ${what}${where} didn’t save. It’s still on screen, but it will be gone if you reload.`,
+      message:
+        lastWriteFailure.kind === "timeout"
+          ? `Your ${what}${where} is taking too long to save and we’ve stopped waiting. It may or may not have gone through — reload to see what the server actually has.`
+          : `Your ${what}${where} didn’t save. ${copy?.consequence ?? "Reload to see what the server actually has."}`,
     });
   }, [lastWriteFailure, showConsequence]);
 

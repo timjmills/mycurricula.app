@@ -447,25 +447,133 @@ describe("splitPatchByField — differently-shaped payloads share a lane", () =>
   });
 
   it("the narrower payload does NOT cover the wider one", () => {
-    // The store's rule: every key of the FAILED patch must appear in the pending
-    // one. Pinned here so a refactor that swaps it back to a boolean has to
-    // confront this case.
+    // Uses the SHIPPED predicate, not a local copy — an inline re-implementation
+    // here would stay green with the fix reverted.
     const [[, wide]] = splitPatchByField({
       status: "not_done",
       reasonNotDone: "assembly",
     });
     const [[, narrow]] = splitPatchByField({ status: "done" });
-    const covers = (failed: object, pending: object) =>
-      Object.keys(failed).every((k) => k in pending);
-    expect(covers(wide, narrow)).toBe(false); // would lose reasonNotDone
-    expect(covers(narrow, wide)).toBe(true); // safe to suppress
+    expect(patchCovers(wide, narrow)).toBe(false); // would lose reasonNotDone
+    expect(patchCovers(narrow, wide)).toBe(true); // safe to suppress
   });
 
   it("standards + standardIds travel together, so they always cover", () => {
     const a = splitPatchByField({ standards: ["A"], standardIds: ["i1"] });
     const b = splitPatchByField({ standards: ["B"], standardIds: ["i2"] });
-    const covers = (failed: object, pending: object) =>
-      Object.keys(failed).every((k) => k in pending);
-    expect(covers(a[0][1], b[0][1])).toBe(true);
+    expect(patchCovers(a[0][1], b[0][1])).toBe(true);
+  });
+});
+
+// ── The saveTarget must be IN THE LANE, not just the payload ───────────────
+// These import the SHIPPED helpers. An earlier draft re-implemented the key
+// construction inline and asserted its own copy — which would have stayed green
+// with the fix reverted. A test that can't fail is not a test.
+//
+// The lane decides whether one failure can be suppressed by another payload. A
+// `core` write targets the SHARED master row; a `personal` one targets this
+// teacher's copy. Different rows, no ordering relationship — and while they
+// shared a lane this happened: a Team-mode title edit is RLS-denied, the teacher
+// flips to Personal and types again before it settles, the personal payload
+// lands in the same pending slot, and the core rejection reads as superseded and
+// is SWALLOWED. Master never got the edit and nobody is told.
+
+import {
+  failureScopeForOp,
+  lessonFieldLane,
+  lessonOpLane,
+  patchCovers,
+  sectionLane,
+} from "@/lib/planner-store";
+
+describe("lessonFieldLane — separates the two sides of the fork", () => {
+  it("a core write and a personal write of the SAME field never share a lane", () => {
+    expect(lessonFieldLane("l1", "core", "title")).not.toBe(
+      lessonFieldLane("l1", "personal", "title"),
+    );
+  });
+
+  it("still separates two lessons, and two fields", () => {
+    expect(lessonFieldLane("l1", "core", "title")).not.toBe(
+      lessonFieldLane("l2", "core", "title"),
+    );
+    expect(lessonFieldLane("l1", "core", "title")).not.toBe(
+      lessonFieldLane("l1", "core", "notes"),
+    );
+  });
+
+  it("same lesson + target + field IS one lane, so ordering is preserved", () => {
+    // Splitting by target must not accidentally split the case the queue exists
+    // to order: repeated keystrokes on one field.
+    expect(lessonFieldLane("l1", "personal", "title")).toBe(
+      lessonFieldLane("l1", "personal", "title"),
+    );
+  });
+
+  it("sections split by target for the same reason", () => {
+    expect(sectionLane("l1", "core")).not.toBe(sectionLane("l1", "personal"));
+  });
+});
+
+describe("lessonOpLane — archive is single-laned, move is not", () => {
+  it("archive does NOT split by target", () => {
+    // softDeleteLesson/unarchiveLesson write ONE row regardless of the toggle.
+    // Splitting would let a Team-mode archive race a Personal-mode un-archive
+    // against it.
+    expect(lessonOpLane("l1", "archive", "core")).toBe(
+      lessonOpLane("l1", "archive", "personal"),
+    );
+  });
+
+  it("move DOES split by target", () => {
+    expect(lessonOpLane("l1", "move", "core")).not.toBe(
+      lessonOpLane("l1", "move", "personal"),
+    );
+  });
+});
+
+describe("failureScopeForOp — scope comes from the VERB", () => {
+  it("archive and unarchive are personal even in Team mode", () => {
+    expect(failureScopeForOp("archive", "core")).toBe("personal");
+    expect(failureScopeForOp("unarchive", "core")).toBe("personal");
+  });
+
+  it("move reports team only when the write targeted master", () => {
+    expect(failureScopeForOp("move", "core")).toBe("team");
+    expect(failureScopeForOp("move", "personal")).toBe("personal");
+  });
+});
+
+describe("patchCovers — the suppression rule, as shipped", () => {
+  it("a narrower pending patch does NOT cover a wider failed one", () => {
+    // The completion lane holds both shapes. Suppressing the wider failure
+    // because the narrower one is queued loses reasonNotDone silently.
+    expect(
+      patchCovers({ status: "not_done", reasonNotDone: "assembly" }, {
+        status: "done",
+      }),
+    ).toBe(false);
+  });
+
+  it("a wider pending patch DOES cover a narrower failed one", () => {
+    expect(
+      patchCovers({ status: "done" }, {
+        status: "not_done",
+        reasonNotDone: "assembly",
+      }),
+    ).toBe(true);
+  });
+
+  it("null pending never covers", () => {
+    expect(patchCovers({ title: "x" }, null)).toBe(false);
+  });
+
+  it("identical key sets cover", () => {
+    expect(
+      patchCovers({ standards: ["A"], standardIds: ["i"] }, {
+        standards: ["B"],
+        standardIds: ["j"],
+      }),
+    ).toBe(true);
   });
 });

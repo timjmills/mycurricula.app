@@ -6091,3 +6091,154 @@ finding), the bounded hydrate retry (self-caught), and the coverage rule
 (self-caught, replacing a boolean Codex had already reviewed). Self-review plus
 the full local stack cover them. **A re-review of that delta is owed when Codex
 is back** — it is small and named here so it can be found.
+
+---
+
+## B4.6 — independent-review fixes (`d2dbb19`), and the vacuity tally
+
+The §4a substitute (independent agent; Codex 503 all evening) reviewed the
+`1cf4816` revert. **No Critical, no High** — the revert verified exact, and it
+confirmed the **security half of `e0eab58` was correctly NOT reverted**: the drifted
+`safeHref` stays deleted and `ResourcesTab` still calls canonical `isSafeUrl`. Rolling
+those back would have reopened the `"/\t/evil.com"` open redirect. **That is the trap in
+a revert** — the instinct is "undo the commit", and the commit contained one thing that
+must survive.
+
+### The product finding — the tooltip and the button contradicted each other
+
+`Section.tsx` told a teacher resources "appear on the preset walls covering that lesson",
+and **pressing that very button makes the statement false**:
+`onAddCard` → `withFork` → `ensurePersonal()` (`ResourceWall.tsx:369-398`) **forks a
+preset into a "My …" wall and sets `override`** — the frozen layout that never picks up
+later lesson edits. Read the tip, add a note, attach a resource in the lesson editor, and
+it never appears on the wall in front of you. The "Copied to My Walls" toast is the only
+signal and doesn't connect the two.
+
+The tooltip now says so. Worth naming *why this was missed*: the whole change was about
+making the wall's copy honest, and both halves of the contradiction were written in the
+same edit — the sentence and the button it sits on. **Reviewing your own copy against the
+code path it describes is not the same as reading it.**
+
+### Four probe defects, all one class: an assertion that observes nothing
+
+1. **Stale gate.** The blank-page gate reused a `sectionCount` sampled tens of seconds
+   earlier. If the wall blanked *after* that sample — the hazard documented in the comment
+   directly beside it — the gate read >0 while the DOM was empty and **three** absence
+   assertions passed over a blank page. Now read INSIDE the same `evaluate()` as each
+   observation.
+2. **Ungated scrim.** No blank-page gate at all, unlike its sibling: it passed on a blank
+   page, a bounced login, and a 500 — the three states it exists to catch.
+3. **Vacuous tooltip check, twice.** Satisfied by `title === null`, and `Tooltip` drops the
+   native `title` when the id is dismissed or the global tips switch is off
+   (`Tooltip.tsx:288`, `:453-455`; `rw-add-card` passes no `required`) — so a dismissed
+   tooltip PASSED having verified nothing. Its regex was a one-phrase blacklist that only
+   caught the OLD string; **the copy `e0eab58` actually shipped would have passed it.**
+   This was the only assertion covering the tooltip, which is half the substance of the
+   change. Now requires the title AND positively asserts both claims.
+4. **A fallback that satisfied its own check — mine, introduced while fixing the above.**
+   `safeEval(…, -1)` for the h-scroll measure meant a destroyed context returned `-1`,
+   which satisfies `overflow <= 0`. The 1440 tier passed that way on a real run. Fallbacks
+   are now `null` and report INCONCLUSIVE.
+
+**The durable rule, which cost six instances to learn: a fallback must never be a value
+that satisfies the assertion, and a gate must be read in the same observation it guards.**
+Every one of these passed a green run before it was caught.
+
+### Probe robustness + ownership
+
+`safeEval` and guarded screenshots: an HMR reload from a sibling lane now yields a
+fallback instead of killing the run with **zero output** and leaking a Chrome process —
+the likeliest failure on this shared server, and the worst-shaped one.
+
+Ownership corrected: **`probe-4b-consolidated.mjs` no longer delegates here** — it
+hand-rolls a read-only 4.7, deliberately, because it must not click anything that writes.
+That split is right and the two no longer duplicate. Its `!wired` branch handles the
+post-revert build correctly (`mark.absent` + a no-composer-leak assertion), so the revert
+does **not** make it report a false failure.
+
+Their caution about this probe writing is worth answering precisely rather than waving
+off: **it does write** — "Add note" forks a preset — but the blast radius is one browser
+profile. `wall-state.ts` is localStorage-only with **zero** server calls ("Persisting to
+Supabase is out of scope for 9a") and Playwright's context is ephemeral, so it cannot
+reach a school's data. The header now states that, and that it must never be pointed at
+production.
+
+**Gates:** Codex still 503 (`biscuit_baker_service_me_circuit_open`, both transports,
+re-checked at commit). Sandbox flag not weakened, nothing routed elsewhere. Findings came
+from an independent agent and were **validated against the code before applying** — the
+fork chain was traced before the copy was touched. Local: `tsc` clean, lint clean,
+**vitest 1241 passed**. §4b live **17/17**, every viewport tier measured rather than
+defaulted.
+
+### Independent review: 6 blocking Mediums, fixed forward
+
+**I had already committed `6fca539` when the review landed.** The instruction was
+"do not commit yet"; it arrived after the fact, so this is a fix-forward rather
+than an amended commit. Saying so plainly because the sequence matters to anyone
+reading the history.
+
+**F1 was already closed** by the coverage fix I self-caught at 10:27 — the
+reviewer measured a tree from ~10:18 and read the older boolean. Verified against
+HEAD before doing anything.
+
+**F2 was the serious one and it defeats the bridge I had just built.** The write
+lane was `${lessonId}::f:${group}` with the saveTarget only in the PAYLOAD. So: a
+teacher edits a title in Team Curriculum, the `core` write is RLS-denied, and
+before it settles they flip to Personal and type again. The personal payload
+lands in the same lane's pending slot, the core rejection reads as SUPERSEDED,
+and it is swallowed. The personal write succeeds, master never got the edit, and
+nobody is told — verbatim the case `write-failure-bridge.tsx`'s own header says
+it exists to catch. Fixed by putting the target in the key; costs nothing,
+because neither side can supersede the other when neither writes the other's row.
+`archive` deliberately does NOT split — `softDeleteLesson`/`unarchiveLesson` are
+personal-scoped in the source, so there is one row and splitting would let a
+Team-mode archive race a Personal-mode un-archive against it.
+
+**F3/F4 — the toast was telling three kinds of lie in the one component whose
+job is telling the truth about writes.** A `SerialWriteTimeoutError` says
+"abandoned (it may still commit)" and the toast rendered "it will be gone if you
+reload" — a definite claim about an indefinite outcome, naming the wrong victim
+(the documented hazard is the NEWER edit losing to a late commit). And a failed
+ARCHIVE inverts: the lesson was already removed optimistically and the row still
+exists, so on reload it COMES BACK — both clauses false. Now `kind:
+"failed" | "timeout"` on the signal, and per-verb consequence copy.
+
+**F5 — scope from the verb, not the payload.** archive/unarchive ignore
+saveTarget entirely, so a teacher in Team mode was told a personal-only operation
+"didn't save for the Team Curriculum" — misusing the one word that carries
+consequence.
+
+**F6 — I regressed the one queue without the guard.** The hand-rolled section
+queue drained via `.catch(handler).then(settle)`; a throw from `handler` skips
+the `.then`, leaves `inFlight` true forever, and silently parks every later
+section write for that lesson. Survivable while the catch body was a bare
+`console.error` — and I put a React `setState` in it. Migrated onto
+`createSerialWriteQueue`, which documents and guards exactly this hazard and
+brings the watchdog the hand-rolled copy never had.
+
+**F9/F10/F11 on the migrations.** The `NO APPLICATION COUPLING` claim was
+over-stated and is corrected: a grade lead currently sees teammates'
+personal-course NAMES through the arm being dropped, and `lib/subjects/source.ts`
+documents "leads see all", which becomes false on apply — named as an apply-day
+doc change rather than edited early, since it is accurate against the current
+database. The backfill now emits a SCHEMA-QUALIFIED `alter`: a bare
+`oid::regprocedure` renders the schema only when it is not already visible, so
+the statement would be re-resolved by name under the applying session's path
+instead of targeting the oid selected — the one mistake not to make in a
+migration about search_path resolution.
+
+**AND MY OWN TESTS WERE VACUOUS.** Three of the tests I wrote to pin these fixes
+declared the rule inline (`const covers = …`, `laneFor`, `scopeFor`) and asserted
+their own copy — they never touched the shipped module, so reverting the fix
+would have left them green. Extracted the real rules as exported helpers
+(`lessonFieldLane`, `lessonOpLane`, `sectionLane`, `failureScopeForOp`,
+`patchCovers`), pointed the tests at those, and **mutation-tested it**: reverting
+each of the three fixes turns exactly the expected tests red (4 failed / 45
+passed), then restored. A test that cannot fail is not a test, and I shipped
+three of them before catching it.
+
+**Verification:** `npx tsc --noEmit` clean · `npx next lint --no-cache` →
+`✔ No ESLint warnings or errors` · `npm run test` → **60 files, 1255 passed,
+68 todo, 0 failed**. Codex still 503 (now also `throttled / concurrency_limit`),
+so this fix-forward carries the independent review + self-review + local stack,
+with the same substitution recorded above.

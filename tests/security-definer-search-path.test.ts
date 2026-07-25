@@ -167,7 +167,19 @@ describe("the back-fill migration", () => {
     // Several targets take composite enum args across multiple lines; a
     // hand-written `alter function` list is how one silently targets a
     // signature that does not exist.
-    expect(sql).toContain("oid::regprocedure");
+    expect(sql).toContain("pg_get_function_identity_arguments");
+  });
+
+  it("emits a SCHEMA-QUALIFIED alter, not a bare regprocedure", () => {
+    // A bare `oid::regprocedure` renders the schema only when it is NOT already
+    // visible on the session search_path, so the emitted statement would be
+    // re-resolved by name under the applying session's path instead of
+    // targeting the oid we selected. In a migration about search_path
+    // resolution, that is the one mistake not to make.
+    expect(sql).toContain(
+      "alter function %I.%I(%s) set search_path = public, pg_temp",
+    );
+    expect(sql).not.toContain("alter function %s set search_path");
   });
 
   it("carries an apply runbook and does not apply itself", () => {

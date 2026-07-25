@@ -75,7 +75,10 @@ import { useAppState } from "@/lib/app-state";
 import { snapshotRestorePatch } from "@/lib/fork-diff-restore";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { plannerClient } from "@/lib/planner/client";
-import { createSerialWriteQueue } from "@/lib/planner/serial-write-queue";
+import {
+  createSerialWriteQueue,
+  SerialWriteTimeoutError,
+} from "@/lib/planner/serial-write-queue";
 import {
   classifyAsyncFailure,
   shouldRetryRead,
@@ -1731,6 +1734,15 @@ const MAX_HYDRATE_ATTEMPTS = 3;
 export interface PlannerWriteFailure {
   /** Monotonic; changes on every failure so an effect can depend on the object. */
   id: number;
+  /**
+   * `"failed"` — the write definitively did not land, so the teacher's value is
+   * on screen and nowhere else.
+   * `"timeout"` — the request was ABANDONED, not cancelled, and may still commit
+   * (see SerialWriteTimeoutError). The outcome is genuinely unknown, and the
+   * edit at risk is the NEWER one, not this one. A surface must not turn this
+   * into a definite claim in either direction.
+   */
+  kind: "failed" | "timeout";
   /** The source verb that failed — "updateLesson", "setSections", "move", … */
   op: string;
   /** Where the lost edit was headed. "team" means a SHARED row: the failure is
@@ -1738,6 +1750,89 @@ export interface PlannerWriteFailure {
   scope: "personal" | "team";
   /** Best-effort message off the error, for the surface to show or log. */
   message: string;
+}
+
+/**
+ * The serial-queue lane a lesson FIELD write belongs to.
+ *
+ * Keyed by lesson AND save target AND field group, and every part is load-bearing:
+ *   • lesson  — two lessons sharing a lane means the newer patch evicts the older;
+ *   • target  — a `core` write targets the SHARED master row and a `personal` one
+ *     this teacher's copy. Different rows, no ordering relationship. While the
+ *     target lived only in the payload, a Team-mode edit that was RLS-denied
+ *     could be reported as SUPERSEDED by a personal payload that landed in the
+ *     same slot — master never got the edit and nobody was told;
+ *   • group   — see splitPatchByField; per-field so an edit and the undo that
+ *     reverses it share exactly one lane.
+ */
+export function lessonFieldLane(
+  lessonId: string,
+  saveTarget: "personal" | "core",
+  group: string,
+): string {
+  return `${lessonId}::${saveTarget}::f:${group}`;
+}
+
+/**
+ * The lane a non-field lesson write belongs to.
+ *
+ * `archive` is deliberately NOT split by target: `softDeleteLesson` /
+ * `unarchiveLesson` take only (lessonId, ownerId) and never touch the shared
+ * master row, so there is exactly one row to write and splitting would let a
+ * Team-mode archive race a Personal-mode un-archive against it. `move` DOES
+ * write a different row per target, so it splits.
+ */
+export function lessonOpLane(
+  lessonId: string,
+  axis: string,
+  saveTarget: "personal" | "core",
+): string {
+  return axis === "archive"
+    ? `${lessonId}::archive`
+    : `${lessonId}::${saveTarget}::${axis}`;
+}
+
+/** The lane a SECTION snapshot belongs to — same target-splitting argument as
+ *  `lessonFieldLane`: core sections and personal sections are different rows. */
+export function sectionLane(
+  lessonId: string,
+  saveTarget: "personal" | "core",
+): string {
+  return `${lessonId}::${saveTarget}::sec`;
+}
+
+/**
+ * Which side of the forking model a failed write actually touched.
+ *
+ * Derived from the VERB, not the payload's save target. `softDeleteLesson` and
+ * `unarchiveLesson` ignore the target entirely and are personal-scoped whatever
+ * the top-bar toggle says, so reading the payload told a teacher in Team mode
+ * that a personal-only operation "didn't save for the Team Curriculum" — misusing
+ * the one word in that message that carries consequence.
+ */
+export function failureScopeForOp(
+  kind: string,
+  saveTarget: "personal" | "core",
+): "personal" | "team" {
+  return kind === "move" && saveTarget === "core" ? "team" : "personal";
+}
+
+/**
+ * Does `pending` carry everything `failed` did?
+ *
+ * The rule that decides whether a failed write is inconsequential. Mere
+ * existence of a pending payload is NOT enough for partial patches: a lane can
+ * legitimately hold differently-shaped ones (the direct completion toggle sends
+ * `{status}`, a replayed undo sends `{status, reasonNotDone}`), and suppressing
+ * the richer patch's failure because the narrower one is queued loses a field
+ * silently.
+ */
+export function patchCovers(
+  failed: Partial<Lesson>,
+  pending: Partial<Lesson> | null,
+): boolean {
+  if (pending === null) return false;
+  return Object.keys(failed).every((k) => k in pending);
 }
 
 /** A non-field lesson write, before identity (owner / save target) is attached.
@@ -2770,6 +2865,10 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       writeFailureSeqRef.current += 1;
       setLastWriteFailure({
         id: writeFailureSeqRef.current,
+        // A timeout is not a failure — it is an UNKNOWN. Collapsing the two here
+        // would throw away the distinction the queue went to trouble to make,
+        // one layer after making it.
+        kind: err instanceof SerialWriteTimeoutError ? "timeout" : "failed",
         op,
         scope,
         message:
@@ -2789,98 +2888,72 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   // ── Serialized (latest-wins) section persistence ────────────────────────
   // W3.8 gate fix (Codex HIGH — persistence ordering race): the lesson editor
   // autosaves per keystroke, and EVERY section persist is a FULL
-  // `replace_lesson_sections` swap. Firing those through the fire-and-forget
-  // fire-and-forget tee that preceded it made them UNORDERED on the wire — a slow early request
-  // ("a") can commit AFTER a later one ("abc"), leaving the DB stale relative
-  // to the UI with no error surfaced.
+  // `replace_lesson_sections` swap. Firing those unordered lets a slow early
+  // request ("a") commit AFTER a later one ("abc"), leaving the DB stale
+  // relative to the UI with no error surfaced.
   //
-  // Fix: per-lesson LATEST-WINS serialization. Each lessonId keeps at most
-  //   • ONE in-flight RPC, and
-  //   • ONE pending "latest snapshot" slot.
-  // While a write is in flight, newer snapshots simply OVERWRITE the pending
-  // slot (each payload is the complete resolved section list, so intermediate
-  // states are safely skippable); when the in-flight settles — success OR
-  // failure — the pending snapshot (if any) is sent next. At most one RPC per
-  // lesson is ever outstanding, so commits land in send order and the final
-  // DB state always equals the last UI state. No timers: a trailing debounce
-  // would merely reduce write volume; the serialization IS the correctness
-  // fix (and a debounce alone would NOT fix ordering).
+  // NOW ON THE SHARED QUEUE, not a hand-rolled copy of it. It used to be a
+  // second implementation of the same state machine — and it was missing the
+  // guard the shared one documents at length: its drain was
+  // `.catch(handler).then(settle)`, so a throw from `handler` SKIPS the
+  // `.then`, leaves `inFlight` true forever, and silently parks every later
+  // section write for that lesson for the rest of the session. That was
+  // survivable while the catch body was a bare `console.error`; adding the
+  // failure report put a React `setState` inside it and made it reachable.
+  // The shared queue already solves this (`try`/`catch` around the reporter
+  // plus `.then(settle, settle)`), and brings the hung-send watchdog with it,
+  // which the hand-rolled version never had at all.
   //
-  // Identity (ownerId / saveTarget) is captured INTO the snapshot at enqueue
-  // time, so a mid-flight sign-out or a Personal↔Team toggle flip never
-  // retargets an already-authored snapshot.
+  // Key = lessonId + saveTarget: a `core` snapshot writes the shared team
+  // section rows and a `personal` one writes this teacher's, so they are
+  // different rows with no ordering relationship and must not share a slot.
+  // Identity is captured INTO the payload at enqueue time, so a mid-flight
+  // sign-out or a Personal↔Team flip never retargets an authored snapshot.
   const sectionWriteQueueRef = useRef(
-    new Map<
-      string,
-      {
-        inFlight: boolean;
-        pending: {
-          sections: LessonSectionContent[];
-          ownerId: string;
-          saveTarget: "personal" | "core";
-        } | null;
-      }
-    >(),
+    createSerialWriteQueue<{
+      lessonId: string;
+      sections: LessonSectionContent[];
+      ownerId: string;
+      saveTarget: "personal" | "core";
+    }>({
+      send: (p) =>
+        plannerClient.setSections(
+          p.lessonId,
+          p.sections,
+          p.ownerId,
+          p.saveTarget,
+        ),
+      onError: (err, p, pending) => {
+        // Per the write-tee contract: reducer state stands and the dropped
+        // write is surfaced without blocking the UI.
+        console.error("[planner] persist 'setSections' failed", err);
+        // A snapshot is the COMPLETE resolved section list, so any pending one
+        // covers the failed one — existence is coverage here. (Contrast the
+        // field queue, whose payloads are partial patches.)
+        reportWriteFailureRef.current(
+          "setSections",
+          p.saveTarget === "core" ? "team" : "personal",
+          err,
+          pending !== null,
+        );
+      },
+    }),
   );
 
   const persistSectionsSerialized = useCallback(
     (lessonId: string, sections: LessonSectionContent[]): void => {
-      // Write-tee gating: flag OFF / no session → no-op (prototype
-      // mode is reducer-local, byte-identical to the pre-seam behavior).
+      // Write-tee gating: flag OFF / no session → no-op (prototype mode is
+      // reducer-local, byte-identical to the pre-seam behavior).
       if (!isPlannerSupabaseConfigured()) return;
-      if (!ownerIdRef.current) return;
-
-      let entry = sectionWriteQueueRef.current.get(lessonId);
-      if (!entry) {
-        entry = { inFlight: false, pending: null };
-        sectionWriteQueueRef.current.set(lessonId, entry);
-      }
-      const queued = entry;
-      // Latest wins: overwrite (never queue behind) the pending snapshot.
-      queued.pending = {
+      const ownerId = ownerIdRef.current;
+      if (!ownerId) return;
+      const saveTarget = saveTargetRef.current;
+      sectionWriteQueueRef.current.enqueue(sectionLane(lessonId, saveTarget), {
+        lessonId,
         sections,
-        ownerId: ownerIdRef.current,
-        saveTarget: saveTargetRef.current,
-      };
-      if (queued.inFlight) return; // the settle handler drains the slot
-
-      const sendNext = (): void => {
-        const next = queued.pending;
-        if (!next) {
-          queued.inFlight = false;
-          // Settled with nothing pending — drop the map entry so a long
-          // editing session doesn't retain one slot per touched lesson
-          // (audit re-pass Low); a later write simply re-creates it.
-          sectionWriteQueueRef.current.delete(lessonId);
-          return;
-        }
-        queued.pending = null;
-        queued.inFlight = true;
-        void plannerClient
-          .setSections(lessonId, next.sections, next.ownerId, next.saveTarget)
-          .catch((err: unknown) => {
-            // Per the write-tee contract: reducer state stands and the
-            // dropped write is surfaced without blocking the UI. A newer
-            // pending snapshot (drained below) supersedes the failed payload.
-            console.error("[planner] persist 'setSections' failed", err);
-            // Same supersession rule as the shared queue: a newer snapshot in
-            // the pending slot carries the teacher's complete current sections,
-            // so this failure has no user-visible consequence once it lands.
-            reportWriteFailureRef.current(
-              "setSections",
-              next.saveTarget === "core" ? "team" : "personal",
-              err,
-              // A snapshot is the COMPLETE resolved section list, so a pending
-              // one always covers the failed one — existence is coverage here.
-              queued.pending !== null,
-            );
-          })
-          .then(() => {
-            queued.inFlight = false;
-            sendNext();
-          });
-      };
-      sendNext();
+        ownerId,
+        saveTarget,
+      });
     },
     [],
   );
@@ -2925,9 +2998,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         // reason, so treating it as superseding would lose that field with no
         // trace. Only a pending patch that covers EVERY key of the failed one
         // makes the failure inconsequential.
-        const covered =
-          pending !== null &&
-          Object.keys(p.patch).every((k) => k in pending.patch);
+        const covered = patchCovers(p.patch, pending?.patch ?? null);
         reportWriteFailureRef.current(
           "updateLesson",
           p.saveTarget === "core" ? "team" : "personal",
@@ -2983,9 +3054,16 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         // {week, day}, or the archived flag — so any pending payload covers the
         // failed one and existence is coverage. (Contrast the field queue, whose
         // payloads are partial patches.)
+        //
+        // SCOPE COMES FROM THE VERB, NOT THE PAYLOAD. `softDeleteLesson` and
+        // `unarchiveLesson` take only (lessonId, ownerId) and are PERSONAL-scoped
+        // whatever the toggle says — they never touch the shared master row.
+        // Reading `p.saveTarget` here told a teacher in Team mode that a
+        // personal-only operation "didn't save for the Team Curriculum", which
+        // misuses the one word in this message that carries consequence.
         reportWriteFailureRef.current(
           p.kind,
-          p.saveTarget === "core" ? "team" : "personal",
+          failureScopeForOp(p.kind, p.saveTarget),
           err,
           pending !== null,
         );
@@ -3034,10 +3112,18 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       // Identity captured at ENQUEUE time so a mid-flight sign-out or a
       // Personal↔Team flip never retargets an already-authored write.
       const axis = op.kind === "unarchive" ? "archive" : op.kind;
-      lessonOpQueueRef.current.enqueue(`${op.lessonId}::${axis}`, {
+      const saveTarget = writeTargetFor(op.lessonId, replay);
+      // The ARCHIVE axis is PERSONAL-SCOPED IN THE SOURCE whatever the toggle
+      // says: `softDeleteLesson` / `unarchiveLesson` take only (lessonId,
+      // ownerId) and never touch the shared master row (§4.6). So its lane must
+      // NOT be split by target — there is only one row to write, and splitting
+      // would let a Team-mode archive and a Personal-mode un-archive run
+      // concurrently against it. `move` DOES write different rows per target,
+      // so it splits (see the field queue for the failure this prevents).
+      lessonOpQueueRef.current.enqueue(lessonOpLane(op.lessonId, axis, saveTarget), {
         ...op,
         ownerId,
-        saveTarget: writeTargetFor(op.lessonId, replay),
+        saveTarget,
       });
     },
     [writeTargetFor],
@@ -3074,12 +3160,28 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       for (const [group, groupPatch] of splitPatchByField(patch)) {
         // ALWAYS namespaced by lessonId — two lessons must never share a lane,
         // or the newer lesson's patch evicts the older one's and loses an edit.
-        fieldWriteQueueRef.current.enqueue(`${lessonId}::f:${group}`, {
-          lessonId,
-          patch: groupPatch,
-          ownerId,
-          saveTarget,
-        });
+        //
+        // AND BY saveTarget, which is the same argument one level down. A `core`
+        // write targets the SHARED master row; a `personal` one targets this
+        // teacher's copy. They are different rows, so they have no ordering
+        // relationship and must not share a slot. With the target only in the
+        // payload, this happened: a teacher edits a title in Team Curriculum,
+        // the core write is RLS-denied, and before it settles they flip to
+        // Personal and type again — the personal payload lands in the same
+        // lane's pending slot, the core rejection reads as SUPERSEDED, and it is
+        // swallowed. The personal write succeeds, master never got the edit, and
+        // nobody is told. That is verbatim the case the write-failure bridge
+        // exists to catch. Separating them costs nothing: neither can supersede
+        // the other because neither writes the other's row.
+        fieldWriteQueueRef.current.enqueue(
+          lessonFieldLane(lessonId, saveTarget, group),
+          {
+            lessonId,
+            patch: groupPatch,
+            ownerId,
+            saveTarget,
+          },
+        );
       }
     },
     [writeTargetFor],

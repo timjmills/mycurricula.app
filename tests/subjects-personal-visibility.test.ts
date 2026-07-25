@@ -164,6 +164,19 @@ describe("the migration is safe to re-apply and leaves insert alone", () => {
     expect(fixed).not.toContain("create policy subjects_insert");
   });
 
+  it("does not claim zero application coupling", () => {
+    // It has some: a grade lead currently sees teammates' personal-course NAMES
+    // through the arm being dropped, and `lib/subjects/source.ts` documents
+    // "leads see all", which becomes false on apply. Graceful (an existing
+    // fallback covers the display) but user-visible on a shipped surface — and
+    // "NO APPLICATION COUPLING" would send the next reader past it.
+    const prose = read(FIX);
+    expect(prose).not.toMatch(/NO APPLICATION COUPLING/);
+    expect(prose).toContain("course-sharing-manager.tsx");
+    expect(prose).toContain("leads see all");
+    expect(prose).toMatch(/UPDATE IT AS PART OF THE APPLY/);
+  });
+
   it("is authored-not-applied and says so", () => {
     const prose = read(FIX);
     expect(prose).toMatch(/AUTHORED, NOT APPLIED/);

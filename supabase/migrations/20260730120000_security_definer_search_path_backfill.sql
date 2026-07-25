@@ -52,15 +52,20 @@
 -- uuid)`, …). Transcribing 38 of those by hand is how one silently ends up
 -- targeting a signature that does not exist — the statement errors, or worse,
 -- matches an overload nobody meant. Resolving each through `pg_proc` and
--- formatting `oid::regprocedure` makes the signature exact by construction, and
+-- formatting an explicitly
+-- schema-qualified `%I.%I(%s)` makes the signature exact by construction, and
 -- makes the migration self-maintaining: it re-pins whatever is actually there.
 --
--- NARROWLY SCOPED SO IT CANNOT CLOBBER A DELIBERATE SETTING. It touches ONLY
--- functions whose current setting is EXACTLY `search_path=public`. In
+-- NARROWLY SCOPED SO IT CANNOT CLOBBER A DELIBERATE SETTING. Part 1 touches
+-- ONLY functions whose current setting is EXACTLY `search_path=public`. In
 -- particular it leaves alone:
---   • `is_claude_admin()`, which uses `set search_path to ''` — the STRICTEST
---     possible setting (nothing is searched; every name must be qualified).
---     A blanket "add pg_temp everywhere" sweep would WEAKEN it.
+--   • `is_claude_admin()`, which uses `set search_path to ''`. A blanket
+--     "add pg_temp everywhere" sweep would rewrite that to `public, pg_temp`
+--     and hand it visibility of every table in `public` — hardening on paper, a
+--     WIDENING in fact. It is instead handled deliberately in PART 2 below,
+--     which moves it to `pg_catalog, pg_temp`: pg_temp named last, and no new
+--     schema visibility. Part 1 and Part 2 are not in tension — Part 1 must not
+--     touch it, and Part 2 does the one thing that is actually safe for it.
 --   • any function with a bespoke multi-schema path (there are none today; the
 --     guard is there so a future one survives a re-run).
 --   • SECURITY INVOKER functions, which run with the caller's own privileges and
@@ -79,8 +84,9 @@ declare
   n_fixed int := 0;
 begin
   for f in
-    select p.oid::regprocedure as sig,
-           p.proname           as name
+    select ns.nspname                                  as schema_name,
+           p.proname                                   as name,
+           pg_get_function_identity_arguments(p.oid)   as args
       from pg_proc p
       join pg_namespace ns on ns.oid = p.pronamespace
      where ns.nspname = 'public'
@@ -89,9 +95,20 @@ begin
        and 'search_path=public' = any (p.proconfig)     -- …and it is exactly this
      order by p.proname
   loop
-    execute format('alter function %s set search_path = public, pg_temp', f.sig);
+    -- SCHEMA-QUALIFIED, and that matters here more than anywhere. Formatting a
+    -- bare `oid::regprocedure` renders the schema ONLY when it is not already
+    -- visible on the session search_path — so the emitted statement would be
+    -- re-RESOLVED by name under whatever path the applying session happens to
+    -- have, rather than targeting the oid we selected. In a migration whose
+    -- entire subject is search_path resolution, that is the one mistake not to
+    -- make: under a session whose path omits or shadows `public` it errors, or
+    -- worse, pins a different function of the same name.
+    execute format(
+      'alter function %I.%I(%s) set search_path = public, pg_temp',
+      f.schema_name, f.name, f.args
+    );
     n_fixed := n_fixed + 1;
-    raise notice 're-pinned search_path on %', f.sig;
+    raise notice 're-pinned search_path on %.%(%)', f.schema_name, f.name, f.args;
   end loop;
 
   raise notice 'search_path back-fill complete: % function(s) re-pinned', n_fixed;
@@ -238,12 +255,15 @@ alter function public.is_claude_admin() set search_path = pg_catalog, pg_temp;
 --            )
 --      order by sig;"
 --
---   # is_claude_admin() pins the EMPTY search path — stricter than pg_temp-last —
---   # and the `path <> ''` clause excludes it once the quote characters are
---   # stripped. A correct run returns ZERO rows, with no expected exceptions.
+--   # A correct run returns ZERO rows, with NO expected exceptions — that is
+--   # the point of Part 2. (The `path <> ''` clause is a belt: it excuses a
+--   # function pinned to the empty path, which nothing is once Part 2 has run.
+--   # Before Part 2, is_claude_admin() would have been excused by it; after,
+--   # it passes on the merits because pg_temp is LAST.)
 --
--- NO APPLICATION COUPLING. This file changes no signature, no return type, no
--- body and no policy — only the resolution order inside each definer body. It
+-- NO APPLICATION COUPLING — and here that claim is exact, not a hopeful
+-- summary. This file changes no signature, no return type, no body, no policy
+-- and no visible data; only the resolution order INSIDE each definer body. It
 -- can be applied before or after any application deploy, and nothing in
 -- `lib/planner/**` or the RPC callers needs to change with it.
 -- ###########################################################################

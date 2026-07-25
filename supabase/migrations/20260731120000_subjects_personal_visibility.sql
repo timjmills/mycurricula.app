@@ -156,9 +156,31 @@ create policy subjects_read on subjects for select using (
 -- Reverting restores the wide read, so only do it if this migration is shown to
 -- break a legitimate flow — and record which flow.
 --
--- NO APPLICATION COUPLING. `lib/subjects/source.ts` reads through RLS and writes
--- only through the SECURITY DEFINER RPCs, none of which change here. Nothing in
--- the app needs to ship with this.
+-- APPLICATION COUPLING — SMALL, BUT REAL. An earlier draft of this header said
+-- "none", and that was over-stated. No code needs to CHANGE for this to apply
+-- safely, but one shipped surface changes what it displays, and one comment
+-- becomes false. Both are consequences of the fix working, not of it breaking.
+--
+--   • `components/settings/course-sharing-manager.tsx` joins the gated
+--     `list_course_sharing` RPC against the RLS-filtered `listSubjectsForGrade`.
+--     A grade lead can currently see other teachers' personal-course NAMES
+--     through exactly the arm being removed. Afterwards the join misses and
+--     `lib/subjects/sharing-view.ts`'s existing fallback renders the literal
+--     "Personal course" with a null colour slug. Graceful — the fallback is
+--     already there for admin-managed courses the caller cannot see — so this is
+--     a COPY consequence on a shipped surface, not a break. It is also the
+--     intended outcome: a lead seeing a teammate's private course name is the
+--     leak. Worth a glance at that row's copy when the sharing UI is built.
+--
+--   • `lib/subjects/source.ts` (top-of-file comment) documents the read boundary
+--     as "team courses to the whole grade, personal courses to their owner,
+--     leads see all". The last clause is TRUE TODAY and FALSE once this applies.
+--     Deliberately not edited here — it is accurate against the current database
+--     and editing it early would make the repo describe a state that does not
+--     exist yet. UPDATE IT AS PART OF THE APPLY, not before.
+--
+-- Otherwise nothing: writes still go through the SECURITY DEFINER RPCs, none of
+-- which change, so no code needs to ship WITH this migration.
 --
 -- SEQUENCING: this must land BEFORE the per-course sharing UI (the RPCs have
 -- been applied since 2026-07-17 with zero component importers). Shipping the
