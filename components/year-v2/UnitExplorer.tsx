@@ -429,7 +429,31 @@ export function UnitExplorer({
     if (header === null) onClose();
   }, [header, onClose]);
 
-  if (header === null) return null;
+  // ── Unit-vanished-while-open guard (§4a MED) ────────────────────────────
+  // The subject guard above is not enough. `resolveUnitHeader` DEGRADES a
+  // missing unit instead of failing — it falls back to `name: unit`, which under
+  // the Supabase source is a raw UUID — so a unit archived from another surface,
+  // or lost in a catalog swap, left this modal painting a husk: a UUID for a
+  // title, no week span, no ordinal, zero lessons. Worse than ugly, because the
+  // B1.7 Unit Plan fields stayed editable and wrote against a unit id that no
+  // longer exists.
+  //
+  // Scoped to what is actually ON SCREEN, not to how the workspace was opened.
+  // The Lesson Planner needs only the lesson, so it keeps running whether the
+  // teacher arrived by a lesson entry point (B5.7 — legitimately unit-less, and
+  // every in-app-created lesson is) or by opening a lesson from the rail, the
+  // Lessons tab or a drawer panel. Closing on `focusLessonId === undefined`
+  // instead would have yanked the editor out from under that second group
+  // mid-edit. The Unit switch is already withheld below, so there is no way
+  // back into the husk from there either.
+  const showingLesson =
+    mode === "lesson" && (planLessonId ?? fallbackLessonId) !== null;
+  const unitGone = !unitResolved && !showingLesson;
+  useEffect(() => {
+    if (unitGone) onClose();
+  }, [unitGone, onClose]);
+
+  if (header === null || unitGone) return null;
 
   // ── Lesson mode — the Lesson Planner over the same shell ─────────────────
   //

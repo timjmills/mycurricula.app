@@ -422,6 +422,17 @@ function AssessmentSection({
     // "Not set" KEEPS the text and drops only the kind — the state the drawer
     // calls Unclassified, and the one the read mapper hands back for a row whose
     // stored kind fails validation.
+    //
+    // WITH NOTHING TO KEEP IT IS NOT A STATE (§4a MED). "Unclassified" is
+    // DERIVED — `kindChoice` reads it off "has text but no valid kind" — so on
+    // an empty assessment the commit writes `{kind: undefined}`, which is `{}`,
+    // and the control snaps straight back to "None". Visibly a no-op; the cost
+    // was invisible and real: `commit` is a store write, so on an unforked Team
+    // lesson it lazily forked a personal copy — dashed stripe, "Modified" pill —
+    // to record a change that never happened. Nothing to write, so write
+    // nothing. (There is deliberately no way to mint a kind-less assessment with
+    // no text: that value IS the empty assessment.)
+    if (next === "unclassified" && !hasAssessmentText(draft)) return;
     commit({ ...draft, kind: next === "unclassified" ? undefined : next });
   }
   function onField(field: "title" | "purpose" | "notes", value: string): void {
