@@ -284,6 +284,32 @@
   opacity: 0.85;
 }
 
+/* The unit pop-in chip on a DEEP subject gradient with white text. The ghost
+   pill's neutral --ink fill would drop a light patch with dark ink onto a dark
+   tile, so — exactly as `.dchip` / `.dfootFinish` do on the DayC hero, which
+   uses this same gradient recipe — the chip is cut from translucent white. That
+   is a surface constant, not a theme branch: this tile is white-on-dark in every
+   tone. `align-self` stops it stretching the cell width. Tripled so the resting
+   rule clears `.btn.ghost` (0,2,0), with the hover/focus rules qualified to clear
+   `.btn.ghost:hover:not(:disabled)` (0,4,0) and `.btn:focus-visible` (0,2,0) by
+   specificity rather than by stylesheet order. */
+.tileUnit.tileUnit.tileUnit {
+  align-self: flex-start;
+  margin-top: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #fff;
+}
+.tileUnit.tileUnit.tileUnit:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: #fff;
+  color: #fff;
+}
+/* --ink-900 is near-black in light tone — no ring at all on this gradient. */
+.tileUnit.tileUnit.tileUnit:focus-visible {
+  outline-color: #fff;
+}
+
 /* The fork cues sit under the title; give them a touch of breathing room. */
 .tileCues {
   margin-top: 1px;

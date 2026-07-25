@@ -70,6 +70,9 @@ import { OpenLessonEditorContext } from "@/components/weekly/weekly-lesson-card"
 // Non-instructional-event popover — a self-contained position:fixed dialog
 // ({ open, onClose, day }); reused verbatim from the Daily canvas (as WeekC does).
 import { AddEventForm } from "@/components/daily/AddEventForm";
+// Lesson → unit-workspace pop-in (B5.5). Opens the workspace as an overlay via
+// the global host — no navigation, so the teacher keeps this week on screen.
+import { UnitChip } from "@/components/unit-chip";
 import styles from "./WeekA.module.css";
 
 // ── Today resolution ────────────────────────────────────────────────────────
@@ -353,6 +356,16 @@ export function WeekA(): ReactNode {
           {stripHtml(lesson.title)}
         </SelectTitle>
         <div className={styles.tileSubject}>{subject.name}</div>
+        {/* Which unit is this lesson part of — and the way into it. The Week
+            canvas never named the lesson's unit at all before B5.5 (it existed
+            only inside the filter predicate above), so this is a NEW line, not a
+            promoted one. It sits last so the tile still reads title-first, and
+            it renders nothing when the unit can't be resolved. */}
+        <UnitChip
+          subjectId={lesson.subject}
+          unit={lesson.unit}
+          className={styles.tileUnit}
+        />
         <ForkCues lesson={lesson} />
       </div>
     );

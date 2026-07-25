@@ -346,12 +346,12 @@
   line-height: 1.35;
 }
 
-.tileUnit {
-  font-size: var(--t-10);
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+/* The unit pop-in chip in the expanded body. The tile is a neutral --surface
+   card, so the ghost pill's own colors already read here — this only stops it
+   stretching the tile width. (`.tileUnit`, the inert uppercase text line it
+   replaced, is gone with its markup.) */
+.tileUnitChip.tileUnitChip.tileUnitChip {
+  align-self: flex-start;
 }
 
 /* ── DragOverlay ghost — subject-tinted rotated pill ────────────────── */

@@ -1,0 +1,72 @@
+/* UnitChip.module.css — FIT ONLY. Color is deliberately absent.
+ *
+ * The chip is the Button primitive's `ghost` pill, so `.btn.ghost` (0,2,0) owns
+ * its neutral fill/border/label. This module only overrides GEOMETRY, and it
+ * does so at (0,3,0) — a tripled class — because `.btn.sm` is (0,2,0) and lives
+ * in a DIFFERENT stylesheet: a doubled class would merely tie and let CSS-module
+ * extraction order decide (the reviewer LOW that `.dfootFinish` was tripled for).
+ *
+ * Leaving color to `.btn.ghost` is what lets a frame recolour the chip for a
+ * colored surface (the DayC hero, the WeekC gradient tiles) with only (0,3,0) of
+ * its own, instead of having to out-stack this base as well.
+ */
+
+.chip.chip.chip {
+  /* Never wider than the row/tile that hosts it — the label ellipsizes instead
+     (see .name). Without this a long unit name would widen a Week grid column. */
+  max-width: 100%;
+  /* Height is deliberately NOT overridden — `.btn.sm`'s 32px stands. Shrinking
+     it to 28px to fit the tighter Week tiles put the desktop target below the
+     primitive's own baseline for a 4px gain, which is the wrong trade: BUILD
+     STANDARD §9 wants ≥36px visual on desktop and the primitive is already
+     under it. Density comes from the padding + type below instead. */
+  padding: 0 10px;
+  gap: 6px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  border-radius: var(--r-pill);
+}
+
+/* Button wraps its children in ONE span (its `.label`, a hashed class this
+   module cannot name). It is the only direct span child here — no leading /
+   trailing icon slots are passed — so `> span` targets it unambiguously. It has
+   to become a shrinkable flex line for the label to ellipsize: as a flex ITEM of
+   `.btn` it defaults to min-width:auto and would otherwise refuse to shrink. */
+.chip.chip.chip > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glyph {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+
+/* ── Touch targets — ≥44px on coarse pointers AND the phone/tablet width tiers
+      (CLAUDE.md §4 makes the floor viewport-tier based, not pointer-type based
+      — a 375px window with a mouse still owes 44px).
+
+      This inflates the chip's OWN box rather than leaning on Button's
+      transparent ::before hit overlay, for two reasons. (1) The overlay is
+      clipped by any ancestor that computes an `overflow` — and every Week frame
+      hosts these tiles inside an `overflow: auto` scroll track. (2) A 44px
+      overlay around a 28px button reaches 8px past it in every direction, which
+      on a tile with a 3px gap would float over the lesson title above and
+      swallow its clicks. A real 44px box has neither problem. ── */
+@media (pointer: coarse), (max-width: 900px) {
+  .chip.chip.chip {
+    min-height: 44px;
+  }
+}

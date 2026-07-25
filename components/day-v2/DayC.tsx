@@ -17,6 +17,7 @@ import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
 import { unitDisplayName } from "@/lib/unit-name";
 import { Tooltip } from "@/components/ui";
+import { UnitChip } from "@/components/unit-chip";
 import type { Lesson } from "@/lib/types";
 import {
   ForkCues,
@@ -211,7 +212,18 @@ function Hero({
           <ForkCues lesson={lesson} />
         </div>
         <h3 className={styles.detailTitle}>{stripHtml(lesson.title)}</h3>
-        {unitName && <div className={styles.dun}>{unitName}</div>}
+        {/* Inert unit text → the pop-in chip, recoloured for the hero (see
+            `.dunChip`). The `unitName &&` guard stays at the callsite so the
+            row's own spacing doesn't linger when there is no unit. */}
+        {unitName && (
+          <div className={styles.dun}>
+            <UnitChip
+              subjectId={lesson.subject}
+              unit={lesson.unit}
+              className={styles.dunChip}
+            />
+          </div>
+        )}
       </div>
       <div className={styles.dcTarget}>
         <span className={styles.dcTl}>Learning target</span>

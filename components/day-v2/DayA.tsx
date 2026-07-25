@@ -12,8 +12,8 @@ import { usePlanner } from "@/lib/planner-store";
 import { deriveDayStatus, currentAndNext } from "@/lib/day-status";
 import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
-import { unitDisplayName } from "@/lib/unit-name";
 import { Tooltip } from "@/components/ui";
+import { UnitChip } from "@/components/unit-chip";
 import type { Lesson } from "@/lib/types";
 import {
   SubjGlyph,
@@ -54,7 +54,7 @@ export function DayA(props: DayViewV2Props): ReactNode {
     onAddEvent,
   } = props;
   const router = useRouter();
-  const { subjectById, units, setLessonStatus } = usePlanner();
+  const { subjectById, setLessonStatus } = usePlanner();
   const nowMin = useNowMin();
 
   const doneCount = dayLessons.filter((l) => l.status === "done").length;
@@ -97,7 +97,6 @@ export function DayA(props: DayViewV2Props): ReactNode {
             const isNow = status === "now" || currentId === lesson.id;
             const [start, end] = timeParts(lesson);
             const title = stripHtml(lesson.title);
-            const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
             return (
               // The row container's onClick is a REDUNDANT pointer convenience
               // (select-on-click anywhere); it is deliberately NOT a
@@ -145,9 +144,13 @@ export function DayA(props: DayViewV2Props): ReactNode {
                   >
                     {title}
                   </SelectTitle>
+                  {/* The unit half of this line used to be inert text — the
+                      row named the unit and gave no way to reach it. It is now
+                      the UnitChip pop-in; the subject stays plain text (it is
+                      already carried by the glyph and the stripe). */}
                   <div className={styles.vaUnit}>
-                    {subject.name}
-                    {unitName ? ` · ${unitName}` : ""}
+                    <span className={styles.vaUnitSubject}>{subject.name}</span>
+                    <UnitChip subjectId={lesson.subject} unit={lesson.unit} />
                   </div>
                   <ForkCues lesson={lesson} />
                 </div>

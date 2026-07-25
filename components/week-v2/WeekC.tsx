@@ -65,6 +65,9 @@ import { OpenLessonEditorContext } from "@/components/weekly/weekly-lesson-card"
 // ({ open, onClose, day }); reused verbatim from the Daily canvas. Deep import
 // because it is not exported from the daily barrel.
 import { AddEventForm } from "@/components/daily/AddEventForm";
+// Lesson → unit-workspace pop-in (B5.5). Opens the workspace as an overlay via
+// the global host — no navigation, so the teacher keeps this week on screen.
+import { UnitChip } from "@/components/unit-chip";
 import styles from "./WeekC.module.css";
 
 // ── Today resolution ────────────────────────────────────────────────────────
@@ -485,6 +488,16 @@ export function WeekC(): ReactNode {
                           {start && (
                             <span className={styles.tileTime}>{start}</span>
                           )}
+                          {/* Which unit this lesson belongs to, and the way
+                              into it. Genuinely NEW on this canvas — the
+                              subject lane already answers "what subject?", but
+                              nothing here ever answered "what unit?". Renders
+                              nothing when the unit can't be resolved. */}
+                          <UnitChip
+                            subjectId={lesson.subject}
+                            unit={lesson.unit}
+                            className={styles.tileUnit}
+                          />
                           {(lesson.moved || lesson.modified) && (
                             <div className={styles.tileCues}>
                               <ForkCues lesson={lesson} />

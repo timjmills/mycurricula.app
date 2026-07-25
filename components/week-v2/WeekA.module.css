@@ -209,6 +209,26 @@
   opacity: 0.7;
 }
 
+/* The unit pop-in chip on a subject-TINTED tile. The ghost pill's neutral --ink
+   fill would fight the tint, so the chip is re-cut out of the tile's own subject
+   ink (`--cd`, which the `.cp-subj` cascade on the tile already redefines per
+   tone) — quiet at rest, unmistakably a control on hover. `align-self` keeps it
+   hugging its label instead of stretching the full column width, and the mixes
+   go toward `transparent` so the tile's tint shows through rather than being
+   overpainted. Tripled for the same order-independence reason as the base. */
+.tileUnit.tileUnit.tileUnit {
+  align-self: flex-start;
+  margin-top: 2px;
+  background: color-mix(in oklab, var(--cd) 12%, transparent);
+  border-color: color-mix(in oklab, var(--cd) 34%, transparent);
+  color: var(--cd);
+}
+.tileUnit.tileUnit.tileUnit:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--cd) 22%, transparent);
+  border-color: color-mix(in oklab, var(--cd) 55%, transparent);
+  color: var(--cd);
+}
+
 /* ── Add affordance row ─────────────────────────────────────────────────── */
 .addCell {
   display: flex;

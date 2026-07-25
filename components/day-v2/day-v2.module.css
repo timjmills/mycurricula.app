@@ -169,11 +169,22 @@
   letter-spacing: -0.01em;
   line-height: 1.15;
 }
+/* Subject text + the unit pop-in chip on one wrapping line. The opacity that
+   used to sit here moved onto `.vaUnitSubject` — on the container it would have
+   faded the chip too, and a control that reads as 66% dimmed does not read as a
+   control. */
 .vaUnit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  margin-top: 5px;
+}
+.vaUnitSubject {
   font-size: 12px;
   font-weight: 600;
   opacity: 0.66;
-  margin-top: 3px;
 }
 .vaEnd {
   display: flex;
@@ -411,10 +422,12 @@
   color: var(--ink);
   line-height: 1.05;
 }
+/* Now a hosting row for the unit pop-in chip rather than a text line — the type
+   rules moved onto the chip itself. Kept as a block so the focus panel's rhythm
+   below the title is unchanged. */
 .un {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--body);
+  display: flex;
+  min-width: 0;
   margin-bottom: 14px;
 }
 .vbObj {
@@ -619,10 +632,34 @@
   margin: 7px 0 5px;
   line-height: 1.05;
 }
+/* Hosting row for the unit pop-in chip (was a text line). */
 .dun {
-  font-size: 15px;
-  font-weight: 600;
-  opacity: 0.9;
+  display: flex;
+  min-width: 0;
+  margin-top: 4px;
+}
+/* The chip sitting ON the subject-colored hero. Same reasoning — and the same
+   translucent-white vocabulary — as `.dchip` and `.dfootFinish` above: the hero
+   is `color:#fff` over a deep subject gradient in EVERY tone, so the ghost
+   pill's neutral --ink fill would read as a light patch with dark ink pasted on
+   it. Branching on tone would be wrong here too; the surface is the constant.
+   TRIPLED so the resting rule clears `.btn.ghost` (0,2,0), and the hover/focus
+   rules carry their own qualifiers so they clear `.btn.ghost:hover:not(:disabled)`
+   (0,4,0) and `.btn:focus-visible` (0,2,0) by specificity, never by load order. */
+.dunChip.dunChip.dunChip {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.34);
+  color: #fff;
+}
+.dunChip.dunChip.dunChip:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: #fff;
+  color: #fff;
+}
+/* The primitive's --ink-900 ring is near-black in light tone — invisible on a
+   deep subject gradient. White is the only ring that reads on this surface. */
+.dunChip.dunChip.dunChip:focus-visible {
+  outline-color: #fff;
 }
 .dcTarget {
   flex: 0 0 auto;

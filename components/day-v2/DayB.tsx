@@ -17,6 +17,7 @@ import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
 import { unitDisplayName } from "@/lib/unit-name";
 import { Tooltip } from "@/components/ui";
+import { UnitChip } from "@/components/unit-chip";
 import type { Lesson } from "@/lib/types";
 import {
   SubjGlyph,
@@ -222,7 +223,16 @@ function FocusPanel({
           <ForkCues lesson={lesson} />
         </div>
         <h3 className={styles.focusTitle}>{stripHtml(lesson.title)}</h3>
-        {unitName && <div className={styles.un}>{unitName}</div>}
+        {/* The unit line was inert text; it is now the pop-in chip. The
+            `unitName &&` guard is kept at the callsite (not left to the chip's
+            own null return) so the wrapper's bottom margin doesn't survive as a
+            gap when there is no unit to show. Both sides resolve through
+            unitDisplayName, so they can't disagree. */}
+        {unitName && (
+          <div className={styles.un}>
+            <UnitChip subjectId={lesson.subject} unit={lesson.unit} />
+          </div>
+        )}
         <div className={`cp-subj ${lesson.subject} ${styles.vbObj}`}>
           {stripHtml(lesson.objective)}
         </div>

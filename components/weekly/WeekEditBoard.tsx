@@ -67,6 +67,10 @@ import { getDayBlocks } from "@/lib/schedule-data";
 import { lessonTime } from "@/lib/mock/schedule";
 import { usePbLayout } from "@/lib/pblayout-state";
 import { OpenLessonEditorContext } from "./weekly-lesson-card";
+// Lesson → unit-workspace pop-in (B5.5). Replaces the expanded body's inert unit
+// line, which printed `lesson.unit` RAW — a slug under the mock source and a
+// UUID on prod (the exact leak lib/unit-name.ts exists to stop).
+import { UnitChip } from "@/components/unit-chip";
 import {
   deriveWeekPeriods,
   assignLessonPeriod,
@@ -1032,7 +1036,16 @@ const LessonCell = React.memo(function LessonCell({
                 {stripHtml(lesson.objective)}
               </p>
             )}
-            <p className={styles.tileUnit}>{lesson.unit || "Planned"}</p>
+            {/* Was `{lesson.unit || "Planned"}` — a raw unit id when set, and
+                the word "Planned" (not a unit, and not information) when not.
+                The chip resolves the id through the catalog and renders nothing
+                when it can't, so this line now either names a real unit and
+                opens it or says nothing at all. */}
+            <UnitChip
+              subjectId={lesson.subject}
+              unit={lesson.unit}
+              className={styles.tileUnitChip}
+            />
           </div>
         )}
       </div>
