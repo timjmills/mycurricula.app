@@ -214,7 +214,11 @@ function Breakdown({
               tooltipId={`b3-ins-${row.key}`}
               side="bottom"
             >
-              <span className={styles.breakdownLabel} tabIndex={0}>
+              {/* The tab stop is how a keyboard user reaches the explanation
+                  (CLAUDE.md §4), but a focusable element with no role arrives
+                  as anonymous text. `note` says what it is: a remark about the
+                  figure beside it. */}
+              <span className={styles.breakdownLabel} role="note" tabIndex={0}>
                 {row.label}
               </span>
             </Tooltip>

@@ -145,6 +145,13 @@ export function PrepPanel({
 
   return (
     <div className={rootClass}>
+      {/* The drawer's three panes have to open at the SAME heading tier —
+          Assessments and Insights both start at h3, and this pane started at
+          none, so a screen-reader user tabbing between them got a document
+          outline that changed shape per tab. Visually hidden because the pane's
+          own tab already names it on screen; the heading is for structure. */}
+      <h3 className={styles.srOnly}>Prep and materials</h3>
+
       {/* Stated inline rather than behind a tooltip: this is a number a teacher
           could misread as a readiness score, so the caveat is always visible
           instead of hover-gated. */}

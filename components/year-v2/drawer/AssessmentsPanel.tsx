@@ -63,6 +63,7 @@ import {
 } from "react";
 import type { Lesson, LessonAssessment } from "@/lib/types";
 import { isAssessmentKind } from "@/lib/types";
+import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import type { PlannerDataState } from "@/lib/planner-store";
 import {
@@ -299,8 +300,11 @@ function AssessmentDetail({
         <span className={styles.fieldLabel}>Kind</span>
         {/* The tray is inline-flex and cannot wrap; a contained, scrollbar-less
             overflow guarantees the third option is still reachable if the
-            drawer is ever narrower than the three chips. */}
-        <div className={styles.kindRow}>
+            drawer is ever narrower than the three chips.
+            `data-ap-kind` is how the panel finds this group again after a kind
+            change has moved the whole row into another group's list — see
+            `restoreKindFocus`. */}
+        <div className={styles.kindRow} data-ap-kind={lesson.id}>
           <ToggleGroup
             options={KIND_OPTIONS}
             value={kindValue}
@@ -460,9 +464,11 @@ export function AssessmentsPanel({
   className,
 }: AssessmentsPanelProps): ReactNode {
   const { editLesson } = usePlanner();
+  const { editMode } = useAppState();
   const uid = useId();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const rows = useMemo<AssessmentRow[]>(
     () =>
@@ -491,9 +497,37 @@ export function AssessmentsPanel({
     [lessons],
   );
 
+  /**
+   * Hand focus back to the Kind group after a change has RELOCATED the row.
+   *
+   * The list is grouped by kind, so changing an assessment's kind moves its
+   * `<li>` into a different group's `<ul>` — React unmounts the whole row and
+   * mounts a new one elsewhere, taking the focused chip with it and dropping
+   * focus to `<body>`. A keyboard teacher's next Tab then restarts from the top
+   * of the document, in the middle of editing. The unit half already solves
+   * exactly this after a reorder; this is the same move, keyed on the group the
+   * row just landed in.
+   */
+  const restoreKindFocus = useCallback((lessonId: string): void => {
+    requestAnimationFrame(() => {
+      rootRef.current
+        ?.querySelector<HTMLElement>(
+          `[data-ap-kind="${lessonId}"] [role="radio"][aria-checked="true"]`,
+        )
+        ?.focus();
+    });
+  }, []);
+
   // THE single write path — identical to LessonWorkspace's AssessmentSection.
   const commit = useCallback(
     (lessonId: string, next: LessonAssessment): void => {
+      // Read the row's CURRENT bucket before the store moves it.
+      const before = rows.find((r) => r.lesson.id === lessonId);
+      const relocated =
+        before !== undefined &&
+        hasAssessmentContent(next) &&
+        bucketOf(next) !== before.bucket;
+
       editLesson(
         lessonId,
         { assessment: next },
@@ -503,8 +537,9 @@ export function AssessmentsPanel({
       // leaves the list — collapse the detail rather than strand it open over a
       // row that no longer exists.
       if (!hasAssessmentContent(next)) setSelectedId(null);
+      if (relocated) restoreKindFocus(lessonId);
     },
-    [editLesson],
+    [editLesson, rows, restoreKindFocus],
   );
 
   // Remove = the editor's "None": clear ALL FOUR fields, never just the kind.
@@ -572,9 +607,9 @@ export function AssessmentsPanel({
             if (groupRows.length === 0) return null;
             return (
               <section key={key} className={styles.group}>
-                {/* h5 under the half's h4 — the kind groups are a level below
+                {/* h4 under the half's h3 — the kind groups are a level below
                     "Lesson assessments", not siblings of it. */}
-                <h5 className={styles.groupHead}>
+                <h4 className={styles.groupHead}>
                   <span
                     className={styles.groupDot}
                     data-kind={key}
@@ -582,7 +617,7 @@ export function AssessmentsPanel({
                   />
                   <span className={styles.groupLabel}>{label}</span>
                   <span className={styles.groupCount}>{groupRows.length}</span>
-                </h5>
+                </h4>
                 <ul className={styles.list}>
                   {groupRows.map(({ lesson, assessment }) => {
                     const open = selectedId === lesson.id;
@@ -681,8 +716,17 @@ export function AssessmentsPanel({
     );
   }
 
+  // Who a lesson-assessment edit lands on. UNLIKE the unit half directly above
+  // — which is team content in both modes and simply goes read-only in Personal
+  // — this half follows the store's live save target: a Personal edit lazily
+  // FORKS the lesson into the teacher's own copy, a Team edit writes master for
+  // everyone. Two near-identical lists with opposite blast radii, stacked in one
+  // pane, need to say which is which; the unit half has always carried its
+  // badge, and until now this one carried nothing at all.
+  const teamMode = editMode === "master";
+
   return (
-    <div className={rootClass}>
+    <div ref={rootRef} className={rootClass}>
       {/* UNIT-owned first: it is the unit's own answer to "how is this unit
           assessed?", and it stays visible even when the lesson list is empty or
           still hydrating. Keyed by unit so a rail switch starts a clean read
@@ -691,8 +735,23 @@ export function AssessmentsPanel({
 
       <section className={styles.half}>
         <div className={styles.halfHead}>
-          <h4 className={styles.halfTitle}>Lesson assessments</h4>
+          <h3 className={styles.halfTitle}>Lesson assessments</h3>
           <span className={styles.halfNote}>Each one belongs to a lesson</span>
+          {/* Always-on (§4): which curriculum an edit writes to is exactly the
+              high-consequence, team-wide fact the required list exists for. */}
+          <Tooltip
+            required
+            side="bottom"
+            content={
+              teamMode
+                ? "You’re in Team Curriculum, so editing an assessment here changes the team’s plan — every teacher sees it."
+                : "Editing an assessment here changes only your copy of that lesson. The team’s plan is untouched, and the first edit makes your own copy."
+            }
+          >
+            <span className={styles.uBadge} role="note" tabIndex={0}>
+              {teamMode ? "Team content" : "Your copy"}
+            </span>
+          </Tooltip>
         </div>
         {lessonBody}
       </section>

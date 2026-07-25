@@ -182,6 +182,10 @@
 .uRowMain.uRowMain:focus-visible {
   outline: 2px solid var(--ink-400);
   outline-offset: -2px;
+  /* The outline is drawn INSIDE a row whose card is rounded and clips its
+     overflow, so a square ring loses its corners to that clip. Matching the
+     card radius keeps the whole ring visible. */
+  border-radius: var(--r-lg, 18px);
 }
 
 .uRowText {
@@ -306,11 +310,16 @@
   text-wrap: pretty;
   overflow-wrap: anywhere;
 }
+/* --ink-500, not --ink-400: "Not set yet." is the row's actual content in
+   Personal mode, so it has to clear 4.5:1 like any other sentence. --ink-400
+   (#908fa3) on --surface is 3.16:1 in light tone; --ink-500 (#57566b) is 7.12:1.
+   The italic is what makes it read as absence — the colour was never doing that
+   job on its own. */
 .roEmpty {
   margin: 0;
   font-size: var(--t-13);
   font-style: italic;
-  color: var(--ink-400);
+  color: var(--ink-500);
 }
 
 /* ── Group (Formative · Summative · Unclassified) ───────────────────────────── */
@@ -416,6 +425,10 @@
 .rowMain.rowMain:focus-visible {
   outline: 2px solid var(--ink-400);
   outline-offset: -2px;
+  /* The outline is drawn INSIDE a row whose card is rounded and clips its
+     overflow, so a square ring loses its corners to that clip. Matching the
+     card radius keeps the whole ring visible. */
+  border-radius: var(--r-lg, 18px);
 }
 
 .glyph {
@@ -458,11 +471,13 @@
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
-/* An assessment with no title says so — never a fabricated name. */
+/* An assessment with no title says so — never a fabricated name. Which makes
+   "Untitled assessment" the row's NAME, read at 3.16:1 until it moved to
+   --ink-500 (7.12:1 on --surface, light tone). */
 .rowTitleEmpty {
   font-weight: 600;
   font-style: italic;
-  color: var(--ink-400);
+  color: var(--ink-500);
 }
 
 .chev {
@@ -502,6 +517,10 @@
 .rowLesson.rowLesson:focus-visible {
   outline: 2px solid var(--ink-400);
   outline-offset: -2px;
+  /* The outline is drawn INSIDE a row whose card is rounded and clips its
+     overflow, so a square ring loses its corners to that clip. Matching the
+     card radius keeps the whole ring visible. */
+  border-radius: var(--r-lg, 18px);
 }
 
 .rowLessonTitle {
@@ -566,9 +585,12 @@
   resize: vertical;
   min-height: 60px;
 }
+/* Placeholder text is text: the example it gives ("e.g. Fractions exit ticket")
+   is the field's only instruction until something is typed. --ink-500 keeps it
+   clearly lighter than a real value (--ink-900) while clearing 4.5:1. */
 .textInput.textInput::placeholder,
 .textArea.textArea::placeholder {
-  color: var(--ink-400);
+  color: var(--ink-500);
 }
 .textInput.textInput:focus-visible,
 .textArea.textArea:focus-visible,

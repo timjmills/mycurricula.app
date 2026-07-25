@@ -61,11 +61,41 @@ import type { UnitAssessmentPatch } from "@/lib/planner/source";
 import { sortUnitAssessments } from "@/lib/planner/unit-assessments";
 import { plannerClient } from "@/lib/planner/client";
 import { useAppState } from "@/lib/app-state";
+import { useConsequenceToast } from "@/lib/consequence-toast";
 import { Button, Skeleton, ToggleGroup, Tooltip } from "@/components/ui";
 import type { ToggleOption } from "@/components/ui";
 import styles from "./AssessmentsPanel.module.css";
 
 const SAVE_DEBOUNCE_MS = 500;
+
+// ── Deadlines ────────────────────────────────────────────────────────────────
+//
+// NOTHING HERE CANCELS OR TIMES OUT A WRITE. `lib/planner` exposes no abort
+// seam, and a deadline on the write ITSELF would be worse than the hang it
+// replaces: releasing a row's queue slot early lets the next patch go out while
+// the first is still live, and if they land out of order the server keeps the
+// OLDER text — silent data loss, where the hang was at least visible. Same for
+// the unit-level barrier: proceeding with a delete or a reorder while a patch is
+// in flight is precisely the race the barrier exists to prevent.
+//
+// So the deadlines below bound WAITING, never writing:
+//   • the read barrier gives up and reads anyway — worst case a display one
+//     write stale, which the next open corrects;
+//   • a delete / reorder that cannot drain in time REFUSES rather than racing,
+//     and hands the editor back instead of leaving it disabled forever.
+// Serialization and ordering are untouched: a row's slot still clears only when
+// its request actually settles.
+
+/** How long a READ waits for outstanding writes before rendering anyway. */
+const BARRIER_DEADLINE_MS = 10_000;
+
+/** How long a stale-read repair keeps waiting for the write that outran the
+ *  barrier. Long, because it costs nothing but a timer; finite, because a write
+ *  that has not settled by then is never going to. */
+const REPAIR_WINDOW_MS = 60_000;
+
+const delay = (ms: number): Promise<void> =>
+  new Promise((r) => setTimeout(r, ms));
 
 // ── Kind vocabulary ──────────────────────────────────────────────────────────
 
@@ -151,7 +181,8 @@ interface PatchQueue {
    *  removed — an error about work that no longer exists. */
   forget: (id: string) => void;
   /**
-   * Resolves once nothing is pending or in flight for ANY row.
+   * Waits until nothing is pending or in flight for ANY row. Resolves `true`
+   * when it actually drained, `false` when it gave up at the deadline.
    *
    * The barrier every UNIT-level operation waits on. Reorder and delete replace
    * or remove whole row objects, so if a per-row PATCH is still outstanding they
@@ -159,8 +190,12 @@ interface PatchQueue {
    * PATCH confirms and overwrite the newer title/purpose/notes, and a delete can
    * discard an edit that had already reached the server. Draining first makes
    * the ordering explicit instead of accidental.
+   *
+   * A `false` is NOT permission to go ahead anyway — the race is exactly what
+   * the caller was avoiding. It means "tell the teacher to try again in a
+   * moment", and the caller must release the editor rather than sit disabled.
    */
-  idle: () => Promise<void>;
+  idle: () => Promise<boolean>;
 }
 
 interface PatchQueueDeps {
@@ -169,7 +204,11 @@ interface PatchQueueDeps {
    *  commit after a switch to Personal. */
   canWrite: () => boolean;
   onConfirm: (row: UnitAssessment) => void;
-  onFail: (reason: "denied" | "failed") => void;
+  /** Carries the ROW the failure belongs to. Without it the report is
+   *  unattributable, and the editor that gets snapped back to confirmed values
+   *  is whichever one happens to be open — not necessarily the one that
+   *  failed. */
+  onFail: (id: string, reason: "denied" | "failed") => void;
 }
 
 /**
@@ -190,7 +229,7 @@ function createPatchQueue(deps: PatchQueueDeps): PatchQueue {
     if (!deps.canWrite()) {
       const dropped = slot.pending !== null;
       slots.delete(id);
-      if (dropped) deps.onFail("denied");
+      if (dropped) deps.onFail(id, "denied");
       return;
     }
     const patch = slot.pending;
@@ -211,7 +250,7 @@ function createPatchQueue(deps: PatchQueueDeps): PatchQueue {
         slot.inFlight = false;
         if (abandoned.has(id)) return;
         console.error("[b3] unit assessment save failed", err);
-        deps.onFail("failed");
+        deps.onFail(id, "failed");
         drain(id);
       },
     );
@@ -237,6 +276,7 @@ function createPatchQueue(deps: PatchQueueDeps): PatchQueue {
       // through both arms of every send. A microtask-frequency poll over a map
       // that holds at most a handful of rows is cheaper to get right, and it
       // cannot miss a slot created while waiting.
+      const until = Date.now() + BARRIER_DEADLINE_MS;
       // eslint-disable-next-line no-constant-condition
       while (true) {
         let busy = false;
@@ -246,8 +286,15 @@ function createPatchQueue(deps: PatchQueueDeps): PatchQueue {
             break;
           }
         }
-        if (!busy) return;
-        await new Promise((r) => setTimeout(r, 15));
+        if (!busy) return true;
+        // Giving up returns the editor to the teacher; it does NOT authorise the
+        // caller to proceed. A send that will not settle must not become a
+        // delete or a reorder issued around it.
+        if (Date.now() >= until) {
+          console.warn("[b3] unit assessment write queue did not drain in time");
+          return false;
+        }
+        await delay(15);
       }
     },
   };
@@ -267,7 +314,9 @@ function createPatchQueue(deps: PatchQueueDeps): PatchQueue {
 // the read that follows is exactly how the UI recovers the true state.
 const inFlightWrites = new Set<Promise<unknown>>();
 
-/** Register a unit-level write so a later remount's read can wait for it. */
+/** Register a unit-level write so a later remount's read can wait for it. The
+ *  caller still awaits the ORIGINAL promise — tracking never wraps, delays or
+ *  times out the request itself. */
 function trackUnitWrite<T>(p: Promise<T>): Promise<T> {
   const tracked = p.then(
     (v) => v,
@@ -276,6 +325,12 @@ function trackUnitWrite<T>(p: Promise<T>): Promise<T> {
     },
   );
   inFlightWrites.add(tracked);
+  // NOTHING EVICTS ON A TIMER. An earlier cut dropped a write from the set after
+  // 15s so later reads would not keep paying the barrier — but the set is also
+  // what tells a delete or a reorder that an earlier write is still live, and a
+  // timed eviction makes it lie: the mutation goes ahead around a request that
+  // is still in flight, which is the overwrite this whole mechanism exists to
+  // prevent. An entry leaves only when its request actually settles.
   void tracked.catch(() => {}).finally(() => inFlightWrites.delete(tracked));
   return p;
 }
@@ -291,13 +346,34 @@ function trackUnitWrite<T>(p: Promise<T>): Promise<T> {
  * would capture the PREDECESSOR's server state — the exact stale snapshot this
  * barrier exists to prevent, just one link further along.
  */
-async function settleUnitWrites(): Promise<void> {
+async function settleUnitWrites(budgetMs: number): Promise<boolean> {
+  // BOUNDED, and it reports WHICH way it ended. `inFlightWrites` is
+  // module-global, so an unbounded wait let one never-settling write block the
+  // read of EVERY unit for the rest of the session — a permanent skeleton with
+  // no retry, on a pane that would have rendered fine.
+  //
+  // Returning `false` is not "carry on regardless": it means the snapshot the
+  // caller is about to take may predate a write that is still live, and the
+  // caller owes the teacher a repair (see the read effect) — while `drained()`
+  // keeps mutations off that snapshot in the meantime.
+  const until = Date.now() + budgetMs;
   while (inFlightWrites.size > 0) {
-    await Promise.allSettled([...inFlightWrites]);
+    const remaining = until - Date.now();
+    if (remaining <= 0) {
+      console.warn("[b3] outstanding unit writes did not settle in time");
+      return false;
+    }
+    // Raced, not awaited: `allSettled` over a promise that never settles never
+    // resolves, so the deadline check below would never be reached.
+    await Promise.race([
+      Promise.allSettled([...inFlightWrites]),
+      delay(Math.min(remaining, 500)),
+    ]);
     // Yield a macrotask so a chained send has registered before we re-check;
     // it is queued from a `.then` that may not have run yet.
-    await new Promise((r) => setTimeout(r, 0));
+    await delay(0);
   }
+  return true;
 }
 
 // ── Messages ─────────────────────────────────────────────────────────────────
@@ -310,7 +386,25 @@ const MSG = {
     "Your last change wasn’t saved — switch to Team Curriculum to edit unit assessments. The saved version is shown.",
   remove: "Couldn’t remove the assessment — it is still there.",
   reorder: "Couldn’t change the order — the saved order is shown.",
+  // A delete or reorder that could not wait for an outstanding save. Nothing was
+  // attempted, so nothing is claimed about it — the alternative was to issue the
+  // operation AROUND a live write and risk it overwriting the newer text.
+  stillSaving:
+    "An earlier change is still saving, so that wasn’t done. Nothing was lost — try again in a moment.",
 } as const;
+
+/** What a failure says when it has to be reported OUTSIDE the pane, because the
+ *  pane that issued the write is no longer on screen (see `report`). Each one
+ *  names the unit-assessment scope, since the drawer is gone and nothing else
+ *  on screen gives the message a context. */
+const OFFSCREEN_MSG: Record<"denied" | "failed" | "stillSaving", string> = {
+  denied:
+    "Your last unit-assessment edit wasn’t saved — unit assessments can only be changed in Team Curriculum. The team’s saved version stands.",
+  failed:
+    "Your last unit-assessment edit didn’t save. Reopen the unit to see what the team has.",
+  stillSaving:
+    "A unit assessment was still saving, so your delete or reorder wasn’t done. Nothing was lost — reopen the unit and try again.",
+};
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -344,6 +438,7 @@ export function UnitAssessments({
   visible,
 }: UnitAssessmentsProps): ReactNode {
   const { currentUser, editMode } = useAppState();
+  const { showConsequence } = useConsequenceToast();
   const canEdit = editMode === "master";
   const ownerId = currentUser.id ?? "";
   const uid = useId();
@@ -360,8 +455,12 @@ export function UnitAssessments({
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   /** Bumped on a rejected save so the open editor reverts to confirmed values —
-   *  see the queue's `onFail`. */
-  const [revertTick, setRevertTick] = useState(0);
+   *  see the queue's `onFail`. ONE COUNTER PER ROW: only the editor for the row
+   *  that failed may be snapped back, and two rows failing in the SAME React
+   *  batch must not collapse into one signal — with a single {id, n} value the
+   *  later updater simply replaced the earlier, so one of the two editors kept
+   *  showing text the server had refused. */
+  const [revert, setRevert] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
 
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -370,6 +469,46 @@ export function UnitAssessments({
   canEditRef.current = canEdit;
   const ownerRef = useRef(ownerId);
   ownerRef.current = ownerId;
+
+  // ── Reporting a failure the pane cannot show ───────────────────────────────
+  //
+  // The banner is only a report while this section is BOTH mounted and on
+  // screen, and neither is guaranteed at the moment a save resolves. The unmount
+  // `flush()` exists precisely so the last keystrokes still go out — after a
+  // pane switch, an "Open lesson", a ✕/Escape, or a rail unit switch — and by
+  // the time that write fails, `setError` is a no-op on a dead component and
+  // only `console.error` survives. The drawer's ✕ is worse: the section stays
+  // MOUNTED and `setError` "works", but the whole subtree is `display: none`, so
+  // the banner paints where nobody can see it.
+  //
+  // The header of this file promises a denial "SURFACES rather than leaving a
+  // value on screen that never persisted". Off-screen, the surface has to be the
+  // app-level toast — it outlives every one of those teardowns because the
+  // provider is mounted at the planner layout.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const onScreen = useRef(visible);
+  onScreen.current = visible;
+  const toastRef = useRef(showConsequence);
+  toastRef.current = showConsequence;
+
+  /** Report a failure through whichever surface the teacher can actually see. */
+  const report = useCallback(
+    (reason: "denied" | "failed" | "stillSaving", inPane: () => void): void => {
+      if (alive.current && onScreen.current) {
+        inPane();
+        return;
+      }
+      toastRef.current({ message: OFFSCREEN_MSG[reason] });
+    },
+    [],
+  );
+
 
   // ── Read ───────────────────────────────────────────────────────────────────
   // Batched seam, one unit: the map is keyed by the ids passed in, and a unit
@@ -398,9 +537,18 @@ export function UnitAssessments({
     // would then display as confirmed truth until the unit is reopened.
     // `inFlightWrites` outlives the component precisely so the new read can
     // wait for the old instance's work.
-    void settleUnitWrites().then(() => {
+    void settleUnitWrites(BARRIER_DEADLINE_MS).then((settled) => {
       if (!alive) return;
       readUnitAssessments();
+      if (settled) return;
+      // The read above went ahead over a write that had not landed, so what it
+      // returns may be one write out of date. Rather than leave that on screen
+      // as confirmed truth until the unit is reopened, wait for the write to
+      // actually settle and read again. Until it does, `drained()` refuses any
+      // delete or reorder — nothing is built on the suspect snapshot.
+      void settleUnitWrites(REPAIR_WINDOW_MS).then((repaired) => {
+        if (alive && repaired) setReloadTick((t) => t + 1);
+      });
     });
 
     function readUnitAssessments(): void {
@@ -444,19 +592,49 @@ export function UnitAssessments({
         // fresh edit for the same reason.)
         setError(null);
       },
-      onFail: (reason) => {
-        setError(reason === "denied" ? MSG.denied : MSG.save);
-        // Snap the editor back to CONFIRMED values. Both failure messages end
-        // "the saved version is shown" / "the last saved version stands", and
-        // until now that was untrue: the editor kept displaying the rejected
-        // text, so the teacher read an error while looking at the very words it
-        // said had not been saved — and the draft was then silently reseeded
-        // when the row collapsed, losing them without a second word. Reverting
-        // makes what is on screen match both the message and the database.
-        setRevertTick((n) => n + 1);
+      onFail: (id, reason) => {
+        report(reason, () => {
+          setError(reason === "denied" ? MSG.denied : MSG.save);
+          // Snap the editor back to CONFIRMED values. Both failure messages end
+          // "the saved version is shown" / "the last saved version stands", and
+          // until now that was untrue: the editor kept displaying the rejected
+          // text, so the teacher read an error while looking at the very words
+          // it said had not been saved — and the draft was then silently
+          // reseeded when the row collapsed, losing them without a second word.
+          // Reverting makes what is on screen match both the message and the
+          // database.
+          //
+          // ONLY the row that failed. The signal used to be a bare counter, so
+          // whichever editor was open absorbed it: fail a save on row A, open
+          // row B, and B's half-typed text was wiped mid-keystroke by A's
+          // failure — under a message that named neither.
+          setRevert((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+        });
       },
     });
   }
+
+  /**
+   * May a unit-level mutation (delete / reorder) go ahead?
+   *
+   * TWO conditions, because there are two ways a write can be outstanding:
+   *
+   *   1. THIS instance's per-row queue — drained by `idle()`.
+   *   2. A PREVIOUS instance's write, still live. The read barrier is bounded,
+   *      so a remounted pane can be looking at a snapshot taken while an earlier
+   *      write was in flight. Its own queue is empty (it never issued that
+   *      write), so `idle()` alone says "clear" and the delete or reorder would
+   *      be built on rows that are already out of date. `inFlightWrites` is
+   *      module-global precisely so this instance can see that.
+   *
+   * Refusing is the conservative answer: the operation is abandoned and said so,
+   * rather than issued against a snapshot we know may be stale.
+   */
+  const drained = useCallback(async (): Promise<boolean> => {
+    if ((await queueRef.current?.idle()) === false) return false;
+    // Re-read AFTER the drain — an entry can settle (or be added) across it.
+    return inFlightWrites.size === 0;
+  }, []);
 
   // ── Debounce (the UnitPlanFields shape) ───────────────────────────────────
   // The buffer carries its assessment id WITH the patch, so a flush always lands
@@ -581,7 +759,15 @@ export function UnitAssessments({
       // the delete strictly ordered after every save, so a failed delete leaves
       // a row whose displayed text matches what was actually persisted.
       flush();
-      await queueRef.current?.idle();
+      // A drain that times out means an edit is STILL IN FLIGHT. Deleting around
+      // it is the very race this barrier exists to stop, so the delete is
+      // abandoned - and the editor is handed back rather than left disabled with
+      // everything greyed out, which is what an unbounded wait did.
+      if (!(await drained())) {
+        report("stillSaving", () => setError(MSG.stillSaving));
+        setBusy(false);
+        return;
+      }
       // RE-CHECK AFTER THE AWAIT. The drain can take as long as the network
       // does, and the Personal / Team toggle is reachable throughout — so the
       // permission that was true when the teacher pressed Delete may be false by
@@ -611,7 +797,7 @@ export function UnitAssessments({
         setBusy(false);
       }
     },
-    [busy, flush],
+    [busy, flush, drained, report],
   );
 
   /** Move a row one slot. Sends the COMPLETE final id order (that is also what
@@ -636,7 +822,13 @@ export function UnitAssessments({
       // first makes the ordering explicit — every edit is persisted and
       // reflected in the snapshot the reorder returns.
       flush();
-      await queueRef.current?.idle();
+      // Same refusal as `remove`: a reorder issued around a live PATCH is
+      // exactly how the older snapshot overwrites the newer text.
+      if (!(await drained())) {
+        report("stillSaving", () => setError(MSG.stillSaving));
+        setBusy(false);
+        return;
+      }
       // Same re-check as `remove`: the drain is an await, and the Personal /
       // Team toggle stays reachable across it. A reorder is a team-wide write.
       if (!canEditRef.current) {
@@ -676,7 +868,7 @@ export function UnitAssessments({
         setBusy(false);
       }
     },
-    [busy, rows, unitId, flush],
+    [busy, rows, unitId, flush, drained, report],
   );
 
   // ── Body ───────────────────────────────────────────────────────────────────
@@ -771,7 +963,7 @@ export function UnitAssessments({
                         index={i}
                         total={rows.length}
                         busy={busy}
-                        revertTick={revertTick}
+                        revert={revert[row.id] ?? 0}
                         onField={scheduleSave}
                         onFlush={flush}
                         onMove={move}
@@ -824,7 +1016,11 @@ export function UnitAssessments({
       aria-label="Unit assessments"
     >
       <div className={styles.uHead}>
-        <h4 className={styles.uTitle}>Unit assessments</h4>
+        {/* h3, matching the lesson half and the Insights pane. The drawer's
+            three panes used to open at three different tiers (h3 / h4 / none),
+            which reads to a screen reader as a structure that changes shape
+            depending on which tab you are on. */}
+        <h3 className={styles.uTitle}>Unit assessments</h3>
         {readState === "ready" && rows.length > 0 ? (
           <span className={styles.groupCount}>{rows.length}</span>
         ) : null}
@@ -837,7 +1033,11 @@ export function UnitAssessments({
           }
           side="bottom"
         >
-          <span className={styles.uBadge} tabIndex={0}>
+          {/* The tab stop is deliberate — it is how a keyboard user reaches the
+              explanation (CLAUDE.md §4) — but a focusable element with no role
+              lands as anonymous text. `note` is what this is: a parenthetical
+              remark about the section it labels. */}
+          <span className={styles.uBadge} role="note" tabIndex={0}>
             {canEdit ? "Team content" : "Team · read-only"}
           </span>
         </Tooltip>
@@ -939,7 +1139,7 @@ function UnitAssessmentEditor({
   index,
   total,
   busy,
-  revertTick,
+  revert,
   onField,
   onFlush,
   onMove,
@@ -950,9 +1150,11 @@ function UnitAssessmentEditor({
   index: number;
   total: number;
   busy: boolean;
-  /** Bumped when a save is rejected — forces the draft back to `row`, so the
-   *  editor stops showing text the server refused. */
-  revertTick: number;
+  /** THIS row's rejection counter — it only ever moves when this row's own save
+   *  is refused, so another row's failure can neither revert this editor nor be
+   *  swallowed by it. Each bump forces the draft back to `row`, so the editor
+   *  stops showing text the server refused. */
+  revert: number;
   onField: (id: string, patch: UnitAssessmentPatch) => void;
   onFlush: () => void;
   onMove: (id: string, dir: -1 | 1) => void;
@@ -979,7 +1181,7 @@ function UnitAssessmentEditor({
     editing.current = false;
     setDraft(draftOf(row));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [revertTick]);
+  }, [revert]);
 
   const edit = useCallback(
     (next: Draft, patch: UnitAssessmentPatch): void => {

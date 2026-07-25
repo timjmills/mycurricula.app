@@ -62,10 +62,15 @@
   font-weight: 700;
 }
 
-/* ── Touch-target inflation — phone / tablet (≤900px) ───────────────── */
-/* Visual stays compact; ::before expands the hit area to ≥44px. */
+/* ── Touch-target inflation — any touch device, plus phone / tablet ──── */
+/* Visual stays compact; ::before expands the hit area to ≥44px.
+   `(pointer: coarse)` carries the rule past the 900px width test: a tablet in
+   landscape (an iPad Pro is 1024px) is a finger-driven device that would
+   otherwise get the bare 26px / 34px chip. Width alone is not a proxy for
+   touch — the sibling drawers already pair the two the same way
+   (UnitContextDrawer.module.css, DayEditSplit.module.css). */
 
-@media (max-width: 900px) {
+@media (pointer: coarse), (max-width: 900px) {
   .md .option::before,
   .sm .option::before {
     content: "";
@@ -121,13 +126,32 @@
   color: inherit;
 }
 
+/* Label slot. The chip owns the colour and the weight; the label only has to
+   stay on one line beside the icon and inherit both. (The class was referenced
+   from the component before it existed here, so the span rendered unclassed.) */
+.optionLabel {
+  display: inline-block;
+  color: inherit;
+  white-space: nowrap;
+}
+
 /* ── Subtle variant (default) ────────────────────────────────────────── */
 /* Active chip: paper fill, shadow-card, ink-900 text.
-   Inactive: transparent background, ink-500 text. */
+   Inactive: transparent background, ink-500 text.
+
+   --ink-500, NOT --muted. An inactive segment is a LABEL a teacher has to read
+   in order to choose — the resting state is the state that gets read, and hover
+   is not a fix because it only ever recovers one segment at a time. --muted
+   (#908fa3) on the tray's --hairline (#f4f2ec) measures 2.82:1, and at
+   13px/700 and 12px/700 nothing here is WCAG "large text", so the bar is 4.5:1.
+   --ink-500 (#57566b) measures 6.36:1 on the same tray. Dark tone moves
+   together: --muted was 4.43:1 on #282737, --ink-500 is 7.07:1. The chip fill +
+   lift + accent ink still carry "which one is on"; contrast is not what was
+   doing that work. */
 
 .subtle .inactive {
   background: transparent;
-  color: var(--muted);
+  color: var(--ink-500);
 }
 
 .subtle .inactive:hover {
@@ -149,9 +173,10 @@
    recipe as subtle but slightly stronger lift. (Used for primary mode
    switches like Personal/Team; the brand-blue active reads as "in force.") */
 
+/* Same --ink-500 reading floor as the subtle variant above. */
 .prominent .inactive {
   background: transparent;
-  color: var(--muted);
+  color: var(--ink-500);
 }
 
 .prominent .inactive:hover {

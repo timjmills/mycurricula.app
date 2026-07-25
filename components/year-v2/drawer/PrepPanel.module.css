@@ -108,6 +108,10 @@
 .rowHead.rowHead:focus-visible {
   outline: 2px solid var(--ink-400);
   outline-offset: -2px;
+  /* The outline is drawn INSIDE a row whose card is rounded and clips its
+     overflow, so a square ring loses its corners to that clip. Matching the
+     card radius keeps the whole ring visible. */
+  border-radius: var(--r-lg, 18px);
 }
 
 .rowTitle {
@@ -158,11 +162,28 @@
   text-wrap: pretty;
 }
 
-/* An explicit "not recorded yet" — never an implied zero. */
+/* An explicit "not recorded yet" — never an implied zero. And since it IS the
+   entry's content, it reads at the same 4.5:1 bar as any other text: --ink-400
+   measured 3.16:1 on --surface-warm in light tone, --ink-500 measures 7.12:1.
+   Italic carries the "nothing here" reading. */
 .entryMissing {
   margin: 0;
   font-size: var(--t-13);
   font-style: italic;
   line-height: 1.5;
-  color: var(--ink-400);
+  color: var(--ink-500);
+}
+
+/* Visually hidden, screen-reader audible — the pane's structural heading (its
+   visible name is the drawer tab). Same recipe as Skeleton.module.css's. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -6,9 +6,10 @@
 //   Personal/Master, By-Unit/By-Week, Grid/List,
 //   Roadmap/Progression, Year sub-nav, etc.
 //
-// This primitive does NOT replace existing toggles yet — that migration
-// is a separate wave. It ships the redesigned visual so every future
-// toggle is consistent from day one.
+// It IS the app's segmented control: ~30 callsites across chrome, the
+// planner surfaces, onboarding, settings, Teach and the unit drawer now
+// render through it, so a rule added here is inherited everywhere — and
+// so is a trap.
 //
 // ── Variants ───────────────────────────────────────────────────────────
 //   subtle    — in-page contextual switches (default). Active option gets
@@ -19,18 +20,31 @@
 //               Tray is ink-100; heavier, more assertive.
 //
 // ── Keyboard ───────────────────────────────────────────────────────────
-//   ArrowLeft / ArrowRight — move selection through options.
+//   ArrowLeft / ArrowRight — move through the options, wrapping.
 //   Enter / Space           — activate the focused option.
 //   The group has role="radiogroup"; each option has role="radio".
+//
+//   Whether an ARROW also commits is the `selectOnFocus` axis. It defaults
+//   to `true` (the ARIA radio-group default: selection follows focus) and
+//   is FORCED off by a `destructive` option — see `toggle-group-keys.ts`.
+//   A destructive option must never be selected in transit, while the
+//   teacher is merely looking at what else is there.
+//
+// ── Never fires for a no-op ────────────────────────────────────────────
+//   Re-selecting the ACTIVE option does not call `onChange`. Callers treat
+//   every onChange as an edit — in the planner an edit lazily FORKS a Team
+//   lesson (CLAUDE.md §2) — and clicking the chip that is already lit is
+//   not an edit.
 //
 // ── Accessibility ──────────────────────────────────────────────────────
 //   • ariaLabel is required on the group (e.g. "View mode").
 //   • Each option can supply an ariaLabel for short/icon labels.
 //   • Touch target ≥44×44 on phone/tablet via padding-trick ::before.
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { Tooltip } from "./Tooltip";
+import { arrowCommits, arrowTarget, selectionOf } from "./toggle-group-keys";
 import styles from "./ToggleGroup.module.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -56,6 +70,21 @@ export interface ToggleOption<T extends string = string> {
    * `tooltipRequired` instead.
    */
   tooltipId?: string;
+  /**
+   * Marks an option whose selection CLEARS or destroys content — a "None",
+   * "Clear" or "Remove" segment, as opposed to one that merely switches
+   * what is shown.
+   *
+   * ONE such option anywhere in the group turns off "selection follows
+   * focus" for the WHOLE group: arrows then move focus only, and
+   * Enter / Space (or a click) commits. Without that, the destructive
+   * option is reachable IN TRANSIT — arrow navigation wraps, so it sits one
+   * keypress after the last option — and a teacher stepping through the
+   * group to see what is there commits it on the way past. Set it on the
+   * option, not at the callsite, so a group that gains a clear/none segment
+   * later inherits the protection with it.
+   */
+  destructive?: boolean;
 }
 
 export interface ToggleGroupProps<T extends string = string> {
@@ -82,6 +111,19 @@ export interface ToggleGroupProps<T extends string = string> {
    * Default false.
    */
   disabled?: boolean;
+  /**
+   * Whether an ARROW key commits the option it lands on (`true`, the ARIA
+   * radio-group default — selection follows focus) or merely moves focus,
+   * leaving Enter / Space to commit (`false`).
+   *
+   * Default `true`: for an ordinary group, arrowing onto an option IS how a
+   * keyboard user picks it, and every existing callsite relies on that.
+   * Pass `false` when a commit is expensive or noisy even though no single
+   * option is destructive (each arrow press fires `onChange`, and several
+   * callsites persist on every one). A `destructive` option overrides this
+   * to `false` regardless of what is passed.
+   */
+  selectOnFocus?: boolean;
 }
 
 // ── ToggleGroup ─────────────────────────────────────────────────────────────
@@ -96,36 +138,54 @@ export function ToggleGroup<T extends string = string>({
   className,
   tooltipRequired = false,
   disabled = false,
+  selectOnFocus = true,
 }: ToggleGroupProps<T>): ReactNode {
   const groupRef = useRef<HTMLDivElement>(null);
 
-  // Arrow-key navigation: move selection forward/backward within the group.
+  const activeIndex = options.findIndex((o) => o.value === value);
+  const commitsOnArrow = arrowCommits(options, selectOnFocus);
+
+  // Where the roving tab stop sits when an arrow has moved focus WITHOUT
+  // committing. Null means "wherever the active option is" — which is the only
+  // possibility while selection follows focus, since the two never diverge
+  // there. Clamped on read: `options` can shrink under an open group.
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  const roving =
+    !commitsOnArrow && focusIndex !== null && focusIndex < options.length
+      ? focusIndex
+      : activeIndex;
+  // A `value` matching no option would otherwise leave every button at
+  // tabIndex -1, i.e. a control the Tab key cannot reach at all.
+  const tabStop = roving >= 0 ? roving : 0;
+
+  /** The one commit path. Never fires for the option that is already active. */
+  const select = useCallback(
+    (next: T) => {
+      const commit = selectionOf(next, value);
+      if (commit !== null) onChange(commit);
+    },
+    [value, onChange],
+  );
+
+  // Arrow-key navigation. Moves the roving focus; whether it also COMMITS is
+  // `commitsOnArrow` — off whenever the group holds a destructive option, so
+  // arrowing past "None" can never clear the fields on the way past.
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
-      const currentIndex = options.findIndex((o) => o.value === value);
-      let nextIndex: number | null = null;
-
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-        e.preventDefault();
-        nextIndex = (currentIndex + 1) % options.length;
-      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        e.preventDefault();
-        nextIndex = currentIndex === 0 ? options.length - 1 : currentIndex - 1;
-      }
-
-      if (nextIndex !== null) {
-        const next = options[nextIndex];
-        onChange(next.value);
-        // Move DOM focus to the newly-selected button so the outline
-        // tracks the keyboard selection correctly.
-        const buttons =
-          groupRef.current?.querySelectorAll<HTMLButtonElement>(
-            "[role='radio']",
-          );
-        buttons?.[nextIndex]?.focus();
-      }
+      if (disabled) return;
+      const nextIndex = arrowTarget(e.key, tabStop, options.length);
+      if (nextIndex === null) return;
+      e.preventDefault();
+      setFocusIndex(nextIndex);
+      if (commitsOnArrow) select(options[nextIndex].value);
+      // Move DOM focus to the option the arrow landed on, so the outline
+      // tracks the keyboard position. In focus-only mode that outline is the
+      // sole indication of where Enter / Space would land.
+      groupRef.current
+        ?.querySelectorAll<HTMLButtonElement>("[role='radio']")
+        ?.[nextIndex]?.focus();
     },
-    [options, value, onChange],
+    [disabled, tabStop, options, commitsOnArrow, select],
   );
 
   const trayClasses = [
@@ -145,7 +205,7 @@ export function ToggleGroup<T extends string = string>({
       className={trayClasses}
       onKeyDown={handleKeyDown}
     >
-      {options.map((option) => {
+      {options.map((option, index) => {
         const isActive = option.value === value;
         const btnClasses = [
           styles.option,
@@ -168,10 +228,16 @@ export function ToggleGroup<T extends string = string>({
             aria-checked={isActive}
             aria-label={option.ariaLabel ?? option.label}
             title={option.title}
-            tabIndex={isActive ? 0 : -1}
+            tabIndex={index === tabStop ? 0 : -1}
             className={btnClasses}
             disabled={disabled}
-            onClick={() => onChange(option.value)}
+            onClick={() => {
+              // Keep the roving stop under the pointer too, so a click
+              // followed by an arrow continues from where the teacher is
+              // looking rather than from the last keyboard position.
+              setFocusIndex(index);
+              select(option.value);
+            }}
           >
             {option.icon && (
               <span className={styles.optionIcon} aria-hidden="true">

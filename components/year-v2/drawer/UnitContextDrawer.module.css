@@ -4,6 +4,13 @@
  * inherit down into the drawer slot (see that file's header). Tokens only — no
  * hex literals, no px font sizes outside the token scale.
  *
+ * NO COLOUR FALLBACKS EITHER. --ink-500 and --ink are declared in :root by
+ * app/tokens.css and re-declared for dark tone, so a `var(--x, #hex)` fallback
+ * is unreachable — and each one here was a latent tone bug waiting for the day
+ * it wasn't: #6e6c82 was not --ink-500's value (#57566b) in either tone, and
+ * #1c1b2e is --ink's LIGHT value, i.e. near-black text had the dark-tone
+ * fallback ever fired on a dark panel.
+ *
  * Every button rule is DOUBLED (.foo.foo, 0-2-0). app/tokens.css carries a
  * `.cp-root button` reset at (0,1,1) that strips padding/border/background, and
  * this subtree portals into .cp-root. A single-class rule here would be silently
@@ -40,7 +47,7 @@
   padding: 12px 10px;
   font-size: var(--t-13, 13px);
   font-weight: 700;
-  color: var(--ink-500, #6e6c82);
+  color: var(--ink-500);
   cursor: pointer;
   white-space: nowrap;
   border-bottom: 2.5px solid transparent;
@@ -50,10 +57,10 @@
     border-color 0.14s;
 }
 .pane.pane:hover {
-  color: var(--cd, var(--ink, #1c1b2e));
+  color: var(--cd, var(--ink));
 }
 .paneOn.paneOn {
-  color: var(--cd, var(--ink, #1c1b2e));
+  color: var(--cd, var(--ink));
   border-bottom-color: var(--c);
 }
 .pane.pane:focus-visible {
@@ -74,7 +81,7 @@
   place-items: center;
   padding: 6px;
   border-radius: var(--r-full, 999px);
-  color: var(--ink-500, #6e6c82);
+  color: var(--ink-500);
   cursor: pointer;
   transition:
     background 0.14s,
@@ -82,7 +89,7 @@
 }
 .close.close:hover {
   background: var(--ue-tint-hover);
-  color: var(--cd, var(--ink, #1c1b2e));
+  color: var(--cd, var(--ink));
 }
 .close.close:focus-visible {
   outline: 2px solid var(--ue-accent-border);
