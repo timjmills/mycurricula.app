@@ -158,6 +158,34 @@ describe("lesson focus (B5.7)", () => {
   });
 });
 
+describe("target lifetime vs host lifetime", () => {
+  it("the target SURVIVES the last host releasing", () => {
+    // Deliberate, and the reason clearing lives in the provider instead: hosts
+    // are transiently absent during a re-election — the holder unmounts before
+    // the survivor claims — so tying the target to host presence would close the
+    // workspace on an ordinary re-render. `UnitWorkspaceProvider`'s unmount
+    // effect is what clears it, which is also what stops a target outliving the
+    // planner route group and re-opening the dialog unbidden on return.
+    openUnitWorkspace("math", "u-m3");
+    const id = nextUnitWorkspaceHostId();
+    claimUnitWorkspaceHost(id);
+    releaseUnitWorkspaceHost(id);
+    expect(isUnitWorkspaceHostRenderer(id)).toBe(false);
+    expect(getUnitWorkspaceTarget()).toEqual({
+      subjectId: "math",
+      unit: "u-m3",
+    });
+  });
+
+  it("closeUnitWorkspace leaves nothing behind for a later mount to read", () => {
+    openUnitWorkspace("math", "u-m3", "m-12-0");
+    closeUnitWorkspace();
+    // Not just falsy — strictly null, because `useUnitWorkspaceTarget()` reads
+    // this value in a mount effect and renders whatever it finds.
+    expect(getUnitWorkspaceTarget()).toBeNull();
+  });
+});
+
 describe("single-renderer election", () => {
   it("hands out unique ids", () => {
     const a = nextUnitWorkspaceHostId();

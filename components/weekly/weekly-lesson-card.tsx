@@ -1541,26 +1541,36 @@ export function WeeklyLessonCard({
                     );
                   })}
 
-                  {/* Footer affordances — "+ Add section" / "+ Add resource" / "Edit Template".
-                      POLISH-010/CARD-001: "Add resource" is a persistent keyboard-
-                      accessible button so teachers can attach a resource without a
-                      mouse hover. It appends a link resource to the first section
-                      (the canonical resource container) via addSectionResource — the
-                      same action the right-rail and daily detail use (BUG-006). */}
+                  {/* Footer affordances — "+ Add resource" and the editor
+                      hand-off. POLISH-010/CARD-001: "Add resource" is a
+                      persistent keyboard-accessible button so teachers can
+                      attach a resource without a mouse hover. It appends a link
+                      resource to the first section (the canonical resource
+                      container) via addSectionResource — the same action the
+                      right-rail and daily detail use (BUG-006).
+
+                      ⚠⚠ TWO BUTTONS WERE REMOVED HERE, AND THE REASON IS A TRAP
+                      FOR WHOEVER IMPLEMENTS THESE ACTIONS NEXT. "Add section"
+                      emitted `onContextAction("add-to-todo")` and "Edit
+                      Template" emitted `onContextAction("print")` — labels and
+                      payloads that have nothing to do with each other. Both were
+                      inert only because no host currently branches on either
+                      action, so the cost was a no-op click.
+
+                      That changes the moment someone wires them up. `print` is
+                      on the cheapest-to-restore list, and implementing it would
+                      have made a button labelled "Edit Template" start printing
+                      — a bug that surfaces months later as "printing is broken
+                      in a bizarre way", with no reason for its author to have
+                      looked at this file.
+
+                      SO: if you are here to implement `print` or `add-to-todo`,
+                      RE-POINT these callsites FIRST — restore each button with
+                      the action its label actually names — and only then wire
+                      the host branch. Never the other way round. Per the
+                      standing ruling on controls that do not do what they say:
+                      hide until they work. */}
                   <div className={styles.expandedFooter}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leadingIcon={<Icon name="plus" size={11} />}
-                      className={styles.footerBtn}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onContextAction?.("add-to-todo", lesson.id);
-                      }}
-                      tooltip="Add a new section to this lesson's flow — useful when your standard template needs an extra step for this topic"
-                    >
-                      Add section
-                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1581,18 +1591,6 @@ export function WeeklyLessonCard({
                       tooltip="Attach a link, file, or video to this lesson — drops into the first section"
                     >
                       Add resource
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={styles.footerBtn}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onContextAction?.("print", lesson.id);
-                      }}
-                      tooltip="Edit the underlying lesson template — sections, default headers, and section colors"
-                    >
-                      Edit Template
                     </Button>
                     {/* W3.8 — week-expand host seam: hand off to the full
                         lesson editor (B5.7: the unit workspace's Lesson

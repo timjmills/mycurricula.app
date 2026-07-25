@@ -37,7 +37,11 @@
 // land in, and it deliberately sets no color, so a frame recolour only needs
 // (0,3,0) to beat `.btn.ghost` rather than having to out-stack this base too.
 
-import type { MouseEvent, ReactNode } from "react";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent,
+  ReactNode,
+} from "react";
 import { Button, Tooltip } from "@/components/ui";
 import { usePlanner } from "@/lib/planner-store";
 import { unitDisplayName } from "@/lib/unit-name";
@@ -90,6 +94,16 @@ export function UnitChip({
           // resources rail) — two unrelated things from one click.
           e.stopPropagation();
           openUnitWorkspace(subjectId, unit);
+        }}
+        onKeyDown={(e: ReactKeyboardEvent<HTMLButtonElement>) => {
+          // The keyboard twin of the click stop above, and it is load-bearing
+          // at the ListRow callsite: that row is a `div[role="button"]` with an
+          // Enter/Space handler, so without this the key that opens the unit
+          // ALSO navigates the row — and the row `preventDefault()`s Space,
+          // which is how a button natively activates, so Space would open
+          // nothing at all. Only the two activation keys are stopped; Tab,
+          // arrows and Escape still belong to whatever is around us.
+          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
         onDoubleClick={(e: MouseEvent<HTMLButtonElement>) => {
           // Belt and braces, and deliberately NOT load-bearing today: every

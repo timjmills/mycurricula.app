@@ -2,19 +2,36 @@
 
 // save-target-dialog.tsx — pop-up that asks a teacher where to save lesson edits.
 //
-// Shown whenever a teacher finishes editing a lesson card and the app needs to
-// know whether the change goes to their own Personal Curriculum (a personal
-// fork of the team plan, visible only to them) or to the shared Team
-// Curriculum (the plan every team member sees). Internal "core" / "master"
-// values are retained in code/IDs (Unified Audit Section 0 Decision #2).
+// Shown whenever a teacher finishes editing a lesson card. It confirms that the
+// change lands in their own Personal Curriculum — a personal fork of the team
+// plan, visible only to them. Internal "core" / "master" values are retained in
+// code/IDs (Unified Audit Section 0 Decision #2).
+//
+// ⚠ THE TEAM CURRICULUM CHOICE WAS REMOVED, AND MUST NOT COME BACK UNTIL THE
+// WRITE EXISTS. It was a live, reachable, false-success control: the button read
+// "Team Curriculum — Updates the shared plan for the whole team" with a "Shared"
+// badge, and the store's reducer is `case "setSaveTarget": if (action.target !==
+// "personal") return doc;` (lib/planner-store.tsx) — "core" returned the
+// document unchanged. Choosing Team was indistinguishable from choosing
+// Personal, with no error, no toast, and no visual difference, while the UI said
+// the whole team would see it. There was no editMode gate either; it fired in
+// Personal mode too.
+//
+// The user has ruled on this family of defect once already — "hide it until it
+// works" — and commit 6324fe8 deleted the equivalent "Push to Team" button for
+// exactly this reason. This was the same hazard on a fourth surface (see
+// docs/7.23.26-unified-v2-plan.md §5.2). The real master write is Phase 2
+// forking semantics and is deliberately NOT built here.
+//
+// `onChoose` still carries the `"personal" | "core"` union so the seam is intact
+// for that wave; nothing in this file can emit "core" today.
 //
 // Anatomy (top to bottom):
 //   • Dim backdrop — full-viewport overlay; click closes.
 //   • Modal panel (centered):
 //       Heading "Save your changes" + lesson title line
-//       Two choice cards, side-by-side on wider viewports:
-//         [Personal Curriculum]  [Team Curriculum  ← weighted warning]
-//       Each card: icon · title · sub-line description.
+//       One choice card: [Personal Curriculum]
+//       The card: icon · title · sub-line description.
 //
 // Accessibility contract:
 //   • role="dialog" + aria-modal="true" + aria-labelledby the heading.
@@ -143,7 +160,6 @@ export function SaveTargetDialog({
   // ── Choice handlers ───────────────────────────────────────────────────────
 
   const choosePersonal = useCallback(() => onChoose("personal"), [onChoose]);
-  const chooseCore = useCallback(() => onChoose("core"), [onChoose]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -162,14 +178,14 @@ export function SaveTargetDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        title="Save destination dialog — choose whether this lesson edit lands in your personal copy or the team's shared curriculum"
+        title="Save confirmation — this lesson edit is kept in your personal copy, which only you can see"
         className={styles.panel}
         onKeyDown={handleKeyDown}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className={styles.header}>
           <Tooltip
-            content="Save destination dialog — choose whether this lesson edit lands in your personal copy or the team's shared curriculum."
+            content="Save confirmation — this lesson edit is kept in your personal copy, which only you can see."
             side="bottom"
           >
             <h2 id={headingId} className={styles.heading} tabIndex={0}>
@@ -183,7 +199,7 @@ export function SaveTargetDialog({
         </div>
 
         {/* ── Prompt text ─────────────────────────────────────────────────── */}
-        <p className={styles.prompt}>Where should these edits be saved?</p>
+        <p className={styles.prompt}>These edits stay in your own copy.</p>
 
         {/* ── Choice cards ────────────────────────────────────────────────── */}
         <div
@@ -219,53 +235,31 @@ export function SaveTargetDialog({
             </button>
           </Tooltip>
 
-          {/* ── Team Curriculum ─────────────────────────────────────────── */}
-          {/* Visual weight: uses --core-mode token family (soft red/pink) to
-              signal that this is the weightier, team-wide action. Not alarming —
-              the tokens.css comment says "carries the shared plan warning without
-              feeling like an emergency" — but clearly distinct from Personal. */}
-          <Tooltip
-            content="Save into the Team Curriculum — every teacher in your grade sees this change on their planner. Choose this for shared curriculum decisions."
-            side="top"
-          >
-            <button
-              type="button"
-              className={`${styles.choiceBtn} ${styles.choiceBtnCore}`}
-              onClick={chooseCore}
-              aria-label="Save to Team Curriculum — updates the shared plan for the whole team."
-              title="Save into the Team Curriculum — every teacher in your grade sees this change on their planner"
-            >
-              {/* Icon — stacked-pages / team plan symbol */}
-              <span className={styles.choiceIcon} aria-hidden="true">
-                <CoreIcon />
-              </span>
-              <span className={styles.choiceText}>
-                <span className={styles.choiceTitle}>Team Curriculum</span>
-                <span className={styles.choiceSub}>
-                  Updates the shared plan for the whole team.
-                </span>
-              </span>
-              {/* Subtle "shared" badge reinforces the weight of this choice */}
-              <span className={styles.coreBadge} aria-hidden="true">
-                Shared
-              </span>
-            </button>
-          </Tooltip>
         </div>
 
-        {/* ── Dismiss link ────────────────────────────────────────────────── */}
-        {/* Keyboard users can reach Cancel via Tab; it is the last focusable
-            element so the trap boundary is clearly defined. */}
+        {/* ── Dismiss ─────────────────────────────────────────────────────── */}
+        {/* Keyboard users reach this via Tab; it is the last focusable element
+            so the trap boundary is clearly defined.
+
+            IT SAYS "Close", NOT "Cancel", AND THAT IS THE POINT. `onClose` is
+            not a discard: the host treats dismissal as the Personal save
+            (weekly-lesson-card's `onClose` calls `onSaveTarget(id,
+            "personal")`), and `editLesson` had already persisted the edit
+            before this dialog opened. So there was never anything to cancel —
+            the old "Cancel — dismiss without saving" label promised a discard
+            no code path performs, which is the same false-label defect as the
+            Team option removed above, one control away from it. Nothing here
+            may be relabelled back to Cancel until an actual revert exists. */}
         <div className={styles.footer}>
           <Button
             variant="ghost"
             size="sm"
             className={styles.cancelBtn}
             onClick={onClose}
-            aria-label="Cancel — dismiss without saving"
-            tooltip="Close this dialog without saving — your edits stay in the editor so you can come back to them"
+            aria-label="Close — your edits are already saved to your personal copy"
+            tooltip="Close this message. Your edits are already saved in your personal copy of the lesson."
           >
-            Cancel
+            Close
           </Button>
         </div>
       </div>
@@ -294,29 +288,6 @@ function PersonalIcon() {
       <circle cx="12" cy="8" r="4" />
       {/* Shoulders */}
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-    </svg>
-  );
-}
-
-function CoreIcon() {
-  return (
-    <svg
-      width={28}
-      height={28}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {/* Stack of pages suggesting the shared master plan */}
-      <rect x="4" y="6" width="14" height="14" rx="2" />
-      <path d="M7 6V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v12" />
-      {/* Horizontal lines inside the page to suggest content */}
-      <line x1="7" y1="11" x2="15" y2="11" />
-      <line x1="7" y1="14" x2="13" y2="14" />
     </svg>
   );
 }

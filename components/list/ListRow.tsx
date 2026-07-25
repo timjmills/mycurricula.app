@@ -9,7 +9,24 @@
 //
 // ── Layout (left→right) ────────────────────────────────────────────────
 //   [subject monogram tile] [time / weekday chip] [title + preview]
-//   [CCSS chip] [resource count] [completion checkbox]
+//   [unit chip] [CCSS chip] [resource count] [completion checkbox]
+//
+// ── Unit chip (B5.7) ───────────────────────────────────────────────────
+//   This row was the last dead end to the unit workspace, and it is the
+//   one every phone and tablet lands on: /weekly picks <WeeklyList> for
+//   ANY frame at ≤900px (WeeklyShell's `showList = isNarrow || …`, decided
+//   BEFORE the frame branch), and again at any width the moment a teacher
+//   picks the List toggle. /daily's List mode has the same shape. So the
+//   Day and Week frames' chips covered desktop-Grid only, and two of the
+//   three §4 viewport tiers could not reach the Unit Plan, Assessments,
+//   Insights or Prep at all. One chip here closes phone, tablet and List
+//   on both routes.
+//
+//   It is unconditional rather than opt-in (WeeklyLessonCard's
+//   `showUnitChip` pattern) because there is no double-chip hazard: no
+//   ListRow host renders a unit affordance of its own. The chip guards
+//   itself — it renders nothing when the lesson's unit is missing, empty,
+//   or unresolvable — so an unfiled lesson simply keeps the row it had.
 //
 // ── Modified / moved visuals ───────────────────────────────────────────
 //   modified === true  → 4px DASHED left edge in the subject's deep color
@@ -38,6 +55,7 @@ import type { Lesson } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import { useTheme } from "@/lib/theme";
 import { Tooltip } from "@/components/ui";
+import { UnitChip } from "@/components/unit-chip";
 import styles from "./ListRow.module.css";
 
 // ── Em-dash title split ───────────────────────────────────────────────────────
@@ -249,6 +267,14 @@ export function ListRow({
   }
 
   function handleRowKeyDown(e: React.KeyboardEvent): void {
+    // Only the ROW's own activation. Enter / Space arriving from a nested
+    // control belongs to that control — and this handler was swallowing it:
+    // it `preventDefault()`s Space, which is exactly how a native <button>
+    // fires, so Space on the completion checkbox toggled nothing and navigated
+    // to the Daily view instead, and Enter did both at once. That predates the
+    // unit chip (the checkbox has always been a nested <button>); the chip
+    // would simply have been the second control it broke.
+    if (e.target !== e.currentTarget) return;
     if ((e.key === "Enter" || e.key === " ") && onClick) {
       e.preventDefault();
       onClick();
@@ -308,6 +334,18 @@ export function ListRow({
             <span className={styles.preview}>{lesson.preview}</span>
           )}
         </span>
+
+        {/* Unit chip — the row's route to the unit workspace. A real
+          <button> inside the ARIA-button row, exactly like the completion
+          checkbox below, which is why the row is a div+role="button" in
+          the first place (see the accessibility note in the header). The
+          chip stops its own propagation, so opening a unit never also
+          navigates the row to the Daily view. */}
+        <UnitChip
+          subjectId={lesson.subject}
+          unit={lesson.unit}
+          className={styles.unitChip}
+        />
 
         {/* CCSS chip — count of standards attached */}
         {lesson.standards.length > 0 && (

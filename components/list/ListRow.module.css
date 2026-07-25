@@ -221,6 +221,25 @@
   font-family: var(--font-mono);
 }
 
+/* ── Unit chip (B5.7) ────────────────────────────────────────────────────
+   FIT ONLY — color stays with `.btn.ghost` and UnitChip's own base, exactly
+   as the Day/Week frame recolours leave it.
+
+   QUADRUPLED, and that is not superstition: UnitChip's own base is
+   `.chip.chip.chip` (0,3,0) — tripled there because `.btn.sm` lives in a
+   different stylesheet and a tie would let module extraction order decide.
+   This rule sets `max-width`, which that base also sets, so it has to
+   out-specify it rather than tie. (`.cp-root button` at (0,1,1) is a long way
+   below either.)
+
+   The cap keeps a long unit name from crowding the title in a dense row; the
+   chip's own `.name` ellipsizes inside it. `flex: 0 1 auto` lets it give way
+   before the title does. */
+.unitChip.unitChip.unitChip.unitChip {
+  flex: 0 1 auto;
+  max-width: 28%;
+}
+
 /* ── Resource count ──────────────────────────────────────────────────── */
 
 .resourceCount {

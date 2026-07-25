@@ -29,7 +29,8 @@
 // switches to), so this provider must sit INSIDE all of them —
 // app/(planner)/layout.tsx mounts it innermost, inside ComposerProvider.
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import type { SubjectId } from "@/lib/types";
 import { UnitExplorer } from "../UnitExplorer";
 import {
@@ -81,6 +82,40 @@ export function UnitWorkspaceProvider({
   // but `children` is the same element object every time, so React bails out of
   // re-rendering the app below it.
   const target = useUnitWorkspaceTarget();
+  const pathname = usePathname();
+
+  // ── The open target must not outlive the provider ────────────────────────
+  // `target` is MODULE-level, so without this it survives unmount. Leaving the
+  // planner route group — /settings/*, /teach and the auth routes have their own
+  // layouts — tears this provider down and the dialog vanishes with it, but the
+  // target stays set; coming back to a planner route re-runs
+  // `useUnitWorkspaceTarget()`'s mount effect, reads the still-live value, and
+  // pops the workspace open unbidden on a unit the teacher had already left.
+  // Armed for the rest of the session. The provider owns the workspace's
+  // lifetime, so the provider clears it.
+  //
+  // Deliberately NOT done in `releaseUnitWorkspaceHost`: hosts are transiently
+  // absent during a re-election (the holder unmounts before the survivor
+  // claims), and clearing there would close the workspace on a re-render.
+  useEffect(() => closeUnitWorkspace, []);
+
+  // ── A route change closes it ─────────────────────────────────────────────
+  // Nothing pushes history for the overlay, so Back — the reflex for dismissing
+  // an overlay, and the ONLY one on Android — navigates the route underneath an
+  // open dialog and leaves it floating over a page it has nothing to do with.
+  // Closing on any pathname change makes Back behave: the route moves and the
+  // dialog goes with it. A history entry per open was the alternative and is
+  // worse — it puts a phantom Back step in every desktop teacher's way and
+  // fights the router's own stack.
+  //
+  // Skips the first run so mounting on a planner route never closes a workspace
+  // opened during that same commit.
+  const lastPathRef = useRef(pathname);
+  useEffect(() => {
+    if (lastPathRef.current === pathname) return;
+    lastPathRef.current = pathname;
+    closeUnitWorkspace();
+  }, [pathname]);
 
   return (
     <UnitWorkspaceActionsContext.Provider value={ACTIONS}>
