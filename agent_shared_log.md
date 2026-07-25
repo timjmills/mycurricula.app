@@ -3532,3 +3532,56 @@ still have written team content.
    v2-flag-OFF production path AND the paper frame.
 4. Unit-standards editor still unbuilt (a locked USER DECISION) — so Insights' standards
    metric reports lesson-tag reach, not unit↔standards coverage.
+
+---
+
+## [Main/orchestrator 7.25 pt14] ✅ B5 in flight — host + /year landed; day/week pending
+
+**Shipped since pt13** (master `ee34749`, all pushed, tree green):
+- `6324fe8` **"Push to Team" REMOVED** — the button was a no-op (`setSaveTarget(id,"core")`
+  hits a reducer arm returning the doc unchanged) while its toast said the lesson "is marked
+  to push". Nothing was marked; the Phase-1B sync would have found nothing. USER chose hide-
+  over-reword. The team plan is still editable via the Personal|Team toggle, which works.
+- `4d173c9` **Kind chips had 36.6px of touch target.** `.kindRow`'s `overflow-x: auto`
+  computes `overflow-y` to `auto` too (CSS Overflow §3), so the 36px row clipped
+  ToggleGroup's transparent 44px `::before`. `padding-block: 4px` → 44.7px measured. NOTE:
+  the first two filings of this were WRONG (blamed the shared primitives; measured
+  `getBoundingClientRect`, which cannot see the overlay). Only a HIT TEST found the truth.
+- `8c11a83` **B5.1 global unit-workspace host** — module singleton + host election
+  (catchup-v2 precedent) + split ACTIONS/STATE contexts (ComposerProvider precedent).
+- `a121863` UnitDrawer deleted (1,424 lines, verified orphaned). `c3493e7` B5 plan corrected.
+- `ee34749` **B5.3 — /year through the host, and the PAPER frame finally has a path.**
+
+**THE ENVIRONMENT PRODUCED MORE FALSE FINDINGS THAN THE CODE DID.** Four, all now in memory:
+1. **FIVE `next dev` servers on one `.next`** → a false "SSR hang, 0 bytes, empty console" on
+   3 of 4 routes that nearly triggered a revert of an innocent commit. Real cause: compile
+   starvation (`/year` alone took 22.8s cold). **The production build is the arbiter — a real
+   cycle/deadlock FAILS `npm run build`.** [[one-dev-server-per-repo]]
+2. **Stale `.next/cache/eslint`** reported a JSX parse error in a file `tsc` parsed cleanly.
+   Use `npx next lint --no-cache` in this tree.
+3. **A contrast probe parsing `color(srgb 1 1 1 / 0.88)` floats as 0–255**, inflating every
+   ratio it reported. The error direction MANUFACTURES PASSES — treat a contrast probe as a
+   gate needing its own sanity check. [[contrast-probe-colour-parsing]]
+4. **Git Bash rewrote a leading `/planner`** into a Windows path, silently re-testing `/year`
+   three times and looking clean.
+
+**ORCHESTRATOR ERROR, on the record:** I overrode the /year lane's hover-reveal twice on
+reasoning ("permanent visibility costs noise, not layout"). False on the 95px timeline tier —
+a resting chip paints over the unit name MID-WORD on 20/20 cards ("Multiplic⤢tion") with no
+ellipsis to signal it. The lane held with measurements both times and was right; I only
+updated after looking at the screenshot myself. It also stopped me gating the exact state I
+had just rejected, because our messages crossed. **Lesson: when an agent brings measurements
+twice, look at the artifact before re-asserting.**
+
+**CARRIED FORWARD:**
+1. **§4c flag-ON preview gate** — B1.7 + B2 + B3 write paths ALL still unexercised against
+   real Supabase.
+2. **B5.4/B5.5 `/daily` + `/weekly` pop-in** — built (shared `components/unit-chip/` owning
+   `useUnitWorkspace`), NOT yet gated or committed.
+3. **QA's five-entry-point reachability sweep** — now a REAL test: with YearShell's local
+   mount retired, a surface wired to neither source shows ZERO dialogs, so the assertion is
+   "exactly one", not "at most one".
+4. **B5.7 "the focus-lesson path" is AMBIGUOUS** — no repo file uses the phrase. `LessonModal`
+   by shape, or the `/daily?lesson=` deep link (10 callsites, far larger). Needs a USER call.
+5. `TimelineYear` is NOT retireable (flag-OFF `/year` + paper frame + sole home of standards
+   coverage, year filters, lesson pane, subjects sidebar). `/subject` KEPT per USER.
