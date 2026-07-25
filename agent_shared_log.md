@@ -5446,3 +5446,115 @@ popovers), M3 (the "Not set" no-op), MEDIUM #7 (unit-vanished husk), MEDIUM #8, 
 Lows. One correction to M5: the "deleted vs not loaded" shape did **not** survive into the
 replacement — `LessonModal` is gone and `PlanPage`'s guard is a different one; `DayEditSplit`
 still has it and is another lane's.
+
+### Addendum — the year-step orphan (`69c4148`)
+
+The lead's map caught something my first trace under-reported, and it was the worst of the
+set: **the wizard's academic year was dropped on the SAME device**, not merely cross-device.
+
+Verified at HEAD before building. Three sibling hooks bridge the onboarding record to their
+live keys on first read — `lib/use-schedule-settings.ts:148` (rotation),
+`lib/use-subject-settings.ts:143` (subject roster), `lib/use-default-template.ts:34` (lesson
+template). `lib/use-academic-year.ts` had **zero** matches for `onboarding` or `seed`. So a
+teacher typed their school year into step 4 and Roadmap/Progression went on using the
+North-American heuristic default.
+
+`seedFromOnboarding()` now mirrors `seedRotationFromOnboarding`: consulted only when
+**neither** live key is set, and it persists what it adopts, so it is genuinely one-time.
+Both endpoints must parse — a half-filled step seeds nothing rather than pairing one real
+date with a heuristic guess, which would look deliberate but be invented. The two setters
+now share `persistPair()` with the seed so one place knows both keys are written together.
+
+**Correction to the scoping I was given:** the **courses step needs nothing**.
+`use-subject-settings.ts` already bridges `data.subjects[]`. Year was the only orphan.
+
+Also fixed in the same commit: `components/onboarding/steps/grade-step.tsx` — with nothing
+selected, `findIndex` returns `-1` and ArrowLeft computed `(-1 - 1 + 14) % 14 = 12`, silently
+selecting **and committing** grade "12" for a teacher who had chosen nothing. Both arrow
+directions now enter an unselected group at the first option. That file is the **v1** wizard
+(live only under `NEXT_PUBLIC_V2=0`), so it is the rollback path — the fix is by inspection;
+I did not flip the flag to see it, since that needs an env change and a server restart.
+
+**Live verification (the decisive one).** From a cleared state on :3099: typed
+`2026-09-06` → `2027-06-18` into the wizard's year step; the onboarding record took it and
+the live keys were still `null`. Navigated to Settings → Calendar: the inputs read
+`2026-09-06` / `2027-06-18` and the team keys persisted. Then set the team keys to a
+different span (`2026-08-10` / `2027-05-28`) and reloaded — the wizard record still said
+Sep 6 / Jun 18 and Settings **correctly kept the deliberate edit**. The one-time invariant
+holds in both directions. Console 0 errors.
+
+`tsc` clean for these files (the only tree error is `components/resource-wall-v2/Section.tsx:364`,
+another lane's) · `next lint` → `✔ No ESLint warnings or errors` · `npm run test` →
+`59 passed / 1224 passed`. Codex gate: **NO BLOCKING ISSUES** (first round).
+
+**Reported, not fixed** (as instructed): `lib/use-my-schedule.ts:8-15` is marked
+"NOT ADOPTED YET" and no planner surface calls it — `/schedule`, Weekly and Daily all read
+`getDayBlocks()` from the fixture directly. So personal time blocks are editable in Settings
+and read by nothing. Third "shipped but unreachable" case in this area.
+
+**Process note on my own two tree breaks.** I twice saved a shared type's definition and its
+callsites in separate steps, leaving `tsc` red for other lanes in between. Adopting the
+scratch-file discipline: the seam compiles before it enters the tree. Both of this commit's
+files are single-file changes with no shared types, so there was no intermediate red state.
+
+---
+
+## B5.7c — M3 + MEDIUM #7, and four Lows dismissed with evidence (build-b57-focuspop)
+
+Third commit from this lane, `08e6d81`.
+
+**M3 — "Not set" was a visible no-op with an invisible cost.** "Unclassified" is DERIVED
+(`kindChoice` reads it off "has text but no valid kind"), so on a lesson with no assessment the
+commit wrote `{kind: undefined}` — which is `{}` — and the control snapped back to "None". The
+teacher saw nothing. What happened underneath: `commit` is a store write, so on an unforked
+**Team** lesson it lazily forked a personal copy — dashed stripe, "Modified" pill, the whole
+three-tier signal — to record a change that never occurred. Now it writes nothing when there is
+nothing to keep. **Live-verified 7/7**: the Kind control starts on "None", selecting "Not set"
+leaves it on "None", and the modified count is unchanged (0 → 0).
+
+**MEDIUM #7 — a vanished UNIT now closes instead of painting a husk.** `UnitExplorer` guarded
+the vanished *subject* but not the unit, and `resolveUnitHeader` DEGRADES a missing unit rather
+than failing (`name: unit` — a raw UUID under Supabase). So an archived unit or a catalog swap
+left a modal with a UUID title, no span, no ordinal, zero lessons — and the B1.7 Unit Plan
+fields still editable, writing against a dead unit id. Reuses B5.7's `unitResolved` rather than
+inventing a second notion of "does this unit exist".
+
+**The scoping decision that matters here:** the guard keys on what is ON SCREEN
+(`mode === "lesson" && a lesson resolves`), NOT on `focusLessonId === undefined`. The obvious
+version would have closed the workspace on any lesson opened from the **rail**, the **Lessons
+tab** or a **drawer panel** — those set `planLessonId` locally and carry no `focusLessonId` —
+yanking the editor out from under a teacher mid-edit. Caught while writing it, not by a gate.
+
+**Honest gap, stated rather than papered over:** the MEDIUM #7 close itself is NOT
+live-verified. Firing it needs the unit catalog mutated under an open workspace and the page
+exposes no hook for that. It is unreachable from today's UI *by design* — `UnitChip` refuses to
+render for an unresolvable unit and every unit entry point resolves — which is precisely why it
+is a defensive guard for the archive / catalog-swap case rather than a path a probe can walk.
+Typechecked and reasoned, not clicked.
+
+**FOUR LOWS DISMISSED, with the evidence, because two of them are false positives.**
+1. **"`LessonWorkspace.tsx` passes `title` with neither `tooltipId` nor `required`, making
+   permanently undismissable tooltips (§4)" — WRONG on both cited sites.** `:136` is
+   `<section className={styles.section} title={tooltip}>` — a **native `title` attribute on a
+   panel root**, which CLAUDE.md §4 does not merely permit but REQUIRES: "Panels carry a
+   `title` attribute on their root so touch users get an explanation by holding the header." A
+   native browser tooltip is not the W2-B3 dismissible system and has no dismissal concept to
+   violate. The other Tooltip in the file, the Duration field at `:272`, **does** carry
+   `tooltipId="b2-lesson-duration"`, so it is dismissible already. The finding conflates the
+   native attribute with the primitive.
+2. **The two `PlanningTabs` Lows** (dragover commit with no restore; `role="tablist"` with
+   unroled `<div>` children) are in `components/daily/planning-tabs/`, the **daily** family —
+   not this lane. Unclaimed, still open.
+3. **`fork-diff-panel.module.css`'s 9.5px** is not this lane's file. Still open.
+4. **The stale "Push to Team" comments were already fixed in B5.7** and verified at HEAD:
+   `LessonWorkspace.tsx:18` and `PlanPage.tsx:22` both now say "stays in DayEditSplit", and
+   `PlanPage` carries no `LessonModal` reference at all.
+
+**Gates.** §4a Codex → **NO BLOCKING ISSUES** first pass. tsc clean on these paths; lint clean
+on these paths; full suite green (1224). §4b live 7/7.
+
+**Tree note, third occurrence today:** `components/resource-wall-v2/Section.tsx(364,14)` (TS2746)
+broke the shared client bundle again mid-run — `pageerror: "Unexpected end of input"`, every
+click a no-op, my first probe run 0/4. Retried after the lane recovered: 7/7 on identical code.
+**Check `npx tsc --noEmit` on the whole tree before believing a red live result during a
+multi-lane wave.** That is now three for three.
