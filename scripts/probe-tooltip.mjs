@@ -135,18 +135,35 @@ async function openWeekly(page) {
 // is 5–16s on a quiet server and several times that when agents share one.
 const BUDGET_MS = 120000;
 
+// Every step below can throw on a saturated server (a locator timing out, a
+// navigation landing mid-flight). An open attempt that cannot complete is a
+// "no" for this iteration, not a crash — the caller decides, once the whole
+// budget is spent, whether that is a real failure.
+const attempt = async (fn) => {
+  try {
+    await fn();
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /** Focus the trigger until the focus path actually opens a bubble. */
 async function openByFocus(page, sel) {
   const deadline = Date.now() + BUDGET_MS;
   while (Date.now() < deadline) {
-    await page.evaluate((s) => document.querySelector(s)?.focus(), sel);
-    await page.waitForTimeout(400);
+    await attempt(async () => {
+      await page.evaluate((s) => document.querySelector(s)?.focus(), sel);
+      await page.waitForTimeout(400);
+    });
     if ((await page.locator(TIP).count()) > 0) {
       await page.waitForTimeout(250); // placement raf + fade
       return true;
     }
-    await page.evaluate((s) => document.querySelector(s)?.blur(), sel);
-    await page.waitForTimeout(400);
+    await attempt(async () => {
+      await page.evaluate((s) => document.querySelector(s)?.blur(), sel);
+      await page.waitForTimeout(400);
+    });
   }
   return false;
 }
@@ -155,10 +172,12 @@ async function openByFocus(page, sel) {
 async function openByHover(page, sel) {
   const deadline = Date.now() + BUDGET_MS;
   while (Date.now() < deadline) {
-    await page.mouse.move(5, 500);
-    await page.waitForTimeout(150);
-    await page.hover(sel);
-    await page.waitForTimeout(900);
+    await attempt(async () => {
+      await page.mouse.move(5, 500);
+      await page.waitForTimeout(150);
+      await page.hover(sel, { timeout: 15000 });
+      await page.waitForTimeout(900);
+    });
     if ((await page.locator(TIP).count()) > 0) return true;
   }
   return false;
@@ -181,6 +200,16 @@ const elementAt = (page, x, y) =>
     },
     [x, y],
   );
+
+// Screenshots are evidence, not assertions: a slow font load must never take
+// down a run whose checks have already passed.
+const shot = async (page, name) => {
+  try {
+    await page.screenshot({ path: `${SHOTS}/${name}`, timeout: 15000 });
+  } catch {
+    console.log(`  (screenshot ${name} timed out — server slow, checks stand)`);
+  }
+};
 
 /** Computed pointer-events of the bubble, or null when none is painted. */
 const pointerEventsOf = (page) =>
@@ -273,7 +302,7 @@ await runSection("focus-open", async () => {
     "focus-open: a full click is delivered to the page, not the bubble",
     JSON.stringify(hits),
   );
-  await page.screenshot({ path: `${SHOTS}/focus-open-inert-1440.png` });
+  await shot(page, "focus-open-inert-1440.png");
 
   // ── PRE-FIX A/B: re-add the class the old code applied from props alone.
   await openByFocus(page, SEARCH);
@@ -330,7 +359,7 @@ await runSection("focus-open", async () => {
     "PRE-FIX repro: the underlying element is denied the click it just received",
     `underSig=${underSig} hits=${JSON.stringify(hits2)}`,
   );
-  await page.screenshot({ path: `${SHOTS}/prefix-repro-swallow-1440.png` });
+  await shot(page, "prefix-repro-swallow-1440.png");
   await ctx.close();
 });
 
@@ -459,7 +488,7 @@ await runSection("required", async () => {
     check(hasLink === 0, "required tooltip renders NO dismiss link");
     const pe = await pointerEventsOf(page);
     check(pe === "none", "required tooltip is inert", `pointer-events: ${pe}`);
-    await page.screenshot({ path: `${SHOTS}/required-team-tooltip-1440.png` });
+    await shot(page, "required-team-tooltip-1440.png");
   }
 
   // Control: a dismissible tooltip IS suppressed by the same global flag.
@@ -492,6 +521,18 @@ await runSection("touch", async () => {
     JSON.stringify(title),
   );
 
+  // GATE: "no bubble after the tap" is also what an UNHYDRATED page shows, so
+  // that branch would pass vacuously on a slow dev server. Prove the listeners
+  // are attached first by opening a bubble the deterministic way, then close it
+  // and run the real tap measurement.
+  const live = await openByFocus(page, SEARCH);
+  if (!live) {
+    await ctx.close();
+    throw new Unhydrated(`${SEARCH} never produced a bubble — cannot judge tap`);
+  }
+  await page.evaluate((s) => document.querySelector(s)?.blur(), SEARCH);
+  await page.waitForTimeout(300);
+
   // A tap focuses the button, which opens the bubble on the focus path.
   await page.tap(SEARCH).catch(() => {});
   await page.waitForTimeout(400);
@@ -508,9 +549,11 @@ await runSection("touch", async () => {
       `pointer-events: ${pe} display: ${disp}`,
     );
   } else {
-    check(true, "touch: no styled bubble painted on tap", "count=0");
+    // Hydration is proven above, so this is a real measurement: the tap did
+    // not open a styled bubble, which means nothing can swallow the next tap.
+    check(true, "touch: no styled bubble painted on tap (page proven live)");
   }
-  await page.screenshot({ path: `${SHOTS}/touch-393.png` });
+  await shot(page, "touch-393.png");
   await ctx.close();
 });
 
