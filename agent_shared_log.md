@@ -6308,3 +6308,390 @@ outage is over; the delta flagged above as owing a re-review has now had one.
 **Verification:** `npx tsc --noEmit` clean · `npx next lint --no-cache` →
 `✔ No ESLint warnings or errors` · `npm run test` → **61 files, 1273 passed,
 68 todo, 0 failed**.
+
+---
+
+## ResMenu on the lesson-editor resource row (fix-resmenu-row)
+
+**Landed as `a285ac3`, path-scoped, off `eb18b17`.**
+
+**The two problems really were one.** `SectionBlock.tsx` rendered every attached
+resource as a chip whose only affordance was `✕ Remove` — from the lesson editor
+a teacher could destroy a resource and do nothing else with it. `ResMenu.tsx` had
+shipped in B4.1 with `Open · Open in new tab · Copy link · Edit · Remove` and no
+caller. Wiring the second at the first fixes both, and **`ResMenu` was a good fit
+— not a forced one.** Nothing had to be bent to make it work; the only thing it
+lacked was a trigger.
+
+**Handoff citations, verified by reading the files, not taken from the brief:**
+- `source-planning-hub/ph-workspace.jsx:400` **and `:425`** — both render
+  `<button className="rmore" title="More — open, edit, remove">⋯` calling
+  `window.openResMenu({res,x,y,edit,remove})`, where `edit` opens the composer
+  with `edit:r` prefilled and an `onSave` that patches that row in place.
+- `README:96-98` — "Used by **workspace resource pills and the planbook chips**."
+- `grep -rl openResMenu` over the whole handoff returns exactly `README.md`,
+  `source-home/planbook-edit.jsx`, `source-planning-hub/ph-composer.jsx`,
+  `source-planning-hub/ph-workspace.jsx`. **The wall (`ph-more.jsx`) has none** —
+  so `/post` is correctly not a callsite.
+
+**What was built.** A new `<ResMenuTrigger>` (`components/composer/`) owning the
+two things every callsite would otherwise re-derive: the **anchor convention**
+(`anchor.x` is the menu's RIGHT edge — the mock's raw `clientX/clientY` anchors
+on the cursor, and on `(0,0)` for a keyboard-activated click) and the
+**empty-menu guard** `hasResMenuActions` (a resource with no isSafeUrl-passing
+url and no callbacks would otherwise open a popover containing nothing; the
+button now does not render at all). It is a separate module deliberately: putting
+it in `ResMenu.tsx` would have created a
+`ResMenu → ComposerProvider → ComposerHost → ResMenu` cycle, which is the /teach
+dev-only TDZ failure this repo has already paid for once.
+
+Edit opens the shared composer **prefilled** through `editResource`, the same
+shape `lesson-flow.tsx`'s note editor uses, so it patches the row rather than
+adding a second one. Every url goes through the one shipped sink
+(`isSafeUrl` via `resMenuOpenUrl`) — **no second guard was introduced.** Remove
+moved inside the menu behind a separator, keeping its `required: true` tooltip.
+
+**The B4.2 engine is still byte-untouched** — `ComposerHost.tsx`,
+`ComposerProvider.tsx` and `composer-state.ts` are not in the diff.
+
+**Two §4a findings from Codex, both legitimate, both fixed:**
+1. **The ⋯ could not dismiss its own menu.** The trigger is exempt from the
+   menu's outside-click close, so without a toggle it was the single click that
+   could not close it. Fixed by making **ResMenu own `aria-expanded` on its
+   trigger** — it is the only thing that can observe every close path (Esc, Tab,
+   outside-click, scroll, resize, item select), and keying the effect on
+   `triggerEl` means handing the menu to a different trigger clears the old
+   one's flag in the same pass. That fixed the toggle **and** closed the
+   a11y gap in one move.
+2. **44px was behind `pointer: coarse`**, which a touchscreen laptop
+   (`pointer: fine` + `any-pointer: coarse`) does not match. Widened to
+   `any-pointer`. Note for the any-pointer lane (#23): the neighbouring
+   `.chipRemove` rules in `lesson-editor.module.css` are still on the narrow
+   form **and still 32px, not 44** — left alone, that file is yours.
+
+Round 3: **`NO BLOCKING ISSUES`.**
+
+**§4b caught a third real defect that code review could not.** The ⋯ was
+quietened with `opacity: 0.7` — which fades the **glyph**, so the painted colour
+is not the colour token. Canvas-resolved from painted sRGB it was **2.64:1**
+against its chip, under the 3:1 bar for a non-text control. Quiet now comes from
+size and from carrying no fill at rest: **4.41:1 light tone, 5.09:1 dark**. The
+first version of that measurement was itself wrong — it force-set
+`data-tone="light"` unconditionally and measured the same tone twice while
+labelling one of them "dark"; it now flips relative to what actually loaded and
+**asserts the flip took** before trusting the second number.
+
+**Verification, verbatim.** `npx tsc --noEmit` clean · `npx next lint --no-cache`
+→ `✔ No ESLint warnings or errors` · `tests/composer-foundation.test.ts` 14/14.
+`scripts/probe-resmenu-row.mjs` (real Chrome, `channel: "chrome"`), **34
+assertions ALL PASS** at 1440 / 834-touch / 768 / 375 — exactly one portaled
+menu, second click toggles shut, Escape closes the menu and leaves all 5 sections
+mounted, focus returns to the trigger, ArrowDown roves without committing, Edit
+opens the composer prefilled with "Fraction Basics", Remove 7→6 chips, console
+clean, no document h-scroll at any width.
+
+**Everything asserted was mutation-checked.** The new predicate tests: making
+`hasResMenuActions` always-true turns 2 red, dropping its url term turns 1 red.
+The probe: reverting the toggle fix turns exactly the 2 toggle assertions red.
+And the 44px check is guarded by its own opposite — a desktop assertion that the
+trigger is **19×16**, so "≥44px on touch" cannot pass with the media query
+deleted.
+
+**Two things I did NOT do, and why.**
+1. **The 9.5px item is not in `components/lesson-editor/`.** The only
+   `fork-diff-panel.module.css` in the repo is
+   `components/lesson-card/fork-diff/fork-diff-panel.module.css` — a different
+   family, so the brief's "it's yours anyway" premise doesn't hold. Untouched,
+   and it already has an owner: **task #28**.
+2. **`lib/use-body-scroll-lock.ts` is untracked while tracked files import it**
+   (Codex flagged it High). That is the scroll-lock lane's (#16), not mine —
+   staging it would have swept another lane's in-flight work into my commit. The
+   risk is real for whoever commits `app/settings/layout.tsx`: **a clean CI
+   checkout fails module resolution unless that file lands with it.**
+
+**Cross-lane notes.** 11 test failures at commit time were
+`tests/body-scroll-lock.test.ts` — an untracked file from lane #16 whose
+adoption test landed before its component migrations. Verified not mine before
+reacting (none of my files touch `body.style.overflow`). Separately,
+`scripts/probe-any-pointer.mjs` appeared **staged** in the shared index without
+my having added it; I left the sibling's index entry alone and committed with
+explicit paths, so it stayed staged and uncommitted.
+
+
+---
+
+## Shared body-scroll lock (fix-scroll-lock)
+
+**Landed: `c60d740`** — 12 files, path-scoped commit, master. Task #16.
+
+**Cross-lane, resolved.** A sibling lane logged (correctly) that
+`lib/use-body-scroll-lock.ts` was untracked while tracked files imported it, and
+that `tests/body-scroll-lock.test.ts` was failing 11 assertions mid-flight. Both
+were this lane's work in progress. `c60d740` lands the hook, the test and all
+nine migrations **in one commit**, so the clean-checkout module-resolution risk
+is closed. `scripts/probe-any-pointer.mjs` was staged in the shared index by
+another lane; I left it alone and committed with explicit paths — it is still
+staged and uncommitted.
+
+### The verified implementer list — 9, not the 9 in the brief
+
+The brief's list came from a code trace; four of its entries were wrong and four
+real implementers were missing. Verified by grep at HEAD `eb18b17`:
+
+| Implementer | In brief? |
+| --- | --- |
+| `app/settings/layout.tsx` | yes |
+| `components/catchup-v2/CatchUpModal.tsx` | yes |
+| `components/resource-wall-v2/Lightbox.tsx` | yes |
+| `components/schedule/SchedulePanel.tsx` | yes |
+| `components/year-v2/ExplorerShell.tsx` | yes |
+| `components/resource-wall-v2/WallLibrary.tsx` | **no — found** |
+| `components/weekly/WeeklyRailDrawer.tsx` | **no — found** |
+| `components/standards/StandardsTaggingPicker.tsx` | **no — found** |
+| `components/year/AddUnitDialog.tsx` | **no — found** |
+
+Corrections to the brief: **`LessonModal` is gone** (retired in `d19169b`).
+**`ResourceComposer`, `NotecardFullscreen` and `command-palette` never locked
+body scroll at all** — no `overflow` write in any of the three.
+
+### What the hook covers
+
+`document.body.style.overflow`, and nothing else — because that is the whole of
+what all nine did. I checked each for the things the brief warned about: **none**
+compensated for scrollbar width with `paddingRight`, **none** used the iOS
+`position: fixed` trick, **none** touched `overscroll-behavior`. So adoption is
+behaviour-preserving and **no callsite was left alone**.
+
+First acquire captures + locks; further acquires only bump the count; the last
+release restores the first acquire's value. Releases are idempotent per caller
+(dev StrictMode double-invoke). `acquire()` is a no-op under SSR. Exported as a
+factory (`createBodyScrollLock`) so tests drive the real logic with no global
+reset backdoor.
+
+**Bonus fix:** `WallLibrary`'s lock lived inside an effect keyed on
+`[menuId, bgForId, confirmId, onClose]`, so it tore down and **re-captured**
+`overflow` on every menu/popover/confirm toggle — re-reading a value another
+overlay may have set in between. Now mount-scoped.
+
+### Reproduction evidence — read this honestly
+
+**Seen, deterministically:** `tests/body-scroll-lock.test.ts` runs the exact
+four-line pattern the nine files used and watches it strand:
+`closeA()` → `overflow === ""` while B is still open; `closeB()` →
+`overflow === "hidden"` with nothing open. The shared lock survives the same
+sequence. **Mutation-tested both ways:**
+
+- Break capture-once (`if (depth === 0)` → always capture): **exactly 5**
+  refcount tests go red; the defect-characterisation and adoption tests stay
+  green (they don't depend on hook internals). Restored → 27/27.
+- Revert one callsite to the inline pattern: **exactly 2** adoption tests go red
+  (the named file + the "no OTHER app file" sweep). Restored → 27/27.
+
+**NOT seen live, and I want this on the record.** I spent a long stretch trying
+to compose two *locking* overlays in the running app and could not, on the
+surfaces I could drive. What I found:
+
+- `SchedulePanel` has no rail trigger on `/weekly` under v2 (GlobalRail is
+  retired there); "Schedule" on `/weekly` is the **view-mode** toggle.
+- The Catch-Up dock wiring is **inert** — the Tools popover renders no items and
+  a raw `catchup:toggle` dispatch does nothing, so the one app-wide independent
+  modal cannot be opened.
+- `/daily` and `/year` hit the onboarding wizard for this account.
+- The workspace's Standards tab is **unit-level**; the lesson-level picker sits
+  behind a focused lesson-flow section.
+- `ResourcePreview` ("Enlarge") does not lock, so it is not a pair.
+
+So `scripts/probe-scroll-lock.mjs` is a **regression gate, not a reproduction** —
+its `EXPECT=bug` mode exists but its drivable steps do not discriminate old from
+new code, because the single-overlay path was always correct. Do not read a
+passing run as proof the collision was reproduced in a browser.
+
+**What this implies about severity, measured not assumed:** the app shell is
+viewport-pinned and scrolls `#main-content`, not the document —
+`scrollHeight === clientHeight` on `/weekly`, `/daily`, `/year`, `/planner`,
+`/post`, `/settings/appearance` at both 375 and 1280, with and without an
+overlay open. A stranded `body{overflow:hidden}` is therefore **inert today**:
+no teacher-visible stuck scroll. The state corruption is real, the fix is
+correct, and it is one document-scrolling surface away from being the visible
+bug that `HubDocHost.tsx` and `workspace-host/workspace-state.ts` already warn
+about in comments — but it is not a live P1 right now.
+
+### Verification (verbatim)
+
+```
+npx tsc --noEmit        → tsc OK (exit 0, no output)
+npx next lint --no-cache→ ✔ No ESLint warnings or errors
+npm run test            → Test Files 63 passed (63)
+                          Tests 1324 passed | 68 todo (1392)
+codex exec --sandbox read-only (diff piped in)
+                        → NO BLOCKING ISSUES
+```
+
+Codex's first pass returned one legitimate **Medium** — the probe wrote to
+`docs/screenshots/scroll-lock/`, which git cannot preserve as an empty dir, so a
+clean checkout would `ENOENT` *after* the assertions and fail the gate for an
+unrelated reason. Fixed with `mkdirSync(..., { recursive: true })`; re-run
+returned `NO BLOCKING ISSUES`.
+
+Live gate, `node scripts/probe-scroll-lock.mjs` (dev :3099, 1280×800):
+
+```
+  ok   baseline: nothing open → no lock — overflow=""
+  ok   cycle 1: workspace open → locked — overflow="hidden"
+  ok   cycle 1: workspace closed → released — overflow=""
+  ok   cycle 2: workspace open → locked — overflow="hidden"
+  ok   cycle 2: workspace closed → released — overflow=""
+  ok   cycle 3: workspace open → locked — overflow="hidden"
+  ok   cycle 3: workspace closed → released — overflow=""
+  ..   nested overlay not reachable from this surface — step 2 skipped
+  ok   settings popup mounted → locked — overflow="hidden"
+  ok   left settings → released — overflow=""
+  ok   no unexpected console errors
+PROBE PASS — 10/10 (EXPECT=fixed)
+```
+
+Three open/close cycles rather than one: a refcount that leaked by one per open
+would still look correct on the first cycle and strand on a later one.
+
+### Follow-ups for whoever owns them
+
+1. **The Catch-Up dock toggle is dead** on `/weekly` — Tools popover renders no
+   items, `catchup:toggle` has no listener. `CatchUpModalHost` is mounted by
+   `ChromeShell`, so either the election or the popover contents regressed. Not
+   my lane; it is a real user-facing gap and it is why the app-wide modal could
+   not be used for the repro.
+2. `HubDocHost.tsx:37-49` still describes the atomic-arbitration gap it deferred
+   to "the wider refcounted body-scroll-lock work". The **scroll-lock** half is
+   now done, so that comment overstates what remains; the reservation/
+   `useSyncExternalStore` work in `workspace-state.ts` is still open.
+
+---
+
+## any-pointer touch targets (fix-any-pointer)
+
+Landed as **`beeae3e`** (category B) + **`d714a06`** (category C) +
+**`3c0c2f7`** (the §4b probe) on master. Started from `eb18b17`.
+
+### Counts
+
+| | files | rules |
+|---|---|---|
+| **B** — no width fallback, did NOTHING on a hybrid | 10 | 20 |
+| **C** — already width-paired, inconsistent only | 23 | 25 |
+| left alone | 8 | 8 |
+
+The handoff said B was "20 rules / 11 files" — it is 10 files. Its line numbers
+had also drifted, and `lesson-plan-v2/plan-page.module.css` had been half-done
+by another lane (`:112` already widened, `:206` not). I worked from a fresh
+grep, not the handoff's numbers.
+
+### Rules I did NOT change, and why
+
+**Category A — all four untouched, as briefed.** Gate 7 of the probe is the
+non-vacuous proof this was right: on a real hybrid,
+`(hover: none), (pointer: coarse)` reads **`now=false`, `ifWidened=true`**
+against `.WeeklyGrid_subjectReorder`. Widening it would have pinned that
+hover-only control permanently open on every touch laptop.
+
+**Two rules the handoff listed under C are actually MIXED A+C.** This is the
+category-A mistake the brief warned about, hiding inside the C list:
+
+- `components/teach-v2/SlideFilmstrip.module.css:158` — alongside the 44px
+  floor it sets `.thumbActions { position: static; opacity: 1 }` and
+  restructures `.thumbWrap` to a column. Base state is `opacity: 0` with **no
+  `pointer-events: none`**. Widening pins the reorder/delete cluster open and
+  relayouts the filmstrip on every touch laptop.
+- `components/week-v2/WeekC.module.css:385` — `.addBtn` is `opacity: 0` at rest,
+  revealed by `.cellEmpty:hover`; the rule sets `opacity: 0.5`. Widening paints
+  a faint dashed "+" into **every empty cell of the week grid** on a hybrid, and
+  grows an invisible-but-hit-testable button 26px → 44px.
+
+Both are splittable in principle (pure-sizing arm widened, reveal arm left) but
+that is a component decision about click-swallowing on invisible controls, not a
+guard widen. Left whole, flagged.
+
+**`components/ui/ToggleGroup.module.css:73`** — genuine category C, in **neither
+handoff list** (it landed in `e7e169c`, after the categorisation was written),
+and outside this lane's ownership. Untouched; C ships with this one known hole.
+
+**`components/year/TimelineYear.module.css:1956`** — correctly flagged by the
+lead. It is a hybrid rule doing both jobs, and its own comment already considered
+and rejected `any-pointer` for the right reason. Residual: `.uws` stays 40px on a
+hybrid >900px → task #27.
+
+**`components/composer/ResMenu.module.css`** arrived mid-sweep as a NEW bare
+guard in another lane's uncommitted work. That lane widened it themselves. It is
+deliberately NOT on the probe's exception list, so if their change is reverted
+the probe will flag it.
+
+### Two deliberate deviations from the canonical form
+
+- **`app/chrome.css` keeps a single arm** (`(any-pointer: coarse)`, no
+  `max-width`). Its comment records an explicit authorial decision to avoid a
+  width cutoff. A phone already matches `any-pointer: coarse`, so the width arm
+  only catches devices that misreport pointer capability — near-zero gain for
+  overriding a stated decision.
+- **`WeekC`'s 1023px ceiling preserved**, and rule ORDER left as found; both
+  orderings exist and churning them is diff noise.
+
+### §4b evidence — and why the obvious probe proves nothing
+
+`scripts/probe-any-pointer.mjs`, 28 assertions, real Chrome. **A desktop resize
+does not reproduce this, and neither does any touch emulation I tried.** Measured:
+
+| route | pointer | any-coarse | hover | verdict |
+|---|---|---|---|---|
+| Playwright `hasTouch: true` | coarse | true | false | phone, NOT a hybrid |
+| CDP `setTouchEmulationEnabled` | coarse | true | false | phone, NOT a hybrid |
+| CDP `setEmulatedMedia {pointer}` | fine | **FALSE** | true | **silently ignored** |
+| `--blink-settings=availablePointerTypes=6,primaryPointerType=4` | fine | true | true | **the hybrid** |
+
+Under a phone the OLD guard matches too, so a probe built that way passes
+identically before and after the fix. `setEmulatedMedia` is the dangerous one —
+Chrome accepts the call and changes nothing, so it looks like it worked.
+
+Key results: pre-fix media text **does not match** / post-fix **does** (the
+defect was real and is closed); 21 declared 44px floors all measure ≥44px via
+`elementFromPoint` on synthetic elements mounted in a real `.cp-root`; and the
+differential control — **21/21 floors DISAPPEAR under a fine pointer**, proving
+the inflation is guard-gated, not unconditional.
+
+### Six review rounds, six real false-pass mechanisms
+
+Every one of these would have produced a green probe over an unproven claim:
+
+1. `owns()` accepted **ancestors**, so the outward walk never terminated and
+   every target measured the walk limit (81px). The probe could detect nothing.
+2. Synthetic elements stacked **past the fold** and hit-tested as
+   `centre-occluded` — an artifact indistinguishable from real ancestor clipping.
+3. The CSSOM scan was **flat**; recursing into grouping rules surfaced a 43rd
+   block the flat scan never saw.
+4. `short.length === 0` passes **vacuously** when nothing declares a floor.
+5. The source scan matched a code sample **quoted inside a comment** in
+   `Button.module.css` and reported the one already-correct file as a straggler.
+6. **The worst:** the fine-pointer control browser was **unauthenticated**. It
+   would have landed on the login page, loaded none of the route CSS, and
+   reported "21/21 dropped" as proof of gating when the floors were absent only
+   because the stylesheet never arrived. It now authenticates, hydrates, and
+   asserts rule presence by `(media, selector)` identity before comparing.
+
+**Durable lesson:** for a guard-widening change, the load-bearing assertion is
+the **differential** — the same selectors measured in both pointer worlds — plus
+a check that the comparison contexts actually loaded the same rules. A one-sided
+"it's 44px on touch" measurement cannot distinguish a working guard from an
+unconditional rule, and an unauthenticated control fabricates the difference.
+
+### Left open
+
+- One justified Medium: Gate 0.4 pins per-file rule **counts**, not per-rule
+  fingerprints. A compound edit deleting one target block and adding an
+  unrelated widened block to the same file would keep counts equal.
+  Fingerprinting means hard-coding ~49 rule bodies; not worth it for a rename.
+- Section 5 of the probe (on-page survey) is **diagnostic, not a gate** —
+  it measures whatever rendered, and deliberate sub-44px controls exist
+  (`Chip .removeBtn` at 24px, by design).
+- Codex's first invocation reviewed the **shared dirty tree** instead of the
+  piped diff and returned three findings about other lanes' files
+  (`.claude/settings.local.json` permissions, `probe-4b-consolidated.mjs`
+  tri-state). Relayed to the lead, not actioned here. Re-running with an
+  explicit "review ONLY the stdin block" instruction fixed the scoping.
