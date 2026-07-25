@@ -7,14 +7,17 @@
 // (YearShell's glass/color frames and HubDocHost), which is why /daily and
 // /weekly have no path to it at all. B5 opens it to four entry points — Day,
 // Week, the paper-frame Year, and the Planner Hub. If each mounted its OWN
-// <UnitExplorer>, two could be on screen at once: two `aria-modal` dialogs, two
-// focus traps, and two competing body-scroll-lock cleanups (ExplorerShell
-// restores `document.body.style.overflow` on unmount, so the second teardown
-// would restore a value the first had already clobbered and leave the page
-// unscrollable). This module makes "which unit is open?" ONE global value and
-// elects ONE host to render it — the structure proven by
-// components/catchup-v2/modal-state.ts, which solves the same hazard at two
-// entry points.
+// <UnitExplorer>, two could be on screen at once: two `aria-modal` dialogs and
+// two focus traps fighting over the same keyboard. (This list used to include
+// "two competing body-scroll-lock cleanups" — ExplorerShell restoring
+// `document.body.style.overflow` on unmount, the second teardown restoring a
+// value the first had already clobbered and leaving the page unscrollable.
+// That hazard is GONE as of c60d740: the lock is refcounted in
+// lib/use-body-scroll-lock, so no teardown order can strand `overflow`. The
+// dialog and focus-trap hazards stand on their own.) This module makes "which
+// unit is open?" ONE global value and elects ONE host to render it — the
+// structure proven by components/catchup-v2/modal-state.ts, which solves the
+// same hazard at two entry points.
 //
 // The open state is a TARGET, not a boolean: the workspace is scoped to a
 // (subject, unit) pair — optionally focused on ONE lesson within it (B5.7) —

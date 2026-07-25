@@ -4,8 +4,11 @@
 //
 // WHY A SINGLETON (Codex W10 gate — dual-modal hazard). The modal is reachable
 // two ways: the /catch-up route, and the chrome Tools-dock. If each mounted its
-// OWN <CatchUpModal>, both could be open at once — two `aria-modal` dialogs, two
-// focus traps, two competing scroll-lock cleanups. This module makes "is the
+// OWN <CatchUpModal>, both could be open at once — two `aria-modal` dialogs and
+// two focus traps. (This list used to end "two competing scroll-lock cleanups";
+// that hazard is GONE as of c60d740 — the lock is refcounted in
+// lib/use-body-scroll-lock, so no teardown order can strand `overflow`. The
+// dialog and focus-trap hazards stand on their own.) This module makes "is the
 // Catch-Up modal open?" a single global boolean, and elects a single Host to
 // render it, so exactly ONE modal can ever be on screen no matter how many
 // Hosts (route + chrome) are mounted.

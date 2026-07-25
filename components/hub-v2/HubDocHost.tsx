@@ -21,14 +21,20 @@
 // THE COST, AND THE INVARIANT THAT PAYS IT. Mounting directly makes this dialog
 // invisible to workspace-state's single-renderer election, which dedupes
 // UnitWorkspaceHost INSTANCES, not rendered dialogs. Two <ExplorerShell>s on
-// screen would mean two aria-modal dialogs, two focus traps, and two body-scroll
-// -lock teardowns — the second restoring `overflow` to a value the first already
-// clobbered, leaving the page unscrollable for the rest of the session. So this
-// file holds the equivalent invariant itself: WHILE THE HUB'S EXPLORER IS OPEN,
-// THE GLOBAL TARGET IS NULL. It closes any open global target, and refuses to
-// render its own dialog until that has landed — which also puts the global
-// shell's unmount and this one's mount in SEPARATE commits, so the global
-// teardown restores `overflow` before this shell captures it.
+// screen would mean two aria-modal dialogs and two focus traps fighting over the
+// same keyboard. So this file holds the equivalent invariant itself: WHILE THE
+// HUB'S EXPLORER IS OPEN, THE GLOBAL TARGET IS NULL. It closes any open global
+// target, and refuses to render its own dialog until that has landed, which also
+// puts the global shell's unmount and this one's mount in SEPARATE commits.
+//
+// Body scroll is NO LONGER part of that cost. This paragraph used to end "…and
+// two body-scroll-lock teardowns, the second restoring `overflow` to a value the
+// first already clobbered", and the separate-commits property was load-bearing
+// for exactly that reason. The lock is refcounted as of c60d740
+// (lib/use-body-scroll-lock): overlapping holders are counted, and the last
+// release restores what the first acquire captured, so no ordering of teardowns
+// can strand `overflow`. The dialog and focus-trap hazards above are unaffected
+// and still carry the invariant on their own.
 //
 // Not reachable today (the global dialog's scrim covers /planner, so the Hub
 // cannot be driven while one is open) — this is the guard for when it is. B5 is
@@ -41,8 +47,10 @@
 // the global one. Closing that properly needs ATOMIC arbitration inside
 // components/year-v2/workspace-host/workspace-state.ts — a `useSyncExternalStore`
 // subscription plus one reservation both explorers take before either commits —
-// which is that module's job, not this file's, and belongs with the wider
-// refcounted body-scroll-lock work. It is unreachable in the meantime for a
+// which is that module's job, not this file's. That reservation work is STILL
+// OPEN and is the whole of what remains here; it used to be described as part of
+// "the wider refcounted body-scroll-lock work", but that half has landed and the
+// two were never actually coupled. It is unreachable in the meantime for a
 // structural reason worth stating: NOTHING on /planner calls the opener. The
 // only three callsites are components/unit-chip/UnitChip, YearShell and
 // TimelineYear, and none of them render under this route. Re-check that
