@@ -31,12 +31,25 @@
 /* ── filter variant ──────────────────────────────────────────────────────── */
 /* Clickable toggle pill — aria-pressed conveyed visually. */
 
+/* DOUBLED (0,2,0). The filter variant is the only one that renders as a
+   <button>, so `.cp-root button { padding: 0 }` in tokens.css (0,1,1) was
+   out-ranking `.chip`'s `padding: 5px 13px` (0,1,0) and stripping the side
+   padding to zero everywhere inside the planner root — measured live at both
+   1024 and 1280 (padding-left: 0px). Restating the SAME values at (0,2,0)
+   restores the geometry the base rule already documents ("13px side padding
+   — at 10px the label crowded the pill edge"). Same-value restatement, so it
+   is a no-op for chips rendered outside .cp-root. */
+.filter.filter {
+  padding: 5px 13px;
+}
+
 .filter {
   background: var(--surface);
   color: var(--ink-soft);
   border-color: var(--border);
   cursor: pointer;
-  /* ≥44px touch target on phone/tablet via transparent padding inflation */
+  /* Resting height; the coarse-pointer / ≤900px block below raises the
+     floor to ≥44px (WCAG 2.5.5). */
   min-height: 36px;
   transition:
     background 120ms ease,
@@ -69,9 +82,21 @@
   outline-offset: 2px;
 }
 
-/* On phone/tablet inflate touch target */
-@media (max-width: 900px) {
-  .filter {
+/* ── Touch target — coarse pointer / phone / tablet (≤900px) ───────────── */
+/* Both arms are required: (pointer: coarse) catches touch devices ABOVE
+   900px (an iPad Pro in landscape is 1024px with a finger as its PRIMARY
+   pointer), while the width arm is the house pattern for a phone-width
+   window under a fine pointer. Same idiom as DayEditSplit /
+   UnitContextDrawer. See Button.module.css for the deliberate `pointer` vs
+   `any-pointer` gap — a trackpad-driven touchscreen laptop is NOT covered,
+   and changing that is a repo-wide call, not a per-file one.
+
+   `.filter` renders as a <button>, so the padding declarations are DOUBLED
+   (.filter.filter → 0,2,0) to beat the `.cp-root button { padding: 0 }`
+   reset in tokens.css (0,1,1). Undoubled they were dead inside .cp-root —
+   only min-height (which the reset does not touch) was landing. */
+@media (pointer: coarse), (max-width: 900px) {
+  .filter.filter {
     min-height: 44px;
     padding-top: 10px;
     padding-bottom: 10px;
@@ -87,12 +112,14 @@
   padding-right: 4px;
 }
 
-/* The × remove button inside a removable chip */
+/* The × remove button inside a removable chip.
+   NOTE: the `removable` variant currently has ZERO callsites — no component
+   passes variant="removable". These rules are kept correct so the variant is
+   usable the day it is first adopted, not because they render today. */
 .removeBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Visually small, but touch-inflated via padding */
   width: 16px;
   height: 16px;
   border-radius: 50%;
@@ -114,10 +141,23 @@
   outline-offset: 2px;
 }
 
-/* Inflate touch target on phone/tablet */
-@media (max-width: 900px) {
+/* ── × hit area — coarse pointer / phone / tablet (≤900px) ─────────────── */
+/* HONEST STATUS: 24px, which is NOT the 44px WCAG 2.5.5 asks for.
+   The rule this replaced claimed "Use padding to reach 44px" while setting
+   width/height to 24px — the comment and the code disagreed and the code
+   won. The comment is now corrected rather than the number, deliberately:
+   • Growing the box to 44px blows out a 36px pill.
+   • The Button.module.css ::before trick does NOT transfer here. Centred on
+     a 16px glyph inside a compact chip, a 44px overlay reaches ~14px into
+     the chip's own label and into the neighbouring chip, so a tap meant for
+     the label — or for the chip beside it — would resolve to "remove". A
+     destructive mis-fire is a worse outcome than an undersized target.
+   TODO before this variant's FIRST use: the callsite must reserve real
+   space (44px row height + inter-chip gap ≥ the overlay it wants), which is
+   a layout decision that cannot be made in this file. The `removable`
+   variant has zero callsites today, so nothing renders this. */
+@media (pointer: coarse), (max-width: 900px) {
   .removeBtn {
-    /* Use padding to reach 44px without changing visual size */
     width: 24px;
     height: 24px;
   }

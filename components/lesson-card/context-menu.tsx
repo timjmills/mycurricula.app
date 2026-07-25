@@ -57,8 +57,9 @@ export type ContextAction =
   | "archive"
   // Legacy aliases kept so existing onContextAction consumers do not break.
   | "move"
-  | "reset-to-master"
-  | "delete";
+  | "reset-to-master";
+// NOTE — there is deliberately no "delete" member. See the removed
+// "Delete from Team Curriculum" item below (search: DELETE-REMOVED).
 
 /**
  * Structured detail for a context action. All fields optional — only the
@@ -82,7 +83,13 @@ interface ContextMenuProps {
   /** Viewport coordinates of the open point. */
   x: number;
   y: number;
-  /** Master mode (internal value: "master" = Team Curriculum) unlocks the destructive "Delete from Team Curriculum" item. */
+  /**
+   * Master mode (internal value: "master" = Team Curriculum). Host-threaded
+   * signal that hides the PERSONAL-scoped forking items ("Restore from Team
+   * Curriculum", "Compare with Team Curriculum"), which have no meaning while
+   * editing the team plan itself. (It formerly also unlocked a destructive
+   * delete item — see DELETE-REMOVED below.)
+   */
   isMaster?: boolean;
   onClose: () => void;
   /**
@@ -125,9 +132,9 @@ export function LessonContextMenu({
   const copyLink = useCopyLink();
   const { activeGradeId } = useCatalogOptional();
   // M1: the LIVE Personal | Team-Curriculum mode. The `isMaster` prop is the
-  // host-threaded signal (today only the destructive delete item consumes
-  // it, and no current host threads it), so the compare gate reads the mode
-  // from app-state directly — the cleanest existing seam. Safe here: every
+  // host-threaded signal, but NO current host actually threads it (it defaults
+  // to false everywhere), so the compare/restore gates read the mode from
+  // app-state directly — the cleanest existing seam. Safe here: every
   // host of this menu (weekly cards, lesson cards, the Settings → Appearance
   // preview) mounts under a layout that provides <AppStateProvider>; only
   // the PLANNER providers are optional in the preview (see the hooks above).
@@ -346,18 +353,29 @@ export function LessonContextMenu({
         onSelect: () => fire("archive"),
       },
 
-      // Master-only destructive item — only in Team Curriculum mode (internal value: "master").
-      ...(isMaster
-        ? ([
-            { kind: "divider" },
-            {
-              label: "Delete from Team Curriculum",
-              danger: true,
-              tip: "Permanently remove this lesson from the Team Curriculum — affects every teacher's plan",
-              onSelect: () => fire("delete"),
-            },
-          ] as MenuRow[])
-        : []),
+      // ── DELETE-REMOVED ───────────────────────────────────────────────────
+      // A master-only "Delete from Team Curriculum" item used to live here,
+      // gated on `isMaster`, styled `danger`, and captioned "Permanently
+      // remove … affects every teacher's plan". It fired `"delete"` — an
+      // action NO host has ever handled. Every consumer of `onContextAction`
+      // (WeeklyGrid, WeekColumns, weekly-board, weekly-lesson-card) either
+      // has no delete branch or drops it through `default:`, so the click
+      // closed the menu and did nothing. It read as an irreversible,
+      // team-wide destructive action and was inert — the worst possible
+      // combination, and worse still because it only appeared in Team
+      // Curriculum mode, exactly where a teacher would believe the
+      // consequence was real.
+      //
+      // Removed rather than implemented: team-scoped deletion is Phase 2
+      // forking semantics (CLAUDE.md §6 — do not build out of phase). To
+      // bring it back, ALL of these must exist first:
+      //   1. a store action that deletes from master (not a personal fork)
+      //      and joins the shared undo history (lib/planner-store.tsx);
+      //   2. a persisted write path + the team-visibility rules for it;
+      //   3. a host branch in every `onContextAction` consumer listed above;
+      //   4. the `"delete"` member restored to `ContextAction` (see the type).
+      // Until then the item stays gone — an inert destructive control is a
+      // worse failure than a missing one.
     ];
   }
 
