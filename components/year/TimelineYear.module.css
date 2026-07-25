@@ -330,12 +330,22 @@
      inline `grid-column` (see `.root[data-hier="grid"] .units` for the grid
      template). The `.unit` button fills it.
    • LIST — the stacking row that holds the unit AND its nested weeks/days
-     (its flex-column display is set in the list block below). */
+     (its flex-column display is set in the list block below).
+
+   B5.3 — it is also the PAIR: the `.unit` drill button plus the `.uws`
+   workspace opener beside it (two destinations, so two sibling buttons; see
+   the `.uws` block below). Hence the flex row + the positioning context the
+   wide-timeline treatment pins its corner chip to. */
 .unode {
-  display: block;
+  display: flex;
+  align-items: stretch;
   min-width: 0;
+  position: relative;
 }
 .unit {
+  /* Takes the row; `.uws` is the fixed trailing column. Shrinkable so a long
+     unit name can never push the opener out of the card. */
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
   display: flex;
@@ -409,6 +419,158 @@
 .unit.sel .un {
   color: var(--ud);
 }
+
+/* ── Unit workspace opener (B5.3) ─────────────────────────────────────────
+   The SECOND affordance on a unit card. The card's own click drills IN-PAGE to
+   the unit scope (weeks → days → the lesson pane, alongside the standards
+   coverage + year filters that live nowhere else); this button opens the global
+   unit workspace overlay instead — unit plan, assessments, insights, prep.
+
+   DEFAULT TREATMENT — a visible trailing column. This is what the subject-scope
+   `.unitGrid` cards (≥200px wide) and every full-width outline row get, because
+   they have the room for it.
+
+   Doubled class throughout: the global `.cp-root button` reset (tokens.css, so
+   0,1,1) strips padding / border / background off any single-class button rule.
+   Every @media override below is doubled for the same reason. */
+.uws.uws {
+  flex: 0 0 auto;
+  width: 40px;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  /* --ink-500, NOT --ink-400. Measured on the live cascade against the card
+     surface: --ink-400 is 3.16:1 — it scrapes past the 3:1 non-text bar (WCAG
+     1.4.11) and fails 4.5:1, and it is the same tone as the `.uw` week label,
+     so the glyph read as decoration. --ink-500 is 7.12:1: unambiguously
+     legible, still plainly subordinate to the --ink-900 bold unit title
+     (16.86:1) it must not compete with. */
+  color: var(--ink-500);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s,
+    opacity 0.12s;
+}
+.uws.uws:hover {
+  background: color-mix(in srgb, var(--uc) 16%, var(--surface));
+  border-color: color-mix(in srgb, var(--uc) 45%, var(--border));
+  color: var(--ud);
+}
+/* Explicit ring — on the wide timeline the chip rests hidden and is revealed by
+   `.unode:focus-within`, so a keyboard user must land on something unmistakable
+   the moment it appears. Same recipe as `.cp-focusable` (tokens.css);
+   `--ink-900` is tone-derived, so it holds on Night. */
+.uws.uws:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+.uws svg {
+  width: 15px;
+  height: 15px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .uws.uws {
+    transition: none;
+  }
+}
+
+/* WIDE ALL-SCOPE TIMELINE (>900px — below that the view force-switches to the
+   list outline, TimelineYear.tsx `isNarrow`). Measured live at 1440px, the
+   timeline's unit cards are only 95–112px wide, so a permanent 40px trailing
+   column would eat a third of the card. The opener is therefore a compact
+   corner chip, absolutely positioned — it costs the card ZERO width (measured
+   95px before and after).
+
+   REVEALED ON HOVER OR KEYBOARD FOCUS — THIS TIER ONLY, and this is the one
+   exception to the rule that the opener is permanently visible. Do not "fix" it
+   by making it permanent: that was built, measured, and REJECTED here. Recorded
+   in full so nobody (including the people who already argued it) re-litigates
+   it.
+
+   The card offers a 65px text column. Both permanent variants damage it:
+
+     • Permanent chip, no space reserved → it MASKS the title, mid-word on most
+       cards. Overlap confirmed on 20 of 20 sampled: "Multiplication" rendering
+       "Multiplic⤢tion", "Fractions" → "Fraction⤢", "Geometry & Measurement" →
+       "Geomet⤢", "Research Report" → "Researc⤢". Hidden content, and the
+       ellipsis does not fire, so nothing signals the loss.
+     • Permanent chip, 28px reserved so the title ellipsizes honestly instead →
+       the 65px column drops to 37px and the unit NAME shreds: "Place Valu…",
+       "Multi pli-…", "Fracti ons", "Volu me …".
+       (docs/screenshots/b5-year/17-EXPERIMENT-title-padding-cost.png)
+
+   Bottom-right instead of top-right is not available either: the week span
+   already consumes 63–64px of the same 65px row (1–2px spare), so the chip would
+   ellipsize the date range instead of the title.
+
+   The unit name is the only thing that makes this timeline readable, and the
+   all-scope grid is the DEFAULT view, so damaging it on nearly every card is
+   worse than deferring discovery. The one non-destructive alternative — giving
+   the chip its own band, ~+26px of card height on every row — was declined: it
+   reshapes a handoff-governed surface's vertical rhythm to serve one affordance.
+
+   DISCOVERY IS DEFERRED, NOT LOST, which is what makes the reveal acceptable
+   here rather than merely necessary. This applies to exactly one context:
+   desktop >900px, paper frame, all-scope grid. Touch never meets it (≤900px
+   force-switches to the list outline, TimelineYear.tsx `isNarrow`, where the
+   opener is a permanent 44px trailing button). Keyboard reaches it via
+   `.unode:focus-within` below. And the natural action on this surface is
+   drilling into a unit via `goUnit` — which lands on the subject-scope cards
+   (≥200px), where the chip IS permanent. So a teacher meets it on the way in.
+
+   The chip costs the card ZERO width either way (measured 95px before and
+   after). It stays hit-testable while transparent, but the pointer must be
+   inside `.unode` to reach it, which is exactly what reveals it — so there is no
+   invisible-click hazard. */
+.root[data-hier="grid"][data-scope="all"] .uws.uws {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  /* The fill is load-bearing, not decoration: it is the card's own colour, so
+     it masks whatever title text sits under the chip. */
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-color: color-mix(in srgb, var(--uc) 30%, var(--border));
+  /* Hidden at rest, full strength when revealed — never a partial "quiet" fade.
+     A fade was the obvious middle road and it CANNOT rescue this tier, for two
+     independent reasons.
+
+     First, it does not solve the real problem: any non-zero resting opacity
+     still paints the chip over the title, so the masking above happens anyway,
+     just faintly. A fade trades hidden text for smeared text.
+
+     Second, it cannot even stay legible while doing so. Group `opacity`
+     composites the GLYPH toward the card as well as the chrome, so legibility
+     falls with the chrome. Bar is 3:1 (WCAG 1.4.11 — icons are non-text).
+     Measured live at 1440 on the paper frame against --ink-500, both tones:
+
+         opacity   light tone   Night
+           0.64      3.03:1     4.10:1
+           0.72      3.61:1     4.81:1
+           0.78      4.14:1     5.41:1
+           1.00      7.12:1     8.00:1
+
+     The LIGHT tone binds: its 3:1 threshold is opacity 0.634 (Night's is 0.495),
+     so anything genuinely recessive is also under the bar. (The previous glyph,
+     --ink-400, could not carry a fade at all: 3.16:1 even at full opacity and
+     2.18:1 at 0.72.) Hence 0/1 rather than a middle value — it is hidden, or it
+     is fully legible at the 7.12:1 / 8.00:1 the base --ink-500 provides. */
+  opacity: 0;
+  z-index: 3;
+}
+.root[data-hier="grid"][data-scope="all"] .unode:hover .uws.uws,
+.root[data-hier="grid"][data-scope="all"] .unode:focus-within .uws.uws {
+  opacity: 1;
+}
+
 /* Doubled class beats the global `.cp-root button` reset (0,1,1) so the chevron
    keeps its sizing/centering even if padding/border are added later. */
 .chev.chev {
@@ -1259,10 +1421,12 @@
   display: none;
 }
 
-/* Each outline node stacks its unit row above its (optional) nested detail. */
+/* Each outline node lays its unit row and its workspace opener side by side
+   (B5.3). It was `flex-direction: column` for a nested `.detail` block that the
+   scope drill replaced — nothing renders inside `.unode` but the button pair
+   now, so the row direction from the base rule stands. */
 .root[data-hier="list"] .unode {
   display: flex;
-  flex-direction: column;
   min-width: 0;
 }
 
@@ -1270,7 +1434,9 @@
    disclosure chevron in subject ink, and the unit name BOLD in subject ink.
    No fill — colour is accent-only. */
 .root[data-hier="list"] .unit {
-  flex: 0 0 auto;
+  /* Shrinkable (was `0 0 auto`, from when `.unode` stacked vertically) so the
+     trailing `.uws` opener keeps its column on the row. */
+  flex: 1 1 auto;
   flex-direction: row;
   align-items: center;
   gap: 10px;
@@ -1348,6 +1514,12 @@
    bar above, so clear the ring here. */
 .root[data-hier="list"] .unit.sel {
   outline: none;
+}
+/* The workspace opener carries the row's bottom hairline too, so the divider
+   runs the full width instead of stopping where the drill button ends. */
+.root[data-hier="list"] .uws.uws {
+  border-radius: 0;
+  border-bottom: 1px solid var(--hair);
 }
 
 /* ── Nested detail ── the open unit's body, indented one level under its row
@@ -1644,16 +1816,17 @@
     gap: 2px;
     padding: 2px 12px 6px;
   }
+  /* Row, not column — the node holds the drill button and its workspace
+     opener side by side (B5.3), same as the LIST outline. */
   .root[data-hier="grid"] .unode {
     display: flex;
-    flex-direction: column;
     min-width: 0;
   }
 
   /* Unit row — neutral, 3px subject accent, disclosure chevron in subject ink
      (same recipe as the LIST outline). */
   .root[data-hier="grid"] .unit {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     flex-direction: row;
     align-items: center;
     gap: 10px;
@@ -1753,6 +1926,25 @@
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
+  /* Phone + tablet: the workspace opener is a real ≥44px touch target
+     (CLAUDE.md §4), matching the ≤900px inflation the Button primitive uses. */
+  .uws.uws {
+    width: 44px;
+    min-height: 44px;
+  }
+  /* At these widths the view force-switches to the list outline
+     (TimelineYear.tsx `isNarrow`), so the wide-timeline corner chip must not
+     survive the one paint before that effect resolves — where `data-hier` is
+     still "grid" and the chip's rules would otherwise apply. */
+  .root[data-hier="grid"][data-scope="all"] .uws.uws {
+    position: static;
+    height: auto;
+    border-radius: 12px;
+    background: transparent;
+    border-color: transparent;
+    opacity: 1;
+  }
+
   .tlhead {
     grid-template-columns: 150px minmax(0, 1fr);
   }

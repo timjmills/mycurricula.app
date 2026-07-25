@@ -6,34 +6,48 @@
 // WeeklyShell.renderGridPanel frame seam, but at the whole-view level):
 //
 //   • glass → <YearA/>          — NEW: subject lanes under a month scale.
-//   • paper → <TimelineYear/>   — EXISTING, untouched: the merged drill view
-//                                 (sidebar, lesson pane, standards coverage,
-//                                 ?subject= drill deep link).
+//   • paper → <TimelineYear/>   — EXISTING: the merged drill view (sidebar,
+//                                 lesson pane, standards coverage, ?subject=
+//                                 drill deep link).
 //   • color → <YearC/>          — NEW: the subject "constellation" of unit
 //                                 progress discs (ported from the legacy
 //                                 YearConstellation, upgraded so a node opens
-//                                 the Unit Explorer modal instead of drilling).
+//                                 the unit workspace instead of drilling).
 //
-// The glass + color frames share ONE data derivation (the per-subject unit
-// lanes, computed here once from the live planner store) and ONE modal host:
-// clicking a unit chip / disc opens <UnitExplorer> over the view. Paper's
-// <TimelineYear> manages its own drill + selection state, so it takes no props.
+// The glass + color frames share ONE data derivation — the per-subject unit
+// lanes, computed here once from the live planner store. Paper's
+// <TimelineYear> derives its own equivalent and manages its own drill +
+// selection state, so it takes no props.
+//
+// B5.3 — NO MODAL HOST HERE. This shell used to own the open-unit state and
+// mount its own <UnitExplorer> for the glass + color frames, which meant the
+// paper frame (early-returning above the mount) had no path to the workspace at
+// all, and any OTHER surface opening the global host would have put a second
+// aria-modal dialog on screen beside this one. Both frames now call the ONE
+// global opener (components/year-v2/workspace-host, mounted in
+// app/(planner)/layout.tsx); paper reaches the same opener through
+// TimelineYear's per-unit-card button. Nothing on /year mounts a workspace.
+//
+// FRAME-SURVIVAL (user-locked decision, 2026-07-24): the open workspace
+// SURVIVES an appearance/frame change rather than being dismissed. That is now
+// structural rather than something this shell has to arrange — the host lives
+// in the planner layout, ABOVE the frame branch, so re-routing glass ⇄ paper ⇄
+// color re-renders the view underneath an untouched workspace.
 //
 // DEAD-BRANCH NOTE (for the lead): TimelineYear still contains its own
-// `frame === "color"` swap to YearConstellation (TimelineYear.tsx ~:618 /
-// :820). With YearShell branching the color frame to <YearC/> here,
+// `frame === "color"` swap to YearConstellation (TimelineYear.tsx ~:640 /
+// :840). With YearShell branching the color frame to <YearC/> here,
 // TimelineYear only ever renders on the PAPER path, so that internal color
-// swap is now unreachable dead logic. It is intentionally NOT edited (not this
-// builder's file) — flagged for a follow-up cleanup.
+// swap is unreachable dead logic — flagged for a follow-up cleanup.
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { TimelineYear } from "@/components/year";
 import { unitLessons, unitProgress } from "@/lib/year-v2-data";
-import type { Lesson, Subject, SubjectId, Unit } from "@/lib/types";
+import type { Lesson, Subject, Unit } from "@/lib/types";
 import { YearA } from "./YearA";
 import { YearC } from "./YearC";
-import { UnitExplorer } from "./UnitExplorer";
+import { useUnitWorkspace } from "./workspace-host";
 import { useTheme } from "@/lib/theme";
 
 // ── Shared lane shapes (consumed by YearA + YearC) ──────────────────────────
@@ -141,32 +155,10 @@ export function YearShell(): ReactNode {
   const { frame } = useTheme();
   const { lessons, subjects, units: allUnits } = usePlanner();
 
-  // The open Unit Explorer target (glass + color frames only; paper's
-  // TimelineYear manages its own drill). `{ subjectId, unit }` mirrors the
-  // pinned <UnitExplorer> interface.
-  const [openUnit, setOpenUnit] = useState<{
-    subjectId: SubjectId;
-    unit: string;
-  } | null>(null);
-
-  const openUnitExplorer = useCallback(
-    (subjectId: SubjectId, unit: string) => setOpenUnit({ subjectId, unit }),
-    [],
-  );
-  const closeUnitExplorer = useCallback(() => setOpenUnit(null), []);
-
-  // FRAME-SURVIVAL (user-locked decision, 2026-07-24): the open workspace
-  // SURVIVES an appearance/frame change instead of being dismissed. An earlier
-  // effect here cleared `openUnit` on every `frame` change — that is gone.
-  //
-  // Why it's safe now: the glass + color frames BOTH mount this host, so a
-  // glass⇄color flip just re-renders the open workspace, which re-skins through
-  // the shared token cascade (no remount, no data loss). A flip to `paper` takes
-  // the early-return below and unmounts the host, but `openUnit` is preserved,
-  // so flipping back to glass/color re-opens the same unit — the workspace is
-  // read-only until B1.7, so there is nothing to lose by keeping it open, and
-  // "survive the frame change" is the intended behavior. Cross-device theme-sync
-  // flipping the frame no longer yanks a teacher's open unit out from under them.
+  // The ONE opener. Referentially stable (a module constant on the workspace
+  // singleton), so handing it straight to YearA/YearC as `onOpenUnit` costs
+  // those trees nothing — no useCallback, no re-render on open/close.
+  const { openUnitWorkspace } = useUnitWorkspace();
 
   // Lanes are only consumed by YearA/YearC; deriving them on the paper path is
   // harmless (memoized, cheap) and keeps the branch below simple.
@@ -175,27 +167,19 @@ export function YearShell(): ReactNode {
     [subjects, lessons, allUnits],
   );
 
-  // Paper keeps the existing merged drill view entirely (own state + deep link).
-  if (frame === "paper") {
-    return <TimelineYear />;
-  }
-
-  // Glass + color: the new frames + the shared Unit Explorer modal host.
-  return (
-    <>
-      {frame === "color" ? (
-        <YearC lanes={lanes} onOpenUnit={openUnitExplorer} />
-      ) : (
-        <YearA lanes={lanes} onOpenUnit={openUnitExplorer} />
-      )}
-      {openUnit ? (
-        <UnitExplorer
-          subjectId={openUnit.subjectId}
-          unit={openUnit.unit}
-          onClose={closeUnitExplorer}
-          onUnitChange={openUnitExplorer}
-        />
-      ) : null}
-    </>
+  // One expression, three peer frames — deliberately NOT an early return for
+  // paper. The early return is what stranded the paper frame in the first
+  // place: it sat above the shell's own workspace mount, so paper had no route
+  // to the unit workspace at all. Paper keeps the merged drill view entirely
+  // (its own state + the ?subject= deep link) and is NOT a subset of the other
+  // two — the subjects sidebar, the standards-coverage panel, the year filters
+  // and the week→lesson drill live only there — so it reaches the workspace
+  // through TimelineYear's own per-unit-card opener.
+  return frame === "paper" ? (
+    <TimelineYear />
+  ) : frame === "color" ? (
+    <YearC lanes={lanes} onOpenUnit={openUnitWorkspace} />
+  ) : (
+    <YearA lanes={lanes} onOpenUnit={openUnitWorkspace} />
   );
 }

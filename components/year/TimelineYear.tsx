@@ -63,7 +63,12 @@ import {
 } from "./YearFiltersPopover";
 import type { YearScope } from "./year-scope";
 import { standardsCoverage } from "@/lib/year-standards-coverage";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
+// The ONE global unit workspace (B5.1). Imported from the workspace-host FOLDER
+// rather than the "@/components/year-v2" barrel so this module doesn't pull
+// YearShell in — YearShell imports TimelineYear, and the barrel would close that
+// into an import cycle.
+import { useUnitWorkspace } from "@/components/year-v2/workspace-host";
 import styles from "./TimelineYear.module.css";
 
 /** Short month labels for the timeline axis header (calendar order). */
@@ -113,6 +118,18 @@ function Svg({
 const IconChevRight = (p: IconProps) => (
   <Svg {...p}>
     <path d="m9 18 6-6-6-6" />
+  </Svg>
+);
+/** Diagonal expand arrows — "open this unit in the full workspace". Reuses the
+ *  workspace's own ⤢ expand vocabulary (ExplorerShell's expand toggle) so the
+ *  two read as the same destination, and stays visually distinct from the
+ *  chevron, which everywhere here means "drill one level deeper in-page". */
+const IconExpand = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M15 3h6v6" />
+    <path d="M9 21H3v-6" />
+    <path d="m21 3-7 7" />
+    <path d="m3 21 7-7" />
   </Svg>
 );
 const IconCheck = (p: IconProps) => (
@@ -264,6 +281,13 @@ export function TimelineYear(): ReactNode {
   // (subject/unit/week) keep the existing UI on every frame — same seam
   // pattern as WeeklyShell.renderGridPanel (frame is the LAST gate).
   const { frame } = useTheme();
+
+  // B5.3 — the opener for the global unit workspace. This view's own click
+  // (`goUnit`) drills IN-PAGE, which is a different destination, so the
+  // workspace is a SECOND affordance on each unit card rather than a
+  // replacement (see `renderUnitCard`). Referentially stable, so the cards it
+  // is closed over never re-render because the workspace opened or closed.
+  const { openUnitWorkspace } = useUnitWorkspace();
 
   // Active notebook = the grade level whose curriculum this Year view shows.
   // The subject-row caption must name it dynamically (never a hard-coded grade —
@@ -541,12 +565,30 @@ export function TimelineYear(): ReactNode {
     ? ({ "--today-frac": axis.todayFrac } as CSSProperties)
     : undefined;
 
+  /**
+   * One unit card — used by BOTH the all-scope timeline rows and the
+   * subject-scope card grid.
+   *
+   * TWO affordances, two destinations (B5.3):
+   *   • the card itself → `onClick` = `goUnit`, the IN-PAGE drill to
+   *     scope={level:"unit"}. That view is the only home for the
+   *     standards-coverage panel, the year filters, the subjects sidebar and
+   *     the unit→week→lesson drill with YearLessonPane, so it stays the
+   *     default click and is never replaced.
+   *   • the trailing ⤢ button → the GLOBAL unit workspace overlay (the unit
+   *     plan, assessments, insights, prep). This is /year-on-paper's only
+   *     route to it; the glass + color frames open the same host from their
+   *     chips/discs.
+   * A sibling <button>, never a nested one — nested buttons are invalid HTML
+   * and the inner click would also fire the outer drill.
+   */
   function renderUnitCard(
     subjectId: SubjectId,
     g: UnitGroup,
     onClick: () => void,
   ): ReactNode {
     const { prefix, rest } = splitUnitName(g.unit.name);
+    const unitLabel = rest || g.unit.name;
     return (
       <div key={g.unit.id} className={styles.unode}>
         <button
@@ -559,6 +601,22 @@ export function TimelineYear(): ReactNode {
           {prefix ? <div className={styles.us}>{rest}</div> : null}
           <div className={styles.uw}>{g.spanLabel}</div>
         </button>
+        <Tooltip
+          content={`Open the ${unitLabel} workspace — its unit plan, assessments, insights and prep in one place. Clicking the card instead opens the unit here on the page.`}
+          tooltipId="year-unit-workspace"
+          side="top"
+        >
+          <button
+            type="button"
+            className={styles.uws}
+            // Stable probe/e2e hook for the §4b live pass.
+            data-year-unit-workspace
+            aria-label={`Open the ${unitLabel} workspace`}
+            onClick={() => openUnitWorkspace(subjectId, g.unit.id)}
+          >
+            <IconExpand />
+          </button>
+        </Tooltip>
       </div>
     );
   }
