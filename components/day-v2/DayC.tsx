@@ -26,6 +26,7 @@ import {
   SelectTitle,
 } from "./atoms";
 import { useNowMin, fromInteractive } from "./util";
+import { DayEmptyState } from "./DayEmptyState";
 import { DayHeader } from "./DayHeader";
 import type { DayViewV2Props } from "./DayViewV2";
 import styles from "./day-v2.module.css";
@@ -171,8 +172,14 @@ export function DayC(props: DayViewV2Props): ReactNode {
           />
         ) : (
           <div className={styles.heroEmpty}>
+            {/* Same reasoning as DayB: `sel` is undefined for the whole hydrate,
+                so this branch must not assert emptiness on its own, and
+                `hasLessons` is passed rather than inferred. */}
             {holidayNode ?? (
-              <p className={styles.emptyDay}>No lessons planned for this day.</p>
+              <DayEmptyState
+                hasLessons={dayLessons.length > 0}
+                skeletonLines={2}
+              />
             )}
           </div>
         )}

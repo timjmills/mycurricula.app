@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { deriveDayStatus, currentAndNext } from "@/lib/day-status";
 import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
@@ -23,6 +23,7 @@ import {
   SelectTitle,
 } from "./atoms";
 import { useNowMin, fromInteractive } from "./util";
+import { DayEmptyState } from "./DayEmptyState";
 import { DayHeader } from "./DayHeader";
 import type { DayViewV2Props } from "./DayViewV2";
 import styles from "./day-v2.module.css";
@@ -59,6 +60,13 @@ export function DayA(props: DayViewV2Props): ReactNode {
 
   const doneCount = dayLessons.filter((l) => l.status === "done").length;
   const { currentId } = currentAndNext(dayLessons, nowMin, isToday);
+  // The header counter is the SAME false-empty defect as the empty state below,
+  // two lines apart: derived from `dayLessons.length`, it reads "0 of 0 complete"
+  // for the whole hydrate — the exact figure the prod report saw resolve to
+  // "1 of 8 complete". Suppress the count until the store can back it; the date
+  // line is static and stays. (Beyond the literal fix spec, but the same
+  // contract, the same component, and the same ~10s window.)
+  const countReady = usePlannerDataState() === "settled";
 
   // Scroll the selected lesson into view once when the selection changes and it
   // lives in this day (decision 1) — e.g. a deep-link or a cross-view select.
@@ -77,8 +85,12 @@ export function DayA(props: DayViewV2Props): ReactNode {
         extra={
           <span className={styles.vsub}>
             {dateLabel}
-            <br />
-            {doneCount} of {dayLessons.length} complete
+            {countReady && (
+              <>
+                <br />
+                {doneCount} of {dayLessons.length} complete
+              </>
+            )}
           </span>
         }
       />
@@ -86,9 +98,12 @@ export function DayA(props: DayViewV2Props): ReactNode {
       {holidayNode && <div className={styles.holiday}>{holidayNode}</div>}
 
       <div className={styles.vaDay}>
-        {dayLessons.length === 0 && !holidayNode && (
-          <p className={styles.emptyDay}>No lessons planned for this day.</p>
-        )}
+        {/* `dayLessons.length === 0` alone cannot tell "nothing planned" from
+            "not loaded yet" — see ./day-empty for why that shipped a live Major.
+            The length test is now an ARGUMENT rather than a gate: the component
+            owns the whole decision and renders nothing when the day has
+            lessons, so there is no caller-side branch left to get wrong. */}
+        {!holidayNode && <DayEmptyState hasLessons={dayLessons.length > 0} />}
         {dayLessons.map((lesson) => {
             const subject = subjectById[lesson.subject];
             const status = deriveDayStatus(lesson, nowMin, isToday);

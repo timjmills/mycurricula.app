@@ -28,6 +28,7 @@ import {
   SelectTitle,
 } from "./atoms";
 import { STATUS_WORD, useNowMin, fromInteractive } from "./util";
+import { DayEmptyState } from "./DayEmptyState";
 import { DayHeader } from "./DayHeader";
 import type { DayViewV2Props } from "./DayViewV2";
 import styles from "./day-v2.module.css";
@@ -173,8 +174,18 @@ export function DayB(props: DayViewV2Props): ReactNode {
           />
         ) : (
           <div className={styles.focusEmpty}>
+            {/* `sel` is undefined both when the day is empty AND for the whole
+                hydrate, so this branch must not assert emptiness on its own —
+                see ./day-empty. `hasLessons` is passed rather than inferred from
+                `sel` being undefined: that implication holds today (pickFocus
+                above) but is exactly the kind of transitive reasoning that
+                shipped the bug. Fewer bars than DayA — one focus panel, not a
+                day list. */}
             {holidayNode ?? (
-              <p className={styles.emptyDay}>No lessons planned for this day.</p>
+              <DayEmptyState
+                hasLessons={dayLessons.length > 0}
+                skeletonLines={2}
+              />
             )}
           </div>
         )}
