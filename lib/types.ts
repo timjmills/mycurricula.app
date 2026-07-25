@@ -225,8 +225,10 @@ export interface LessonAssessment {
 /** The write-path validation contract for LessonAssessment.kind (§4a F1): the
  *  DB column is deliberately un-CHECKed, so THIS guard is the single validity
  *  gate — B2's persist path must refuse (or drop the field on) any value that
- *  fails it, or a mistyped kind silently vanishes from the Assessments tab's
- *  formative/summative filters. */
+ *  fails it. The read path re-runs it (`assessmentFromRow`), so a mistyped kind
+ *  that slipped past the write comes back `undefined`: the assessment silently
+ *  drops out of Formative / Summative into the B3 drawer's Unclassified group,
+ *  losing the teacher's classification with no error raised anywhere. */
 export function isAssessmentKind(
   value: unknown,
 ): value is NonNullable<LessonAssessment["kind"]> {
