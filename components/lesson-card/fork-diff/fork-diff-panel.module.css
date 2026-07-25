@@ -113,28 +113,40 @@
 
 /* "Team" / "Yours" tag — doubles as the screen-reader-visible naming of
    which side is which (no color-only meaning). */
+/* BUILD_STANDARD.md:320 Label role — Jakarta 11px / .09em / 700 / UPPERCASE.
+   Was 9.5px / 0.4px: not an outlier by size (this codebase has 8px and 9px
+   labels too), but off the ROLE, which is the thing the standard actually
+   pins. `--t-11` is that size on the token scale (CLAUDE.md §4 — never a raw
+   px font-size), and .09em is the tracking the role specifies rather than the
+   fixed 0.4px, so it now scales with the size instead of drifting from it. */
 .valueTag {
   flex: 0 0 auto;
-  font-size: 9.5px;
+  font-size: var(--t-11);
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
 .removed .valueTag {
   /* AA: --danger (#ef5a5a) on --danger-tint (#fdecec) is only ~2.93:1 —
-     9.5px uppercase text needs ≥4.5:1. --tag-red-fg (#991b1b, the deep
+     this 11px uppercase text needs ≥4.5:1. --tag-red-fg (#991b1b, the deep
      chip-text red the tag-pill chrome pairs already use on a near-identical
      #fee2e2 tint) clears it at ~7.28:1 on this tint (~8.31:1 on white).
-     The tint background stays — only the small-text color deepens. */
+     The tint background stays — only the small-text color deepens.
+
+     The 9.5px→11px Label-role bump did NOT move this bar: WCAG's large-text
+     allowance (3:1) starts at 24px, or 18.66px when bold, so every size this
+     tag could plausibly take is small text at 4.5:1. Re-measured live after
+     the bump rather than inherited — see scripts/probe-fork-diff-label.mjs. */
   color: var(--tag-red-fg);
 }
 
 .added .valueTag {
   /* AA: --done (#16a06b) on --done-tint (#e4f6ee) is only ~2.98:1 — same
-     small-text ≥4.5:1 bar as above. --tag-green-fg (#166534, the deep
-     chip-text green of the tag-pill chrome) clears it at ~6.35:1 on this
-     tint (~7.13:1 on white). Tint background unchanged. */
+     small-text ≥4.5:1 bar as above, and likewise unmoved by the size bump.
+     --tag-green-fg (#166534, the deep chip-text green of the tag-pill
+     chrome) clears it at ~6.35:1 on this tint (~7.13:1 on white). Tint
+     background unchanged. */
   color: var(--tag-green-fg);
 }
 
