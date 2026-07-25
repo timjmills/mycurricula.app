@@ -8,7 +8,8 @@ import {
   type ComposerOpenOptions,
   type ResMenuOptions,
 } from "@/components/composer/composer-state";
-import type { Lesson } from "@/lib/types";
+import { hasResMenuActions } from "@/components/composer/ResMenu";
+import type { Lesson, LessonResource } from "@/lib/types";
 
 // Pure-core tests for the Shared Composer (B4.0 + B4.1). The React wrappers
 // (provider/host/menu) are thin shells over these; the node vitest harness only
@@ -49,6 +50,51 @@ describe("resMenuOpenUrl — the single isSafeUrl sink", () => {
     expect(resMenuOpenUrl({ url: "/\t/evil.example/x" })).toBeNull(); // smuggle char
     expect(resMenuOpenUrl({ url: undefined })).toBeNull();
     expect(resMenuOpenUrl({ url: "" })).toBeNull();
+  });
+});
+
+describe("hasResMenuActions — the empty-menu guard", () => {
+  // The REAL predicate ResMenuTrigger calls, imported rather than restated:
+  // a copy here would keep passing after the rule changed.
+  const noUrl = { type: "notecard", label: "Note" } as LessonResource;
+  const safeUrl = {
+    type: "link",
+    label: "R",
+    url: "https://example.com/a",
+  } as LessonResource;
+  const unsafeUrl = {
+    type: "link",
+    label: "R",
+    url: "javascript:alert(1)",
+  } as LessonResource;
+
+  it("is false when a resource has no safe url and no callbacks", () => {
+    // The case that would otherwise paint a popover containing nothing.
+    expect(hasResMenuActions({ resource: noUrl })).toBe(false);
+    expect(hasResMenuActions({ resource: unsafeUrl })).toBe(false);
+  });
+
+  it("is true on a safe url alone (read-only rows still open + copy)", () => {
+    expect(hasResMenuActions({ resource: safeUrl })).toBe(true);
+  });
+
+  it("is true on any single callback, even with no url at all", () => {
+    // A notecard has no url — Edit is the whole point of its menu.
+    expect(hasResMenuActions({ resource: noUrl, onEdit: () => {} })).toBe(true);
+    expect(hasResMenuActions({ resource: noUrl, onRemove: () => {} })).toBe(
+      true,
+    );
+    expect(hasResMenuActions({ resource: noUrl, onOpen: () => {} })).toBe(true);
+  });
+
+  it("routes its url check through the isSafeUrl sink, not a second guard", () => {
+    // The tab-smuggle that defeated a hand-rolled local guard: the browser
+    // strips the \t AFTER a naive regex has already approved the string.
+    const smuggled = { type: "link", label: "R", url: "/\t/evil.example/x" };
+    expect(resMenuOpenUrl(smuggled)).toBeNull();
+    expect(hasResMenuActions({ resource: smuggled as LessonResource })).toBe(
+      false,
+    );
   });
 });
 

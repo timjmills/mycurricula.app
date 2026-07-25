@@ -24,8 +24,11 @@
 // list) — it renders regardless of the global onboarding-tooltip switch and
 // carries no "turn off these tips" escape hatch.
 //
-// DORMANT in this tranche: exposed via ComposerProvider.openResMenu but no live
-// surface calls it yet (the B4.3+ host migrations consume it).
+// LIVE as of the lesson-editor resource row: SectionBlock's chips open this
+// menu through <ResMenuTrigger>, which is the handoff's placement for it
+// (source-planning-hub/ph-workspace.jsx:400 — `.rmore`, "More — open, edit,
+// remove"; README:96-98 names "workspace resource pills and the planbook
+// chips"). It was dormant from B4.1 until then.
 
 import {
   useCallback,
@@ -47,6 +50,27 @@ export interface ResMenuProps extends ResMenuOptions {
 }
 
 const VIEWPORT_MARGIN = 8;
+
+/**
+ * Would a ResMenu built from these options render ANY item?
+ *
+ * Open / Edit / Remove each render only when their callback is supplied, and
+ * the two url items only when `resMenuOpenUrl` (the isSafeUrl sink) yields a
+ * url — so a resource with no safe url and no callbacks paints an EMPTY
+ * popover. A trigger consults this to decide whether to render at all: a
+ * control whose only outcome is a blank menu should not exist. Kept beside the
+ * render it describes so the two cannot drift.
+ */
+export function hasResMenuActions(
+  opts: Pick<ResMenuOptions, "resource" | "onOpen" | "onEdit" | "onRemove">,
+): boolean {
+  return Boolean(
+    opts.onOpen ||
+      opts.onEdit ||
+      opts.onRemove ||
+      resMenuOpenUrl(opts.resource),
+  );
+}
 
 export function ResMenu({
   resource,
@@ -125,6 +149,23 @@ export function ResMenu({
       ?.querySelector<HTMLElement>('[role="menuitem"]')
       ?.focus({ preventScroll: true });
   }, []);
+
+  // Reflect the open state ON THE TRIGGER, because the trigger cannot observe
+  // it otherwise: this menu is a provider SINGLETON whose every close path
+  // (Esc, Tab, outside-click, scroll, resize, item select) lives in here, and
+  // the actions context deliberately carries no state so openers never
+  // re-render. Writing the attribute from the element that actually knows keeps
+  // it honest, and it is the signal ResMenuTrigger needs to TOGGLE the menu
+  // shut on a second click (§4a round-2) instead of re-dispatching an open that
+  // changes nothing on screen. Keyed on triggerEl so handing the menu to a
+  // DIFFERENT trigger clears the old one's flag in the same pass.
+  useEffect(() => {
+    if (!triggerEl) return;
+    triggerEl.setAttribute("aria-expanded", "true");
+    return () => {
+      triggerEl.setAttribute("aria-expanded", "false");
+    };
+  }, [triggerEl]);
 
   // Return focus to the (still-connected) trigger after a KEYBOARD close or an
   // action selection — otherwise the focused portaled button unmounts and focus

@@ -73,8 +73,60 @@
   margin: 4px 8px;
 }
 
+/* ── The "⋯" trigger (ResMenuTrigger) ────────────────────────────────────
+ *
+ * Deliberately TONE-AGNOSTIC by inheritance: it takes `color: inherit` from
+ * whatever row/chip hosts it, so it is legible on a dark-tone glass chip and a
+ * light-tone one without branching on either (the §4 contract's cheapest form
+ * — inherit the surface's own resolved ink instead of re-deciding it). The
+ * hover fill mixes from `currentColor` for the same reason. */
+.trigger.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  /* Full-strength inherited ink, NOT a faded one. `opacity` fades the glyph
+   * itself, so quietening it that way is not a colour decision the tone
+   * contract can reason about — measured, `opacity: 0.7` painted the ⋯ at
+   * 2.64:1 on its chip, under the 3:1 bar for a non-text control. The ⋯ is
+   * kept subordinate by SIZE and by carrying no fill at rest instead. */
+  color: inherit;
+  font-size: var(--t-12);
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.trigger.trigger:hover,
+.trigger.trigger:focus-visible {
+  background: color-mix(in oklab, currentColor 14%, transparent);
+}
+
+.trigger.trigger:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+
+/* ≥44px touch target (CLAUDE.md §4). `any-pointer`, NOT `pointer`: a
+ * touchscreen laptop reports `pointer: fine` with `any-pointer: coarse`, so the
+ * narrower query would leave a real finger a ~20px target. This is a superset —
+ * a coarse PRIMARY pointer implies a coarse any-pointer — and it cannot touch
+ * mouse-only machines, which match neither. (The neighbouring chip rules in
+ * lesson-editor.module.css still use the narrow form; that is the standing
+ * any-pointer sweep's to widen, not this lane's.) */
+@media (any-pointer: coarse) {
+  .trigger.trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .menuItem.menuItem {
+  .menuItem.menuItem,
+  .trigger.trigger {
     transition: none;
   }
 }

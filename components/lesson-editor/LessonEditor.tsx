@@ -64,6 +64,7 @@ import {
 import { useReducedMotion } from "framer-motion";
 import type {
   LessonSectionContent,
+  SectionResource,
   SectionTintScope,
 } from "@/lib/lesson-flow";
 import {
@@ -502,6 +503,29 @@ export function LessonEditor({
     },
     [removeSectionResource, lessonId],
   );
+  // The chip's ⋯ → Edit. Same shape as LessonFlow's note editor
+  // (components/lesson-flow/lesson-flow.tsx): notecard mode + an editResource
+  // target, so the composer opens PREFILLED with the resource's label, body
+  // and gallery and PATCHES that row on commit instead of creating a new one.
+  // Routing locks itself in edit mode (`routingLocked = lockRouting ||
+  // isEditMode`), so no lockRouting is passed here.
+  const handleEditResource = useCallback(
+    (sectionId: string, resource: SectionResource) => {
+      if (!lesson) return;
+      openSharedComposer({
+        lesson,
+        mode: "notecard",
+        editResource: {
+          lessonId,
+          sectionId,
+          resourceId: resource.id,
+          resource,
+        },
+        initialSectionId: sectionId,
+      });
+    },
+    [lesson, lessonId, openSharedComposer],
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────
   const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
@@ -555,6 +579,7 @@ export function LessonEditor({
               onDuplicate={handleDuplicate}
               onDelete={canDelete ? handleDelete : undefined}
               onRemoveResource={handleRemoveResource}
+              onEditResource={handleEditResource}
             />
           ))}
         </SortableContext>

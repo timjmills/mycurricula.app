@@ -13,8 +13,11 @@ export type { ComposerActions } from "./ComposerProvider";
 
 export { ComposerHost } from "./ComposerHost";
 
-export { ResMenu } from "./ResMenu";
+export { ResMenu, hasResMenuActions } from "./ResMenu";
 export type { ResMenuProps } from "./ResMenu";
+
+export { ResMenuTrigger } from "./ResMenuTrigger";
+export type { ResMenuTriggerProps } from "./ResMenuTrigger";
 
 export { resMenuOpenUrl, composerPropsFrom } from "./composer-state";
 export type {

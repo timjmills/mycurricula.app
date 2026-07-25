@@ -22,13 +22,15 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type {
   LessonSectionContent,
+  SectionResource,
   SectionTintScope,
 } from "@/lib/lesson-flow";
 import { DEFAULT_TINT_SCOPE, resolveSectionWash } from "@/lib/lesson-flow";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { stripHtml } from "@/lib/html-text";
+import { useUndoToastOptional } from "@/lib/undo-toast";
 import { RichTextEditor } from "@/components/rich-text";
-import { Tooltip } from "@/components/ui";
+import { ResMenuTrigger } from "@/components/composer";
 import { SectionMenu, ColorDot } from "./SectionMenu";
 import { AddResourceMenu, type AddResourceRequest } from "./AddResourceMenu";
 import { AddStandardFooter } from "./AddStandardFooter";
@@ -75,6 +77,10 @@ export interface SectionBlockProps {
   /** Absent → Delete hidden (resources permanence D7 / last section). */
   onDelete?: (sectionId: string) => void;
   onRemoveResource: (sectionId: string, resourceId: string) => void;
+  /** Open the composer on an EXISTING chip (label + notes + gallery). Lives
+   *  on the host because the composer's edit target needs the lesson, which
+   *  this block deliberately does not hold. Absent → Edit hidden. */
+  onEditResource?: (sectionId: string, resource: SectionResource) => void;
 }
 
 export const SectionBlock = memo(function SectionBlock({
@@ -96,7 +102,11 @@ export const SectionBlock = memo(function SectionBlock({
   onDuplicate,
   onDelete,
   onRemoveResource,
+  onEditResource,
 }: SectionBlockProps): ReactNode {
+  // Optional: the editor also mounts in hosts that carry no toast provider —
+  // "Link copied" is a confirmation, never a precondition for copying.
+  const undoToast = useUndoToastOptional();
   const [renaming, setRenaming] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
@@ -293,24 +303,38 @@ export const SectionBlock = memo(function SectionBlock({
         </div>
       )}
 
-      {/* ── Structured resource chips (never inline HTML — D1) ──────── */}
+      {/* ── Structured resource chips (never inline HTML — D1) ────────
+             The chip's action is the shared ⋯ ResMenu, NOT a bare ✕: until
+             this wiring the only thing a teacher could do to an attached
+             resource from the editor was DELETE it — no open, no edit. The
+             handoff has the same control in the same place
+             (ph-workspace.jsx:400, "More — open, edit, remove"), with Remove
+             demoted into the menu behind a separator. */}
       {section.resources.length > 0 && (
         <div className={styles.chips}>
           {section.resources.map((r) => (
             <span key={r.id} className={styles.chip} title={r.url ?? r.label}>
               <span className={styles.chipLabel}>{r.label}</span>
-              {!readOnly && (
-                <Tooltip content="Remove this resource from the section" required>
-                  <button
-                    type="button"
-                    className={styles.chipRemove}
-                    aria-label={`Remove resource ${r.label}`}
-                    onClick={() => onRemoveResource(section.id, r.id)}
-                  >
-                    ✕
-                  </button>
-                </Tooltip>
-              )}
+              <ResMenuTrigger
+                resource={r}
+                label={r.label}
+                tooltipId="lesson-editor-resource-more"
+                onCopied={() =>
+                  undoToast?.showUndoToast({ message: "Link copied" })
+                }
+                // Read-only keeps the menu (Open in new tab / Copy link stay
+                // useful when viewing another teacher's plan) but drops both
+                // mutating items. With neither those nor a safe url, the
+                // trigger renders nothing at all rather than an empty menu.
+                onEdit={
+                  readOnly || !onEditResource
+                    ? undefined
+                    : () => onEditResource(section.id, r)
+                }
+                onRemove={
+                  readOnly ? undefined : () => onRemoveResource(section.id, r.id)
+                }
+              />
             </span>
           ))}
         </div>
