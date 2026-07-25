@@ -80,6 +80,7 @@ import { SUBJECTS } from "../mock/subjects";
 // this leaf so they are unit-testable without this server-only module.
 import {
   assessmentFromRow,
+  isCompletionOnlyPatch,
   lessonTrackBColumns,
   type LessonTrackBRow,
 } from "./lesson-track-b";
@@ -96,7 +97,6 @@ import type { LessonSectionContent } from "../lesson-flow";
 import type { SectionResource } from "../lesson-flow";
 import {
   type LessonMoveTarget,
-  type LessonPatch,
   type PlannerDataSource,
   type SaveTarget,
 } from "./source";
@@ -1679,44 +1679,34 @@ export const plannerSupabaseSource: PlannerDataSource = {
       return reloadAuthoredLesson(client, lessonId, ownerId);
     }
 
-    // Master-derived path: status-only patch is delegated to setLessonStatus
-    // (which never forks); any content key forks the lesson. The Track-B rich
-    // fields (B2) are ALL content — each must appear here so a Track-B-only edit
-    // (e.g. an assessment-only change) forks in Personal mode / writes master in
-    // Team mode, rather than falling through the status-only branch into a
-    // spurious EMPTY fork (the `time` hazard — a contentKey with no column).
-    // `taughtAt` is NOT here: it is read-only in B2 (never patched).
-    const contentKeys: (keyof LessonPatch)[] = [
-      "title",
-      "objective",
-      "preview",
-      "directions",
-      "notes",
-      "resources",
-      "standards",
-      "time",
-      "tasks",
-      "differentiation",
-      "durationMinutes",
-      "assessment",
-      "builds",
-      "prep",
-      "frameworkId",
-      "frameworkData",
-      "carried",
-    ];
-    // A cleared Track-B field is PRESENT-but-undefined in the patch, so the
-    // `!== undefined` scan alone would miss it; OR-in the mapped columns so a
-    // clear still counts as content (never a status-only delegate, never a
-    // spurious empty fork).
-    const hasContent =
-      contentKeys.some((k) => patch[k] !== undefined) ||
-      Object.keys(trackBCols).length > 0;
-
-    if (patch.status !== undefined && !hasContent) {
-      // Status-only patch: never forks (completion is always per-teacher, so the
-      // saveTarget is irrelevant here — see setLessonStatus).
-      return this.setLessonStatus(lessonId, patch.status, ownerId);
+    // Master-derived path: a COMPLETION-ONLY patch never forks; any content key
+    // forks the lesson. Both predicates live in the pure `lesson-track-b` leaf
+    // (LESSON_CONTENT_KEYS / patchHasContent / isCompletionOnlyPatch) so the
+    // gate is unit-testable without this server-only module, and so the content
+    // key list cannot drift from the column mapper that sits beside it.
+    //
+    // COMPLETION-ONLY patch: never forks (completion is always per-teacher, so
+    // the saveTarget is irrelevant here — see setLessonStatus).
+    //
+    // `reasonNotDone` is part of completion, and leaving it out of this gate
+    // broke CLAUDE.md §2 twice over. `{status, reasonNotDone}` delegated to
+    // `setLessonStatus`, which takes no reason, and the reason was silently
+    // dropped. `{reasonNotDone}` alone left the content check false with an undefined
+    // status, fell past this gate, and reached `forkAndPatch` with an EMPTY
+    // mapper — minting a personal copy stamped `is_diverged_from_master` for a
+    // lesson whose content never changed: a "Modified" pill on a fork that
+    // exists only because the teacher said why a lesson did not happen.
+    // Completion must NEVER fork. (Only master-derived lessons reach here — the
+    // authored branch above already writes both completion columns itself.)
+    if (isCompletionOnlyPatch(patch)) {
+      await writeStatus(
+        client,
+        lessonId,
+        ownerId,
+        patch.status,
+        patch.reasonNotDone,
+      );
+      return reloadLesson(client, lessonId, ownerId);
     }
 
     // ── #14 AUTHORIZED MASTER-WRITE ──────────────────────────────────────────
@@ -2020,6 +2010,58 @@ export const plannerSupabaseSource: PlannerDataSource = {
     await forkAndPatch(client, lessonId, ownerId, () => ({
       archived_at: new Date().toISOString(),
     }));
+  },
+
+  async unarchiveLesson(lessonId, ownerId) {
+    // The exact mirror of softDeleteLesson, and the write that makes an archive
+    // Undo real instead of reducer-only.
+    const client = await sb();
+
+    // 1. Authored lesson → clear its own `deleted_at`.
+    const authoredRes = await client
+      .from("personal_authored_lessons")
+      .select("id")
+      .eq("id", lessonId)
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+    const authored = unwrapMaybe(
+      authoredRes,
+      "unarchive lesson (authored lookup)",
+    ) as { id: string } | null;
+    if (authored) {
+      const res = await client
+        .from("personal_authored_lessons")
+        .update({ deleted_at: null })
+        .eq("id", lessonId)
+        .eq("owner_id", ownerId);
+      if (res.error) {
+        throw new Error(
+          `Planner repository unarchive authored lesson failed: ${res.error.message}`,
+        );
+      }
+      return;
+    }
+
+    // 2. Master-derived lesson → clear `archived_at` on the owner's personal
+    //    copy. Deliberately NOT forkAndPatch: that would MINT a personal copy
+    //    (and stamp `is_diverged_from_master`) for a lesson the teacher never
+    //    forked — a "Modified" pill and a fork conjured out of an un-archive.
+    //    No copy means nothing was ever archived, so a plain no-op is correct.
+    //    Note the .eq() is on the copy's own archive flag being non-null only
+    //    implicitly: clearing an already-null column is harmless and keeps this
+    //    idempotent (the contract promises it).
+    const copy = await loadCopy(client, lessonId, ownerId);
+    if (!copy) return;
+    const res = await client
+      .from("personal_core_lesson_event_copies")
+      .update({ archived_at: null })
+      .eq("id", copy.id)
+      .eq("teacher_id", ownerId);
+    if (res.error) {
+      throw new Error(
+        `Planner repository unarchive lesson failed: ${res.error.message}`,
+      );
+    }
   },
 
   // ── Unit mutations ─────────────────────────────────────────────────────────

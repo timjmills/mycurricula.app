@@ -72,6 +72,48 @@ interface Entry {
   onResult?: (ok: boolean) => void;
 }
 
+/**
+ * Which keys of a RETAINED failed patch have gone stale — i.e. the unit's
+ * server-confirmed value for that key is no longer what it was when the write
+ * failed.
+ *
+ * WHY THIS MATTERS. A retained patch outlives the editor that authored it (that
+ * is the point — §4a R5 H2) and it also outlives a RE-HYDRATE, which is where it
+ * turns dangerous. Teacher A's `bigIdea:"A"` fails; a re-hydrate later brings in
+ * teammate B's `bigIdea:"C"`; A clicks Retry and the queue re-sends `"A"`
+ * verbatim, reverting a TEAM value to text that was not on screen at retry
+ * time — and because the retry genuinely commits, `onResult(true)` clears the
+ * banner and it reads as success. Units are shared content, so this is a
+ * silent team-wide revert.
+ *
+ * `baseline` is what the unit held when the write failed; `current` is what it
+ * holds now. A key whose value moved between the two is reported, and the caller
+ * must drop it from the retry rather than blind-overwrite.
+ *
+ * Pure and exported so the rule is unit-testable without a queue or a store.
+ */
+export function staleUnitPatchKeys(
+  patch: UnitPatch,
+  baseline: UnitPatch,
+  current: UnitPatch,
+): (keyof UnitPatch)[] {
+  const stale: (keyof UnitPatch)[] = [];
+  for (const key of Object.keys(patch) as (keyof UnitPatch)[]) {
+    const was = baseline[key];
+    const now = current[key];
+    if (was === now) continue;
+    // Structural compare: the catalog rebuilds unit objects on every confirmed
+    // write, so reference equality reports far too many keys as moved. Absent
+    // and `undefined` are the same value to the write path.
+    if (was === undefined || now === undefined) {
+      stale.push(key);
+      continue;
+    }
+    if (JSON.stringify(was) !== JSON.stringify(now)) stale.push(key);
+  }
+  return stale;
+}
+
 export function createUnitWriteQueue(deps: UnitWriteQueueDeps): UnitWriteQueue {
   const queue = new Map<string, Entry>();
 

@@ -297,7 +297,16 @@ describe("read/write-path lock — lesson + unit seams both LIVE (B1.7 + B2)", (
     const applies = src.match(/Object\.assign\(next, trackBCols\)/g) ?? [];
     expect(applies.length).toBe(3);
     // The mapper result also gates content (a cleared field still forks/writes).
-    expect(src).toContain("Object.keys(trackBCols).length > 0");
+    // That gate MOVED into the pure leaf (`patchHasContent`) so it is testable
+    // without this server-only module — see tests/planner-completion-gate.ts.
+    // The lock follows it: the source must delegate, and the leaf must OR the
+    // mapped columns in, or a cleared Track-B field stops counting as content
+    // and falls into the completion-only branch (dropping the clear AND skipping
+    // the fork).
+    expect(src).toContain("isCompletionOnlyPatch(patch)");
+    expect(trackBSrc).toContain(
+      "Object.keys(lessonTrackBColumns(patch)).length",
+    );
   });
 
   it("first personal fork clones EVERY Track-B column from master (§4a HIGH-1 — no data loss)", () => {

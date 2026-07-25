@@ -95,3 +95,65 @@ export function lessonTrackBColumns(patch: LessonPatch): LessonTrackBRow {
   }
   return next;
 }
+
+/** The lesson-CONTENT keys of a `LessonPatch` — the ones whose presence must
+ *  fork a master-derived lesson in Personal mode (or write master in Team mode).
+ *  Kept HERE, beside the Track-B column mapper, so the content gate and the
+ *  column mapper cannot drift apart.
+ *
+ *  `time` is included but has NO column: every write branch skips it. That is
+ *  deliberate and is why a time-only edit must never reach `updateLesson` at all
+ *  (the store keeps re-times reducer-local) — it would fork with an empty patch.
+ *  `taughtAt` is absent: read-only in B2. `reasonNotDone` is absent because it is
+ *  COMPLETION, not content — see `isCompletionOnlyPatch`. */
+export const LESSON_CONTENT_KEYS: readonly (keyof LessonPatch)[] = [
+  "title",
+  "objective",
+  "preview",
+  "directions",
+  "notes",
+  "resources",
+  "standards",
+  "time",
+  "tasks",
+  "differentiation",
+  "durationMinutes",
+  "assessment",
+  "builds",
+  "prep",
+  "frameworkId",
+  "frameworkData",
+  "carried",
+];
+
+/**
+ * Does this patch carry lesson CONTENT (as opposed to completion alone)?
+ *
+ * A cleared Track-B field is PRESENT-but-undefined in the patch, so a
+ * `!== undefined` scan alone would miss it — hence the OR against the mapped
+ * columns, which use `in patch` semantics.
+ */
+export function patchHasContent(patch: LessonPatch): boolean {
+  return (
+    LESSON_CONTENT_KEYS.some((k) => patch[k] !== undefined) ||
+    Object.keys(lessonTrackBColumns(patch)).length > 0
+  );
+}
+
+/**
+ * Is this patch COMPLETION-ONLY — `status` and/or `reasonNotDone`, with no
+ * content? Such a patch must NEVER fork (CLAUDE.md §2: completion is always
+ * per-teacher).
+ *
+ * `reasonNotDone` belongs here and its omission broke the rule twice:
+ * `{status, reasonNotDone}` was delegated to a status-only writer that dropped
+ * the reason, and `{reasonNotDone}` alone fell all the way through to the fork
+ * path with an EMPTY column mapper — minting a personal copy stamped
+ * `is_diverged_from_master` (a "Modified" pill) for a lesson whose content never
+ * changed.
+ */
+export function isCompletionOnlyPatch(patch: LessonPatch): boolean {
+  const touchesCompletion =
+    patch.status !== undefined || patch.reasonNotDone !== undefined;
+  return touchesCompletion && !patchHasContent(patch);
+}

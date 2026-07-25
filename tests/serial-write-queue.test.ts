@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { createSerialWriteQueue } from "@/lib/planner/serial-write-queue";
+import {
+  createSerialWriteQueue,
+  SerialWriteTimeoutError,
+} from "@/lib/planner/serial-write-queue";
 
 // The queue is the planner's write-durability mechanism: a regression here loses
 // teacher edits silently, and only on reload. Every test therefore drives real
@@ -298,5 +301,189 @@ describe("createSerialWriteQueue — slot lifecycle", () => {
     gate.resolve();
     await flush();
     expect(q.activeKeyCount()).toBe(0);
+  });
+});
+
+// ── The watchdog ──────────────────────────────────────────────────────────
+// The contract above assumes every send eventually settles. A send that NEVER
+// settles used to wedge its key permanently: `inFlight` stayed true, every later
+// payload parked in `pending` and was never sent, and nothing was logged —
+// because nothing failed. That is the exact silent loss this module exists to
+// prevent, made permanent for the rest of the session. These pin the bound.
+//
+// Timers are INJECTED so the tests are deterministic: `fire()` is the timeout
+// arriving, with no wall-clock wait and no reliance on fake-timer ordering
+// against the promise chain.
+
+/** A controllable timer pair: `fire()` runs the pending callback on demand. */
+function manualTimers(): {
+  timers: {
+    setTimeout: (fn: () => void, ms: number) => unknown;
+    clearTimeout: (h: unknown) => void;
+  };
+  fire: () => void;
+  pending: () => number;
+} {
+  const scheduled = new Map<number, () => void>();
+  let next = 1;
+  return {
+    timers: {
+      setTimeout: (fn: () => void) => {
+        const id = next;
+        next += 1;
+        scheduled.set(id, fn);
+        return id;
+      },
+      clearTimeout: (h: unknown) => {
+        scheduled.delete(h as number);
+      },
+    },
+    fire: () => {
+      for (const [id, fn] of [...scheduled]) {
+        scheduled.delete(id);
+        fn();
+      }
+    },
+    pending: () => scheduled.size,
+  };
+}
+
+describe("createSerialWriteQueue — hung-send watchdog", () => {
+  it("releases a key whose send never settles, and drains what was pending", async () => {
+    const { timers, fire } = manualTimers();
+    const sent: string[] = [];
+    let call = 0;
+    const q = createSerialWriteQueue<string>({
+      send: (p) => {
+        sent.push(p);
+        call += 1;
+        // The first send NEVER settles — a black-holed request.
+        return call === 1 ? new Promise<void>(() => {}) : Promise.resolve();
+      },
+      onError: () => {},
+      timeoutMs: 20_000,
+      timers,
+    });
+
+    q.enqueue("k", "a");
+    q.enqueue("k", "b");
+    await flush();
+    // Before the timeout, "b" correctly waits behind the in-flight "a".
+    expect(sent).toEqual(["a"]);
+
+    fire(); // the watchdog fires
+    await flush();
+    // WITHOUT the watchdog this stayed ["a"] forever and "b" was lost.
+    expect(sent).toEqual(["a", "b"]);
+    expect(q.activeKeyCount()).toBe(0);
+  });
+
+  it("reports the timeout through onError with the payload that hung", async () => {
+    const { timers, fire } = manualTimers();
+    const seen: { error: unknown; payload: string }[] = [];
+    const q = createSerialWriteQueue<string>({
+      send: () => new Promise<void>(() => {}),
+      onError: (error, payload) => seen.push({ error, payload }),
+      timeoutMs: 20_000,
+      timers,
+    });
+
+    q.enqueue("k", "a");
+    await flush();
+    expect(seen).toEqual([]);
+
+    fire();
+    await flush();
+    // Silence is the failure mode being fixed — the drop must be surfaced.
+    expect(seen).toHaveLength(1);
+    expect(seen[0].payload).toBe("a");
+    expect(seen[0].error).toBeInstanceOf(SerialWriteTimeoutError);
+    expect((seen[0].error as Error).message).toContain("k");
+  });
+
+  it("does not fire the watchdog for a send that settles normally", async () => {
+    const { timers, fire, pending } = manualTimers();
+    const errors: unknown[] = [];
+    const q = createSerialWriteQueue<string>({
+      send: () => Promise.resolve(),
+      onError: (e) => errors.push(e),
+      timeoutMs: 20_000,
+      timers,
+    });
+
+    q.enqueue("k", "a");
+    await flush();
+    // The timer must be CLEARED on settle, or a long session leaks one per write.
+    expect(pending()).toBe(0);
+    fire(); // no-op: nothing is scheduled
+    await flush();
+    expect(errors).toEqual([]);
+  });
+
+  it("reports a rejection ONCE, not twice, when the watchdog also fires", async () => {
+    const { timers, fire } = manualTimers();
+    const gate = deferred();
+    const errors: unknown[] = [];
+    const q = createSerialWriteQueue<string>({
+      send: () => gate.promise,
+      onError: (e) => errors.push(e),
+      timeoutMs: 20_000,
+      timers,
+    });
+
+    q.enqueue("k", "a");
+    await flush();
+    fire(); // watchdog gives up first
+    await flush();
+    expect(errors).toHaveLength(1);
+
+    // The abandoned request answers late. It must not report again, and must not
+    // release a slot a newer send may now hold.
+    gate.reject(new Error("late failure"));
+    await flush();
+    expect(errors).toHaveLength(1);
+  });
+
+  it("a late answer from an abandoned send cannot double-drain the key", async () => {
+    const { timers, fire } = manualTimers();
+    const late = deferred();
+    const sent: string[] = [];
+    let call = 0;
+    const q = createSerialWriteQueue<string>({
+      send: (p) => {
+        sent.push(p);
+        call += 1;
+        return call === 1 ? late.promise : new Promise<void>(() => {});
+      },
+      onError: () => {},
+      timeoutMs: 20_000,
+      timers,
+    });
+
+    q.enqueue("k", "a");
+    q.enqueue("k", "b");
+    await flush();
+    fire(); // "a" abandoned → "b" sent
+    await flush();
+    expect(sent).toEqual(["a", "b"]);
+
+    q.enqueue("k", "c"); // parks behind the in-flight "b"
+    late.resolve(); // "a" finally answers
+    await flush();
+    // "c" must still be waiting on "b" — the stale settle must not have released
+    // the slot, which would run "b" and "c" concurrently for one key.
+    expect(sent).toEqual(["a", "b"]);
+  });
+
+  it("timeoutMs: 0 disables the watchdog entirely", async () => {
+    const { timers, pending } = manualTimers();
+    const q = createSerialWriteQueue<string>({
+      send: () => new Promise<void>(() => {}),
+      timeoutMs: 0,
+      timers,
+    });
+    q.enqueue("k", "a");
+    await flush();
+    expect(pending()).toBe(0);
   });
 });

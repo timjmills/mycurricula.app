@@ -6,7 +6,10 @@
 // and is driven here with a fake, controllable client.
 
 import { describe, expect, it, vi } from "vitest";
-import { createUnitWriteQueue } from "@/lib/planner/unit-write-queue";
+import {
+  createUnitWriteQueue,
+  staleUnitPatchKeys,
+} from "@/lib/planner/unit-write-queue";
 import type { UnitPatch } from "@/lib/planner/source";
 import type { Unit } from "@/lib/types";
 
@@ -274,5 +277,89 @@ describe("unit-write-queue — failed-write retention outside the component (R5 
     sends[2].d.resolve(U({ bigIdea: "B2" }));
     await tick();
     expect(retained.has("u1")).toBe(false);
+  });
+});
+
+// ── Retry staleness ────────────────────────────────────────────────────────
+// A retained failed patch outlives the editor that authored it — that is the
+// point (§4a R5 H2). It also outlives a RE-HYDRATE, which is where it turns
+// dangerous. Units are TEAM content, so re-sending a stale patch reverts a value
+// for everyone, and because the retry genuinely commits, `onResult(true)` clears
+// the banner and it reads as success. `staleUnitPatchKeys` is what stops that.
+
+describe("staleUnitPatchKeys — the retry guard", () => {
+  it("reports nothing when the unit has not moved since the failure", () => {
+    expect(
+      staleUnitPatchKeys(
+        { bigIdea: "A" },
+        { bigIdea: "orig" },
+        { bigIdea: "orig" },
+      ),
+    ).toEqual([]);
+  });
+
+  it("reports a field a teammate changed after the write failed", () => {
+    // A queued "A" fails; a re-hydrate brings in B's "C"; Retry must NOT
+    // overwrite "C" with "A" — text that was never on screen at retry time.
+    expect(
+      staleUnitPatchKeys({ bigIdea: "A" }, { bigIdea: "orig" }, { bigIdea: "C" }),
+    ).toEqual(["bigIdea"]);
+  });
+
+  it("reports only the MOVED fields, so the rest of the retry still goes", () => {
+    expect(
+      staleUnitPatchKeys(
+        { bigIdea: "A", notes: "N" },
+        { bigIdea: "orig", notes: "n0" },
+        { bigIdea: "C", notes: "n0" },
+      ),
+    ).toEqual(["bigIdea"]);
+  });
+
+  it("treats a value that APPEARED as stale", () => {
+    // Baseline absent (the field was unset), current set → someone filled it in.
+    expect(staleUnitPatchKeys({ notes: "N" }, {}, { notes: "theirs" })).toEqual([
+      "notes",
+    ]);
+  });
+
+  it("treats a value that was CLEARED as stale", () => {
+    expect(staleUnitPatchKeys({ notes: "N" }, { notes: "was" }, {})).toEqual([
+      "notes",
+    ]);
+  });
+
+  it("compares structurally, not by reference", () => {
+    // The catalog rebuilds unit objects on every confirmed write, so reference
+    // equality would report every array/object field as moved and refuse every
+    // retry — the guard would silently become a blanket "never retry".
+    expect(
+      staleUnitPatchKeys(
+        { vocab: [{ term: "t", definition: "d" }] },
+        { vocab: [{ term: "was", definition: "d0" }] },
+        { vocab: [{ term: "was", definition: "d0" }] },
+      ),
+    ).toEqual([]);
+  });
+
+  it("detects a real change inside an object field", () => {
+    expect(
+      staleUnitPatchKeys(
+        { vocab: [{ term: "t", definition: "d" }] },
+        { vocab: [{ term: "was", definition: "d0" }] },
+        { vocab: [{ term: "theirs", definition: "d0" }] },
+      ),
+    ).toEqual(["vocab"]);
+  });
+
+  it("ignores fields the retry does not carry", () => {
+    // A teammate editing an UNRELATED field must not block this retry.
+    expect(
+      staleUnitPatchKeys(
+        { bigIdea: "A" },
+        { bigIdea: "orig", notes: "n0" },
+        { bigIdea: "orig", notes: "theirs" },
+      ),
+    ).toEqual([]);
   });
 });

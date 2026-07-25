@@ -288,10 +288,30 @@ grant execute on function public.reorder_unit_assessments(uuid, uuid[]) to authe
 --   * Any change to the LESSON assessment columns. B2's four
 --     `assessment_*` columns on the three fork tables are untouched.
 --
+-- ⛔ DO NOT RE-APPLY THIS FILE ON ITS OWN. It is superseded by
+-- `20260729140000_unit_assessments_policy_split.sql`, which DROPS the
+-- `unit_assessments_write` policy created below and replaces it with
+-- command-specific INSERT / UPDATE / DELETE policies. A `FOR ALL` policy also
+-- grants SELECT, so re-running this file standalone silently RE-WIDENS reads
+-- from `can_read_grade` alone to `read ∪ write ∪ admin` — the exact leak 140000
+-- exists to close, re-opened with no error and nothing to notice.
+--
+-- `supabase db push` is SAFE: it applies pending files in timestamp order, so
+-- 140000 lands after this one and the split policies win. Only a STANDALONE
+-- `db query -f` re-apply (or a repair-then-rerun) is dangerous. If you must
+-- re-run this file, re-run 20260729140000 immediately after it, then verify the
+-- policy list with the pg_policy query below — it must show
+-- unit_assessments_read / _insert / _update / _delete and NO _write.
+--
 -- APPLY-DAY RUNBOOK (hand-apply — ORCHESTRATOR + USER ONLY; agents never apply):
---   # from the project dir (the supabase link lives here):
+--   # from the project dir (the supabase link lives here). Preferred: let push
+--   # order the whole pending set, so the 140000 policy split cannot be skipped.
+--   supabase db push
+--   # If applying by hand instead, BOTH files, in this order — never this one alone:
 --   supabase db query --linked -f supabase/migrations/20260729120000_unit_assessments.sql
+--   supabase db query --linked -f supabase/migrations/20260729140000_unit_assessments_policy_split.sql
 --   supabase migration repair --status applied 20260729120000   # keep history in sync
+--   supabase migration repair --status applied 20260729140000
 --   # verify the table, its RLS, and the RPC:
 --   supabase db query --linked "select relrowsecurity from pg_class
 --     where oid = 'public.unit_assessments'::regclass;"

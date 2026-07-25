@@ -9,7 +9,7 @@
 // round-trip). The Supabase implementation itself needs a live DB, so the
 // runtime RLS behaviour is recorded as it.todo at the end rather than faked.
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -21,17 +21,26 @@ import {
 import { plannerMockSource } from "@/lib/planner/mock-source";
 import type { UnitAssessment } from "@/lib/types";
 
-// ALL THREE migrations, concatenated in timestamp order, so the locks below
+// EVERY migration touching this table, in timestamp order, so the locks below
 // describe the schema that is actually DEPLOYED rather than an intermediate one.
 // Pinning only the first file was a FALSE GUARD: 20260729140000 drops the
 // `unit_assessments_write` FOR ALL policy that a lock still asserted, so this
 // suite stayed green while production carried entirely different policies.
+//
+// DISCOVERED FROM DISK, never hardcoded. A hand-maintained list re-opens that
+// same false guard the moment a fourth migration lands and nobody remembers to
+// add it here — and, worse, `latest` used to be a hardcoded INDEX into the
+// list, so even appending the new file correctly would have left `latest`
+// pointing at the second-newest one.
 const MIGRATION_DIR = join(__dirname, "..", "supabase", "migrations");
-const MIGRATION_FILES = [
-  "20260729120000_unit_assessments.sql",
-  "20260729130000_unit_assessments_anon_revoke.sql",
-  "20260729140000_unit_assessments_policy_split.sql",
-];
+const MIGRATION_FILES = readdirSync(MIGRATION_DIR)
+  .filter((f) => f.endsWith(".sql"))
+  .filter((f) =>
+    readFileSync(join(MIGRATION_DIR, f), "utf8").includes(
+      "public.unit_assessments",
+    ),
+  )
+  .sort(); // filenames are timestamp-prefixed → lexical sort IS apply order
 const SOURCE = join(__dirname, "..", "lib", "planner", "supabase-source.ts");
 
 const sql = MIGRATION_FILES.map((f) =>
@@ -54,9 +63,13 @@ const code = stripComments(sql);
 
 /** ONLY the newest migration, which defines the CURRENT policy + RPC shape. Use
  *  for anything that counts or asserts a final state, so a lock can never be
- *  satisfied by DDL that a later file has already replaced. */
+ *  satisfied by DDL that a later file has already replaced. Taken from the END
+ *  of the discovered list — never a fixed index. */
 const latest = stripComments(
-  readFileSync(join(MIGRATION_DIR, MIGRATION_FILES[2]), "utf8"),
+  readFileSync(
+    join(MIGRATION_DIR, MIGRATION_FILES[MIGRATION_FILES.length - 1]),
+    "utf8",
+  ),
 );
 
 /** The table's column set, in the order the migration declares it. This array
@@ -619,6 +632,55 @@ describe("migration ↔ seam column lock", () => {
     for (const col of selected) {
       expect(ddl, col).toMatch(new RegExp(`^\\s*${col}\\s+\\S`, "m"));
     }
+  });
+
+  it("every column the migration DECLARES is either selected or explicitly excused", () => {
+    // The lock above only runs SELECT-list → migration. That direction alone is
+    // a HALF guard: a column added to the table (here, or by a later `alter
+    // table add column`) that nobody adds to UNIT_ASSESSMENT_COLS ships
+    // INVISIBLY — the seam never reads it, the mapper never sees it, and no test
+    // notices. This is the other direction.
+    const body = code.slice(
+      code.indexOf("create table if not exists public.unit_assessments"),
+    );
+    const ddl = body.slice(0, body.indexOf(");") + 2);
+    const declared = ddl
+      .split("\n")
+      .slice(1) // the `create table (` line
+      .map((l) => l.trim())
+      // Column lines start with an identifier; skip table-level constraints and
+      // the closing paren.
+      .map((l) => /^([a-z_][a-z0-9_]*)\s+\S/.exec(l)?.[1])
+      .filter((c): c is string => Boolean(c))
+      .filter((c) => !["constraint", "primary", "unique", "check"].includes(c));
+
+    // DB-MANAGED, deliberately unread: nothing in the domain maps them, and
+    // selecting them would put a server clock in a client type. Anything else
+    // appearing here is a real gap — add it to UNIT_ASSESSMENT_COLS + the mapper,
+    // or add it to this list with the reason.
+    const EXCUSED = ["created_at", "updated_at"];
+    const unread = declared.filter(
+      (c) => !COLUMNS.includes(c as (typeof COLUMNS)[number]),
+    );
+    expect(unread.sort()).toEqual([...EXCUSED].sort());
+  });
+
+  it("no LATER migration adds a column the seam never learns to read", () => {
+    // The create-table lock cannot see `alter table ... add column`, which is
+    // how a column normally arrives after the fact. Catch it separately so the
+    // half-guard cannot re-open through the back door.
+    const adds = [
+      ...code.matchAll(
+        /alter table (?:if exists )?(?:only )?public\.unit_assessments\s+add column (?:if not exists )?([a-z_][a-z0-9_]*)/gi,
+      ),
+    ].map((m) => m[1].toLowerCase());
+    const EXCUSED = ["created_at", "updated_at"];
+    const unread = adds.filter(
+      (c) =>
+        !COLUMNS.includes(c as (typeof COLUMNS)[number]) &&
+        !EXCUSED.includes(c),
+    );
+    expect(unread).toEqual([]);
   });
 
   it("the seam SELECTs no DB-managed timestamp (nothing maps them)", () => {

@@ -362,12 +362,19 @@ export const plannerMockSource: PlannerDataSource = {
     // mock doc has no master/personal split, so both targets move the same row.
     void _ownerId;
     void _saveTarget;
-    const sameSlot = target.week === lesson.week && target.day === lesson.day;
+    // BOTH comparisons must read the PRE-move slot. Deriving `moved` after
+    // assigning `lesson.week` compared the target against itself, so the test
+    // was always false and EVERY cross-week move was labelled "same-week" —
+    // the wrong move-arrow icon (↔ instead of ⤴) on the whole flag-OFF path.
+    // Capture the origin first; mutate after.
+    const fromWeek = lesson.week;
+    const fromDay = lesson.day;
+    const sameSlot = target.week === fromWeek && target.day === fromDay;
     lesson.day = target.day;
     lesson.week = target.week;
     lesson.moved = sameSlot
       ? lesson.moved
-      : target.week !== lesson.week
+      : target.week !== fromWeek
         ? "across-weeks"
         : "same-week";
     // NOTE: cell-layout pruning is view-local (CellLayout lives in the store,
@@ -450,6 +457,14 @@ export const plannerMockSource: PlannerDataSource = {
     // (mark archived) mirrors the reducer's `archiveLesson`; reads exclude it.
     void _ownerId;
     if (lesson) lesson.archived = true;
+  },
+
+  async unarchiveLesson(lessonId: string, _ownerId: string): Promise<void> {
+    const lesson = findLesson(lessonId);
+    // Mirror of softDeleteLesson, and idempotent for the same reason: a
+    // missing / already-visible lesson is a no-op, never an error.
+    void _ownerId;
+    if (lesson) lesson.archived = false;
   },
 
   // ── Unit mutations ─────────────────────────────────────────────────────────

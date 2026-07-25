@@ -254,6 +254,17 @@ export interface PlannerDataSource {
    *  teacher-authored lesson sets its own `deleted_at`. The shared master row is
    *  NEVER mutated. */
   softDeleteLesson(lessonId: string, ownerId: string): Promise<void>;
+  /** Reverse `softDeleteLesson` — PERSONAL-scoped, the exact mirror image. A
+   *  teacher-authored lesson clears its own `deleted_at`; a master-derived one
+   *  clears `archived_at` on the owner's personal copy. The shared master row is
+   *  NEVER mutated.
+   *
+   *  WHY IT EXISTS: without it, "Undo" on an archive was reducer-only — the
+   *  delete committed, the restore did not, and the lesson came back deleted on
+   *  reload while the toast said otherwise. Idempotent: restoring a lesson that
+   *  is not archived (or whose personal copy does not exist — nothing was ever
+   *  archived) is a no-op, never an error. */
+  unarchiveLesson(lessonId: string, ownerId: string): Promise<void>;
 
   // ── Unit mutations (the Unit Plan editor commits through this) ─────────────
   /** Patch a unit's editable Track-B workspace fields (big idea, essential

@@ -11,9 +11,10 @@
 // missing an objective / resources / standards. No date-based "missed", no
 // projected-finish, no ahead/behind pace — none of that data exists yet.
 
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import type { Lesson, SubjectId } from "@/lib/types";
 import type { UnitProgress } from "@/lib/year-v2-data";
+import { usePlanner } from "@/lib/planner-store";
 import {
   ARC_PHASES,
   arcPhasesReached,
@@ -57,7 +58,24 @@ export function OverviewTab({
   /** Distinct standards tagged across the unit's lessons (unitStandards length). */
   standardCount: number;
 }): ReactNode {
-  const gaps = useMemo(() => unitGaps(lessons), [lessons]);
+  // Resource truth for the Gaps card. `Lesson.resources` is only half of it —
+  // SECTION resources are the canonical half (lib/resources-dedup.ts), and the
+  // composer attaches to a section whenever one is the destination. Calling
+  // `unitGaps(lessons)` with no opts falls back to `l.resources.length > 0`, so
+  // this card counted a lesson whose resources all live on sections as having
+  // none — and reported a DIFFERENT number from the Insights panel, which was
+  // given the section-aware predicate. Same predicate here, same count there.
+  const { getSections } = usePlanner();
+  const hasAnyResource = useCallback(
+    (l: Lesson): boolean =>
+      l.resources.length > 0 ||
+      getSections(l.id).some((s) => s.resources.length > 0),
+    [getSections],
+  );
+  const gaps = useMemo(
+    () => unitGaps(lessons, { hasResources: hasAnyResource }),
+    [lessons, hasAnyResource],
+  );
   const pace = useMemo(() => unitPace(lessons), [lessons]);
   // arcPhasesReached takes unitPace's output directly (Pick<total|taught>).
   const arcReached = useMemo(() => arcPhasesReached(pace), [pace]);

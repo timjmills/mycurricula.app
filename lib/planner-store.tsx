@@ -76,11 +76,13 @@ import { snapshotRestorePatch } from "@/lib/fork-diff-restore";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
 import { plannerClient } from "@/lib/planner/client";
 import { createSerialWriteQueue } from "@/lib/planner/serial-write-queue";
+import { diffLessonsForReplay } from "@/lib/planner/doc-replay";
 import { resolveGrade } from "@/lib/planner/grade";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
 import type { UnitPatch } from "@/lib/planner/source";
 import {
   createUnitWriteQueue,
+  staleUnitPatchKeys,
   type UnitWriteQueue,
 } from "@/lib/planner/unit-write-queue";
 import { WORKSPACE_CHANGED_EVENT } from "@/lib/workspaces";
@@ -1665,6 +1667,101 @@ function findChangedLessonIds(a: PlannerDoc, b: PlannerDoc): string[] {
   return [...ids];
 }
 
+/** Split a lesson patch into per-field write groups, so every write touching a
+ *  column shares exactly one serial-queue lane no matter which mutator produced
+ *  it. Returns `[groupName, patchForThatGroup]` pairs.
+ *
+ *  `standards` and `standardIds` are index-aligned (same position = same
+ *  standard), so they are ONE group: sending them separately lets the codes and
+ *  the ids commit out of order and disagree. Exported for the unit tests. */
+export function splitPatchByField(
+  patch: Partial<Lesson>,
+): [string, Partial<Lesson>][] {
+  // Two groups hold MORE than one field because their fields cannot be written
+  // independently:
+  //   standards  — `standards` (codes) and `standardIds` (uuids) are
+  //     index-aligned; split across lanes they commit out of order and disagree.
+  //   completion — `status` and `reasonNotDone` are ONE row, written
+  //     read-modify-write by the source's `writeStatus`. Two concurrent requests
+  //     each read the same prior row and each writes its own field plus the
+  //     OTHER field's stale value, so the loser's change is silently reverted:
+  //     a lesson marked done with its reason wiped, or a reason saved against
+  //     the completion state it replaced.
+  const MULTI: Record<string, string> = {
+    standards: "standards",
+    standardIds: "standards",
+    status: "completion",
+    reasonNotDone: "completion",
+  };
+  const grouped = new Map<string, Partial<Lesson>>();
+  const groups: [string, Partial<Lesson>][] = [];
+  for (const key of Object.keys(patch) as (keyof Lesson)[]) {
+    const group = MULTI[key];
+    if (group) {
+      const bucket = grouped.get(group) ?? {};
+      (bucket as Record<string, unknown>)[key] = patch[key];
+      grouped.set(group, bucket);
+      continue;
+    }
+    groups.push([key, { [key]: patch[key] } as Partial<Lesson>]);
+  }
+  for (const [name, bucket] of grouped) groups.push([name, bucket]);
+  // Stable order so the emitted request sequence is deterministic + testable.
+  return groups.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+}
+
+/** A non-field lesson write, before identity (owner / save target) is attached.
+ *  `move` is the resolved FINAL slot, never a partial patch — sending a bare
+ *  `{ day }` lets the omitted `week` default to 0 server-side and the lesson
+ *  vanishes on reload. */
+type LessonOp =
+  | { kind: "move"; lessonId: string; week: number; day: number }
+  | { kind: "archive"; lessonId: string }
+  | { kind: "unarchive"; lessonId: string };
+
+/** A `LessonOp` with the identity captured at enqueue time. */
+type LessonOpPayload = LessonOp & {
+  ownerId: string;
+  saveTarget: "personal" | "core";
+};
+
+/**
+ * The `lastChange.kind` values the document-replay tee persists (see the
+ * provider effect). These are EXACTLY the mutators that change the document
+ * without writing anything themselves; every other kind already tees its own
+ * write, and adding one here would double-send it.
+ *
+ * `undo`/`redo` are set directly by the reducer's own branches; the other four
+ * come from `buildLastChange` below, where `kind` is the action type verbatim.
+ */
+const REPLAYED_CHANGE_KINDS: ReadonlySet<string> = new Set([
+  "undo",
+  "redo",
+  "bumpLesson",
+  "relocateLesson",
+  "unarchiveLesson",
+]);
+
+/**
+ * `restoreLesson` is DELIBERATELY ABSENT from the set above, and that is a
+ * decision, not an oversight (§4a gate, Codex High).
+ *
+ * "Restore the team's version" means the personal FORK should stop existing.
+ * The replay diff cannot express that: it writes content fields, and the fork
+ * signals (`isPersonal` / `modified` / `moved`) are derived from
+ * `is_diverged_from_master`, which no client may set. Replaying restore would
+ * therefore push the master's text INTO the personal copy and leave the copy
+ * standing — the card keeps its "Modified" pill after reload, and the lesson
+ * still does not follow later Team Curriculum updates. That is a NEW wrong
+ * state, worse than the honest reducer-local behaviour it replaced.
+ *
+ * The real fix is a source verb that DELETES the personal copy row. It is not
+ * in this change because it is destructive — for a snapshot-less fork it would
+ * discard the teacher's own edits, which the reducer's restore does not do — so
+ * it needs an explicit product decision, not a data-layer guess. Until then
+ * restore stays session-local, exactly as it was.
+ */
+
 /** Build a lastChange signal from a dispatched action. */
 function buildLastChange(action: PlannerAction): LastChange {
   switch (action.type) {
@@ -1794,7 +1891,7 @@ export interface PlannerValue {
    * deliberately so: it awaits the data source's createLesson (mock resolves
    * instantly; Supabase inserts a personal_authored_lessons row) and then
    * dispatches the RETURNED lesson with its source-minted id. No optimistic
-   * uid, no persist() tee — the source call IS the persistence. (The
+   * uid, no write tee — the source call IS the persistence. (The
    * optimistic-uid + fire-and-forget pattern is FORBIDDEN here: it corrupted
    * rows for duplicateLesson — see that mutator's finding #10 note.)
    * Defaults: title "New lesson", no unit, empty objective. `objective`
@@ -2378,8 +2475,29 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         ]);
         if (!alive) return;
         if (lessons.length === 0) {
-          // Genuinely empty → stay EMPTY_DOC, settle to "empty".
-          dispatchRef.current({ type: "setHydration", hydration: "empty" });
+          // Genuinely empty DOCUMENT — but NOT an empty catalog. The four reads
+          // above all succeeded, so subjects/units/standards are live reference
+          // data that a freshly-provisioned workspace (or a brand-new school
+          // year) needs BEFORE it can hold a single lesson. Dispatching a bare
+          // `setHydration` here would keep EMPTY_CATALOG on screen and discard
+          // them — and since `hydrate` is the only path into the catalog slice
+          // (`setCatalog` exists but is never dispatched), nothing would ever
+          // put them back: no subjects → no unit workspace, and DailyView's
+          // quick-add silently no-ops when `subjects[0]` is undefined. That is a
+          // cold-start deadlock on exactly the path a new school takes.
+          //
+          // So hydrate the CATALOG with an empty document and settle to "empty":
+          // plannerDataStateFromHydration maps "empty" → "settled", so surfaces
+          // render their real "no lessons yet" state (never a stuck spinner) while
+          // the catalog is fully populated. Sections are skipped deliberately —
+          // there are no lessons to batch.
+          dispatchRef.current({
+            type: "hydrate",
+            doc: EMPTY_DOC,
+            catalog: { subjects, units, standards, activeGradeId: gradeLevelId },
+            hydration: "empty",
+            owner: ownerId,
+          });
           return;
         }
         // Batched section hydrate — one round-trip seeds every lesson's
@@ -2390,10 +2508,28 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         // returned (no extra masters/authored round-trips) and never persists:
         // a section-less lesson's resources surface for display, but the backend
         // still has zero section rows until the teacher explicitly edits.
-        const batchedSections = await plannerClient.getSectionsBatch(
-          lessons.map((l) => l.id),
-          ownerId,
-        );
+        //
+        // The batch read is DELIBERATELY not inside the primary try: it is
+        // SUPPLEMENTARY. All four primary reads have already succeeded at this
+        // point, so letting a sections RPC failure reach the outer catch would
+        // throw away a fully-loaded document and paint hydration:"error" — the
+        // whole planner blank because of a decoration. `fillSyntheticSections`
+        // already handles a lesson the batch omits, so an EMPTY batch is a
+        // first-class fallback: every lesson gets read-only synthetic sections
+        // from its own already-loaded `resources`, and the teacher's real
+        // sections re-appear on the next successful hydrate.
+        let batchedSections: Record<string, LessonSectionContent[]> = {};
+        try {
+          batchedSections = await plannerClient.getSectionsBatch(
+            lessons.map((l) => l.id),
+            ownerId,
+          );
+        } catch (err) {
+          console.error(
+            "[planner] section batch failed; falling back to synthetic sections",
+            err,
+          );
+        }
         if (!alive) return;
         const sections = fillSyntheticSections(lessons, batchedSections);
         dispatchRef.current({
@@ -2459,43 +2595,34 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [present.sections],
   );
 
-  // ── Optimistic persistence tee (planner Supabase seam) ─────────────────
-  // Mutators dispatch to the reducer FIRST (snappy optimistic UI), then fire a
-  // best-effort write through plannerClient. Gated on BOTH the backend flag AND
-  // a resolved auth uid — with the flag OFF (or no session) this is a no-op, so
-  // the prototype path is byte-identical to the pre-seam reducer (the mutator's
-  // dispatch is the only effect). The reducer remains the source of truth for
-  // the session; a rejected write is surfaced via console.error (never blocks
-  // the UI thread). Fire-and-await: the await lives inside the detached promise
-  // so the caller stays synchronous + optimistic.
-  const persist = useCallback(
-    <M extends keyof typeof plannerClient>(
-      method: M,
-      ...args: Parameters<(typeof plannerClient)[M]>
-    ): void => {
-      if (!isPlannerSupabaseConfigured()) return;
-      if (!ownerIdRef.current) return; // no session → never send null/slug
-      const fn = plannerClient[method] as (
-        ...a: Parameters<(typeof plannerClient)[M]>
-      ) => Promise<unknown>;
-      void fn.apply(plannerClient, args).catch((err: unknown) => {
-        // Reducer state stands; surface the failure so a dropped write is
-        // visible. A reconcile toast is unavailable here — ConsequenceToast-
-        // Provider mounts as a CHILD of PlannerProvider (see (planner)/layout),
-        // so its hook is out of scope in this provider body. console.error is
-        // the strongest non-blocking signal reachable without reordering
-        // providers or adding a dependency.
-        console.error(`[planner] persist '${String(method)}' failed`, err);
-      });
-    },
-    [],
-  );
+  // ── THE WRITE-TEE CONTRACT (planner Supabase seam) ──────────────────────
+  // Every persist helper below obeys the same three rules. Stated once here so
+  // the helpers can refer to "the write-tee contract" instead of restating it.
+  //
+  //   GATING. Both the backend flag AND a resolved auth uid. With the flag OFF
+  //     (or no session) a helper is a no-op, so the prototype path is
+  //     byte-identical to the pre-seam reducer — the mutator's dispatch is the
+  //     only effect, and a null owner is never sent as a key.
+  //   OPTIMISM. Mutators dispatch to the reducer FIRST (snappy UI), then tee the
+  //     write. The reducer is the source of truth for the session; the await
+  //     lives inside a detached promise so the caller stays synchronous.
+  //   ERROR HANDLING. A rejected write leaves the reducer state standing and is
+  //     surfaced via console.error — never swallowed, never blocking. A
+  //     reconcile toast is unreachable from here: ConsequenceToastProvider
+  //     mounts as a CHILD of PlannerProvider (see (planner)/layout), so its hook
+  //     is out of scope in this provider body. console.error is the strongest
+  //     non-blocking signal available without reordering providers.
+  //
+  // There is deliberately no generic `persist(method, ...args)` escape hatch any
+  // more: every lesson write now belongs to an ORDERED axis (field patch,
+  // slot/completion/archive, sections), and an unordered one-shot alongside them
+  // is how two edits to the same axis commit out of order with nothing logged.
 
   // ── Serialized (latest-wins) section persistence ────────────────────────
   // W3.8 gate fix (Codex HIGH — persistence ordering race): the lesson editor
   // autosaves per keystroke, and EVERY section persist is a FULL
   // `replace_lesson_sections` swap. Firing those through the fire-and-forget
-  // `persist()` tee makes them UNORDERED on the wire — a slow early request
+  // fire-and-forget tee that preceded it made them UNORDERED on the wire — a slow early request
   // ("a") can commit AFTER a later one ("abc"), leaving the DB stale relative
   // to the UI with no error surfaced.
   //
@@ -2530,7 +2657,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   const persistSectionsSerialized = useCallback(
     (lessonId: string, sections: LessonSectionContent[]): void => {
-      // Same gating as persist(): flag OFF / no session → no-op (prototype
+      // Write-tee gating: flag OFF / no session → no-op (prototype
       // mode is reducer-local, byte-identical to the pre-seam behavior).
       if (!isPlannerSupabaseConfigured()) return;
       if (!ownerIdRef.current) return;
@@ -2564,7 +2691,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         void plannerClient
           .setSections(lessonId, next.sections, next.ownerId, next.saveTarget)
           .catch((err: unknown) => {
-            // Mirror persist()'s error contract: reducer state stands and the
+            // Per the write-tee contract: reducer state stands and the
             // dropped write is surfaced without blocking the UI. A newer
             // pending snapshot (drained below) supersedes the failed payload.
             console.error("[planner] persist 'setSections' failed", err);
@@ -2582,7 +2709,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   // ── Serialized (latest-wins) lesson-FIELD persistence ───────────────────
   // B3 gate fix (Codex HIGH — the same ordering race W3.8 closed for sections,
   // still open for scalar fields). `editLesson` autosaves per keystroke through
-  // the fire-and-forget `persist()` tee, so two `updateLesson` calls for one
+  // the fire-and-forget tee that preceded this queue, so two `updateLesson` calls for one
   // field are UNORDERED on the wire: typing "Quiz" can leave the DB holding
   // "Qu" if the earlier request commits last, and a reload silently discards
   // the newer text. Pre-existing — every scalar field in the B2 lesson editor
@@ -2609,33 +2736,247 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       send: (p) =>
         plannerClient.updateLesson(p.lessonId, p.patch, p.ownerId, p.saveTarget),
       onError: (err) => {
-        // Mirror persist()'s error contract: reducer state stands, the dropped
+        // Per the write-tee contract: reducer state stands, the dropped
         // write is surfaced, and a newer pending patch supersedes the failure.
         console.error("[planner] persist 'updateLesson' failed", err);
       },
     }),
   );
 
-  const persistLessonPatchSerialized = useCallback(
-    (lessonId: string, patch: Partial<Lesson>, fieldKey: string): void => {
-      // Same gating as persist(): flag OFF / no session → no-op.
-      if (!isPlannerSupabaseConfigured()) return;
-      if (!ownerIdRef.current) return;
-      // ALWAYS namespaced by lessonId. `editLesson`'s public API does not
-      // require the caller's coalesce key to contain one, and two lessons
-      // sharing a key would otherwise share a slot — the newer lesson's patch
-      // would evict the older one's, losing an edit outright.
-      fieldWriteQueueRef.current.enqueue(`${lessonId}::${fieldKey}`, {
-        lessonId,
-        patch,
-        // Identity captured at ENQUEUE time so a mid-flight sign-out or a
-        // Personal↔Team flip never retargets an already-authored patch.
-        ownerId: ownerIdRef.current,
-        saveTarget: saveTargetRef.current,
-      });
+  // ── Serialized NON-FIELD lesson writes (slot · completion · archive) ─────
+  // The serial queue above closed the ordering race for lesson FIELDS. The other
+  // three lesson axes still rode a raw fire-and-forget tee, so two
+  // quick drags of the same card raced on the wire: both requests succeed, the
+  // slower-but-earlier one commits last, and the DB ends up holding a slot the
+  // teacher already moved away from — with nothing logged, because nothing
+  // failed. Same hazard for a fast done → not-done → done, and for
+  // archive → Undo.
+  //
+  // One queue, keyed per lesson AND per AXIS, because latest-wins is only safe
+  // within an axis: a newer move must supersede an older move, but must never
+  // evict a still-pending archive. Archive and un-archive deliberately SHARE
+  // the "archive" key — they are two values of one axis, and ordering between
+  // them is exactly what an Undo depends on.
+  //
+  // COMPLETION is NOT here. It rides the FIELD queue as a completion-only
+  // `updateLesson` patch, because that is the only way `status` and
+  // `reasonNotDone` reach the server in ONE atomic `writeStatus` — and because
+  // it puts every completion write, direct or replayed, in a single lane. A
+  // completion-only patch provably never forks (isCompletionOnlyPatch).
+  const lessonOpQueueRef = useRef(
+    createSerialWriteQueue<LessonOpPayload>({
+      send: (p) => {
+        switch (p.kind) {
+          case "move":
+            return plannerClient.moveLesson(
+              p.lessonId,
+              { week: p.week, day: p.day },
+              p.ownerId,
+              p.saveTarget,
+            );
+          case "archive":
+            return plannerClient.softDeleteLesson(p.lessonId, p.ownerId);
+          case "unarchive":
+            return plannerClient.unarchiveLesson(p.lessonId, p.ownerId);
+        }
+      },
+      onError: (err, p) => {
+        // Per the write-tee contract: reducer state stands and the
+        // dropped write is surfaced.
+        console.error(`[planner] persist '${p.kind}' failed`, err);
+      },
+    }),
+  );
+
+  // ── Which side of the fork a lesson was last written to ─────────────────
+  // A REPLAYED write (undo/redo) must land on the same side of the forking model
+  // as the change it reverses. `saveTargetRef.current` is the target NOW, which
+  // is not the same thing: edit a title in Team Curriculum, flip the top-bar
+  // toggle to Personal, then ⌘Z — the reducer shows the team edit undone, but a
+  // write keyed to the CURRENT target forks a personal copy while the shared
+  // master row quietly keeps the change (CLAUDE.md §2).
+  //
+  // So each lesson remembers the target of its most recent write and a replay
+  // reuses it. Undo reverses the most recent action; if that action touched this
+  // lesson, this map holds exactly that action's target — so the first undo
+  // after a mode flip, the realistic case, is exact.
+  //
+  // LIMIT, stated plainly: successive undos reaching back PAST a mode change
+  // reuse the most recent target rather than each history entry's own. Making
+  // that exact means stamping the target onto every history entry — a reducer
+  // and action-shape change well beyond this fix. The residual error direction
+  // is the safe one (a personal fork where master was meant), never a personal
+  // edit silently landing on the team's shared row.
+  const lastWriteTargetRef = useRef(new Map<string, "personal" | "core">());
+  const writeTargetFor = useCallback(
+    (lessonId: string, replay: boolean): "personal" | "core" => {
+      const target = replay
+        ? (lastWriteTargetRef.current.get(lessonId) ?? saveTargetRef.current)
+        : saveTargetRef.current;
+      lastWriteTargetRef.current.set(lessonId, target);
+      return target;
     },
     [],
   );
+
+  /** Enqueue a slot / archive write on its own per-lesson axis. Write-tee
+   *  gating: flag OFF or no session → reducer-local no-op. */
+  const persistLessonOp = useCallback(
+    (op: LessonOp, replay = false): void => {
+      if (!isPlannerSupabaseConfigured()) return;
+      const ownerId = ownerIdRef.current;
+      if (!ownerId) return;
+      // Identity captured at ENQUEUE time so a mid-flight sign-out or a
+      // Personal↔Team flip never retargets an already-authored write.
+      const axis = op.kind === "unarchive" ? "archive" : op.kind;
+      lessonOpQueueRef.current.enqueue(`${op.lessonId}::${axis}`, {
+        ...op,
+        ownerId,
+        saveTarget: writeTargetFor(op.lessonId, replay),
+      });
+    },
+    [writeTargetFor],
+  );
+
+  /** Persist a lesson content patch, ORDERED PER FIELD.
+   *
+   *  The queue lane is derived from the PATCH ITSELF — never from a
+   *  caller-supplied string. That is the whole correctness argument, and getting
+   *  it wrong is subtle: while the lane was the caller's coalesce key, a direct
+   *  editor write (`lesson:<id>:title`) and the undo that reverses it
+   *  (`replay::title`) landed in DIFFERENT lanes, so both could be in flight for
+   *  the same column at once — and a late-committing "New" would overwrite the
+   *  "Old" the teacher just undid. Any two writes touching a column must share
+   *  exactly one lane, whatever produced them.
+   *
+   *  So the patch is SPLIT into per-field groups, each with its own lane. A
+   *  multi-field patch becomes one request per group; `updateLesson` takes
+   *  partial patches, and the alternative — one lane per field COMBINATION —
+   *  puts `{title}` and `{title, notes}` in different lanes and re-opens the
+   *  same race. `standards` + `standardIds` are index-aligned, so they travel as
+   *  ONE group; splitting them would let the codes and the ids disagree. */
+  const persistLessonPatchSerialized = useCallback(
+    (lessonId: string, patch: Partial<Lesson>, replay = false): void => {
+      // Write-tee gating: flag OFF / no session → no-op.
+      if (!isPlannerSupabaseConfigured()) return;
+      if (!ownerIdRef.current) return;
+      // Identity captured at ENQUEUE time so a mid-flight sign-out or a
+      // Personal↔Team flip never retargets an already-authored patch. A REPLAY
+      // reuses the side of the fork this lesson was last written to — see
+      // writeTargetFor.
+      const ownerId = ownerIdRef.current;
+      const saveTarget = writeTargetFor(lessonId, replay);
+      for (const [group, groupPatch] of splitPatchByField(patch)) {
+        // ALWAYS namespaced by lessonId — two lessons must never share a lane,
+        // or the newer lesson's patch evicts the older one's and loses an edit.
+        fieldWriteQueueRef.current.enqueue(`${lessonId}::f:${group}`, {
+          lessonId,
+          patch: groupPatch,
+          ownerId,
+          saveTarget,
+        });
+      }
+    },
+    [writeTargetFor],
+  );
+
+  // ── Document-replay persistence (undo/redo + the reducer-only mutators) ──
+  // Six mutators changed the document and wrote NOTHING:
+  //
+  //   undo / redo      — the worst of them. Every other mutator persists on the
+  //                      way IN, so ⌘Z rewound the reducer alone: the toast
+  //                      confirmed an undo that came back on reload, and a Team-
+  //                      mode value the teacher had just taken back stayed
+  //                      shared with the whole team.
+  //   bumpLesson       — reschedule to the next free slot.
+  //   relocateLesson   — move (or copy-then-move) to a target slot.
+  //   unarchiveLesson  — the Undo half of an archive: the delete committed, the
+  //                      restore did not. A whole Catch-Up triage session (the
+  //                      surface whose ONLY job is rescheduling) evaporated on
+  //                      reload.
+  //
+  // (`restoreLesson` is the sixth and is deliberately NOT replayed — see the
+  // note beside REPLAYED_CHANGE_KINDS. Replaying it would leave a fork standing
+  // with master's text in it, which is a new wrong state, not a fix.)
+  //
+  // All six ask the same question, so they get one answer: the document went
+  // from A to B — what has to be written for a reload to show B? `lib/planner/
+  // doc-replay.ts` answers it as a pure diff; this effect executes the result
+  // through the SAME verbs the hand-written tees use, so a replayed write is
+  // indistinguishable from a direct one (serialized field patches included).
+  //
+  // KNOWN LIMIT (§4a gate, Codex Medium — accepted, not overlooked). The diff
+  // runs render-to-render, so if a DIRECT mutator and its undo land in the SAME
+  // React batch, the direct write has already been enqueued while the net
+  // prevDoc→present diff is empty — no compensating write is sent and the
+  // server keeps the pre-undo value. It takes two gestures inside one frame
+  // (each real gesture is its own task, so auto-batching does not combine
+  // them), and the next edit or reload reconciles it. Closing it properly means
+  // capturing replay intent at DISPATCH time rather than diffing documents,
+  // which is a bigger change than this fix warrants.
+  //
+  // KEYED ON `lastChange`, NOT ON THE MUTATORS. Reading the post-dispatch
+  // document out of a callback closure would go stale the moment two actions
+  // batch into one render. Diffing across renders instead is exact by
+  // construction: `prevDocRef` holds the doc this effect last saw, `present` is
+  // the committed reducer state, and React's batching simply makes the diff the
+  // NET of everything that landed — which is the right thing to persist.
+  //
+  // The allowlist is the whole safety argument. Only the six kinds above replay;
+  // every other mutator already tees its own write, and replaying those too
+  // would double-send. `hydrate` clears lastChange to null, so a fresh document
+  // arriving from the server can never be mistaken for an edit and echoed back.
+  const prevDocRef = useRef<PlannerDoc | null>(null);
+  useEffect(() => {
+    const prevDoc = prevDocRef.current;
+    prevDocRef.current = present;
+    // Write-tee gating: flag OFF / no session → reducer-local only.
+    if (!isPlannerSupabaseConfigured()) return;
+    if (!ownerIdRef.current) return;
+    if (!prevDoc || prevDoc === present) return;
+    if (!lastChange || !REPLAYED_CHANGE_KINDS.has(lastChange.kind)) return;
+
+    for (const op of diffLessonsForReplay(prevDoc.lessons, present.lessons)) {
+      switch (op.kind) {
+        case "move":
+        case "archive":
+        case "unarchive":
+          // Through the SAME per-axis serialized queue the direct mutators use,
+          // so a replayed write orders correctly against a concurrent direct one
+          // for the same lesson+axis (an Undo landing on the heels of the
+          // archive it reverses is exactly that case). `replay: true` reuses the
+          // side of the fork this lesson was last written to.
+          persistLessonOp(op, true);
+          break;
+        case "completion":
+          // BOTH fields in ONE patch, on the shared "completion" lane — see
+          // splitPatchByField for why they can never be written separately.
+          persistLessonPatchSerialized(
+            op.lessonId,
+            { status: op.status, reasonNotDone: op.reasonNotDone },
+            true,
+          );
+          break;
+        case "patch":
+          // Through the serialized queue, which lanes by FIELD — so a replayed
+          // patch and a concurrent keystroke autosave for the same column share
+          // one lane and commit in order rather than racing.
+          persistLessonPatchSerialized(op.lessonId, op.patch, true);
+          break;
+        case "unpersistable":
+          // Surfaced, never swallowed. A lesson appearing or vanishing has no
+          // source verb that reproduces it (see doc-replay.ts), so the reducer
+          // and the server genuinely disagree until the next hydrate — the one
+          // thing the teacher must not be told is that it saved.
+          console.error(
+            `[planner] '${lastChange.kind}' changed lesson ${op.lessonId} in a way no write can express (${op.reason}); it will not survive reload`,
+          );
+          break;
+      }
+    }
+    // `present` and `lastChange` are the intended triggers; the persist helpers
+    // are stable and listed for lint completeness.
+  }, [present, lastChange, persistLessonOp, persistLessonPatchSerialized]);
 
   // ── Granular section-mutator persistence ───────────────────────────────
   // Several section reducer actions (reorder / add / remove / duplicate section,
@@ -2711,24 +3052,25 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         const day = patch.day ?? current?.day ?? 0;
         // saveTarget threads the Personal | Team-Curriculum mode: "core" moves
         // the shared master row (#14, RLS-gated), else a personal-copy move.
-        persist(
-          "moveLesson",
-          id,
-          { week, day },
-          ownerIdRef.current ?? "",
-          saveTargetRef.current,
-        );
+        // Through the SERIALIZED slot queue, so two quick drags of the same card
+        // commit in gesture order instead of racing on the wire.
+        persistLessonOp({ kind: "move", lessonId: id, week, day });
       }
     },
-    [persist, present.lessons],
+    [persistLessonOp, present.lessons],
   );
 
   const setLessonStatus = useCallback(
     (id: string, status: LessonStatus) => {
       dispatchRef.current({ type: "setLessonStatus", id, status });
-      persist("setLessonStatus", id, status, ownerIdRef.current ?? "");
+      // A completion-ONLY patch: the source routes it to `writeStatus` and it
+      // never forks (CLAUDE.md §2 — completion is always per-teacher).
+      // `reasonNotDone` is deliberately omitted so the server keeps whatever
+      // reason it holds; the shared "completion" lane means a replayed undo of
+      // this toggle can never be in flight alongside it.
+      persistLessonPatchSerialized(id, { status });
     },
-    [persist],
+    [persistLessonPatchSerialized],
   );
 
   const editLesson = useCallback(
@@ -2748,16 +3090,14 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       // source decides whether the edit forks (personal) or writes the shared
       // master row (core — #14 authorized Team-Curriculum write, RLS-gated).
       //
-      // Routed through the SERIALIZED queue, not the raw persist() tee, so
+      // Routed through the SERIALIZED queue, not a raw one-shot tee, so
       // per-keystroke autosaves for one field can't commit out of order. The
-      // queue key is the caller's coalesce key where there is one (it already
-      // identifies the field being edited, e.g. `lesson:<id>:assessment`);
-      // otherwise it is derived from the patch's own field names, so unrelated
-      // fields never share — and therefore never discard — a pending slot.
-      const queueKey =
-        coalesce?.key ??
-        `lesson:${id}:fields:${Object.keys(patch).sort().join(",")}`;
-      persistLessonPatchSerialized(id, patch, queueKey);
+      // caller's `coalesce.key` drives the REDUCER's history coalescing only —
+      // it is deliberately NOT the queue lane. The queue derives its lane from
+      // the patch's own fields (see persistLessonPatchSerialized), so an edit
+      // and the undo that reverses it share one lane and can never be in flight
+      // for the same column simultaneously.
+      persistLessonPatchSerialized(id, patch);
     },
     [persistLessonPatchSerialized],
   );
@@ -2805,13 +3145,13 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       // why the usual optimistic tee is FORBIDDEN for creates: the backend
       // mints its own id, so an optimistic reducer uid writes a corrupt/
       // orphaned row. Here the source resolves FIRST and the reducer receives
-      // the REAL lesson; there is no persist() tee because the createLesson
+      // the REAL lesson; there is no write tee because the createLesson
       // call is itself the persistence (mock: instant in-memory append).
       //
-      // Identity plumbing mirrors persist(): ownerId from ownerIdRef (the
+      // Identity plumbing follows the write-tee contract: ownerId from ownerIdRef (the
       // live auth uid), grade from gradeLevelIdRef (captured during hydrate).
       // In backend mode both must be resolved before a row can be keyed —
-      // bail to null instead of writing a mis-keyed row (persist()'s "no
+      // bail to null instead of writing a mis-keyed row (the contract's "no
       // session → never send null/slug" guard, extended to the grade).
       if (isPlannerSupabaseConfigured()) {
         if (!ownerIdRef.current || !gradeLevelIdRef.current) {
@@ -2902,7 +3242,53 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   // switch) before an RPC settles, so a post-unmount failure has no component to
   // surface it. The queue retains a failed patch HERE (keyed by unit) so the
   // unit's next open can re-surface / retry it — a confirmed write clears it.
-  const failedUnitWritesRef = useRef(new Map<string, UnitPatch>());
+  //
+  // …AND A RETAINED PATCH CAN GO STALE. Retention outliving the editor is the
+  // point; outliving a RE-HYDRATE is the hazard. The patch is retained
+  // alongside the BASELINE — what the unit held, server-confirmed, when the
+  // write failed — so `retryFailedUnitWrite` can tell "still the value I
+  // diverged from" apart from "a teammate has since changed this" and refuse to
+  // blind-overwrite the latter. Units are shared, so a blind retry is a
+  // team-wide revert to text nobody had on screen.
+  const failedUnitWritesRef = useRef(
+    new Map<string, { patch: UnitPatch; baseline: UnitPatch }>(),
+  );
+  // The live catalog units, mirrored for the queue callbacks + the retry
+  // guard (both are stable-identity callbacks that must read the CURRENT
+  // catalog, not the one captured when they were created).
+  const catalogUnitsRef = useRef(state.catalog.units);
+  catalogUnitsRef.current = state.catalog.units;
+  /** The unit's current server-confirmed field values, or `{}` when the unit is
+   *  not in the catalog (a stale id, or a unit outside the hydrated grade).
+   *  Stable identity — it reads the ref, never a captured render's catalog. */
+  const confirmedUnitPatch = useCallback((unitId: string): UnitPatch => {
+    const unit = catalogUnitsRef.current.find((u) => u.id === unitId);
+    return unit ? unitToPatch(unit) : {};
+  }, []);
+  /**
+   * The server-confirmed value each unit field DIVERGED FROM — the thing the
+   * failed-write retry guard compares against. Maintained by three rules, and
+   * all three are needed; each fixes a different way the guard lies.
+   *
+   *   CAPTURE at ENQUEUE, not at failure. A request can fail seconds after it
+   *     was sent, and a re-hydrate in between may already have replaced the
+   *     field with a teammate's value — recording THAT as "what I diverged
+   *     from" makes the retry look fresh and silently overwrite their edit.
+   *   ADVANCE on our own CONFIRMED write, don't drop. Type "A", type "B"
+   *     (coalesced behind it), "A" commits, "B" fails: with the baseline
+   *     dropped, "B" has none, the catalog legitimately reads "A", and the guard
+   *     would call the teacher's own newer text stale and discard it.
+   *   RE-CAPTURE when a NEW write sequence starts. Once nothing is outstanding
+   *     for a field, the next edit diverges from whatever the catalog holds NOW
+   *     — which may be a teammate's value that arrived while we were idle.
+   *     Reusing the stale baseline would flag the teacher's own new edit as
+   *     stale on a failure and throw it away.
+   */
+  const enqueuedUnitBaselineRef = useRef(new Map<string, UnitPatch>());
+  /** Unit → the field keys with a write still unsettled or retained-failed.
+   *  While a key is in here its baseline is live; once it leaves, the next edit
+   *  to that key starts a fresh sequence and re-captures. */
+  const outstandingUnitKeysRef = useRef(new Map<string, Set<string>>());
   const unitWriteQueueRef = useRef<UnitWriteQueue | null>(null);
   if (unitWriteQueueRef.current === null) {
     unitWriteQueueRef.current = createUnitWriteQueue({
@@ -2915,22 +3301,65 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       onError: (message, err) => console.error(message, err),
       retainFailed: (unitId, patch) => {
         const m = failedUnitWritesRef.current;
-        m.set(unitId, { ...(m.get(unitId) ?? {}), ...patch });
+        const prior = m.get(unitId);
+        // The baseline comes from what was recorded at ENQUEUE time, never from
+        // the catalog as it stands NOW. Reading it here would be too late: a
+        // request can fail seconds after it was sent, and a re-hydrate in
+        // between can already have replaced the field with a teammate's value —
+        // which would then be recorded as "the value I diverged from", making
+        // the retry look fresh and silently overwrite their edit. That is the
+        // exact revert the baseline exists to prevent.
+        const baseline: UnitPatch = { ...(prior?.baseline ?? {}) };
+        const authored = enqueuedUnitBaselineRef.current.get(unitId) ?? {};
+        for (const key of Object.keys(patch) as (keyof UnitPatch)[]) {
+          if (key in baseline) continue;
+          // Assigning key-by-key across a heterogeneous patch type needs the
+          // index form; the read side is fully typed.
+          (baseline as Record<string, unknown>)[key] = authored[key];
+        }
+        m.set(unitId, {
+          patch: { ...(prior?.patch ?? {}), ...patch },
+          baseline,
+        });
       },
       // FIELD-WISE clear (§4a R6 H2-B): remove only the fields the confirmed
       // write covered; keep any still-unconfirmed retained fields (e.g. an
       // earlier failed `bigIdea` retry survives a later `notes` success). Drop
       // the entry only when nothing retained remains.
       clearFailed: (unitId, confirmedPatch) => {
+        // A confirmed write ADVANCES the enqueue-time baseline to the value that
+        // just committed — it does NOT delete it. Deleting looks tidier and is
+        // wrong: a coalesced later edit can still be in flight against the same
+        // field. Type "A", type "B" (coalesced behind it), "A" confirms, "B"
+        // fails — with the baseline deleted, "B" retains no baseline at all, the
+        // catalog now legitimately reads "A", and the retry guard would call the
+        // teacher's own newer text stale and silently drop it. Advancing instead
+        // keeps "no teammate touched this" and "a teammate touched this"
+        // distinguishable, which is the guard's entire job.
+        const authored = enqueuedUnitBaselineRef.current.get(unitId) ?? {};
+        const outstanding = outstandingUnitKeysRef.current.get(unitId);
+        for (const key of Object.keys(confirmedPatch) as (keyof UnitPatch)[]) {
+          (authored as Record<string, unknown>)[key] = confirmedPatch[key];
+          // The sequence for this key has landed. A still-coalesced later write
+          // compares against the value just advanced above; a brand-new edit
+          // after this point re-captures from the catalog, which by then may
+          // carry a teammate's value.
+          outstanding?.delete(key);
+        }
+        enqueuedUnitBaselineRef.current.set(unitId, authored);
+        if (outstanding && outstanding.size === 0)
+          outstandingUnitKeysRef.current.delete(unitId);
         const m = failedUnitWritesRef.current;
         const retained = m.get(unitId);
         if (!retained) return;
-        const next = { ...retained };
+        const next = { ...retained.patch };
+        const nextBaseline = { ...retained.baseline };
         for (const key of Object.keys(confirmedPatch) as (keyof UnitPatch)[]) {
           delete next[key];
+          delete nextBaseline[key];
         }
         if (Object.keys(next).length === 0) m.delete(unitId);
-        else m.set(unitId, next);
+        else m.set(unitId, { patch: next, baseline: nextBaseline });
       },
     });
   }
@@ -2945,13 +3374,34 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         onResult?.(false);
         return;
       }
+      // Record what each field is DIVERGING FROM, now, before the request goes
+      // out — this is the baseline a later failed-write retry checks against.
+      // Captured once per key: the first edit since the last confirmation is the
+      // one that left the server's value behind, and every keystroke after it
+      // diverges from that same point.
+      const authored = enqueuedUnitBaselineRef.current.get(unitId) ?? {};
+      const outstanding =
+        outstandingUnitKeysRef.current.get(unitId) ?? new Set<string>();
+      const confirmed = confirmedUnitPatch(unitId);
+      for (const key of Object.keys(patch) as (keyof UnitPatch)[]) {
+        // Re-capture ONLY when this key has no write still outstanding. Mid
+        // sequence the existing baseline is the right one (a coalesced later
+        // keystroke diverges from the same point); at the START of a sequence
+        // the catalog is the right one, and it may have moved under us.
+        if (!outstanding.has(key)) {
+          (authored as Record<string, unknown>)[key] = confirmed[key];
+        }
+        outstanding.add(key);
+      }
+      enqueuedUnitBaselineRef.current.set(unitId, authored);
+      outstandingUnitKeysRef.current.set(unitId, outstanding);
       // CONFIRM-ONLY: no optimistic catalog write. The queue confirms via the
       // source (mock flag-OFF, server flag-ON) and dispatches the CANONICAL row
       // on success; on failure / mode-drop the catalog is untouched. The editor's
       // draft holds the live value throughout.
       unitWriteQueueRef.current?.enqueue(unitId, patch, onResult);
     },
-    [],
+    [confirmedUnitPatch],
   );
 
   /** Whether a unit has a retained FAILED write (§4a R5 H2) — the editor reads
@@ -2963,21 +3413,68 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   /** Re-submit a unit's retained failed patch (§4a R5 H2 — the "retry?" action).
    *  Gated to Team mode; a confirmed retry clears the retained patch (via the
-   *  queue's clearFailed). No-op when nothing is retained. */
+   *  queue's clearFailed). No-op when nothing is retained.
+   *
+   *  STALE-SAFE. Every retained key is checked against the unit's CURRENT
+   *  server-confirmed value before it is re-sent. A key whose value has moved
+   *  since the failure — the only way that happens is a re-hydrate pulling in a
+   *  teammate's edit, because the confirm-only model never writes the catalog
+   *  otherwise — is DROPPED from the retry and forgotten. Re-sending it would
+   *  revert shared team content to text that was not on screen at retry time,
+   *  and would report success while doing it. */
   const retryFailedUnitWrite = useCallback(
     (unitId: string, onResult?: (ok: boolean) => void) => {
       if (editModeRef.current !== "master") {
         onResult?.(false);
         return;
       }
-      const patch = failedUnitWritesRef.current.get(unitId);
-      if (!patch) {
+      const retained = failedUnitWritesRef.current.get(unitId);
+      if (!retained) {
         onResult?.(true); // nothing to retry
         return;
       }
-      unitWriteQueueRef.current?.enqueue(unitId, patch, onResult);
+      const stale = staleUnitPatchKeys(
+        retained.patch,
+        retained.baseline,
+        confirmedUnitPatch(unitId),
+      );
+      if (stale.length > 0) {
+        const fresh = { ...retained.patch };
+        const freshBaseline = { ...retained.baseline };
+        const outstanding = outstandingUnitKeysRef.current.get(unitId);
+        for (const key of stale) {
+          delete fresh[key];
+          delete freshBaseline[key];
+          // Abandoned: the field's write sequence is over, so the teacher's NEXT
+          // edit to it must re-capture a baseline from the current catalog
+          // rather than inherit this dropped one.
+          outstanding?.delete(key);
+          const authored = enqueuedUnitBaselineRef.current.get(unitId);
+          if (authored) delete authored[key];
+        }
+        if (outstanding && outstanding.size === 0)
+          outstandingUnitKeysRef.current.delete(unitId);
+        console.error(
+          `[planner] retry dropped ${stale.length} field(s) on unit ${unitId} (${stale.join(", ")}): the team's value changed after the write failed, so re-sending would revert it`,
+        );
+        if (Object.keys(fresh).length === 0) {
+          // Nothing left to send. Report FAILURE, not success — the teacher's
+          // text did not reach the server and never will; the banner must stay
+          // honest about that even though there is no longer anything to retry.
+          failedUnitWritesRef.current.delete(unitId);
+          onResult?.(false);
+          return;
+        }
+        failedUnitWritesRef.current.set(unitId, {
+          patch: fresh,
+          baseline: freshBaseline,
+        });
+        unitWriteQueueRef.current?.enqueue(unitId, fresh, onResult);
+        return;
+      }
+      unitWriteQueueRef.current?.enqueue(unitId, retained.patch, onResult);
     },
-    [],
+    [confirmedUnitPatch],
   );
 
   const setCellLayout = useCallback(
@@ -2996,17 +3493,27 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       dispatchRef.current({ type: "archiveLesson", id });
       // Soft-delete is PERSONAL-scoped in the source (archives the owner's copy;
       // never mutates the shared master row). Optimistic: reducer first, persist
-      // after. unarchiveLesson stays local-only — the contract has no
-      // "restore" method yet (TODO: add a source un-delete when it lands).
-      persist("softDeleteLesson", id, ownerIdRef.current ?? "");
+      // after — on the shared "archive" axis, so an immediate Undo (which now
+      // persists too, through the document-replay tee) commits AFTER this one
+      // rather than racing it.
+      persistLessonOp({ kind: "archive", lessonId: id });
     },
-    [persist],
+    [persistLessonOp],
   );
 
+  // unarchiveLesson / restoreLesson / bumpLesson / relocateLesson dispatch only;
+  // their persistence is the DOCUMENT-REPLAY tee (see REPLAYED_CHANGE_KINDS and
+  // the effect above), which diffs the resulting document and writes it. They
+  // used to write nothing at all — the archive Undo toast affirmed a restore
+  // that never committed, and a whole Catch-Up triage session evaporated on
+  // reload.
   const unarchiveLesson = useCallback((id: string) => {
     dispatchRef.current({ type: "unarchiveLesson", id });
   }, []);
 
+  // restoreLesson is the exception: still reducer-only, on purpose. Clearing a
+  // fork needs a source verb that deletes the personal copy — see the note
+  // beside REPLAYED_CHANGE_KINDS for why replaying it instead would be worse.
   const restoreLesson = useCallback((id: string) => {
     dispatchRef.current({ type: "restoreLesson", id });
   }, []);
@@ -3039,22 +3546,16 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       const current = present.lessons.find((l) => l.id === id);
       const week = to.week ?? current?.week ?? 0;
       const day = to.day ?? current?.day ?? 0;
-      persist(
-        "moveLesson",
-        id,
-        { week, day },
-        ownerIdRef.current ?? "",
-        saveTargetRef.current,
-      );
+      persistLessonOp({ kind: "move", lessonId: id, week, day });
     },
-    [persist, present.lessons],
+    [persistLessonOp, present.lessons],
   );
 
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
       // Routed through the SAME serialized per-lesson queue as the granular
-      // section mutators (a direct persist() here could interleave with the
+      // section mutators (an unordered one-shot here could interleave with the
       // queued keystroke writes and re-introduce the ordering race). The
       // queue captures the live saveTarget: "core" writes the shared team
       // section rows (#14, RLS-gated), else a personal fork.

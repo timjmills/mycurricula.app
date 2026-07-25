@@ -89,6 +89,31 @@ describe("lessonTrackBColumns — write mapping + assessment-kind validation", (
     expect(Object.keys(cols)).toHaveLength(1);
   });
 
+  it.each([
+    ["durationMinutes", "duration_minutes"],
+    ["builds", "builds"],
+    ["prep", "prep"],
+    ["frameworkId", "fw_id"],
+    ["frameworkData", "fw_data"],
+    ["carried", "carried"],
+  ] as const)(
+    "clears %s → %s: null, and emits nothing else",
+    (patchKey, column) => {
+      // The case above pinned ONE of the six scalar keys. Every one of them is
+      // reachable from the editor's clear path, and each is a separate `in
+      // patch` branch in the mapper — so five of the six could regress to the
+      // `!== undefined` form (silently skipping the clear, leaving the stale DB
+      // value, and spurious-forking on the otherwise-empty patch) with the
+      // suite still green.
+      const cols = lessonTrackBColumns({ [patchKey]: undefined });
+      expect(column in cols, `${column} key must be emitted`).toBe(true);
+      expect(cols[column]).toBeNull();
+      // Exactly one column: a clear must never touch a field the teacher did
+      // not edit.
+      expect(Object.keys(cols)).toEqual([column]);
+    },
+  );
+
   it("leaves a column ABSENT from the patch untouched (no key emitted)", () => {
     // An unrelated edit (builds only) must not emit any other Track-B column, so
     // it can never clear a field the teacher didn't touch.
