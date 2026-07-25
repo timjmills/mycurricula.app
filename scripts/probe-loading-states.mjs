@@ -14,6 +14,8 @@
 //
 // Token: CLAUDE_BYPASS_TOKEN env, else .env.local. Read-only.
 import { chromium } from "playwright";
+// One owner for the login hop — see scripts/lib/auth.mjs.
+import { bypassLoginOnPage } from "./lib/auth.mjs";
 import { readFileSync } from "node:fs";
 
 const arg = (n, d) => {
@@ -44,8 +46,7 @@ const page = await context.newPage();
 
 // Authenticate first, fully settled, so the login hydrate can't bleed into the
 // first measured surface.
-await page.goto(`${BASE}/auth/claude-login?token=${encodeURIComponent(token)}&next=/home`,
-  { waitUntil: "domcontentloaded", timeout: 90_000 });
+await bypassLoginOnPage(page, { base: BASE, next: "/home", timeout: 90_000, settleMs: 0 });
 await page.waitForLoadState("networkidle", { timeout: 30_000 }).catch(() => {});
 await page.waitForTimeout(3_000);
 log(!/claude-login/.test(page.url()), "authenticated");

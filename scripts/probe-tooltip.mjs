@@ -36,17 +36,12 @@
 //                    and survives the global off switch
 //   5. touch       → native title= mirror present; tap-focus bubble is inert
 import { chromium, devices } from "playwright";
-import { readFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { bypassLogin } from "./lib/auth.mjs";
 
 const BASE = process.env.PROBE_BASE ?? "http://localhost:3099";
 const SHOTS = process.env.PROBE_SHOTS ?? "docs/screenshots/tooltip-fix";
 mkdirSync(SHOTS, { recursive: true });
-
-let token = process.env.CLAUDE_BYPASS_TOKEN;
-if (!token) {
-  const env = readFileSync(".env.local", "utf8");
-  token = env.match(/CLAUDE_BYPASS_TOKEN=(.+)/)?.[1]?.trim();
-}
 
 const results = [];
 const check = (ok, name, detail = "") => {
@@ -63,25 +58,10 @@ const browser = await chromium.launch({ channel: "chrome" });
 // ── One authenticated storage state, reused by every context ────────────────
 const auth = await browser.newContext();
 {
-  const boot = await auth.newPage();
-  // /auth/claude-login is a cold route in dev and compiles on first hit; with
-  // several agents sharing one dev server that has been measured well past a
-  // minute. Retry rather than fail the whole probe on a compile queue.
-  let ok = false;
-  for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
-    try {
-      await boot.goto(
-        `${BASE}/auth/claude-login?token=${encodeURIComponent(token)}&next=/weekly`,
-        { waitUntil: "domcontentloaded", timeout: 180000 },
-      );
-      ok = true;
-    } catch (err) {
-      console.log(`  …login attempt ${attempt} timed out, retrying`);
-    }
-  }
-  if (!ok) throw new Error("could not reach /auth/claude-login");
-  await boot.waitForTimeout(2500);
-  await boot.close();
+  // The hop (and its retry-on-cold-compile) lives in scripts/lib/auth.mjs.
+  await bypassLogin(auth, {
+    base: BASE, next: "/weekly", timeout: 180000, settleMs: 2500, retries: 3,
+  });
 }
 const storageState = await auth.storageState();
 await auth.close();

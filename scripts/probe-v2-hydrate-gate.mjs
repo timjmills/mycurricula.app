@@ -22,6 +22,8 @@
 // Token: CLAUDE_BYPASS_TOKEN env, else read from .env.local. Read-only — it
 // navigates and reads; it never mutates planner data.
 import { chromium } from "playwright";
+// One owner for the login hop — see scripts/lib/auth.mjs.
+import { bypassLoginOnPage } from "./lib/auth.mjs";
 import { readFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -257,10 +259,7 @@ page.on("requestfailed", (r) =>
 );
 
 // --- authenticate once; the bypass cookie carries across routes
-await page.goto(
-  `${BASE}/auth/claude-login?token=${encodeURIComponent(token)}&next=/weekly`,
-  { waitUntil: "domcontentloaded", timeout: 90_000 },
-);
+await bypassLoginOnPage(page, { base: BASE, next: "/weekly", timeout: 90_000, settleMs: 0 });
 // Let the post-login landing FULLY settle before the sweep starts. Without
 // this, the first route's goto interrupts the landing page's in-flight
 // hydrate fetches; they abort with net::ERR_ABORTED, surface as

@@ -11,12 +11,10 @@
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-
-const TOKEN = process.env.CLAUDE_BYPASS_TOKEN;
-if (!TOKEN) {
-  console.error("CLAUDE_BYPASS_TOKEN not set");
-  process.exit(1);
-}
+// The login hop lives in ONE module so no probe builds a URL containing the
+// bypass token — Playwright puts that URL into every navigation error it
+// throws, and probes are routinely run with output redirected to a file.
+import { bypassLogin } from "./lib/auth.mjs";
 
 const BASE = process.env.PROBE_BASE ?? "http://localhost:3000";
 const WAVE = process.argv[2] ?? "wave-0-baseline";
@@ -44,18 +42,18 @@ const TIERS = [
 
 await mkdir(OUT_DIR, { recursive: true });
 
-const browser = await chromium.launch();
+// `channel: "chrome"` — real Chrome, never the system default (Edge on Windows)
+// and never Playwright's bundled Chromium, which is not installed on this
+// machine. Without it this probe could not launch at all, which is how the
+// CLAUDE.md §5-mandated responsive audit had quietly stopped being runnable.
+const browser = await chromium.launch({ channel: "chrome" });
 const context = await browser.newContext();
 
-// Bootstrap auth via the claude-login route so the bypass cookie is set
-// on the context before any probed page loads.
-const boot = await context.newPage();
-await boot.goto(
-  `${BASE}/auth/claude-login?token=${encodeURIComponent(TOKEN)}&next=/weekly`,
-  { waitUntil: "domcontentloaded", timeout: 60000 },
-);
-await boot.waitForTimeout(1500);
-await boot.close();
+// Bootstrap auth via the claude-login route so the bypass cookie is set on the
+// context before any probed page loads. `bypassLogin` owns the URL, resolves the
+// token (exiting loudly if absent rather than probing unauthenticated), and
+// redacts any navigation error it throws.
+await bypassLogin(context, { base: BASE, next: "/weekly" });
 
 const results = [];
 

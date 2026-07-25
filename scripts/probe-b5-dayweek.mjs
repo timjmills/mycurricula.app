@@ -22,6 +22,8 @@
 //
 // Usage: node scripts/probe-b5-dayweek.mjs   (PROBE_BASE defaults to :3099)
 import { chromium, devices } from "playwright";
+// One owner for the login hop — see scripts/lib/auth.mjs.
+import { bypassLogin } from "./lib/auth.mjs";
 import { readFileSync, mkdirSync } from "node:fs";
 
 const BASE = process.env.PROBE_BASE ?? "http://localhost:3099";
@@ -59,13 +61,7 @@ const browser = await chromium.launch({ channel: "chrome" });
 // ── One authenticated storage state, reused by every context ────────────────
 const auth = await browser.newContext();
 {
-  const boot = await auth.newPage();
-  await boot.goto(
-    `${BASE}/auth/claude-login?token=${encodeURIComponent(token)}&next=/weekly`,
-    { waitUntil: "domcontentloaded", timeout: 60000 },
-  );
-  await boot.waitForTimeout(2500);
-  await boot.close();
+  await bypassLogin(auth, { base: BASE, next: "/weekly", timeout: 60000, settleMs: 2500 });
 }
 const storageState = await auth.storageState();
 await auth.close();

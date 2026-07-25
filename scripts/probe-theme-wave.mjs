@@ -30,6 +30,8 @@
 //
 // Usage: CLAUDE_BYPASS_TOKEN=… node theme-wave-probe.mjs
 import { chromium } from "playwright";
+// One owner for the login hop — see scripts/lib/auth.mjs.
+import { bypassLogin } from "./lib/auth.mjs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -85,12 +87,7 @@ const browser = await chromium.launch({ channel: "chrome" });
 
 // Auth boot once to harvest cookies, reused per themed context.
 const authCtx = await browser.newContext();
-const boot = await authCtx.newPage();
-await boot.goto(
-  `${BASE}/auth/claude-login?token=${encodeURIComponent(TOKEN)}&next=/weekly`,
-  { waitUntil: "domcontentloaded", timeout: 120000 },
-);
-await boot.waitForTimeout(2000);
+await bypassLogin(authCtx, { base: BASE, next: "/weekly", timeout: 120000, settleMs: 2000 });
 const cookies = await authCtx.cookies();
 await authCtx.close();
 
