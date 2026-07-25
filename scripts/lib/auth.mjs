@@ -57,6 +57,7 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 /**
  * Strip anything credential-shaped from a string. Applied to every value this
@@ -114,6 +115,45 @@ export function requireToken({ repoRoot = process.cwd(), exit = true } = {}) {
  * @returns {Promise<{ok: true, landedOn: string}>}
  * @throws {Error} with a REDACTED message — never containing the token.
  */
+/**
+ * Make a probe context look like a RETURNING teacher.
+ *
+ * A fresh Playwright context is un-onboarded by definition on the prototype
+ * path: `.env.local` sets neither NEXT_PUBLIC_PLANNER_USE_SUPABASE nor
+ * NEXT_PUBLIC_V2, so `computeNeedsOnboarding` falls back to a per-device
+ * localStorage flag. `first-run-redirect` then yanks the run to /onboarding
+ * from a POST-HYDRATION effect — measured at 10.0s, squarely inside this dev
+ * server's 5-17s hydration window, i.e. exactly when probes measure.
+ *
+ * That is NOT a product defect: a session carrying completion state is never
+ * sent to the wizard, in either environment (verified, 7a73d39). It is a probe
+ * hazard, and a vicious one — a run parked on /onboarding produces the
+ * IDENTICAL element-not-found signature as a real regression on the target
+ * route, so it fails toward reporting a defect that is not there. It cost one
+ * lane several runs before anyone knew what they were looking at.
+ *
+ * Key + shape read from lib/onboarding-state.tsx (STORAGE_KEY :184,
+ * PersistShape :228), not assumed.
+ *
+ * `addInitScript` runs before page scripts on EVERY navigation, so it beats the
+ * gate's effect rather than racing it. Inert against a deployed build, where
+ * account-scoped `teachers.onboarded_at` wins and this flag is ignored — so it
+ * is safe to apply unconditionally.
+ */
+async function seedOnboardedFlag(target) {
+  await target.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        "mycurricula:onboarding",
+        JSON.stringify({ stepIndex: 0, data: {}, finished: true }),
+      );
+    } catch {
+      // Storage disabled/partitioned: the gate then behaves as it would for any
+      // such user. A storage failure must never abort the auth hop.
+    }
+  });
+}
+
 export async function bypassLogin(context, opts = {}) {
   const {
     base = process.env.PROBE_BASE ?? "http://localhost:3099",
@@ -137,6 +177,8 @@ export async function bypassLogin(context, opts = {}) {
     retries = 1,
     token = requireToken({ repoRoot: opts.repoRoot ?? process.cwd() }),
   } = opts;
+
+  await seedOnboardedFlag(context);
 
   // Built here, never returned. The only place this string exists.
   const url = `${base}/auth/claude-login?token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`;
@@ -183,6 +225,10 @@ export async function bypassLoginOnPage(page, opts = {}) {
     token = requireToken({ repoRoot: opts.repoRoot ?? process.cwd() }),
   } = opts;
 
+  // Page-level parity with the context variant above — probes written in this
+  // shape are equally exposed to the gate.
+  await seedOnboardedFlag(page);
+
   const url = `${base}/auth/claude-login?token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`;
   try {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout });
@@ -216,7 +262,18 @@ export async function authedStorageState(browser, opts = {}) {
 // ── selftest ────────────────────────────────────────────────────────────────
 // Proves the failure path rather than asserting it: forces a REAL navigation
 // error by pointing at a dead port, then checks the thrown message.
-if (process.argv.includes("--selftest")) {
+//
+// GUARDED ON BEING THE ENTRY MODULE, not merely on the flag. This block calls
+// process.exit(), and every probe that imports this helper also has its own
+// `--selftest`. Keying on argv alone meant `node scripts/probe-X.mjs
+// --selftest` ran THIS selftest at import time and exited 0 before the probe's
+// own assertions were reached — printing a confident SELFTEST PASS for a test
+// that never ran. A side-effecting entrypoint in an imported module is a trap
+// whatever the flag is called.
+const IS_ENTRY_MODULE =
+  import.meta.url === pathToFileURL(process.argv[1] ?? "").href;
+
+if (IS_ENTRY_MODULE && process.argv.includes("--selftest")) {
   const { chromium } = await import("playwright");
   const checks = [];
   const ok = (name, cond, detail = "") => {
