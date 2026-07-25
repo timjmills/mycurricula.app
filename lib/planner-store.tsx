@@ -1826,13 +1826,61 @@ export function failureScopeForOp(
  * `{status}`, a replayed undo sends `{status, reasonNotDone}`), and suppressing
  * the richer patch's failure because the narrower one is queued loses a field
  * silently.
+ *
+ * KEY PRESENCE IS NOT ENOUGH EITHER, which is the subtler half. `undefined`
+ * means two different things depending on the field: for a Track-B column it is
+ * the editor's CLEAR (key-presence semantics — `lessonTrackBColumns` emits
+ * `null`), but for a plain scalar the source's `if (patch.x !== undefined)`
+ * guard skips it entirely. So a pending `{title: undefined}` does NOT write
+ * `title`, and treating it as covering a failed `{title: "A"}` would suppress a
+ * real loss. Coverage therefore requires the pending value to be DEFINED —
+ * unless the failed one was itself undefined, in which case the two agree.
  */
 export function patchCovers(
   failed: Partial<Lesson>,
   pending: Partial<Lesson> | null,
 ): boolean {
   if (pending === null) return false;
-  return Object.keys(failed).every((k) => k in pending);
+  return Object.keys(failed).every((k) => {
+    if (!(k in pending)) return false;
+    const failedValue = failed[k as keyof Lesson];
+    const pendingValue = pending[k as keyof Lesson];
+    // A defined value can only be superseded by another defined value.
+    return failedValue === undefined || pendingValue !== undefined;
+  });
+}
+
+/**
+ * Build the failure signal for a write that did not land — or `null` when the
+ * failure is inconsequential and must NOT be surfaced.
+ *
+ * Exported and pure so the two decisions that matter can be tested without
+ * mounting a provider: whether to speak at all, and whether this was a definite
+ * FAILURE or an unknowable TIMEOUT. Both were previously buried in a callback
+ * with no coverage, in the diff whose whole purpose is making silent failures
+ * visible.
+ */
+export function buildWriteFailure(
+  id: number,
+  op: string,
+  scope: "personal" | "team",
+  error: unknown,
+  inconsequential: boolean,
+): PlannerWriteFailure | null {
+  if (inconsequential) return null;
+  return {
+    id,
+    // A timeout is not a failure — it is an UNKNOWN. Collapsing the two here
+    // would throw away the distinction the queue went to trouble to make, one
+    // layer after making it.
+    kind: error instanceof SerialWriteTimeoutError ? "timeout" : "failed",
+    op,
+    scope,
+    message:
+      error instanceof Error && error.message
+        ? error.message
+        : "The change could not be saved.",
+  };
 }
 
 /** A non-field lesson write, before identity (owner / save target) is attached.
@@ -2697,18 +2745,32 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
           );
         } catch (err) {
           // Same cancelled-vs-failed distinction as the outer catch, minus the
-          // retry: this read is supplementary, the fallback is already correct,
-          // and a superseded batch is not worth a second round-trip. It IS worth
-          // a truthful log line — an error entry here for a navigation would
-          // send the next reader hunting a section bug that never existed.
-          if (classifyAsyncFailure(err) === "failed") {
+          // retry: this read is supplementary and the fallback is already
+          // correct, so a superseded batch is not worth a second round-trip.
+          //
+          // THREE MESSAGES, NOT TWO, and the middle one is the point. Collapsing
+          // "aborted" and "transport" into a single "cancelled (likely
+          // superseded by navigation)" line asserts a CAUSE that this file's own
+          // classifier documents as unknowable at this layer — and unlike the
+          // hydrate, there is no retry here to settle it by observation. A
+          // teacher whose network dropped would silently fall back to synthetic
+          // sections under a log line blaming their own navigation. That is the
+          // 7.16 misdiagnosis inverted, and it is the reason the classifier has
+          // three states rather than two.
+          const kind = classifyAsyncFailure(err);
+          if (kind === "failed") {
             console.error(
               "[planner] section batch failed; falling back to synthetic sections",
               err,
             );
-          } else {
+          } else if (kind === "aborted") {
             console.info(
-              "[planner] section batch cancelled (likely superseded by navigation); using synthetic sections",
+              "[planner] section batch cancelled; using synthetic sections",
+              err,
+            );
+          } else {
+            console.warn(
+              "[planner] section batch did not settle — cancelled by navigation OR the network is down, we cannot tell here and do not retry; using synthetic sections. Persisted sections reappear on the next successful hydrate.",
               err,
             );
           }
@@ -2861,21 +2923,16 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       // win; reporting it would say their work was lost while the queue is busy
       // saving it. Each caller computes coverage itself, because only it knows
       // whether its payloads are whole values or partial patches.
-      if (inconsequential) return;
-      writeFailureSeqRef.current += 1;
-      setLastWriteFailure({
-        id: writeFailureSeqRef.current,
-        // A timeout is not a failure — it is an UNKNOWN. Collapsing the two here
-        // would throw away the distinction the queue went to trouble to make,
-        // one layer after making it.
-        kind: err instanceof SerialWriteTimeoutError ? "timeout" : "failed",
+      const next = buildWriteFailure(
+        writeFailureSeqRef.current + 1,
         op,
         scope,
-        message:
-          err instanceof Error && err.message
-            ? err.message
-            : "The change could not be saved.",
-      });
+        err,
+        inconsequential,
+      );
+      if (next === null) return;
+      writeFailureSeqRef.current = next.id;
+      setLastWriteFailure(next);
     },
     [],
   );

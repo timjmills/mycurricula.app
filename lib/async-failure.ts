@@ -19,6 +19,22 @@
 // LOGGABLE is the durable fix — the next person reading a console should not
 // have to re-litigate it.
 //
+// THE `TypeError` PREMISE IS CONFIRMED BY PRODUCTION, not assumed. A review
+// flagged that the whole classifier rests on a navigation-cancelled server
+// action reaching our catch as a RAW `TypeError` rather than something React or
+// the action layer wrapped — and that nothing in the tests can prove it. The
+// proof is already in hand: the prod console line was
+//
+//     [planner] hydrate failed; showing empty document — TypeError: Failed to fetch
+//
+// and that line is `console.error(message, err)` from the store's own catch,
+// printing the CAUGHT object as its second argument. A wrapper would have
+// rendered its own class name there. So the object this classifier receives is a
+// `TypeError` with that message. Recorded here so the question is not re-opened
+// from first principles; if the action layer ever starts wrapping, the
+// `instanceof TypeError` gate degrades to "failed", which is the safe direction
+// (a cancellation surfaces as an error rather than an error being swallowed).
+//
 // THE HARD PART, STATED HONESTLY. A cancelled `fetch` and a genuinely broken
 // network are not always distinguishable from the error object. An explicit
 // `AbortController.abort()` produces a named `AbortError`; a NAVIGATION-cancelled

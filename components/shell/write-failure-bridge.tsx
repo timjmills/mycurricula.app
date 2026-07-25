@@ -30,7 +30,7 @@
 // states the fact and gets out of the way.
 
 import { useEffect, useRef } from "react";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, type PlannerWriteFailure } from "@/lib/planner-store";
 import { useConsequenceToast } from "@/lib/consequence-toast";
 
 /**
@@ -77,6 +77,37 @@ const FAILED_COPY: Record<string, { what: string; consequence: string }> = {
   },
 };
 
+/**
+ * The sentence a failure becomes. Exported and pure so the copy — which is the
+ * whole product of this component, and which was factually inverted for two of
+ * six verbs before review — is testable without a DOM.
+ *
+ * `missed` is how many earlier failures this toast is standing in for (see the
+ * bridge for why that is not zero).
+ */
+export function writeFailureMessage(
+  failure: PlannerWriteFailure,
+  missed: number,
+): string {
+  const copy = FAILED_COPY[failure.op];
+  const what = copy?.what ?? "change";
+  const where = failure.scope === "team" ? " for the Team Curriculum" : "";
+  const alsoOthers =
+    missed > 0 ? ` (and ${missed} other change${missed === 1 ? "" : "s"})` : "";
+
+  // A TIMEOUT IS NOT A FAILURE, and must not be phrased as one. The request was
+  // abandoned rather than cancelled, so it may still commit — and the documented
+  // hazard is that it commits AFTER the next write, putting the NEWER edit at
+  // risk, not this one. Any sentence predicting what a reload will show would be
+  // inventing a certainty nobody has. So it says what is known, and what to do.
+  if (failure.kind === "timeout") {
+    return `Your ${what}${where}${alsoOthers} is taking too long to save and we’ve stopped waiting. It may or may not have gone through — reload to see what the server actually has.`;
+  }
+  return `Your ${what}${where}${alsoOthers} didn’t save. ${
+    copy?.consequence ?? "Reload to see what the server actually has."
+  }`;
+}
+
 export function WriteFailureBridge(): null {
   const { lastWriteFailure } = usePlanner();
   const { showConsequence } = useConsequenceToast();
@@ -88,25 +119,17 @@ export function WriteFailureBridge(): null {
   useEffect(() => {
     if (!lastWriteFailure) return;
     if (lastWriteFailure.id <= shownIdRef.current) return;
+
+    // HOW MANY FAILURES THIS TOAST IS STANDING IN FOR. A multi-field
+    // `editLesson` splits into one lane PER FIELD, so a Team-mode save that is
+    // denied fails N times; React batches the N state updates and only the last
+    // survives, so the guard above legitimately shows one toast. Showing one is
+    // right — a queue of six identical toasts helps nobody — but silently
+    // speaking for six is not. The monotonic id already carries the count.
+    const missed = lastWriteFailure.id - shownIdRef.current - 1;
     shownIdRef.current = lastWriteFailure.id;
 
-    const copy = FAILED_COPY[lastWriteFailure.op];
-    const what = copy?.what ?? "change";
-    const where =
-      lastWriteFailure.scope === "team" ? " for the Team Curriculum" : "";
-
-    // A TIMEOUT IS NOT A FAILURE, and must not be phrased as one. The request
-    // was abandoned rather than cancelled, so it may still commit — and the
-    // documented hazard is that it commits AFTER the next write, putting the
-    // NEWER edit at risk, not this one. Any sentence that predicts what a reload
-    // will show would be inventing a certainty nobody has. So it says what is
-    // actually known, and what to do about it.
-    showConsequence({
-      message:
-        lastWriteFailure.kind === "timeout"
-          ? `Your ${what}${where} is taking too long to save and we’ve stopped waiting. It may or may not have gone through — reload to see what the server actually has.`
-          : `Your ${what}${where} didn’t save. ${copy?.consequence ?? "Reload to see what the server actually has."}`,
-    });
+    showConsequence({ message: writeFailureMessage(lastWriteFailure, missed) });
   }, [lastWriteFailure, showConsequence]);
 
   return null;

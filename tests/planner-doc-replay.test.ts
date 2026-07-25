@@ -568,6 +568,31 @@ describe("patchCovers — the suppression rule, as shipped", () => {
     expect(patchCovers({ title: "x" }, null)).toBe(false);
   });
 
+  it("a present-but-UNDEFINED pending value does NOT cover a defined one", () => {
+    // Key presence alone is not coverage. `undefined` means "clear" for a
+    // Track-B column (lessonTrackBColumns uses `in patch` and writes null) but
+    // "skip" for a plain scalar (`if (patch.x !== undefined)`), so a pending
+    // {title: undefined} writes nothing and cannot stand in for a failed
+    // {title: "A"}. Reachable on the standards lane, where doc-replay assigns
+    // standardIds unconditionally and it can legitimately be undefined.
+    expect(patchCovers({ title: "A" }, { title: undefined })).toBe(false);
+    expect(
+      patchCovers(
+        { standards: ["A"], standardIds: ["i"] },
+        { standards: ["B"], standardIds: undefined },
+      ),
+    ).toBe(false);
+  });
+
+  it("undefined covers undefined — the two agree", () => {
+    // A failed clear superseded by another clear is genuinely inconsequential.
+    expect(patchCovers({ prep: undefined }, { prep: undefined })).toBe(true);
+  });
+
+  it("a defined pending value covers a failed CLEAR", () => {
+    expect(patchCovers({ prep: undefined }, { prep: "set it" })).toBe(true);
+  });
+
   it("identical key sets cover", () => {
     expect(
       patchCovers({ standards: ["A"], standardIds: ["i"] }, {

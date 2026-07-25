@@ -6242,3 +6242,69 @@ three of them before catching it.
 68 todo, 0 failed**. Codex still 503 (now also `throttled / concurrency_limit`),
 so this fix-forward carries the independent review + self-review + local stack,
 with the same substitution recorded above.
+
+### Owed re-review: 3 of 6 were already fixed; 3 Mediums taken
+
+**The re-review measured `6fca539`. `daf5c73` had already landed.** Verified
+against HEAD before touching anything, per the rule this session keeps
+re-learning:
+
+- **B-1 / B-2 (both HIGH) — already closed.** The identity half of F2 was the
+  first thing `daf5c73` fixed: all three lane keys carry `saveTarget`
+  (`lessonFieldLane` / `lessonOpLane` / `sectionLane`), so a `core` write and a
+  `personal` write of the same field are in different lanes and neither can
+  supersede or evict the other. `archive` deliberately stays single-laned
+  because `softDeleteLesson`/`unarchiveLesson` are personal-scoped in the source.
+- **"The new tests would pass against a broken implementation" — already
+  closed**, and it was a fair hit on `6fca539`. `daf5c73` exported the rules and
+  pointed the tests at them, then mutation-tested: reverting each fix turned
+  exactly the expected tests red.
+
+**Three Mediums were genuinely open and are now fixed.**
+
+**B-3 — key presence is not coverage.** `undefined` means two different things:
+for a Track-B column it is the editor's CLEAR (`lessonTrackBColumns` uses
+`in patch` and writes `null`), but for a plain scalar the source's
+`if (patch.x !== undefined)` guard SKIPS it. So a pending `{title: undefined}`
+writes nothing and must not suppress a failed `{title: "A"}`. `patchCovers` now
+requires the pending value to be DEFINED unless the failed one was also
+undefined. Reachable on the standards lane, where doc-replay assigns
+`standardIds` unconditionally.
+
+**B-4 — the toast spoke for failures it never mentioned.** A multi-field
+`editLesson` splits into one lane per field, so a denied Team save fails N times;
+React batches the N updates and the id guard shows one toast. Showing one is
+right — six identical toasts help nobody — but silently standing for six is not.
+The monotonic id already carried the count, so it now says "(and N other
+changes)".
+
+**C-1 — the sections-batch catch asserted a cause its own classifier calls
+unknowable.** It logged every non-`failed` rejection as "cancelled (likely
+superseded by navigation)" at `console.info`. A teacher whose network dropped
+would silently fall back to synthetic sections under a line blaming their own
+navigation — the 7.16 misdiagnosis inverted. Three distinct lines now, and the
+ambiguous one says so and admits there is no retry here to settle it.
+
+**The unverified premise is verified, from evidence already in hand.** The whole
+classifier rests on a navigation-cancelled server action reaching us as a RAW
+`TypeError`. The prod line was
+`[planner] hydrate failed; showing empty document — TypeError: Failed to fetch`
+— and that is `console.error(message, err)` from the store's own catch printing
+the CAUGHT object. A wrapper would have rendered its own class name there. Noted
+in `lib/async-failure.ts` so it is not re-derived; and if the action layer ever
+starts wrapping, the gate degrades to "failed", which is the safe direction.
+
+**Also closed the reviewer's structural point: there was no test anywhere for
+`reportWriteFailure`, the `onError` callbacks, or the toast copy.** The two
+decisions are now pure exported functions — `buildWriteFailure` (speak at all?
+failure or timeout?) and `writeFailureMessage` (the sentence) — with
+`tests/write-failure-signal.test.ts` pinning them, mutation-verified: reverting
+the timeout classification, the per-verb copy, the batched count, or the
+coverage rule turns exactly 7 tests red.
+
+**§4a: Codex RECOVERED and returned `NO BLOCKING ISSUES` on this diff.** The
+outage is over; the delta flagged above as owing a re-review has now had one.
+
+**Verification:** `npx tsc --noEmit` clean · `npx next lint --no-cache` →
+`✔ No ESLint warnings or errors` · `npm run test` → **61 files, 1273 passed,
+68 todo, 0 failed**.
