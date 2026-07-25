@@ -10,14 +10,34 @@
 // Tab stop:
 //   • Roving tabindex — the selected option is tabIndex=0, every other is -1,
 //     so the group is entered with ONE Tab and arrows move within it.
-//   • ArrowRight / ArrowDown → next option (wrapping).
-//     ArrowLeft  / ArrowUp   → previous option (wrapping).
+//   • ArrowRight / ArrowDown → next option (wrapping by default).
+//     ArrowLeft  / ArrowUp   → previous option (wrapping by default).
 //     Home → first, End → last.
 //   • Selection follows focus — the standard radio behavior, and exactly
 //     right here since these are instant-apply preferences (moving the
 //     selection IS choosing it). The hook calls `onSelect(nextValue)` and
 //     then moves DOM focus to that option's button so the focus ring tracks
 //     the selection.
+//
+// ── WHY `wrap` EXISTS (read before "simplifying" it away) ──────────────────
+// Follows-focus above is deliberate and stays the default. But it composes
+// badly with WRAPPING when one option CLEARS something, and one callsite has
+// exactly that: settings/workspace-settings.tsx `DefaultNotebookCard` puts an
+// `__auto__` sentinel at index 0 whose onSelect writes `null`, wiping the
+// stored default-notebook preference.
+//
+// The distinction that matters, because it is easy to over-fix: arrowing LEFT
+// from the first notebook onto that sentinel is an ADJACENT step onto a
+// labelled radio option — normal, intended, not a bug. The bug is only the
+// WRAP: ArrowRight off the LAST option circles round to index 0, so a user
+// moving forward runs off the end and silently clears the preference without
+// ever aiming at it.
+//
+// So the fix is scoped to wrapping, not to follows-focus. `wrap` defaults to
+// true and the six appearance/filter callsites are unchanged; only the one
+// with a clearing sentinel opts out. Do NOT "fix" this by breaking
+// follows-focus for everyone — that would trade a real ARIA idiom for one
+// callsite's problem.
 //
 // The hook is dependency-free and DOM-agnostic about styling: a consumer
 // renders a container with `getGroupProps()` (onKeyDown) and each option
@@ -39,6 +59,15 @@ export interface RovingRadioOptions {
   selected: string;
   /** Apply a value. Called on arrow/Home/End (selection follows focus). */
   onSelect: (value: string) => void;
+  /**
+   * Whether arrow keys wrap past the ends. Defaults to **true** (the ARIA
+   * radiogroup norm, and what every appearance picker wants).
+   *
+   * Pass `false` when one option is a CLEARING sentinel — see the WRAP note in
+   * the header above. Non-wrapping clamps at both ends instead: the first
+   * option ignores ArrowLeft/Up, the last ignores ArrowRight/Down.
+   */
+  wrap?: boolean;
 }
 
 export interface RovingRadioApi {
@@ -59,6 +88,7 @@ export function useRovingRadio({
   values,
   selected,
   onSelect,
+  wrap = true,
 }: RovingRadioOptions): RovingRadioApi {
   const groupRef = useRef<HTMLElement | null>(null);
 
@@ -81,11 +111,20 @@ export function useRovingRadio({
       switch (e.key) {
         case "ArrowRight":
         case "ArrowDown":
-          nextIndex = (anchor + 1) % count;
+          // wrap=false clamps at the last option: `null` below means "no
+          // movement", so the handler returns without calling onSelect at all
+          // (rather than re-committing the current value).
+          nextIndex =
+            anchor + 1 < count ? anchor + 1 : wrap ? (anchor + 1) % count : null;
           break;
         case "ArrowLeft":
         case "ArrowUp":
-          nextIndex = (anchor - 1 + count) % count;
+          nextIndex =
+            anchor - 1 >= 0
+              ? anchor - 1
+              : wrap
+                ? (anchor - 1 + count) % count
+                : null;
           break;
         case "Home":
           nextIndex = 0;
@@ -95,6 +134,13 @@ export function useRovingRadio({
           break;
         default:
           return;
+      }
+
+      // wrap=false at an end: swallow the key (the group still owns the arrow,
+      // so the page doesn't scroll) but commit nothing and move nothing.
+      if (nextIndex === null) {
+        e.preventDefault();
+        return;
       }
 
       e.preventDefault();
@@ -110,7 +156,7 @@ export function useRovingRadio({
       );
       next?.focus();
     },
-    [values, selected, onSelect],
+    [values, selected, onSelect, wrap],
   );
 
   const getGroupProps = useCallback(

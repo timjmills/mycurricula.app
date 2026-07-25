@@ -38,6 +38,48 @@ import { STATUS_LABEL } from "./status";
 // the host handle opening the sub-surfaces. This keeps the menu tree
 // shallow and avoids nesting portals inside portals.
 
+// ── INERT-HIDDEN (2026-07-25) ───────────────────────────────────────────────
+// Six items were removed from the menu below because they emitted an action NO
+// host handles. They were not destructive — they simply closed the menu and did
+// nothing. A menu where six of the items are dead teaches a teacher the menu is
+// broken, so they stop trying the ones that work; the standing ruling on this
+// family is HIDE IT UNTIL IT WORKS. Each removal site is marked INERT-HIDDEN.
+//
+// Verified across every consumer of `onContextAction`: WeeklyGrid:667,
+// WeekColumns:464 and weekly-board:271 branch only on duplicate/move/
+// mark-status; weekly-lesson-card:1762 handles nine actions itself and drops
+// the rest through `default:` to those hosts.
+//
+//   REMOVED             ACTION              WHAT IT WOULD TAKE TO RESTORE
+//   Save as template    save-template       a saveAsTemplate store action;
+//                                           LESSON_TEMPLATE_BY_ID already
+//                                           exists in planner-store
+//   Add resource…       add-resource        an opener for the resource
+//                                           composer at this callsite
+//   Add to to-do list   add-to-todo         a todo-store write
+//   See standards       see-standards   ←── CHEAPEST. A standards tab and the
+//                                           StandardsPicker both exist; this
+//                                           only needs the same navigation
+//                                           "Open in Daily" already does.
+//   Print this lesson   print           ←── CHEAP. /weekly/print and
+//                                           /year/print exist and work; this
+//                                           needs a single-lesson print route
+//                                           or a router.push to one.
+//   Copy to my personal copy-to-personal ←── CHEAP-ISH. The forking model is
+//                                           real (setSaveTarget lazy-forks);
+//                                           this needs the host to call it.
+//
+// The three marked ← are the scoped follow-up worth picking up first. Note the
+// two survivors that look similar but are NOT inert: "Open in Daily" and
+// "Compare with Team Curriculum" are self-contained (router.push), and "Copy
+// link" uses useCopyLink — none of them round-trip through a host.
+//
+// SEPARATELY, on the v1 rollback path only: WeeklyGrid leaves 11 emitted
+// actions unhandled (it accepts just duplicate/move/mark-status). Left as-is
+// by decision — that path exists to be a faithful rollback, and changing its
+// behaviour to fix cosmetics on a surface nobody sees unless the flag flips is
+// the wrong trade.
+
 /** Stable action ids handed back through `onContextAction`. */
 export type ContextAction =
   | "open-daily"
@@ -241,11 +283,9 @@ export function LessonContextMenu({
         tip: "Create a copy of this lesson on the next available slot — handy when you want to teach the same thing twice",
         onSelect: () => fire("duplicate"),
       },
-      {
-        label: "Save as template",
-        tip: "Save this lesson's structure as a reusable template so you can stamp out similar lessons later",
-        onSelect: () => fire("save-template"),
-      },
+      // INERT-HIDDEN: "Save as template" → fire("save-template").
+      // weekly-lesson-card forwards it to the host with a TODO admitting it is
+      // a stub, and no host has a branch for it. See INERT-HIDDEN below.
 
       { kind: "divider" },
 
@@ -261,21 +301,9 @@ export function LessonContextMenu({
         tip: "Mark this lesson skipped in one click — it'll show on the catch-up list until you decide what to do with it",
         onSelect: () => fire("skip-quick"),
       },
-      {
-        label: "Add resource…",
-        tip: "Attach a link, file, or note to this lesson so the whole team has the material when they teach it",
-        onSelect: () => fire("add-resource"),
-      },
-      {
-        label: "Add to to-do list",
-        tip: "Pin this lesson to today's to-do list as a reminder to prep it",
-        onSelect: () => fire("add-to-todo"),
-      },
-      {
-        label: "See standards",
-        tip: "Open the standards drawer to see which CCSS / curriculum standards this lesson hits",
-        onSelect: () => fire("see-standards"),
-      },
+      // INERT-HIDDEN: "Add resource…" → fire("add-resource"),
+      // "Add to to-do list" → fire("add-to-todo"),
+      // "See standards" → fire("see-standards"). All three unhandled.
 
       { kind: "divider" },
 
@@ -331,22 +359,14 @@ export function LessonContextMenu({
           onClose();
         },
       },
-      {
-        label: "Copy to my personal",
-        hidden: lesson.modified,
-        tip: "Fork the Team Curriculum lesson into your personal copy so you can edit it without affecting anyone else",
-        onSelect: () => fire("copy-to-personal"),
-      },
+      // INERT-HIDDEN: "Copy to my personal" → fire("copy-to-personal").
+      // weekly-lesson-card explicitly forwards this one to the host "so the
+      // grid can handle it as before" — but no host ever did.
 
       { kind: "divider" },
 
       // ── Group 4: print + archive ─────────────────────────────────────────
-      {
-        label: "Print this lesson",
-        kbd: "⌘P",
-        tip: "Open a paper-friendly single-lesson print view (good for handouts and substitute folders)",
-        onSelect: () => fire("print"),
-      },
+      // INERT-HIDDEN: "Print this lesson" → fire("print").
       {
         label: "Archive",
         tip: "Move this lesson out of the active planner — it stays in your archive so you can revive it next year",

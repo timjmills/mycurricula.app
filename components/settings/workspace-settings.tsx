@@ -748,10 +748,19 @@ function DefaultNotebookCard(): ReactNode {
   };
 
   // Shared radiogroup keyboard pattern — sentinel maps null ⇄ AUTO_OPTION.
+  //
+  // wrap: false — REQUIRED here, unlike the appearance pickers. AUTO_OPTION
+  // sits at index 0 and its onSelect CLEARS the stored preference. With
+  // wrapping, ArrowRight off the LAST notebook circles round to index 0, so a
+  // teacher moving forward through the list runs off the end and silently
+  // wipes their default notebook without ever aiming at "Automatic".
+  // (Arrowing LEFT onto it from the first notebook is fine — that is an
+  // adjacent step onto a labelled option, which is what a radiogroup is for.)
   const roving = useRovingRadio({
     values: [AUTO_OPTION, ...activeNotebooks.map((nb) => nb.gradeLevelId)],
     selected: selectedId ?? AUTO_OPTION,
     onSelect: (value) => select(value === AUTO_OPTION ? null : value),
+    wrap: false,
   });
 
   return (
