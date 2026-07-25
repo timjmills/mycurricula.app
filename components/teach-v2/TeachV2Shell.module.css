@@ -281,7 +281,7 @@
 
 /* Phone/tablet: 44px touch floor for shell controls + wrap the board header so
    its controls never clip off-screen (Codex R2 #1/#2). */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .mobToggle,
   .zoomReset {
     min-height: 44px;

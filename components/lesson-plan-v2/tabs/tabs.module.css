@@ -414,7 +414,7 @@
 
 /* ── Touch tiers — ≥44px targets on coarse pointers (CLAUDE.md §4) ───────── */
 
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .flowRow {
     min-height: 44px;
     padding-block: 12px;

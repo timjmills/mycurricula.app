@@ -65,7 +65,7 @@
       overlay around a 28px button reaches 8px past it in every direction, which
       on a tile with a 3px gap would float over the lesson title above and
       swallow its clicks. A real 44px box has neither problem. ── */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .chip.chip.chip {
     min-height: 44px;
   }

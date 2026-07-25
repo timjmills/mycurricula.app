@@ -196,7 +196,7 @@
 }
 
 /* ── Touch targets — ≥44px on coarse pointers + phone/tablet tiers ───────── */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .chip.chip {
     min-height: 44px;
     display: flex;

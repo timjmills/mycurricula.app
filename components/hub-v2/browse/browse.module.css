@@ -296,7 +296,7 @@
   font-weight: 600;
 }
 
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .row.row {
     min-height: 44px;
   }

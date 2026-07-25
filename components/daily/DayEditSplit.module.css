@@ -529,7 +529,7 @@
    The band's pill buttons get the same floor (LessonModal precedent). The
    max-width arm is the house pattern (Dock / planning-tabs / day-v2): a
    phone-width window is treated as touch even under a fine pointer. */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .deItem.deItem {
     min-height: 44px;
   }

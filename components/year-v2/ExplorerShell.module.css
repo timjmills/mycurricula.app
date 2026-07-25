@@ -285,7 +285,7 @@
 }
 
 /* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   /* Doubled to match the doubled bases above (a single-class @media override
      would lose to `.tab.tab` / `.close.close` / `.modeBtn.modeBtn`). */
   .close.close {

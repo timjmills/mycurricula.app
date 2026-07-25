@@ -821,7 +821,7 @@
 /* The atom touch targets (.vaFinish / .addRowNew / .addRowEvent) get their
    44px floor in planner-v2/atoms.module.css; the FRAME controls keep theirs
    here. */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .wkarrow.wkarrow {
     width: 44px;
     height: 44px;

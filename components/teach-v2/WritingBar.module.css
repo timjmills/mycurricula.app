@@ -225,7 +225,7 @@
 
 /* Phone/tablet: 44px touch floor for the writing-bar + popover controls
    (Codex R2 #1). */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .swatch {
     width: 44px;
     height: 44px;

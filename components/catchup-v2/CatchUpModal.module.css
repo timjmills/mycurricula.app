@@ -366,7 +366,7 @@
    rules were removed with the bespoke markup. */
 
 /* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .close.close {
     width: 44px;
     height: 44px;

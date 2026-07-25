@@ -612,7 +612,7 @@
    Gated on the BUILD_STANDARD §8 width tier AND coarse pointers, so the
    documented ~400px DevTools width check exercises these rules. */
 
-@media (max-width: 900px), (pointer: coarse) {
+@media (max-width: 900px), (any-pointer: coarse) {
   .tab {
     padding-top: 14px;
     padding-bottom: 13px;

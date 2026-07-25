@@ -389,7 +389,7 @@
 
 /* Touch-target floor for the subject filter chips on tablet + coarse pointers
    (the ≤640 sheet block below also bumps them on phone). */
-@media (max-width: 900px), (pointer: coarse) {
+@media (max-width: 900px), (any-pointer: coarse) {
   .subjChip {
     min-height: 44px;
   }

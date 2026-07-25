@@ -722,7 +722,7 @@
    the BUILD_STANDARD §8 width tier AND coarse pointers. The buttons all
    create a positioning context here (none carried position before). */
 
-@media (max-width: 900px), (pointer: coarse) {
+@media (max-width: 900px), (any-pointer: coarse) {
   .slotModeBtn,
   .slotCtrlBtn,
   .colRailExpand,

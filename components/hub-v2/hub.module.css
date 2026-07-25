@@ -530,14 +530,14 @@
   border-radius: 6px;
 }
 
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .areaTab.areaTab {
     min-height: 44px;
   }
 }
 
 /* ── Touch tiers ────────────────────────────────────────────────────────── */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .iconBtn.iconBtn {
     width: 44px;
     height: 44px;

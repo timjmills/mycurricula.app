@@ -109,7 +109,7 @@
 
 /* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
 /* Doubled to match the doubled bases above. */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .pane.pane {
     padding-top: 15px;
     padding-bottom: 15px;

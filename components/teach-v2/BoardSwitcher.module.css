@@ -118,7 +118,7 @@
 }
 
 /* Touch targets ≥44px on phone/tablet (L1 — hard responsive contract). */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .pill,
   .iconPill {
     min-height: 44px;

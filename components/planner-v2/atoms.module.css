@@ -238,7 +238,7 @@
 /* ── Touch targets — ≥44px on coarse pointers AND the phone/tablet width
       tiers (CLAUDE.md §4 makes the floor viewport-tier based, not
       pointer-type based — a 375px window with a mouse still owes 44px). ── */
-@media (pointer: coarse), (max-width: 900px) {
+@media (any-pointer: coarse), (max-width: 900px) {
   .vaFinish.vaFinish,
   .addRowNew.addRowNew,
   .addRowEvent.addRowEvent {
