@@ -98,7 +98,9 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type SVGProps,
 } from "react";
+import Link from "next/link";
 import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
 import {
   DndContext,
@@ -158,6 +160,34 @@ import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
 import { CURRENT_WEEK } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
 import styles from "./WeeklyShell.module.css";
+
+// ── Print entry point ─────────────────────────────────────────────────────
+// The ONLY reason these three additions (Link, IconPrint, and the link in the
+// WeekNavigator `actions` slot below) exist: /weekly/print had no inbound link
+// anywhere in the app, so a fully-built print template was unreachable —
+// against CLAUDE.md §2's "print- and paper-friendly" principle. Deliberately
+// mirrors the Year precedent (components/year/YearView.tsx:428-441) so it reads
+// as the same affordance, not a new pattern. <Link> rather than a router push,
+// so it works without JS and stays keyboard-accessible.
+//
+// The href carries `?week=` for cold loads and bookmarks. Filters and search
+// are NOT in the href: /weekly/print sits under the same (planner) layout, so a
+// client-side navigation preserves the AppStateProvider and the sheet reads
+// them straight from the store (see WeeklyPrintSheet's precedence note).
+const IconPrint = (p: SVGProps<SVGSVGElement>) => (
+  <svg
+    {...p}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    aria-hidden="true"
+  >
+    <path d="M6 9V3h12v6" />
+    <rect x="4" y="9" width="16" height="9" rx="1.5" />
+    <path d="M6 14h12v6H6z" />
+  </svg>
+);
 
 // ── Pane-width constants (mirror of the DailyView model) ─────────────────
 // PANE_FLOOR — absolute minimum width for the rail AND the reservation
@@ -1422,7 +1452,28 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           maxWeek={maxWeek}
           onChange={setWeek}
           headingLevel="h1"
-          actions={<WeeklyViewControls isNarrow={isNarrow} />}
+          actions={
+            <>
+              {/* Print → /weekly/print, the paper-friendly subject × day sheet.
+                  See the IconPrint note at the top of this file for why this
+                  exists and why the href carries only `?week=`. */}
+              <Tooltip
+                content="Open a paper-friendly print layout of this week — the grid re-flows as a clean subject × day sheet for printing or saving as a PDF."
+                side="bottom"
+              >
+                <Link
+                  href={`/weekly/print?week=${week}`}
+                  className={styles.printLink}
+                  aria-label="Print this week"
+                  title="Open a paper-friendly print layout of this week"
+                >
+                  <IconPrint width={14} height={14} />
+                  Print
+                </Link>
+              </Tooltip>
+              <WeeklyViewControls isNarrow={isNarrow} />
+            </>
+          }
         />
 
         {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}

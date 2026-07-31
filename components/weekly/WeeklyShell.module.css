@@ -437,3 +437,55 @@
     transform: none;
   }
 }
+
+/* ── Print entry point ───────────────────────────────────────────────────
+   The "Print" link in the WeekNavigator actions slot — /weekly/print's only
+   inbound link in the app. Recipe copied from the Year precedent
+   (components/year/YearView.module.css `.actionBtn`) so the two print
+   affordances read as one pattern: pill, bordered/secondary, hover routed
+   through the chrome-accent tier so it tracks the active theme.
+
+   `.printLink.printLink` — specificity (0,2,0) so the `.cp-root button` /
+   anchor reset in tokens.css cannot strip it (see the same doubling on
+   `.actionBtn.actionBtn`). min-height 44px is the §4 touch-target floor. */
+.printLink.printLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  background: var(--ink-150);
+  color: var(--ink);
+  border: 1px solid var(--ink-300);
+  font-size: var(--t-13);
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  min-height: 44px;
+  box-shadow: var(--sh-xs);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.printLink:hover {
+  background: var(--ink-200);
+  border-color: var(--chrome-accent-mid);
+  color: var(--chrome-accent-deep);
+  box-shadow: var(--sh-sm);
+}
+
+.printLink:focus-visible {
+  outline: 2px solid var(--chrome-accent-mid);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .printLink.printLink {
+    transition: none;
+  }
+}

@@ -87,6 +87,35 @@
   --subj-15-tint: #e8f0e2;
 }
 
+/* ── Not-ready print guard ──────────────────────────────────────────────
+   The Print button can be disabled; Ctrl+P cannot. While the page root
+   carries data-print-ready="false" — the planner store still hydrating, or
+   the configured school week not yet adopted from its post-mount effect — a
+   printed sheet would show the SSR default week (Sun–Thu) and possibly file
+   a six-day school's Friday lessons under "Unscheduled". Both are confident
+   and wrong, and paper gives a teacher no way to notice. So on paper the
+   sheet is replaced by a one-line instruction until it is ready.
+
+   Screen is untouched: the grid stays visible the whole time, because a
+   teacher reading the preview can see it change and re-print. */
+.notReady {
+  display: none;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--ink-900);
+  margin: 0;
+}
+
+@media print {
+  .page[data-print-ready="false"] .notReady {
+    display: block;
+  }
+
+  .page[data-print-ready="false"] .sheet {
+    display: none;
+  }
+}
+
 /* Action bar — screen-only "Print" button and "Back" link. Hidden in
    @media print so they don't appear in the paper output. */
 .actions {
@@ -142,6 +171,18 @@
 .printBtn:focus-visible {
   outline: 2px solid var(--ink-900);
   outline-offset: 2px;
+}
+
+/* Disabled while the planner data is still loading — printing then would
+   produce a sheet that is silently missing lessons. */
+.printBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.printBtn:disabled:hover {
+  background: var(--paper);
+  border-color: var(--ink-300);
 }
 
 /* ── Print sheet ─────────────────────────────────────────────────────────── */
@@ -296,6 +337,31 @@
   overflow: hidden;
 }
 
+/* The "I can…" objective — the sentence the lesson is actually about, and
+   the line a substitute teacher reads first. Clamped so one verbose
+   objective cannot push a whole row onto a second sheet. */
+.lessonObjective {
+  font-size: var(--t-11);
+  font-weight: 400;
+  color: var(--ink-500);
+  line-height: 1.3;
+  margin: 0 0 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The time slot + marker strip beneath the objective. Wraps rather than
+   overflowing — a cell with a status AND a move marker is normal. */
+.lessonMarkers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 5px;
+  margin: 0;
+}
+
 .lessonTime {
   font-size: var(--t-10);
   font-weight: 500;
@@ -303,15 +369,50 @@
   white-space: nowrap;
 }
 
-/* Status indicator — tiny dot for done/partial/carried */
-.statusDot {
+/* Status / move / provenance marker. A hairline-outlined pill rather than a
+   colored dot: on paper a 4px dot is a speck, it survives no B&W printer, and
+   it reads as nothing at all to a screen reader. The legend at the foot of the
+   sheet explains every marker, because paper has no tooltips. */
+.marker {
   display: inline-block;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  vertical-align: middle;
-  margin-left: 4px;
-  /* background set inline */
+  padding: 0 4px;
+  border: 1px solid var(--ink-300);
+  border-radius: 999px;
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--ink-500);
+  white-space: nowrap;
+  /* border-color overridden inline to the subject accent for done/partial */
+}
+
+.marker[data-status="done"] {
+  color: var(--ink-900);
+}
+
+/* Teacher's own note, and the reason a lesson did not happen. De-emphasised —
+   they are context, not the plan. */
+.lessonAside {
+  font-size: var(--t-10);
+  font-weight: 400;
+  color: var(--ink-500);
+  line-height: 1.3;
+  margin: 2px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Trailing "Unscheduled" column — lessons whose day index has no column in the
+   configured school week. Tinted so it reads as an exception, not a sixth day. */
+.offCol,
+.offCell {
+  background: var(--ink-50);
+}
+
+.offCol {
+  color: var(--ink-500);
 }
 
 /* Empty cell placeholder */
@@ -319,6 +420,37 @@
   color: var(--ink-200);
   font-size: var(--t-11);
   font-style: italic;
+}
+
+/* The colSpan row that carries the empty / loading affordance. */
+.emptyRow {
+  padding: 24px 8px;
+}
+
+/* ── Footnote + legend ──────────────────────────────────────────────────── */
+
+.footnote {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  line-height: 1.4;
+  margin: 12px 0 0;
+}
+
+.legend {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ink-150);
+}
+
+.legendLine {
+  font-size: var(--t-10);
+  color: var(--ink-500);
+  line-height: 1.45;
+  margin: 0 0 2px;
+}
+
+.legendLine:last-child {
+  margin-bottom: 0;
 }
 
 /* ── Print-specific overrides ─────────────────────────────────────────────── */
@@ -333,13 +465,40 @@
     font-size: 9pt;
     -webkit-line-clamp: 3;
   }
-  .lessonTime {
+  .lessonObjective {
+    font-size: 8pt;
+  }
+  .lessonTime,
+  .marker,
+  .lessonAside {
     font-size: 7pt;
+  }
+  .footnote {
+    font-size: 8pt;
+  }
+  .legendLine {
+    font-size: 7.5pt;
   }
   /* Avoid breaking rows across pages — keep each row together. */
   .grid tr {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  /* Repeat the day-label header on every continuation page. Without this a
+     long week slices at a page boundary and page 2 is a wall of unlabelled
+     columns — the reader has to flip back to learn which column is Tuesday.
+     `table-header-group` is the only thing that makes a browser repeat
+     <thead>; `position: sticky` does nothing on paper. */
+  .grid thead {
+    display: table-header-group;
+  }
+
+  /* Keep the legend with the grid where it fits, and never orphan it as a
+     lone line on a fresh sheet. */
+  .legend {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }
 

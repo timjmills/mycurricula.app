@@ -99,6 +99,32 @@
   }
 }
 
+/* ── Not-ready print guard ──────────────────────────────────────────────
+   The Print button can be disabled; Ctrl+P cannot. While the page root
+   carries data-print-ready="false" — the planner store still hydrating, or
+   the academic year not yet adopted from its post-mount effect — the month
+   bands and every "Wk N" header belong to the heuristic default year rather
+   than the school's own. On screen that self-corrects a moment later and the
+   teacher sees it; on paper it is permanent and unmarked. So on paper the
+   stack is replaced by a one-line instruction until it is ready. */
+.notReady {
+  display: none;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--ink-900);
+  margin: 0;
+}
+
+@media print {
+  .page[data-print-ready="false"] .notReady {
+    display: block;
+  }
+
+  .page[data-print-ready="false"] .sheet {
+    display: none;
+  }
+}
+
 .backLink {
   font-size: var(--t-13);
   font-weight: 500;
@@ -139,6 +165,18 @@
 .printBtn:focus-visible {
   outline: 2px solid var(--ink-900);
   outline-offset: 2px;
+}
+
+/* Disabled while the planner data is still loading — printing then would
+   produce a year overview that is silently missing units. */
+.printBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.printBtn:disabled:hover {
+  background: var(--paper);
+  border-color: var(--ink-300);
 }
 
 /* ── Print sheet ─────────────────────────────────────────────────────────
@@ -391,6 +429,15 @@
   .grid tr {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  /* Repeat the "Wk N" header on every continuation page. A month section
+     normally fits one sheet (`break-inside: avoid` above), but a school with
+     many subjects overflows it — and page 2 of an overflowed month is a wall
+     of unlabelled week columns without this. `table-header-group` is the only
+     mechanism that repeats a <thead> on paper. */
+  .grid thead {
+    display: table-header-group;
   }
 }
 
