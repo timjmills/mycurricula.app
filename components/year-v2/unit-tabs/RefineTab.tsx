@@ -62,6 +62,7 @@ import {
   REFINE_FILLABLE,
   REFINE_PASSES,
   refineCompleteness,
+  refineFillDescriptors,
   refineFillPatch,
   refinePassProgress,
   type RefineFieldKey,
@@ -88,7 +89,7 @@ export interface RefineTabProps {
 // ── Small pieces ─────────────────────────────────────────────────────────────
 
 /**
- * Is this value safe to round-trip through a plain `<input>`?
+ * Does this value carry real markup a plain `<input>` would destroy?
  *
  * `Lesson.title` and `Lesson.objective` MAY CONTAIN RICH-TEXT HTML
  * (lib/types.ts:330). The title is authored through `<RichTextEditor singleLine>`
@@ -98,19 +99,45 @@ export interface RefineTabProps {
  * An `<input>` cannot hold HTML. Binding `value={l.objective}` and writing
  * `e.target.value` back therefore renders a bolded objective as the literal
  * `I can <em>place</em> a fraction…` and DESTROYS the markup on the first
- * keystroke — silently, with no error and no undo prompt.
+ * keystroke — silently, with no error and no undo prompt. So a value with a tag
+ * in it is rendered read-only instead.
  *
- * It would not have been caught by testing locally: the mock fixtures carry no
- * markup, so every local run looks correct. That is the same shape as the
- * computed-FK bug that took lesson creation down on production — a premise that
- * holds in fixtures and fails against real rows.
+ * WHY A TAG TEST AND NOT A ROUND-TRIP. This guard first shipped as
+ * `stripHtml(value) === value.trim()`, reading the `stripHtml(escapeHtml(t)) ===
+ * t.trim()` contract (lib/html-text.ts:11) backwards. `stripHtml` does two
+ * things, and only the first is about markup: it strips tags AND THEN DECODES
+ * ENTITIES. So the equality also failed for every value containing an entity —
+ * and those are plain text:
  *
- * The contract `stripHtml(escapeHtml(t)) === t.trim()` (lib/html-text.ts:11)
- * inverts into exactly the test we need: if stripping changes nothing, the value
- * was already plain and is safe to edit here.
+ *   • `escapeHtml` emits `&amp;` / `&#39;` / `&quot;` BY DESIGN (html-text.ts:33)
+ *   • every contenteditable in the app serialises a typed "&" as `&amp;` and
+ *     consecutive spaces as `&nbsp;`; `sanitizeHtml` re-serialises the same way
+ *   • a bare `<` … `>` pair in prose ("if a < b > c then") is stripped as if it
+ *     were a tag
+ *
+ * A lesson titled "Fractions &amp; decimals" was therefore locked read-only and
+ * told the teacher "formatted text, read-only here" — false, and permanent.
+ * A round-trip through `escapeHtml` fixes none of that: `escapeHtml(stripHtml(v))`
+ * still cannot reproduce `&nbsp;` or the bare-bracket sentence.
+ *
+ * Detecting a TAG directly is the property actually wanted, and it is strictly
+ * NARROWER than the old test (anything this matches, `stripHtml` also removed),
+ * so nothing that was editable becomes locked. `<` must be followed by a letter
+ * (optionally after a closing `/`) and a `>` must close it — which is what every
+ * tag `sanitizeHtml` can emit looks like, and what "1 < 2" is not. The residual
+ * false positive is prose like "compare <b and c>"; the cost there is a locked
+ * cell with an explanation, never lost data, which is the right side to err on.
+ *
+ * DISPLAY NOTE. An editable cell binds the RAW stored string, so a title stored
+ * as "Fractions &amp; decimals" shows its entity in the input. That is
+ * deliberate: decoding on read while writing the decoded text back would turn a
+ * stored `&lt;b&gt;` (the literal characters "<b>") into a real tag on the first
+ * keystroke — a second, worse data-loss path in the name of cosmetics.
  */
+const TAG = /<\/?[a-z][^>]*>/i;
+
 function isPlainText(value: string): boolean {
-  return stripHtml(value) === value.trim();
+  return !TAG.test(value);
 }
 
 /**
@@ -349,18 +376,19 @@ export function RefineTab({
    *
    * All N writes share ONE coalesce key and one timestamp, so the store's
    * coalescing window folds them into a SINGLE undo step — otherwise undoing a
-   * twelve-lesson fill would take twelve presses of ⌘Z. `refineFillPatch`
-   * returns null when the source cell is empty, which is what stops a fill-down
-   * from silently CLEARING the column (the handoff's version has no such guard
-   * and does exactly that).
+   * twelve-lesson fill would take twelve presses of ⌘Z. That invariant lives in
+   * `refineFillDescriptors`, which returns the writes as DATA: a static render
+   * fires no events, so it is the only way the property can be asserted at all
+   * (this handler never runs in a test). It also returns nothing when the source
+   * cell is empty, which is what stops a fill-down from silently CLEARING the
+   * column (the handoff's version has no such guard and does exactly that).
    */
   const fillDown = useCallback(
     (field: RefineFillableKey): void => {
-      const patch = refineFillPatch(lessons, field);
-      if (!patch) return;
-      const key = `unit-refine:filldown:${field}`;
-      const ts = Date.now();
-      for (const l of lessons.slice(1)) editLesson(l.id, { ...patch }, { key, ts });
+      // One clock reading for the whole fill: sampling Date.now() per write can
+      // straddle the store's coalescing window and split the undo step.
+      for (const d of refineFillDescriptors(lessons, field, Date.now()))
+        editLesson(d.id, d.patch, d.coalesce);
     },
     [lessons, editLesson],
   );

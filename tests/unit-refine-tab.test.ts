@@ -61,22 +61,17 @@ import type { Lesson } from "@/lib/types";
 
 const store = vi.hoisted(() => ({
   state: "settled" as "pending" | "error" | "settled",
-  edits: [] as Array<{
-    id: string;
-    patch: Record<string, unknown>;
-    coalesce?: { key: string; ts: number };
-  }>,
 }));
 
+// `editLesson` is a deliberate no-op. `renderToStaticMarkup` fires no events, so
+// no write can reach it from here; a capture array would be permanently empty
+// and would make this file read as though it covered the write path. What the
+// writes must satisfy — one coalesce key and one timestamp per fill-down, so a
+// fill is a SINGLE undo step — is asserted against `refineFillDescriptors` in
+// tests/unit-refine.test.ts, where the dispatch is data rather than an event.
 vi.mock("@/lib/planner-store", () => ({
   usePlanner: () => ({
-    editLesson: (
-      id: string,
-      patch: Record<string, unknown>,
-      coalesce?: { key: string; ts: number },
-    ) => {
-      store.edits.push({ id, patch, coalesce });
-    },
+    editLesson: () => {},
     describeStandard: (code: string) => code,
     mergeStandards: () => {},
     getSections: () => [],
@@ -165,7 +160,6 @@ function render(lessons: readonly Lesson[]): string {
 
 beforeEach(() => {
   store.state = "settled";
-  store.edits = [];
 });
 
 // ── The columns ─────────────────────────────────────────────────────────────

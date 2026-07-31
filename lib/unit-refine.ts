@@ -262,6 +262,27 @@ export function refineFillPatch(
   lessons: readonly Lesson[],
   field: RefineFillableKey,
 ): Partial<Lesson> | null {
+  const patch = rawFillPatch(lessons, field);
+  return patch ? clonePatch(patch) : null;
+}
+
+/** Deep-enough copy of a fill patch: every array and the assessment object are
+ *  copied, so no two lessons a fill touches ever share a reference. Copying once
+ *  in `refineFillPatch` is not enough — N lessons receiving the SAME patch object
+ *  would all alias one `standards` array, and a later edit to one of them would
+ *  mutate every lesson the fill wrote. */
+function clonePatch(patch: Partial<Lesson>): Partial<Lesson> {
+  const out: Partial<Lesson> = { ...patch };
+  if (patch.standards) out.standards = [...patch.standards];
+  if (patch.standardIds) out.standardIds = [...patch.standardIds];
+  if (patch.assessment) out.assessment = { ...patch.assessment };
+  return out;
+}
+
+function rawFillPatch(
+  lessons: readonly Lesson[],
+  field: RefineFillableKey,
+): Partial<Lesson> | null {
   const source = lessons[0];
   if (!source) return null;
   switch (field) {
@@ -285,4 +306,57 @@ export function refineFillPatch(
       return { assessment: { ...source.assessment } };
     }
   }
+}
+
+// ── Fill-down, as data ───────────────────────────────────────────────────────
+
+/** One `editLesson(id, patch, coalesce)` call, described rather than performed. */
+export interface RefineEditDescriptor {
+  id: string;
+  patch: Partial<Lesson>;
+  /** The store's coalescing metadata. Writes sharing a key AND falling inside
+   *  the store's 700ms window fold into ONE undo step. */
+  coalesce: { key: string; ts: number };
+}
+
+/** The coalesce key every write of one fill-down shares. Exported so the
+ *  single-undo invariant is asserted against the real string, not a copy of it
+ *  that could drift. */
+export function refineFillCoalesceKey(field: RefineFillableKey): string {
+  return `unit-refine:filldown:${field}`;
+}
+
+/**
+ * Every write a fill-down would make, as data.
+ *
+ * THE INVARIANT THIS EXISTS TO MAKE TESTABLE: all N writes carry ONE coalesce
+ * key and ONE timestamp, so the store folds them into a SINGLE undo step.
+ * Without that, undoing a twelve-lesson fill means pressing ⌘Z twelve times —
+ * and a teacher who fills the wrong column has no way to know how many presses
+ * they are owed. It cannot be checked through the component: a static render
+ * fires no events, so the handler that dispatches these never runs.
+ *
+ * Returns `[]` when there is nothing to copy (empty unit, or an empty source
+ * cell — see `refineFillPatch`), so an inert fill-down dispatches nothing rather
+ * than clearing the column. The FIRST lesson is the source and is never written.
+ *
+ * `ts` is injected rather than read from `Date.now()` here so the caller stamps
+ * every write from one clock reading — two readings taken inside a loop can
+ * straddle the coalescing window and split the undo step.
+ */
+export function refineFillDescriptors(
+  lessons: readonly Lesson[],
+  field: RefineFillableKey,
+  ts: number,
+): RefineEditDescriptor[] {
+  const patch = rawFillPatch(lessons, field);
+  if (!patch) return [];
+  const key = refineFillCoalesceKey(field);
+  return lessons.slice(1).map((l) => ({
+    id: l.id,
+    // A fresh copy per lesson: one shared patch object would alias its
+    // `standards` array across every lesson the fill touched.
+    patch: clonePatch(patch),
+    coalesce: { key, ts },
+  }));
 }

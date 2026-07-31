@@ -6,6 +6,8 @@ import {
   REFINE_PASSES,
   refineCompleteness,
   refineFieldSet,
+  refineFillCoalesceKey,
+  refineFillDescriptors,
   refineFillPatch,
   refinePassProgress,
 } from "@/lib/unit-refine";
@@ -40,18 +42,16 @@ import type { RefineTabProps } from "@/components/year-v2/unit-tabs";
 
 const store = vi.hoisted(() => ({
   state: "settled" as "pending" | "error" | "settled",
-  edits: [] as Array<{ id: string; patch: Partial<Lesson>; key?: string }>,
 }));
 
+// `editLesson` is a no-op on purpose. A static render fires no events, so no
+// write can ever reach it — an array capturing calls here would only ever be
+// empty, and an unasserted capture makes the suite read as if it tested the
+// write path when nothing does. The writes are asserted as DATA instead, in the
+// `refineFillDescriptors` block above.
 vi.mock("@/lib/planner-store", () => ({
   usePlanner: () => ({
-    editLesson: (
-      id: string,
-      patch: Partial<Lesson>,
-      coalesce?: { key: string; ts: number },
-    ) => {
-      store.edits.push({ id, patch, key: coalesce?.key });
-    },
+    editLesson: () => {},
     describeStandard: (code: string) => code,
     mergeStandards: () => {},
   }),
@@ -183,6 +183,65 @@ describe("refineFillPatch — standards carry their identity or none at all", ()
   });
 });
 
+describe("refineFillDescriptors — a fill-down is ONE undo step", () => {
+  // The invariant RefineTab's fillDown documents: N writes, one coalesce key,
+  // one timestamp, so the store folds them into a SINGLE undo step. It cannot be
+  // observed through the component — `renderToStaticMarkup` fires no events, so
+  // the handler never runs — which is why the writes are produced as DATA here
+  // and the component only forwards them.
+  const UNIT = [
+    lesson({ id: "a", durationMinutes: 45, standards: ["5.NF.1"] }),
+    lesson({ id: "b" }),
+    lesson({ id: "c" }),
+    lesson({ id: "d" }),
+  ];
+
+  it("writes every lesson but the source, which IS the source", () => {
+    const d = refineFillDescriptors(UNIT, "duration", 1000);
+    expect(d.map((x) => x.id)).toEqual(["b", "c", "d"]);
+    expect(d.every((x) => x.patch.durationMinutes === 45)).toBe(true);
+  });
+
+  it("folds into one undo step: a single coalesce key and a single timestamp", () => {
+    // Twelve keys (or twelve timestamps) means twelve presses of ⌘Z to undo one
+    // click — and no way for the teacher to know how many they are owed.
+    const d = refineFillDescriptors(UNIT, "duration", 1000);
+    expect(d.length).toBeGreaterThan(1);
+    expect(new Set(d.map((x) => x.coalesce.key)).size).toBe(1);
+    expect(new Set(d.map((x) => x.coalesce.ts)).size).toBe(1);
+    expect(d[0].coalesce.key).toBe(refineFillCoalesceKey("duration"));
+  });
+
+  it("uses a key distinct from the per-cell typing key, so a fill is its own step", () => {
+    // `edit()` coalesces on `lesson:<id>:<field>`. If a fill-down reused that,
+    // it would merge into whatever the teacher was typing a moment earlier and
+    // one ⌘Z would undo both.
+    const key = refineFillDescriptors(UNIT, "duration", 1000)[0].coalesce.key;
+    expect(key).not.toMatch(/^lesson:/);
+    expect(refineFillCoalesceKey("standards")).not.toBe(
+      refineFillCoalesceKey("duration"),
+    );
+  });
+
+  it("dispatches NOTHING when there is nothing to copy", () => {
+    // The wipe guard, at the dispatch layer: an empty source cell must produce
+    // zero writes, not N writes of `undefined` down the column.
+    expect(refineFillDescriptors([lesson({ id: "a" }), lesson({ id: "b" })], "duration", 1)).toEqual([]);
+    expect(refineFillDescriptors([], "duration", 1)).toEqual([]);
+    expect(refineFillDescriptors([lesson({ id: "a", durationMinutes: 45 })], "duration", 1)).toEqual([]);
+  });
+
+  it("gives each lesson its OWN arrays, never one shared reference", () => {
+    // A shared `standards` array would make a later edit to one lesson silently
+    // mutate every lesson the fill touched.
+    const d = refineFillDescriptors(UNIT, "standards", 1000);
+    expect(d).toHaveLength(3);
+    expect(d[0].patch.standards).toEqual(["5.NF.1"]);
+    expect(d[0].patch.standards).not.toBe(d[1].patch.standards);
+    expect(d[0].patch.standards).not.toBe(UNIT[0].standards);
+  });
+});
+
 // ── 2. Completeness agrees with the Insights drawer ──────────────────────────
 
 describe("refineFieldSet — the same truth the drawer reports", () => {
@@ -287,7 +346,6 @@ beforeAll(async () => {
 
 beforeEach(() => {
   store.state = "settled";
-  store.edits = [];
 });
 
 describe("RefineTab — never claims a unit is empty before it knows", () => {
@@ -456,12 +514,52 @@ describe("RefineTab — a cell refuses to flatten formatting it cannot hold", ()
   });
 
   it("does not mistake a bare ampersand or angle bracket for markup", async () => {
-    // `stripHtml` decodes entities, so a value containing a LITERAL "<" or "&"
-    // must still compare equal to itself after stripping — otherwise a lesson
-    // titled "Fractions & decimals" would go read-only for no reason.
+    // THE CONTROL this assertion used to lack. `not.toContain` passes vacuously
+    // if the row never rendered at all, so prove the title reached the markup
+    // first — React escapes "&" in an attribute, so `&amp;` is the shape to
+    // look for, not the raw character.
     const html = await render([
       lesson({ id: "a", title: "Fractions & decimals: 1 < 2" }),
     ]);
+    expect(html).toContain("Fractions &amp; decimals");
     expect(html).not.toContain('aria-readonly="true"');
+  });
+
+  it("never locks a plain sentence carrying an entity or a bare angle bracket", async () => {
+    // The case above was the ONE string the old `stripHtml(v) === v.trim()`
+    // predicate happened to get right, and it made the guard look correct while
+    // it locked every value below.
+    //
+    // `stripHtml` DECODES entities, so any entity made a plain sentence compare
+    // unequal to itself and the cell rendered `aria-readonly="true"` with the
+    // false explanation "formatted text, read-only here" — a teacher could
+    // never edit that title in Refine again. None of these are exotic:
+    // `escapeHtml` (lib/html-text.ts:33) emits `&amp;`/`&#39;`/`&quot;` BY
+    // DESIGN, and every contenteditable in the app serialises a typed "&" as
+    // `&amp;` and consecutive spaces as `&nbsp;` (sanitizeHtml runs the string
+    // through DOMPurify, which re-serialises the same way).
+    for (const title of [
+      "Fractions &amp; decimals", // what a rich-text editor stores for "&"
+      "a&nbsp;b", // what contenteditable stores for two spaces
+      "if a < b > c then", // bare angle brackets, no tag anywhere
+    ]) {
+      const html = await render([lesson({ id: "a", title })]);
+      expect(html, `plain title locked read-only: ${title}`).not.toContain(
+        'aria-readonly="true"',
+      );
+    }
+  });
+
+  it("still locks a value that really does carry a tag", async () => {
+    // The anti-overshoot pair for the test above: loosening the predicate must
+    // not turn it into "everything is editable", which would restore the
+    // original data-loss bug (a plain <input> flattening stored markup on the
+    // first keystroke).
+    for (const title of ["<b>bold</b>", "<p>x</p>", "a<br/>b", "x</p>"]) {
+      const html = await render([lesson({ id: "a", title })]);
+      expect(html, `markup left editable: ${title}`).toContain(
+        'aria-readonly="true"',
+      );
+    }
   });
 });
