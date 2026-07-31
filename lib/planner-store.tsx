@@ -85,7 +85,11 @@ import {
 } from "@/lib/async-failure";
 import { diffLessonsForReplay } from "@/lib/planner/doc-replay";
 import { resolveGrade } from "@/lib/planner/grade";
-import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
+import {
+  assertUnitWeekPatch,
+  expandStaleUnitKeys,
+  isPlannerSupabaseConfigured,
+} from "@/lib/planner/source";
 import type { UnitPatch } from "@/lib/planner/source";
 import {
   createUnitWriteQueue,
@@ -2528,7 +2532,6 @@ function unitToPatch(u: Unit): UnitPatch {
     // contradicts what every other teacher on the team sees.
     startWeek: u.startWeek,
     endWeek: u.endWeek,
-    weeks: u.weeks,
   };
 }
 
@@ -3753,6 +3756,21 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         onResult?.(false);
         return;
       }
+      // INVARIANT GATE, and it must fire BEFORE the baseline bookkeeping below.
+      // The sources validate the week range too, but by then the patch has been
+      // enqueued and — on the async rejection — RETAINED for retry. A patch
+      // that is invalid by construction (one end without the other, or an
+      // inverted pair) is invalid on every retry: the catalog never moved, so
+      // `staleUnitPatchKeys` finds nothing to drop and the same bad patch is
+      // re-sent forever. Rejecting it here means it never enters the queue, and
+      // the caller learns immediately instead of a round-trip later.
+      try {
+        assertUnitWeekPatch(patch);
+      } catch (err) {
+        reportWriteFailureRef.current("editUnitFields", "team", err);
+        onResult?.(false);
+        return;
+      }
       // Record what each field is DIVERGING FROM, now, before the request goes
       // out — this is the baseline a later failed-write retry checks against.
       // Captured once per key: the first edit since the last confirmation is the
@@ -3812,11 +3830,21 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         onResult?.(true); // nothing to retry
         return;
       }
-      const stale = staleUnitPatchKeys(
-        retained.patch,
-        retained.baseline,
-        confirmedUnitPatch(unitId),
-      );
+      // ATOMIC SCHEDULE. `staleUnitPatchKeys` works key by key, which is right
+      // for every content field and wrong for the week range: `startWeek` /
+      // `endWeek` / `weeks` are one logical field, and the write seam refuses a
+      // patch carrying one end without the other (`assertUnitWeekPatch`). A
+      // per-key drop could therefore leave a retry that can never succeed.
+      // `expandStaleUnitKeys` drops the three together, which is also the
+      // honest outcome: if the team's weeks have moved, the teacher's stale
+      // range is precisely what must not be re-sent.
+      const stale = expandStaleUnitKeys(
+        staleUnitPatchKeys(
+          retained.patch,
+          retained.baseline,
+          confirmedUnitPatch(unitId),
+        ),
+      ).filter((k) => k in retained.patch);
       if (stale.length > 0) {
         const fresh = { ...retained.patch };
         const freshBaseline = { ...retained.baseline };

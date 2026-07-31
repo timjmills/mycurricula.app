@@ -109,19 +109,20 @@ export type LessonPatch = Partial<
  * allowlist that a caller cannot widen is exactly the seam that would
  * otherwise have been worked around with a second, unaudited write path.
  *
- * Three keys, and the reason they travel together:
- *   • `startWeek` / `endWeek` — the numbers. These are the fields that are
- *     actually stored (`units.start_week` / `end_week`, NOT NULL since
- *     20260518102823_initial_schema.sql:351-352).
- *   • `weeks` — the DISPLAY collapse ("Wk 9–14"). Derived, not stored. It is
- *     in the patch only so the OPTIMISTIC local update stays self-consistent:
- *     the reducer spreads the patch over the catalog unit, and a unit whose
- *     numbers said weeks 3–8 while its label still said "Wk 9–14" would show
- *     two different schedules on two different surfaces until the next
- *     hydrate. `supabase-source.updateUnitFields` deliberately does NOT write
- *     it — the server row has no such column and `mapUnitRow` re-derives the
- *     label on the echo, which is what corrects a caller that computed it
- *     differently.
+ * `startWeek` / `endWeek` are the numbers that are actually stored
+ * (`units.start_week` / `end_week`, NOT NULL since
+ * 20260518102823_initial_schema.sql:351-352), and they are validated as a PAIR
+ * — see `assertUnitWeekPatch`.
+ *
+ * `Unit.weeks` — the display collapse ("Wk 9–14") — is deliberately NOT
+ * patchable. It is DERIVED from the two numbers, and letting a caller supply
+ * it independently means a caller can supply one that disagrees with them: the
+ * Supabase source would drop the label and re-derive it while the mock stored
+ * it verbatim, so the two paths would disagree about the same write. Both
+ * sources now derive it through `unitWeeksLabel` below, which removes the
+ * divergence rather than validating around it. The store is confirm-only — the
+ * catalog is updated from the source's returned row, never from the patch — so
+ * nothing needs the label to travel.
  *
  * What this does NOT open: DAY-granularity scheduling. `units.anchor_slot` /
  * `position` and `lessons.pad` / `stack` stay deferred
@@ -162,9 +163,113 @@ export type UnitPatch = Partial<
     // ── Week range (the Plan timeline's band drag) — see the note above ──
     | "startWeek"
     | "endWeek"
-    | "weeks"
   >
 >;
+
+/**
+ * The `Unit.weeks` display label for a week range.
+ *
+ * ONE formatter, exported from the seam both sources import, because three
+ * places have to agree on it character for character: the Supabase read mapper
+ * (`mapUnitRow`), the mock source (which has no read mapper and must derive it
+ * itself), and the timeline's band tooltip. A one-character difference — a
+ * hyphen where the EN DASH belongs — makes a unit card visibly flicker between
+ * two spellings on every successful write, and breaks
+ * `lib/plan-timeline/bands.ts:unitWeekRange`'s fallback parser, which is the
+ * only path for any unit whose numeric fields are absent.
+ */
+export function unitWeeksLabel(start: number, end: number): string {
+  return start === end ? `Wk ${start}` : `Wk ${start}–${end}`;
+}
+
+/**
+ * Validate a patch's week range. Throws; call BEFORE any write.
+ *
+ * ── WHY THE SEAM VALIDATES AND NOT JUST THE CALLER ────────────────────────
+ * `UnitPatch` is a public write seam, not a private argument of the timeline's
+ * drag. The drag happens to produce only well-formed ranges (see
+ * lib/plan-timeline/drag.ts, whose `normalise` cannot emit a reversed one),
+ * but the type now permits any caller to send `{ startWeek: 20 }` on a unit
+ * whose `end_week` is 5 — and the result is a unit whose band renders
+ * inside-out, whose `unitWeekRange` silently swaps the ends, and whose pacing
+ * maths runs against a negative duration. That is shared TEAM content, so one
+ * bad caller corrupts the schedule every teacher sees.
+ *
+ * TWO RULES, and the first is the one that makes the second enforceable:
+ *
+ *   1. BOTH ENDS TOGETHER. A patch carrying one week key without the other is
+ *      rejected. Validating a single end would require reading the current row
+ *      first — a round trip, and a race with any concurrent write between the
+ *      read and the update. Demanding the pair makes the patch self-describing
+ *      and the check local. Every real caller already has both.
+ *   2. `start <= end`, and both positive integers. The columns are NOT NULL
+ *      integers, so a fractional or non-positive value is a constraint
+ *      violation that would fail the WHOLE statement — taking the content keys
+ *      travelling in the same patch down with it.
+ *
+ * A database `CHECK (start_week <= end_week)` would be the belt to this
+ * braces and is worth adding; it needs a migration, which is not this seam's
+ * to write.
+ */
+/**
+ * The keys that make up a unit's schedule, as ONE logical field.
+ *
+ * `startWeek` and `endWeek` are validated as a pair (see
+ * `assertUnitWeekPatch`), so any per-key operation that can drop one of them
+ * must drop both or produce something the write seam will refuse. Exported so
+ * the rule lives next to the invariant it protects rather than being
+ * re-derived at each callsite.
+ */
+export const UNIT_WEEK_KEYS = ["startWeek", "endWeek"] as const;
+
+/**
+ * Given a set of patch keys being dropped, return the set actually to drop.
+ *
+ * The failed-write retry (`planner-store.tsx:retryFailedUnitWrite`) drops
+ * individual keys whose team value has moved since the failure. Applied
+ * key-by-key to the schedule that produces `{ startWeek }` without `endWeek` —
+ * a patch `assertUnitWeekPatch` will refuse, which strands the retry
+ * permanently in a state that can never succeed. Dropping the whole schedule
+ * together is the honest resolution: the team's weeks have moved on, so the
+ * teacher's stale week range is exactly what must not be re-sent.
+ */
+export function expandStaleUnitKeys(
+  stale: readonly (keyof UnitPatch)[],
+): (keyof UnitPatch)[] {
+  const set = new Set<keyof UnitPatch>(stale);
+  if (UNIT_WEEK_KEYS.some((k) => set.has(k))) {
+    for (const k of UNIT_WEEK_KEYS) set.add(k);
+  }
+  return [...set];
+}
+
+export function assertUnitWeekPatch(patch: UnitPatch): void {
+  const hasStart = patch.startWeek !== undefined;
+  const hasEnd = patch.endWeek !== undefined;
+  if (!hasStart && !hasEnd) return;
+  if (hasStart !== hasEnd) {
+    throw new Error(
+      "updateUnitFields: startWeek and endWeek must be patched together — a single end cannot be validated without reading the row it is being compared against",
+    );
+  }
+  const start = patch.startWeek as number;
+  const end = patch.endWeek as number;
+  for (const [field, value] of [
+    ["startWeek", start],
+    ["endWeek", end],
+  ] as const) {
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error(
+        `updateUnitFields: ${field} must be a positive integer week, got ${value}`,
+      );
+    }
+  }
+  if (start > end) {
+    throw new Error(
+      `updateUnitFields: startWeek (${start}) must not be after endWeek (${end})`,
+    );
+  }
+}
 
 /**
  * The editable content of a UNIT assessment (migration 20260729120000 — the B3

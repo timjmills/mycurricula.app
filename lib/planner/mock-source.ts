@@ -59,6 +59,7 @@ import type {
   UnitAssessmentPatch,
   UnitPatch,
 } from "./source";
+import { assertUnitWeekPatch, unitWeeksLabel } from "./source";
 // The unit-assessment store below holds ROW-shaped records and maps them with
 // the SAME pure mappers the Supabase source uses, so the flag-OFF path shares
 // the flag-ON clear/validation semantics exactly (rather than re-implementing
@@ -474,6 +475,11 @@ export const plannerMockSource: PlannerDataSource = {
     patch: UnitPatch,
     _ownerId: string,
   ): Promise<Unit> {
+    // The SAME pair guard the Supabase source runs, and it has to be here too
+    // or the flag-OFF path accepts a patch the flag-ON path rejects — the mock
+    // would happily store an inverted range that production refuses, and the
+    // bug would only ever appear for real teachers.
+    assertUnitWeekPatch(patch);
     const unit = findUnit(unitId);
     if (!unit) throw new Error(`Unit not found: ${unitId}`);
     // Mirror the reducer's `editUnitFields`: spread the patch over the unit.
@@ -482,16 +488,18 @@ export const plannerMockSource: PlannerDataSource = {
     // parity-only here. Only the keys present in `patch` are overwritten, so an
     // absent field is never nulled.
     //
-    // WEEK-RANGE PARITY (the Plan timeline's band drag). `UnitPatch` now also
-    // carries `startWeek` / `endWeek` / `weeks`, and the blanket assign is the
-    // RIGHT behaviour for all three here — unlike the Supabase source, which
-    // must drop `weeks` because there is no such column and `mapUnitRow`
-    // re-derives the label from the two numbers. The mock has no derivation
-    // step and no reload echo: what is assigned IS the canonical value, so
-    // dropping `weeks` here would leave a mock unit's label frozen at its old
-    // schedule and the flag-OFF path would diverge visibly from flag-ON.
     void _ownerId;
     Object.assign(unit, patch);
+    // WEEK-RANGE PARITY (the Plan timeline's band drag). `Unit.weeks` is the
+    // DISPLAY collapse of the two numbers, and it is derived here rather than
+    // patched — exactly as `mapUnitRow` derives it on the Supabase read path.
+    // The mock has no read mapper and no reload echo, so what is stored here IS
+    // the canonical value; leaving the label to a caller (or to the previous
+    // schedule) is how the flag-OFF path would come to disagree with flag-ON
+    // about the same write.
+    if (patch.startWeek !== undefined && patch.endWeek !== undefined) {
+      unit.weeks = unitWeeksLabel(patch.startWeek, patch.endWeek);
+    }
     return cloneUnit(unit);
   },
 

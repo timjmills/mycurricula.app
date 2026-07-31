@@ -96,6 +96,8 @@ import {
 import type { LessonSectionContent } from "../lesson-flow";
 import type { SectionResource } from "../lesson-flow";
 import {
+  assertUnitWeekPatch,
+  unitWeeksLabel,
   type LessonMoveTarget,
   type PlannerDataSource,
   type SaveTarget,
@@ -980,29 +982,13 @@ function finiteWeek(value: number | null | undefined): number | undefined {
     : undefined;
 }
 
-/** The WRITE-side mirror of `finiteWeek`. Throws rather than coercing: a
- *  fractional or non-positive week violates the NOT NULL integer column, and
- *  PostgREST would reject the whole statement — silently taking the content
- *  keys travelling in the same patch down with it. Failing here fails the
- *  mutator, which is what surfaces `onResult(false)` to the caller instead of a
- *  write that reports success and is not there on reload. */
-function assertWeek(value: number, field: string): void {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(
-      `updateUnitFields: ${field} must be a positive integer week, got ${value}`,
-    );
-  }
-}
-
 function mapUnitRow(
   row: UnitRow,
   subject: SubjectId,
   uuidToUnitSlug: Map<string, string>,
 ): Unit {
-  const weeks =
-    row.start_week === row.end_week
-      ? `Wk ${row.start_week}`
-      : `Wk ${row.start_week}–${row.end_week}`;
+  // The ONE formatter, shared with the mock source — see `unitWeeksLabel`.
+  const weeks = unitWeeksLabel(row.start_week, row.end_week);
   return {
     id: uuidToUnitSlug.get(row.id) ?? row.id,
     subject,
@@ -2200,6 +2186,10 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   // ── Unit mutations ─────────────────────────────────────────────────────────
   async updateUnitFields(unitId, patch, ownerId) {
+    // FIRST, before any network call: an invalid week range must not reach the
+    // wire, and must not half-apply alongside the content keys in the same
+    // patch. See `assertUnitWeekPatch` in ./source.ts.
+    assertUnitWeekPatch(patch);
     // Units are TEAM / MASTER content — one shared `units` row per unit, NO
     // personal fork (contrast updateLesson's forkAndPatch). So this is a direct
     // in-place UPDATE, RLS-gated by `units_write` (can_edit_subject_master OR
@@ -2239,26 +2229,14 @@ export const plannerSupabaseSource: PlannerDataSource = {
     if (patch.archived !== undefined)
       next.archived_at = patch.archived ? new Date().toISOString() : null;
     // ── Week range (the Plan timeline's band drag) ──────────────────────────
-    // INTEGER-GUARDED on the way out, mirroring `finiteWeek` on the way in. The
-    // columns are NOT NULL integers, so a fractional or non-positive value is a
-    // constraint violation that would fail the whole patch — including the
-    // content keys alongside it. Dropping the bad key instead would be worse
-    // (a silently partial write), so the write is refused outright and the
-    // mutator throws, which is what surfaces `onResult(false)` to the caller.
-    if (patch.startWeek !== undefined) {
-      assertWeek(patch.startWeek, "startWeek");
-      next.start_week = patch.startWeek;
-    }
-    if (patch.endWeek !== undefined) {
-      assertWeek(patch.endWeek, "endWeek");
-      next.end_week = patch.endWeek;
-    }
-    // `patch.weeks` is intentionally NOT written: there is no such column. It
-    // is the display collapse `mapUnitRow` derives from the two numbers above,
-    // and it rides in the patch only so the caller's OPTIMISTIC catalog update
-    // stays self-consistent (see the UnitPatch doc in ./source.ts). The
-    // `reloadUnit` echo below re-derives it, which is what corrects a caller
-    // that formatted the label differently.
+    // Validated as a PAIR, by the shared guard in ./source.ts — see its doc
+    // comment for why a single end cannot be checked here without a read, and
+    // why an inverted range corrupts shared team content rather than merely
+    // rendering oddly. It THROWS rather than dropping the key: a silently
+    // partial write is worse than a refused one, and the throw is what
+    // surfaces `onResult(false)` to the caller.
+    if (patch.startWeek !== undefined) next.start_week = patch.startWeek;
+    if (patch.endWeek !== undefined) next.end_week = patch.endWeek;
 
     if (Object.keys(next).length > 0) {
       await patchUnit(client, unitDbId, next);

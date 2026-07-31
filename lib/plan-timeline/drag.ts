@@ -72,11 +72,21 @@ export function axisWeekCount(axisLength: number, schoolWeekLen: number): number
 /**
  * Move a unit's whole week range by `deltaWeeks`, preserving its duration.
  *
- * Clamping moves the WHOLE range rather than each end independently. Clamping
- * the ends separately turns a six-week unit dragged off the left edge into a
- * one-week unit on week 1 — the teacher sees a bar snap to the start of the
- * year and has silently lost five weeks of declared schedule, with no signal
- * that anything but a move happened.
+ * A MOVE NEVER CHANGES DURATION — not by a week, not at either edge. Clamping
+ * the ends independently would turn a six-week unit dragged off the left edge
+ * into a one-week unit on week 1: the teacher sees a bar snap to the start of
+ * the year and has silently lost five weeks of declared schedule, with no
+ * signal that anything but a move happened. So the whole range slides and the
+ * clamp moves it, never shortens it.
+ *
+ * The same rule decides the degenerate case, and it decides it against the
+ * clamp: a unit whose stored duration EXCEEDS the axis (a stale range, or an
+ * academic year later shortened in Settings) cannot be moved anywhere that
+ * both fits and preserves it — so it is not moved at all. The earlier version
+ * of this function clamped it to the whole axis, which meant one nudge of a
+ * 50-week unit in a 40-week year deleted ten weeks of schedule and reported it
+ * as a move. Refusing is the only honest answer available here; giving that
+ * unit a range it can live in is an edit, and an edit needs asking for.
  *
  * A non-integer or non-finite delta is refused (returns the range unchanged)
  * rather than rounded: `units.start_week` is an integer column and the read
@@ -94,13 +104,13 @@ export function moveWeekRange(
   if (maxWeek < 1) return norm;
 
   const duration = norm.end - norm.start + 1;
+  // Longer than the year itself: there is no destination that preserves it.
+  if (duration > maxWeek) return norm;
+
   let start = norm.start + deltaWeeks;
-  // Right edge first, then left — so on a unit LONGER than the axis the left
-  // clamp wins and the unit stays anchored at week 1, visible, rather than
-  // being pushed off the end of the year where nothing can reach it.
   if (start + duration - 1 > maxWeek) start = maxWeek - duration + 1;
   if (start < 1) start = 1;
-  return { start, end: Math.min(maxWeek, start + duration - 1) };
+  return { start, end: start + duration - 1 };
 }
 
 /**

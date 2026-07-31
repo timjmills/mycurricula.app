@@ -22,6 +22,20 @@ import {
   weekRangeSlots,
   weeksLabel,
 } from "@/lib/plan-timeline/drag";
+// Hoisted to module scope, not `await import`ed inside a test.
+//
+// A dynamic import inside a test charges that ONE test the cold transform cost
+// of the imported module's whole dependency graph — `plannerMockSource` pulls
+// in every fixture in lib/mock. Alone that is ~1.7s and invisible; under a full
+// parallel `vitest run` it crossed vitest's 5s default and the file passed in
+// isolation while failing in the suite. Deliberately not fixed by raising the
+// timeout: that would leave a real hang, if one ever appeared here,
+// indistinguishable from this.
+import {
+  assertUnitWeekPatch,
+  expandStaleUnitKeys,
+} from "@/lib/planner/source";
+import { plannerMockSource } from "@/lib/planner/mock-source";
 
 const LEN = 5; // a Mon–Fri school week
 const SUN_THU = 5;
@@ -99,14 +113,37 @@ describe("moveWeekRange", () => {
     });
   });
 
-  it("clamps a unit LONGER than the year to the whole year", () => {
-    // Degenerate but reachable (a stale range, or a 2-week year in Settings).
-    // Both clamps fight; start wins, so the unit stays anchored where the
-    // teacher can see it rather than being pushed off the end.
+  it("REFUSES to move a unit longer than the year, rather than shortening it", () => {
+    // Degenerate but reachable (a stale range, or an academic year later
+    // shortened in Settings). Clamping it to the axis was the first
+    // implementation and it is a data-loss bug: one nudge of a 50-week unit in
+    // a 40-week year silently deleted ten weeks of declared schedule and
+    // reported it as a move. A move must never change duration.
     expect(moveWeekRange({ start: 1, end: 50 }, 5, 10)).toEqual({
       start: 1,
-      end: 10,
+      end: 50,
     });
+    expect(moveWeekRange({ start: 1, end: 50 }, -5, 10)).toEqual({
+      start: 1,
+      end: 50,
+    });
+  });
+
+  it("preserves duration EXACTLY at every clamped edge", () => {
+    // The general form of the bug above. Any move, clamped or not, must return
+    // a range of the same length.
+    const cases: Array<[number, number, number, number]> = [
+      [9, 14, -100, 40],
+      [9, 14, 100, 40],
+      [1, 1, -3, 40],
+      [38, 40, 5, 40],
+    ];
+    for (const [start, end, delta, max] of cases) {
+      const out = moveWeekRange({ start, end }, delta, max);
+      expect(out.end - out.start).toBe(end - start);
+      expect(out.start).toBeGreaterThanOrEqual(1);
+      expect(out.end).toBeLessThanOrEqual(max);
+    }
   });
 
   it("normalises a reversed stored range instead of rejecting it", () => {
@@ -245,5 +282,105 @@ describe("weekRangeEquals", () => {
     );
     expect(weekRangeEquals(null, { start: 9, end: 14 })).toBe(false);
     expect(weekRangeEquals(null, null)).toBe(true);
+  });
+});
+
+// ── The write seam's own guard ─────────────────────────────────────────────
+// `moveWeekRange` cannot emit an invalid range, but `UnitPatch` is a PUBLIC
+// write seam and any caller can. These pin the guard that stands between an
+// arbitrary caller and shared team content.
+
+describe("assertUnitWeekPatch", () => {
+  it("passes a patch with no week keys at all", async () => {
+    expect(() => assertUnitWeekPatch({})).not.toThrow();
+    expect(() => assertUnitWeekPatch({ notes: "hi" })).not.toThrow();
+  });
+
+  it("passes a well-formed pair, including a single-week unit", async () => {
+    expect(() =>
+      assertUnitWeekPatch({ startWeek: 3, endWeek: 8 }),
+    ).not.toThrow();
+    expect(() =>
+      assertUnitWeekPatch({ startWeek: 3, endWeek: 3 }),
+    ).not.toThrow();
+  });
+
+  it("REJECTS one end without the other", async () => {
+    // The hole this closes: `{ startWeek: 20 }` on a unit whose end_week is 5
+    // produces an inverted range that renders inside-out and runs the pacing
+    // maths against a negative duration — on TEAM content every teacher sees.
+    // A single end cannot be validated without reading the row, and a read
+    // opens a race, so the pair is required.
+    expect(() => assertUnitWeekPatch({ startWeek: 20 })).toThrow(
+      /must be patched together/,
+    );
+    expect(() => assertUnitWeekPatch({ endWeek: 2 })).toThrow(
+      /must be patched together/,
+    );
+  });
+
+  it("REJECTS an inverted pair", async () => {
+    expect(() => assertUnitWeekPatch({ startWeek: 9, endWeek: 4 })).toThrow(
+      /must not be after/,
+    );
+  });
+
+  it("REJECTS a fractional or non-positive week", async () => {
+    // Both columns are NOT NULL integers; PostgREST would reject the whole
+    // statement, taking the content keys in the same patch down with it.
+    expect(() => assertUnitWeekPatch({ startWeek: 1.5, endWeek: 4 })).toThrow(
+      /positive integer week/,
+    );
+    expect(() => assertUnitWeekPatch({ startWeek: 0, endWeek: 4 })).toThrow(
+      /positive integer week/,
+    );
+    expect(() => assertUnitWeekPatch({ startWeek: 1, endWeek: -2 })).toThrow(
+      /positive integer week/,
+    );
+  });
+
+  it("is enforced by BOTH sources, not just the Supabase one", async () => {
+    // Parity, or the flag-OFF path stores what production refuses and the bug
+    // only ever appears for real teachers.
+    await expect(
+      plannerMockSource.updateUnitFields("u1", { startWeek: 9 }, "owner"),
+    ).rejects.toThrow(/must be patched together/);
+    await expect(
+      plannerMockSource.updateUnitFields(
+        "u1",
+        { startWeek: 9, endWeek: 2 },
+        "owner",
+      ),
+    ).rejects.toThrow(/must not be after/);
+  });
+});
+
+describe("expandStaleUnitKeys", () => {
+  it("drops the whole schedule when any one of its three keys is stale", async () => {
+    // The retry path drops keys one at a time, which is right for content and
+    // wrong here: `{ startWeek }` without `endWeek` is a patch the write seam
+    // refuses, so a per-key drop leaves a retry that can never succeed.
+    expect(expandStaleUnitKeys(["startWeek"]).sort()).toEqual([
+      "endWeek",
+      "startWeek",
+    ]);
+    expect(expandStaleUnitKeys(["endWeek"]).sort()).toEqual([
+      "endWeek",
+      "startWeek",
+    ]);
+  });
+
+  it("leaves content keys exactly as they were", async () => {
+    expect(expandStaleUnitKeys(["notes", "bigIdea"]).sort()).toEqual([
+      "bigIdea",
+      "notes",
+    ]);
+    expect(expandStaleUnitKeys([])).toEqual([]);
+  });
+
+  it("does not duplicate a key already in the set", async () => {
+    const out = expandStaleUnitKeys(["startWeek", "endWeek", "notes"]);
+    expect(out).toHaveLength(3);
+    expect(new Set(out).size).toBe(3);
   });
 });

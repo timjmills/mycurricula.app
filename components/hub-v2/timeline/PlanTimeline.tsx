@@ -403,6 +403,16 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
    * if the unit's range has moved since (a re-hydrate pulling in a teammate's
    * change is the way that happens), the undo is refused and says why rather
    * than reverting shared content to a schedule nobody is looking at.
+   *
+   * THE LIMIT OF THAT GUARD, stated rather than glossed: it compares against
+   * the LOCAL catalog, so it catches a change this client has already seen. A
+   * teammate's write that has not yet reached this client is invisible to it,
+   * and the undo would revert that too. Closing that properly needs optimistic
+   * concurrency on the row (a version column in the update predicate), which is
+   * a migration and not this surface's to write. The exposure is bounded by the
+   * toast's six-second life, and it is the same exposure every other unit write
+   * in the app already carries — this one is merely the first to be honest
+   * about it.
    */
   const rescheduleUnit = useCallback(
     (
@@ -449,14 +459,11 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
 
       editUnitFields(
         unitId,
-        {
-          startWeek: next.start,
-          endWeek: next.end,
-          // The DISPLAY collapse, so the unit card and the rail do not keep
-          // showing the old schedule. Derived, not stored — the Supabase source
-          // drops it and re-derives from the numbers (see UnitPatch's doc).
-          weeks: label,
-        },
+        // The two numbers ONLY. `Unit.weeks` is the display collapse, derived
+        // by whichever source confirms the write — see the UnitPatch doc in
+        // lib/planner/source.ts on why letting a caller supply it lets the two
+        // paths disagree about the same write.
+        { startWeek: next.start, endWeek: next.end },
         (ok) => {
           if (!ok) {
             toastRef.current?.showUndoToast({
@@ -487,11 +494,23 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
                     });
                     return;
                   }
-                  editUnitFields(unitId, {
-                    startWeek: before.start,
-                    endWeek: before.end,
-                    weeks: weeksLabel(before.start, before.end),
-                  });
+                  editUnitFields(
+                    unitId,
+                    { startWeek: before.start, endWeek: before.end },
+                    // The undo is a WRITE, and it can be refused exactly like
+                    // the write it reverses (an RLS denial, a mode flip between
+                    // the toast appearing and the click). Fire-and-forget would
+                    // dismiss the toast and leave the teacher believing the
+                    // move was undone when the unit still sits where the drag
+                    // put it — a silent failure on the one control whose whole
+                    // job is to be trustworthy.
+                    (undone) => {
+                      if (undone) return;
+                      toastRef.current?.showUndoToast({
+                        message: `Could not undo — ${unit.name} is still at ${label}.`,
+                      });
+                    },
+                  );
                 }
               : undefined,
           });

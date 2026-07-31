@@ -430,6 +430,31 @@ describe("RefineTab — a cell refuses to flatten formatting it cannot hold", ()
     expect(html).toContain('aria-readonly="true"');
   });
 
+  it("catches markup shaped the way the app's OWN editor stores it", async () => {
+    // CLOSES THE FIXTURE BLIND SPOT. Every other test in this block feeds a
+    // hand-written string, which proves the guard catches markup I imagined —
+    // not markup the app produces. The real path is:
+    //   contenteditable → sanitizeHtml() on emit (rich-text-editor.tsx:55)
+    //   → handleObjective stores `I can ${html}` (LessonWorkspace.tsx:198-204)
+    // so this runs a realistic execCommand-bold payload through the REAL
+    // sanitizer and asserts the stored shape trips `isPlainText`. If the
+    // sanitizer's allowlist ever changed to emit something `stripHtml` treats as
+    // plain, this fails — and the data-loss bug would otherwise be live again
+    // with every hand-written test still green.
+    const { sanitizeHtml } = await import("@/lib/sanitize-html");
+    const emitted = sanitizeHtml("<b>compare</b> two fractions");
+    const stored = `I can ${emitted}`;
+
+    // Control: the sanitizer really did keep an inline tag. Without this the
+    // assertion below could pass because the payload was stripped to plain text
+    // upstream — a vacuous pass.
+    expect(emitted).toMatch(/<[a-z]/i);
+
+    const html = await render([lesson({ id: "a", objective: stored })]);
+    expect(html).toContain('aria-readonly="true"');
+    expect(html).toContain("I can compare two fractions");
+  });
+
   it("does not mistake a bare ampersand or angle bracket for markup", async () => {
     // `stripHtml` decodes entities, so a value containing a LITERAL "<" or "&"
     // must still compare equal to itself after stripping — otherwise a lesson

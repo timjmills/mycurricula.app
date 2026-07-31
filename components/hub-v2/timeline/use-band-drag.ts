@@ -16,7 +16,7 @@
 // every zoom but one. The track's own rendered width divided by its column
 // count is the used value, and it cannot drift from what is on screen.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   axisWeekCount,
   moveWeekRange,
@@ -100,6 +100,29 @@ export function useBandDrag({
   const startXRef = useRef(0);
   const weekPxRef = useRef(0);
   const suppressClickRef = useRef(false);
+  /** The pointer that STARTED this gesture. Every window listener filters on
+   *  it — see the multi-pointer note in `begin`. */
+  const pointerIdRef = useRef<number | null>(null);
+  /** Detach the current gesture's window listeners. Held in a ref so the
+   *  unmount effect below can call it without re-subscribing on every render,
+   *  and so a second `begin` can never leave a first gesture's listeners
+   *  behind. */
+  const detachRef = useRef<(() => void) | null>(null);
+
+  // A drag can outlive its own canvas: flipping the Timeline|List switch
+  // mid-gesture unmounts this hook while the window listeners are still
+  // attached. Left alive they would call `setSession` on an unmounted
+  // component and — worse — COMMIT a reschedule on a pointerup the teacher
+  // made somewhere else entirely, seconds later, on a surface that no longer
+  // shows the timeline.
+  useEffect(() => {
+    return () => {
+      detachRef.current?.();
+      detachRef.current = null;
+      sessionRef.current = null;
+      pointerIdRef.current = null;
+    };
+  }, []);
 
   const maxWeek = axisWeekCount(axisLength, schoolWeekLen);
 
@@ -119,6 +142,12 @@ export function useBandDrag({
       // session live and the next click re-scheduling a unit.
       if (e.button !== 0) return;
       if (maxWeek < 1 || schoolWeekLen <= 0) return;
+      // ONE GESTURE AT A TIME. A second pointer landing on another band while
+      // the first is still down would attach a second set of window listeners
+      // over the first's session — and the first pointerup to arrive would
+      // commit whichever session happened to be in the ref. Ignored rather
+      // than replacing, so the gesture already in the teacher's hand wins.
+      if (sessionRef.current) return;
 
       const el = e.currentTarget;
       const track = el.closest<HTMLElement>("[data-tl-track]");
@@ -130,6 +159,7 @@ export function useBandDrag({
 
       weekPxRef.current = colPx * schoolWeekLen;
       startXRef.current = e.clientX;
+      pointerIdRef.current = e.pointerId;
 
       const started: BandDragSession = {
         subject,
@@ -153,7 +183,17 @@ export function useBandDrag({
         // because a failed capture has no user-visible consequence.
       }
 
+      // EVERY window listener filters on the initiating pointer. Without it a
+      // second finger's `pointermove` steers a drag it never started, and its
+      // `pointerup` COMMITS one — a teacher resting a thumb on a tablet while
+      // dragging with a finger would reschedule a unit to wherever the thumb
+      // happened to be. `pointerId` is the only thing that distinguishes them:
+      // the events are otherwise identical.
+      const mine = (ev: PointerEvent): boolean =>
+        pointerIdRef.current === null || ev.pointerId === pointerIdRef.current;
+
       const onMove = (ev: PointerEvent): void => {
+        if (!mine(ev)) return;
         const live = sessionRef.current;
         if (!live) return;
         const dx = ev.clientX - startXRef.current;
@@ -169,12 +209,26 @@ export function useBandDrag({
         setSession(updated);
       };
 
-      const finish = (): void => {
+      const detach = (): void => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", finish);
         window.removeEventListener("pointercancel", cancel);
+        // ON THE ELEMENT, not on window — `lostpointercapture` does NOT bubble.
+        // Registered on window it would simply never fire, and the case it
+        // exists for (the captured band being removed mid-drag, which is what
+        // flipping Timeline→List does) would leave the session and the window
+        // pointerup handler live, so a release seconds later still committed
+        // the move.
+        el.removeEventListener("lostpointercapture", cancel);
+        if (detachRef.current === detach) detachRef.current = null;
+      };
+
+      const finish = (ev: PointerEvent): void => {
+        if (!mine(ev)) return;
+        detach();
         const live = sessionRef.current;
         sessionRef.current = null;
+        pointerIdRef.current = null;
         setSession(null);
         if (!live) return;
         // The click that follows a real drag must not ALSO open the unit.
@@ -184,24 +238,28 @@ export function useBandDrag({
         }
       };
 
-      const cancel = (): void => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", finish);
-        window.removeEventListener("pointercancel", cancel);
+      const cancel = (ev: PointerEvent): void => {
+        if (!mine(ev)) return;
+        detach();
         // A CANCELLED gesture commits nothing. `pointercancel` fires when the
         // browser takes the pointer over (a system gesture, a scroll the
-        // touch-action rules did allow) — the teacher did not let go, so
-        // treating it as a release would re-schedule a unit from an
-        // interrupted gesture.
+        // touch-action rules did allow), and `lostpointercapture` when the
+        // captured element is removed from the document mid-drag — a
+        // re-render that reorders the bands does exactly that. In neither case
+        // did the teacher let go, so treating it as a release would
+        // re-schedule a unit from an interrupted gesture.
         const live = sessionRef.current;
         sessionRef.current = null;
+        pointerIdRef.current = null;
         setSession(null);
         suppressClickRef.current = live?.moved ?? false;
       };
 
+      detachRef.current = detach;
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", finish);
       window.addEventListener("pointercancel", cancel);
+      el.addEventListener("lostpointercapture", cancel);
     },
     [enabled, maxWeek, schoolWeekLen],
   );
