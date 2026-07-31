@@ -527,44 +527,22 @@ then do BOTH of the following — neither substitutes for the other:
    script (`node scripts/probe-uxa.mjs`), and the relevant test suite
    (`npm run test`).
 
-### Known sandbox limitations + mitigations (Windows, 2026-05-28)
+### Known sandbox limitation (Windows)
 
-Observed during the first real gate invocations on this machine. Surface
-these to the user if the gate behaves unexpectedly — they are not
-permission to bypass the gate.
+Codex's read-only sandbox can fail to spawn `git diff` on Windows
+(`windows sandbox: spawn setup refresh`), intermittently. **Standard fix —
+pipe the diff in as stdin** so Codex never has to shell out for it:
 
-1. **`windows sandbox: spawn setup refresh` on git commands.** Codex's
-   read-only sandbox can fail to spawn `git diff` / `git diff --cached` /
-   downstream shells on Windows. Codex falls back to direct file reads +
-   `git status --short`, so findings still arrive — but the diff-centric
-   prompt loses some context. The failure is sometimes intermittent (first
-   invocation succeeds, later invocations in the same shell session fail).
-2. **Mitigations** (in increasing order of intrusiveness):
-   - **(a) Retry in a fresh shell.** The spawn failure sometimes resolves
-     after closing + reopening the terminal.
-   - **(b) Upgrade Codex CLI.** `npm i -g @openai/codex@latest`. The npm
-     package is `@openai/codex` (not `@anthropic/codex`). The
-     `--approval-policy` flag was removed around the 0.133/0.134 boundary;
-     as of 2026-05-28 the latest is 0.134.0. If a newer release ships with
-     a Windows-sandbox fix, this is where it lands. Verify the installed
-     version with `npm list -g --depth=0 | grep codex`.
-   - **(c) Pipe the diff as stdin context.** Bypass Codex's in-sandbox
-     `git diff` by capturing the diff yourself + piping it into the
-     prompt: `git diff --cached | codex exec --sandbox read-only
-     "$REVIEW_PROMPT"`. The `[PROMPT]` argument is optional when stdin is
-     piped (Codex appends stdin as a `<stdin>` block, per
-     `codex exec --help`). This lets Codex review even when its own
-     sandbox can't shell out for the diff.
-   - **(d) Accept the gate as best-effort on Windows.** If (a)+(b)+(c)
-     all still fail, the gate is genuinely blocked. Surface the blocker
-     per the failure protocol above + run the full local verification
-     stack instead. Note in the commit message that the gate could not
-     run, what was tried, and what local verification was substituted.
-3. **Do NOT use `--dangerously-bypass-approvals-and-sandbox` as a
-   workaround.** Per the hard rule at the top of this section, every
-   invocation runs under `--sandbox read-only`. If you cannot get a
-   read-only run to work, that's a blocker to report, not a license to
-   weaken the sandbox.
+```bash
+git diff --cached | codex exec --sandbox read-only "$REVIEW_PROMPT"
+```
+
+(The `[PROMPT]` arg is optional when stdin is piped.) If that still fails,
+retry in a fresh shell, then `npm i -g @openai/codex@latest`. If all fail the
+gate is genuinely blocked — follow the failure protocol above and note in the
+commit message what was tried and what local verification was substituted.
+**Never** reach for `--dangerously-bypass-approvals-and-sandbox`; a blocked
+gate is a blocker to report, not a license to weaken the sandbox.
 
 ---
 
@@ -618,35 +596,10 @@ diverges from the handoff is a finding.
   `PROVISIONING_MODE=individual` in `.env.local`).
 - `QA-REPORT.md` is a working artifact — do not commit it unless asked.
 
-**QA audit prompt** (canonical template):
-
-```text
-Goal: QA audit — code inspection + live visual testing.
-Inspect this codebase and visually test the running website, then produce a
-prioritized report of bugs and improvements.
-
-1. Code inspection. Review the project structure, components, routing, and
-   state management. Flag dead code, error-handling gaps, accessibility
-   issues (missing alt text, labels, focus states), hardcoded values, and
-   obvious performance problems.
-2. Run and visually inspect the site. Start the dev server. Open the site
-   and take screenshots of every page/route. Compare what renders against
-   what the code intends.
-3. Interact like a user. Click every button, link, and menu item. Fill out
-   and submit every form — including with invalid/empty input. Test all
-   interactive features (modals, dropdowns, search, filters, auth flows).
-   Note anything that errors, dead-ends, or behaves unexpectedly. Check the
-   browser console for errors/warnings during all interactions.
-4. Responsive testing. Resize the window to mobile (375px), tablet (768px),
-   and desktop (1440px) widths. Screenshot each. Flag layout breaks,
-   overflow, overlapping elements, unusable touch targets, and hidden
-   content.
-5. Report. Write findings to QA-REPORT.md with: severity
-   (critical/major/minor), description, steps to reproduce, screenshot
-   reference, suspected file/line where applicable, and suggested fix.
-   Separate "bugs" from "improvement ideas." Do not fix anything yet —
-   report only.
-```
+**QA audit prompt.** Use the canonical 5-step template in
+`~/.claude/CLAUDE.md` ("QA audit prompt (canonical template)") — it is
+user-wide and already loaded in every session, so it is not restated here.
+Its step 4 widths (375 / 768 / 1440) are the ones this project checks.
 
 **Acting on the report.** The audit is report-only — it never fixes anything
 in the same pass. Triage `QA-REPORT.md` afterwards: an unresolved
@@ -657,57 +610,17 @@ supplements the §4 contract, it does not replace it.)
 
 ### Visual verification method (A: video · B: screenshots)
 
-Visual verification is mandatory — **never sign off on UI work from code
-review alone; run the site and look at it.** Pick a method by what the
-change is:
+**Never sign off on UI work from code review alone; run the site and look at
+it.** The full Method A (video + `ffmpeg` frame extraction) / Method B
+(screenshot key moments) contract — when to use each, and how — lives in
+`~/.claude/CLAUDE.md` and is loaded every session. It is not restated here.
 
-**Method A — video + frame-by-frame.** Record the whole browser session,
-then extract and review frames as images.
-- _Use when:_ motion / time-based behavior (animations, transitions,
-  loading/skeleton states, scroll, drag-and-drop); hunting layout shift,
-  flicker, or jank that only shows up _between_ states; auditing a long
-  multi-step flow end-to-end where the journey matters; any
-  post-major-change pass where you want a replayable record as evidence;
-  or a vague "something looks off when I click around" report where you
-  don't yet know where to look.
-- _How:_ run Playwright with video capture (`playwright` MCP with
-  `--save-video=800x600 --output-dir …`, or a local script —
-  `chromium.launch({ channel: "chrome" })`, `recordVideo` on the
-  context). Drive the full flow in one session, narrating each action in
-  your notes. Extract frames:
-
-  ```bash
-  ffmpeg -i session.webm -vf fps=1 frames/frame_%03d.png
-  ```
-
-  Use `fps=2` or higher for fast animations/transitions; `fps=1` is the
-  default. Review frames in sequence; for each anomaly note the frame
-  number, what's wrong, and the action that preceded it. Keep the
-  `.webm` and reference it in the report so a human can replay it.
-- _Cost:_ slower (record → extract → review many images). Don't use it
-  for a single page or one button.
-
-**Method B — screenshot key moments.** Screenshot after each meaningful
-action and assess it before proceeding (this is what the
-`scripts/probe-*.mjs` probes already do).
-- _Use when:_ static / discrete states (layouts, forms, modals,
-  empty/error states, dark mode); responsive checks (screenshot each
-  surface at 375 / 768 / 1440); targeted verification of one specific
-  change; fast fix → screenshot → confirm → next iteration; or
-  console/network-error focus (pair with `chrome-devtools` MCP). Always
-  screenshot before AND after a destructive/state-changing action, and
-  save with descriptive names (`calendar-chips-night-1280.png`).
-- _Cost:_ misses anything that happens _between_ shots (transitions,
-  flicker, races).
-
-**Choosing.** Default to **B** for routine reviews and targeted checks
-(faster, cheaper). Escalate to **A** when behavior over time matters or
-for a full post-major-change audit (B for the spot-checks after the
-fixes). When unsure, start with B and switch to A the moment you see
-something you can't explain from stills. Combining is fine — video for
-the main flow pass, screenshots for responsive and error-state checks.
-Evidence in `QA-REPORT.md` is the frame number + `.webm` path (A) or the
-screenshot filename (B).
+Project-specific bindings:
+- `scripts/probe-*.mjs` already implement **Method B**; extend one rather
+  than writing a new harness.
+- Screenshot names are descriptive + width-suffixed:
+  `calendar-chips-night-1280.png`.
+- Responsive checks are 375 / 768 / 1440 (inside the §4 tiers).
 
 ---
 
@@ -822,15 +735,9 @@ handoff bundle.
 - `docs/claude-bypass.sql` — DDL for `public.claude_access_log` (the bypass audit
   table). Run once in the Supabase SQL editor.
 
-**Phasing reminder:** Phase 1A shipped — Weekly/Daily/Year/Schedule/Catch-up
-views, Personal | Team Curriculum toggle, Simple/Task/Advanced view modes, standards tagging,
-daily notes, basic print/export, unified Settings hub, and
-the onboarding wizard (see §1 status table for the full list). Phase 1B is the
-**Supabase backend wave** — wiring persistence so the forking model writes through,
-holidays render, schedule rotation cycles work end-to-end, unit-import lands. Phase 2
-brings full forking semantics + year rollover. Phase 3+ brings annotation, admin, and
-AI. When in doubt about whether to build something, check the §1 table and the
-roadmap, and ask.
+**Phasing reminder:** see §1 for what has shipped and
+`docs/7.23.26-unified-v2-plan.md` §5 for what is sequenced next. When in doubt
+about whether to build something, check those two and ask.
 
 ---
 
@@ -854,40 +761,13 @@ Everything else under `Documents/` (the design handoff bundle) and
 `docs/historical/` (historical reference) and `docs/*audit*.md` / `docs/research-*.md`
 (dated audit snapshots) is reference material. See "Audit-doc disclaimer" below.
 
-### App name — canonical spelling
+### Reference lookups → `docs/route-map-and-doc-conventions.md`
 
-**`mycurricula.app`** (plural). The GitHub repo is `timjmills/mycurricula.app`
-and the deployed Cloudflare custom domain is the same. Older docs that use the
-singular `mycurriculum.app` predate the canonical name; treat those as
-historical.
+The canonical app-name spelling (`mycurricula.app`, plural), the **route-alias
+table** (older docs' `/curriculum` · `/yearly` · `/subject` → today's routes),
+and the **audit-doc disclaimer** live there. Two rules worth keeping in mind
+without opening it:
 
-### Route aliases (planning-doc names vs. current routes)
-
-The planning doc and some older artifacts name routes that have since been
-renamed in the codebase. Older docs that say `/curriculum`, `/yearly`, or
-`/subject` refer to the same surfaces; v2 added the Planner Hub and Resource Wall.
-
-| Planning-doc / older name | Current route | v2 console / tab label |
-| --- | --- | --- |
-| `/curriculum`, `/subject` (→ `/subject/<id>`) | `/year` (`/subject` is a legacy redirect to `/year`) | "Year" (the v2 "Curricular plan") |
-| `/yearly` | `/year` | "Year" |
-| (the unit/lesson planner) | Lesson Plan | "Lesson Plan" |
-| (the projection board) | Teach | "Teach" |
-| (new in v2) | `/planner` | "Planner Hub" |
-| (new in v2 — resource board) | `/post` | "Resource Wall" |
-
-### Audit-doc disclaimer
-
-Every `docs/*audit*.md` and `docs/research-*.md` is a **dated snapshot**.
-Findings, recommendations, and "open questions" recorded in those docs may
-already be fixed, deferred, regressed, or superseded by later work. Each
-audit doc carries a snapshot-disclaimer header noting its date. **Verify
-against current code before treating any finding as open or any
-recommendation as binding.** A quick check:
-
-```
-git log --oneline -- <relevant-file-path>
-```
-
-The canonical project guide for what's true today is **this file
-(`CLAUDE.md`)** plus `BUILD_STANDARD.md`.
+- Every `docs/*audit*.md` / `docs/research-*.md` is a **dated snapshot** —
+  verify against current code before treating a finding as open.
+- `/subject` is a legacy redirect to `/year` (also stated in §1).
