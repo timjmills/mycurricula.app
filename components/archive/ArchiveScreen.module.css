@@ -207,6 +207,24 @@
   color: var(--muted);
 }
 
+/* The two states where a count cannot be printed. Both sit inline in .statRow
+   beside the (always-known) weeks stat, sized so the row does not jump when the
+   real numbers arrive. */
+.statSkeleton {
+  flex: 1 1 200px;
+  max-width: 260px;
+  align-self: center;
+}
+.countsUnavailable {
+  flex: 1 1 220px;
+  max-width: 340px;
+  margin: 0;
+  align-self: center;
+  font-size: var(--t-12);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .currentActions {
   display: flex;
   align-items: center;
