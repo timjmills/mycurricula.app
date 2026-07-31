@@ -516,6 +516,195 @@ describe("seam types — full Unit + Lesson literals exercise every Track-B fiel
   });
 });
 
+describe("buildLesson callsite guard — the createLesson fuse (§4c Step 5)", () => {
+  // `supabase-source.ts` has FIVE `buildLesson({` callsites. FOUR spread
+  // `...trackBArgsFromRow(row)` — two list-hydrate, two post-mutation reload —
+  // which is what makes "widen the mapper, widen every read" hold. The fifth,
+  // inside `createLesson`, does NOT, and that omission is CORRECT TODAY:
+  //
+  //   The insert names no Track-B column and none has a DB default, so every
+  //   Track-B field on `inserted` is null. Spreading them would add nothing.
+  //
+  // So the literal invariant "every callsite spreads" is the wrong assertion —
+  // it fails on legitimate code. The REAL invariant is an implication, and it
+  // is a fuse: `units` already has `default_dur` + `default_flow`, both already
+  // read into the `Unit` type, so `createLesson` is one small change away from
+  // honouring a unit default. The first insert that carries a duration returns a
+  // Lesson that silently DROPS it until a full re-hydrate — the card shows no
+  // duration and the teacher's "why did that not save" is unanswerable from the
+  // UI. Hence:
+  //
+  //   createLesson's insert names ANY Track-B column  ⇒  it MUST spread.
+  //
+  // Verified unreachable at authoring time (2026-07-31): the only `createLesson`
+  // caller (`planner-store.tsx:3538`) passes `unit: ""` and no duration, and
+  // `defaultFlow`/`defaultDuration` are read only by the unit mapper
+  // (`supabase-source.ts:994-995`), written only by `updateUnit` (`:2121-2123`),
+  // and threaded through `unitToPatch` (`planner-store.tsx:2520-2521`) — an
+  // UPDATE reconcile, not a create path.
+  //
+  // But the fuse is SHORTER than "one small change away". `input.unit` is
+  // ALREADY threaded into createLesson and already resolved to a real units.id
+  // (`supabase-source.ts:1898-1902`), so the plumbing for a unit-defaults lookup
+  // at create time exists in full — only the lookup-and-apply is missing.
+  // Whoever adds it is ONE line from the silent drop, which is precisely why
+  // this guard is worth its weight.
+
+  /** Strip whole-line `//` comments — see the two traps below.
+   *
+   *  TRAP 1: the ⚠ comment at supabase-source.ts:1972-1992 contains the literal
+   *  string `...trackBArgsFromRow(inserted)` TWICE. Counting the raw source
+   *  reports 6 spreads instead of 4, and `createLessonBody(...).includes(spread)`
+   *  reads TRUE — inverting every assertion here into a vacuous pass. Same idiom
+   *  as the SQL `code` stripper at the top of this file. */
+  function stripLineComments(ts: string): string {
+    return ts
+      .split("\n")
+      .filter((l) => {
+        const t = l.trimStart();
+        return !t.startsWith("//") && !t.startsWith("*") && !t.startsWith("/*");
+      })
+      .join("\n");
+  }
+
+  const CALLSITE = /buildLesson\(\{/g;
+  const SPREAD = /\.\.\.trackBArgsFromRow\(/g;
+  const count = (ts: string, re: RegExp): number =>
+    (ts.match(new RegExp(re.source, "g")) ?? []).length;
+
+  /** Slice `createLesson`'s body by its two unique neighbouring markers. Both
+   *  are `async <name>(` method heads, so no brace counting is needed — and if
+   *  either marker is renamed the bounds assertions below fail loudly rather
+   *  than silently returning an empty (always-passing) slice. */
+  function createLessonBody(ts: string): string {
+    const start = ts.indexOf("async createLesson(");
+    const end = ts.indexOf("async softDeleteLesson(");
+    if (start < 0 || end < 0 || end <= start) return "";
+    return ts.slice(start, end);
+  }
+
+  /** The Track-B lesson columns NAMED as object keys in a block. Key-shaped
+   *  (`col:`) rather than a bare substring so `notes: null` in the insert is not
+   *  mistaken for `assessment_notes`. */
+  function namedTrackBCols(block: string): string[] {
+    return LESSON_COLS.filter((c) =>
+      new RegExp(`(^|[\\s{,(])${c}\\s*:`, "m").test(block),
+    );
+  }
+
+  const srcCode = stripLineComments(src);
+  const createBody = createLessonBody(srcCode);
+
+  it("the comment stripper is load-bearing (it removes a commented-out spread)", () => {
+    // TRAP 1, asserted rather than assumed. A stripper that silently no-ops
+    // (idiom drift, CRLF, a reformat to block comments) would leave every count
+    // below inflated and the fuse assertion vacuously satisfied.
+    //
+    // Asserted on a SYNTHETIC fixture, deliberately NOT on the live file. The
+    // first draft of this test asserted `count(src) > count(srcCode)` — true
+    // only because the ⚠ docblock at supabase-source.ts:1972-1992 quotes
+    // `...trackBArgsFromRow(inserted)` twice. Reword that comment (a pure prose
+    // edit, zero behaviour change) and the assertion flips to false and breaks
+    // the build. A test that fails when a comment is IMPROVED trains people to
+    // stop improving comments. The property being protected is the stripper's,
+    // so test the stripper — not the prose that happens to exercise it.
+    const withCommentedSpread = ["  a: 1,", "  // ...trackBArgsFromRow(row)", "  b: 2,"].join(
+      "\n",
+    );
+    expect(count(withCommentedSpread, SPREAD)).toBe(1);
+    expect(count(stripLineComments(withCommentedSpread), SPREAD)).toBe(0);
+  });
+
+  it("has exactly five buildLesson callsites and four trackBArgsFromRow spreads", () => {
+    // A SIXTH callsite must force whoever adds it to read this block. Note
+    // `function buildLesson(args: {` (~:848) is the DEFINITION and does not match
+    // `buildLesson({` — which is why that literal is the right probe.
+    expect(count(srcCode, CALLSITE)).toBe(5);
+    expect(count(srcCode, SPREAD)).toBe(4);
+  });
+
+  it("the one unspread callsite is the one inside createLesson", () => {
+    expect(createBody.length).toBeGreaterThan(0);
+    expect(count(createBody, CALLSITE)).toBe(1);
+    expect(count(createBody, SPREAD)).toBe(0);
+    // …and the other four are all spread: removing createLesson's body leaves
+    // 4 callsites and 4 spreads, so no OTHER callsite is quietly unspread.
+    const rest = srcCode.replace(createBody, "");
+    expect(count(rest, CALLSITE)).toBe(4);
+    expect(count(rest, SPREAD)).toBe(4);
+  });
+
+  it("createLesson's whole body names NO Track-B lesson column today (the fuse is unlit)", () => {
+    // Pins the premise. Without this, the implication below is satisfiable by an
+    // empty column list — a detector that finds nothing passes forever.
+    //
+    // SCOPE, stated precisely because the assertion is broader than the hazard:
+    // this scans createLesson's ENTIRE body, not just the `row` insert literal.
+    // Three Track-B column names (`builds`, `prep`, `carried`) are spelled the
+    // same in snake_case and camelCase, so they are also valid `buildLesson`
+    // ARG names — meaning this fires if someone hand-threads one into the
+    // callsite instead of spreading. That is a false positive against the
+    // narrow "insert" wording, and it is the SAFE direction: it demands the
+    // spread, which is the fix either way. Narrowing the slice to the `row`
+    // literal would make the detector miss exactly that case.
+    expect(namedTrackBCols(createBody)).toEqual([]);
+  });
+
+  it("FUSE: if createLesson names a Track-B column it MUST spread trackBArgsFromRow", () => {
+    // The implication, stated so it punishes exactly one state: named-and-not-
+    // spread. Adding a Track-B column WITH the spread passes; adding the spread
+    // pre-emptively (all-null, harmless) passes; today's named-none passes.
+    const named = namedTrackBCols(createBody);
+    const spreads = count(createBody, SPREAD) > 0;
+    expect(named.length > 0 && !spreads, `named: ${named.join(", ")}`).toBe(
+      false,
+    );
+  });
+
+  it("SELF-TEST: the detectors report a VIOLATION on a synthetic armed source", () => {
+    // A gate nobody has seen fail is not evidence (five instruments in this repo
+    // have failed open). Run the same three detectors against a fixture where
+    // the fuse IS lit — a createLesson whose insert carries `duration_minutes`
+    // and whose only spread sits in a COMMENT (trap 1, reproduced deliberately).
+    const ARMED = [
+      "  async createLesson(input, ownerId, gradeLevelId) {",
+      "    const row = { owner_id: ownerId, duration_minutes: 45 };",
+      "    const inserted = unwrap(res, 'create lesson');",
+      "    return buildLesson({",
+      "      id: inserted.id,",
+      "      // ...trackBArgsFromRow(inserted)  <- NOT applied, only mentioned",
+      "    });",
+      "  },",
+      "",
+      "  async softDeleteLesson(lessonId, ownerId) {",
+      "    return buildLesson({ ...trackBArgsFromRow(row) });",
+      "  },",
+    ].join("\n");
+
+    const armedBody = createLessonBody(stripLineComments(ARMED));
+    expect(armedBody).toContain("duration_minutes");
+    expect(namedTrackBCols(armedBody)).toEqual(["duration_minutes"]);
+    expect(count(armedBody, SPREAD)).toBe(0);
+    // …therefore the fuse predicate is TRUE (violation) on this input.
+    expect(namedTrackBCols(armedBody).length > 0 && count(armedBody, SPREAD) === 0).toBe(true);
+
+    // Trap 1, proved: WITHOUT stripping, the same body reads as spread and the
+    // violation vanishes. This is the failure mode the stripper exists to stop.
+    const unstripped = createLessonBody(ARMED);
+    expect(count(unstripped, SPREAD)).toBe(1);
+
+    // And the detector is not stuck-on: the same fixture WITH a real spread is
+    // clean, so a correct fix is not punished.
+    const FIXED = ARMED.replace(
+      "      id: inserted.id,",
+      "      id: inserted.id,\n      ...trackBArgsFromRow(inserted),",
+    );
+    const fixedBody = createLessonBody(stripLineComments(FIXED));
+    expect(namedTrackBCols(fixedBody)).toEqual(["duration_minutes"]);
+    expect(count(fixedBody, SPREAD)).toBe(1);
+  });
+});
+
 describe("planner_settings / units runtime behavior (needs a DB harness)", () => {
   it.todo("a teacher reads/writes ONLY their own planner_settings row (owner RLS)");
   it.todo("anon cannot select or write planner_settings (grant revoked)");
