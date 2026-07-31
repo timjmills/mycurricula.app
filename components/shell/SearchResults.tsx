@@ -32,6 +32,14 @@
 //   feature lands — so the filter pill itself never looks broken. The
 //   <FutureControl> primitive is the canonical "coming after beta" treatment
 //   (CLAUDE.md §4; FutureControl.tsx header).
+//
+// Structure:
+//   The panel splits in two. <SearchResults> owns the chrome a portal needs —
+//   mount gate, placement, dismissal, the filter pills. <SearchResultsBody>
+//   owns the answer to "what does this query turn up", which is the part with
+//   a correctness contract worth pinning in a test (the portal + the
+//   post-mount `mounted` latch make the outer component unrenderable by
+//   react-dom/server; the body renders fine).
 
 import {
   useCallback,
@@ -45,7 +53,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { EmptyState, FutureControl, ToggleGroup } from "@/components/ui";
+import {
+  EmptyState,
+  FutureControl,
+  PlannerEmpty,
+  ToggleGroup,
+} from "@/components/ui";
 import { ResourceTypeIcon } from "@/components/year/resource-icons";
 import {
   searchEverything,
@@ -116,7 +129,6 @@ export function SearchResults({
   onDismiss,
 }: SearchResultsProps): ReactNode {
   const router = useRouter();
-  const data = useSearchData();
 
   // SSR safety — createPortal needs a real document. Mirror the gate used in
   // NotificationBell: render nothing on the server pass, then flip on after
@@ -149,33 +161,6 @@ export function SearchResults({
   const trimmedQuery = query.trim();
   const isOpen =
     mounted && trimmedQuery !== "" && dismissedForQuery !== trimmedQuery;
-
-  // ── Compute results ───────────────────────────────────────────────────
-  // searchEverything is a pure function; useMemo is the right level of
-  // caching. The filter state participates so changing chips re-runs the
-  // engine (which short-circuits other sources internally — cheap).
-  const filterObj = useMemo<SearchFilter>(
-    () => ({ source: filter }),
-    [filter],
-  );
-  const results = useMemo<SearchResult[]>(
-    () => (isOpen ? searchEverything(trimmedQuery, filterObj, data) : []),
-    [isOpen, trimmedQuery, filterObj, data],
-  );
-
-  // Group results by source so we can render them as labelled sections.
-  // Order is fixed (lesson → standard → resource → comment) so the panel's
-  // visual rhythm stays consistent regardless of which source produced hits.
-  const grouped = useMemo(() => {
-    const out: Record<SearchSource, SearchResult[]> = {
-      lesson: [],
-      standard: [],
-      resource: [],
-      comment: [],
-    };
-    for (const r of results) out[r.source].push(r);
-    return out;
-  }, [results]);
 
   // ── Placement ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -245,22 +230,6 @@ export function SearchResults({
   if (!isOpen) return null;
   if (typeof document === "undefined") return null;
 
-  const totalLiveResults = results.length;
-  // Whether to render the Comments "coming after beta" stand-in. Only when
-  // the active filter shows the comments group AND no comment hits landed.
-  const showCommentsStandIn =
-    (filter === null || filter === "comment") &&
-    grouped.comment.length === 0;
-  // "No matches anywhere" only fires when EVERY source bucket is empty AND
-  // we're not surfacing the comments stand-in (because that counts as
-  // something to show the teacher).
-  const isCompletelyEmpty =
-    totalLiveResults === 0 &&
-    (filter === "lesson" ||
-      filter === "standard" ||
-      filter === "resource" ||
-      (filter === null && !showCommentsStandIn));
-
   const positionStyle: CSSProperties =
     placement !== null
       ? {
@@ -320,63 +289,172 @@ export function SearchResults({
       </div>
 
       {/* ── Result body ──────────────────────────────────────────────── */}
-      <div className={styles.body}>
-        {isCompletelyEmpty ? (
-          <EmptyState
-            size="sm"
-            heading="No matches"
-            body="Try shorter terms or check spelling."
-          />
-        ) : (
-          <>
-            {(filter === null || filter === "lesson") &&
-              grouped.lesson.length > 0 && (
-                <SearchGroup
-                  label="Lessons"
-                  count={grouped.lesson.length}
-                  results={grouped.lesson}
-                  onResultClick={handleResultClick}
-                />
-              )}
-            {(filter === null || filter === "standard") &&
-              grouped.standard.length > 0 && (
-                <SearchGroup
-                  label="Standards"
-                  count={grouped.standard.length}
-                  results={grouped.standard}
-                  onResultClick={handleResultClick}
-                />
-              )}
-            {(filter === null || filter === "resource") &&
-              grouped.resource.length > 0 && (
-                <SearchGroup
-                  label="Resources"
-                  count={grouped.resource.length}
-                  results={grouped.resource}
-                  onResultClick={handleResultClick}
-                />
-              )}
-            {showCommentsStandIn && (
-              <section className={styles.group} aria-label="Comments">
-                <header className={styles.groupHeader}>
-                  <span className={styles.groupLabel}>Comments</span>
-                </header>
-                <div className={styles.commentsStandIn}>
-                  <FutureControl
-                    label="Comments search — coming after beta"
-                    tooltip="Lesson + Unit Comments will become searchable when the comments document store ships (Phase 1B alongside Supabase)."
-                    variant="ghost"
-                    size="sm"
-                    tooltipSide="top"
-                  />
-                </div>
-              </section>
-            )}
-          </>
-        )}
-      </div>
+      <SearchResultsBody
+        query={trimmedQuery}
+        filter={filter}
+        onResultClick={handleResultClick}
+      />
     </div>,
     document.body,
+  );
+}
+
+// ── Result body ──────────────────────────────────────────────────────────
+
+// Hoisted so the honest branch and the hydration-aware branch cannot drift
+// apart into two different messages.
+const NO_MATCH_HEADING = "No matches";
+const NO_MATCH_BODY = "Try shorter terms or check spelling.";
+
+export interface SearchResultsBodyProps {
+  /** The query, ALREADY trimmed and known non-empty (the panel is closed
+   *  otherwise). */
+  query: string;
+  /** The active source filter; null === "All". */
+  filter: SearchSource | null;
+  onResultClick: (result: SearchResult) => void;
+}
+
+/**
+ * Everything below the filter pills: run the engine, group the hits, and decide
+ * what to say when nothing comes back. Split out of <SearchResults> so this —
+ * the half with a correctness contract — can be rendered directly in a test;
+ * the outer component's portal + post-mount latch make it unrenderable by
+ * react-dom/server, and the false-empty this guards against is unreachable on a
+ * dev server (see tests/search-results-empty.test.ts).
+ */
+export function SearchResultsBody({
+  query,
+  filter,
+  onResultClick,
+}: SearchResultsBodyProps): ReactNode {
+  const data = useSearchData();
+
+  // ── Compute results ───────────────────────────────────────────────────
+  // searchEverything is a pure function; useMemo is the right level of
+  // caching. The filter state participates so changing chips re-runs the
+  // engine (which short-circuits other sources internally — cheap).
+  const filterObj = useMemo<SearchFilter>(() => ({ source: filter }), [filter]);
+  const results = useMemo<SearchResult[]>(
+    () => searchEverything(query, filterObj, data),
+    [query, filterObj, data],
+  );
+
+  // Group results by source so we can render them as labelled sections.
+  // Order is fixed (lesson → standard → resource → comment) so the panel's
+  // visual rhythm stays consistent regardless of which source produced hits.
+  const grouped = useMemo(() => {
+    const out: Record<SearchSource, SearchResult[]> = {
+      lesson: [],
+      standard: [],
+      resource: [],
+      comment: [],
+    };
+    for (const r of results) out[r.source].push(r);
+    return out;
+  }, [results]);
+
+  const totalLiveResults = results.length;
+  // Whether to render the Comments "coming after beta" stand-in. Only when
+  // the active filter shows the comments group AND no comment hits landed.
+  const showCommentsStandIn =
+    (filter === null || filter === "comment") && grouped.comment.length === 0;
+  // "No matches anywhere" only fires when EVERY source bucket is empty AND
+  // we're not surfacing the comments stand-in (because that counts as
+  // something to show the teacher).
+  const isCompletelyEmpty =
+    totalLiveResults === 0 &&
+    (filter === "lesson" ||
+      filter === "standard" ||
+      filter === "resource" ||
+      (filter === null && !showCommentsStandIn));
+
+  // Whether the ACTIVE filter's sources come out of the planner store. Lessons
+  // and resources both derive from `usePlanner().lessons` (lib/search-index.ts
+  // useSearchData flattens resources out of the same array), which is empty for
+  // the whole 11–16s Supabase hydrate — so "No matches" over those buckets is
+  // a claim the store cannot yet back. This search is reachable from the top
+  // bar on ANY route, and its sub-line goes further than a bare denial: it
+  // tells the teacher to CHECK THEIR SPELLING of a term that was correct.
+  //
+  // Standards are deliberately NOT in this set: they are a module-frozen map
+  // (lib/mock/standards.ts), hydration-independent, so a standards-only miss
+  // is honest immediately. Gating it too would strand that search behind a
+  // skeleton for 11–16s — the overshoot this guard has to avoid.
+  const dependsOnPlannerStore =
+    filter === null || filter === "lesson" || filter === "resource";
+
+  return (
+    <div className={styles.body}>
+      {isCompletelyEmpty ? (
+        // Deferring to <PlannerEmpty> rather than gating on `settled` here:
+        // it reads usePlannerDataState() itself and already owns the pending
+        // skeleton and the failed-hydrate copy (components/ui/PlannerEmpty.tsx
+        // :40), and it still shows the real EmptyState once settled — so a
+        // genuine miss is answered honestly and the box never strands loading.
+        // Same fix as the four hub browse pickers (commit 11a0001).
+        dependsOnPlannerStore ? (
+          <PlannerEmpty
+            size="sm"
+            skeletonLines={2}
+            heading={NO_MATCH_HEADING}
+            body={NO_MATCH_BODY}
+          />
+        ) : (
+          <EmptyState
+            size="sm"
+            heading={NO_MATCH_HEADING}
+            body={NO_MATCH_BODY}
+          />
+        )
+      ) : (
+        <>
+          {(filter === null || filter === "lesson") &&
+            grouped.lesson.length > 0 && (
+              <SearchGroup
+                label="Lessons"
+                count={grouped.lesson.length}
+                results={grouped.lesson}
+                onResultClick={onResultClick}
+              />
+            )}
+          {(filter === null || filter === "standard") &&
+            grouped.standard.length > 0 && (
+              <SearchGroup
+                label="Standards"
+                count={grouped.standard.length}
+                results={grouped.standard}
+                onResultClick={onResultClick}
+              />
+            )}
+          {(filter === null || filter === "resource") &&
+            grouped.resource.length > 0 && (
+              <SearchGroup
+                label="Resources"
+                count={grouped.resource.length}
+                results={grouped.resource}
+                onResultClick={onResultClick}
+              />
+            )}
+          {showCommentsStandIn && (
+            <section className={styles.group} aria-label="Comments">
+              <header className={styles.groupHeader}>
+                <span className={styles.groupLabel}>Comments</span>
+              </header>
+              <div className={styles.commentsStandIn}>
+                <FutureControl
+                  label="Comments search — coming after beta"
+                  tooltip="Lesson + Unit Comments will become searchable when the comments document store ships (Phase 1B alongside Supabase)."
+                  variant="ghost"
+                  size="sm"
+                  tooltipSide="top"
+                />
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

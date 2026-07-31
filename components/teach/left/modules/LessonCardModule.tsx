@@ -9,6 +9,7 @@ import { type ReactNode } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { useSubjectColor } from "@/lib/palette";
 import { SUBJECT_BY_ID } from "@/lib/mock";
+import { PlannerEmpty } from "@/components/ui";
 import { ExternalLinkIcon, LessonIcon } from "../icons";
 import styles from "../TeachLeft.module.css";
 
@@ -27,12 +28,41 @@ export function LessonCardModule({
   // lesson present anyway.
   const subjectColor = useSubjectColor(lesson?.subject ?? "math");
 
-  if (!lesson) {
+  // No id at all: sandbox mode (TeachWorkspace's `enterSandbox` nulls it), a
+  // standalone board open, or the tick before the default-lesson seed lands.
+  // That is a fact about WORKSPACE state, not about the store — true in every
+  // data state — so it keeps its copy and is deliberately NOT deferred.
+  if (!activeLessonId) {
     return (
       <p className={styles.muted}>
         No lesson selected. Pick a lesson from the Lessons tab, or build a
         sandbox board.
       </p>
+    );
+  }
+
+  if (!lesson) {
+    // An id we hold but cannot resolve. `getLesson` scans usePlanner().lessons,
+    // which is empty for the whole 11–16s Supabase hydrate — and app/(teach)/
+    // layout.tsx mounts its OWN <PlannerProvider>, so EVERY Day/Week→Teach
+    // navigation pays that hydrate, not just a cold load. This branch therefore
+    // fired on the way in to Teach and told a teacher, minutes before class,
+    // that the lesson they had deep-linked was gone. Until the store settles the
+    // answer is unknown, so this defers to <PlannerEmpty>, which reads
+    // usePlannerDataState() ITSELF (components/ui/PlannerEmpty.tsx:40) — hence no
+    // local hook here — and owns the pending skeleton and the failed-hydrate
+    // copy, both the right thing to say in this slot. Once SETTLED it renders
+    // the heading below, so the miss is still stated: deferring forever would
+    // strand Teach on a permanent skeleton, worse than the bug being fixed. Copy
+    // split from the no-id case above because they are different facts: "you
+    // picked nothing" vs "what you picked is not in your plan".
+    return (
+      <PlannerEmpty
+        size="sm"
+        skeletonLines={2}
+        heading="That lesson isn’t in your plan."
+        body="Pick a lesson from the Lessons tab, or build a sandbox board."
+      />
     );
   }
 

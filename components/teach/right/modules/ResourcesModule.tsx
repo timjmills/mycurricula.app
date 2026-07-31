@@ -31,7 +31,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
 import { toTeachResource } from "@/lib/teach/toTeachResource";
 import {
@@ -40,7 +40,7 @@ import {
 } from "@/lib/teach/boardToResource";
 import type { Board, TeachResource } from "@/lib/types";
 import type { TeachResourceDragData } from "@/lib/teach/types";
-import { Button } from "@/components/ui";
+import { Button, PlannerEmpty } from "@/components/ui";
 import {
   SearchIcon,
   GridIcon,
@@ -413,6 +413,9 @@ export function ResourcesModule({
   onOpenBoard,
 }: ResourcesModuleProps): ReactNode {
   const { getSections } = usePlanner();
+  // Whether the store can actually back a claim about what this lesson holds.
+  // Read unconditionally — it gates a render branch, not a code path.
+  const settled = usePlannerDataState() === "settled";
   const [view, setView] = useState<ViewMode>("grid");
   const [chip, setChip] = useState<string>("all");
   const [query, setQuery] = useState("");
@@ -565,8 +568,29 @@ export function ResourcesModule({
             Select a lesson to see its resources here.
           </p>
         ) : totalCount === 0 ? (
-          <p className={styles.empty}>No resources on this lesson yet.</p>
+          // "No resources on this lesson yet." is only TRUE once the store can
+          // back it. `resources` flattens getSections(activeLessonId), which
+          // returns [] for the whole 11–16s Supabase hydrate — and app/(teach)/
+          // layout.tsx mounts its OWN <PlannerProvider>, so every Day/Week→Teach
+          // navigation pays that hydrate afresh. A teacher opening Teach before
+          // class was told the slides they had attached were not there. Not
+          // settled → defer to <PlannerEmpty>, which owns the pending skeleton
+          // and the failed-hydrate copy. A SETTLED store still states the
+          // emptiness, in the panel's own muted register — deferring forever
+          // would strand the panel on a permanent skeleton, the worse bug.
+          settled ? (
+            <p className={styles.empty}>No resources on this lesson yet.</p>
+          ) : (
+            <PlannerEmpty
+              size="sm"
+              skeletonLines={2}
+              heading="No resources on this lesson yet."
+            />
+          )
         ) : visible.length === 0 ? (
+          // Reachable only with totalCount > 0, i.e. the store already produced
+          // this lesson's resources — so a filter miss here is a real miss and
+          // needs no hydration guard.
           <p className={styles.empty}>No resources match your filter.</p>
         ) : view === "grid" ? (
           <div className={styles.grid}>
