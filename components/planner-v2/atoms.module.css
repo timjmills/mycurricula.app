@@ -131,22 +131,6 @@
   position: relative;
   width: 100%;
 }
-/* Rail / agenda menus open left-aligned (bundle .va-dayaddmenu.wk); the DayA
-   full-width row keeps the centered default. */
-.menuStart {
-  left: 0;
-  transform: none;
-}
-/* Right-aligned. The menu is 300px and a week COLUMN is ~170px, so a centered
-   menu on the last column overhangs its track by ~130px and the week's
-   horizontal scroll container clips it (measured: 38px lost off the right edge
-   on a 5-day week at 1440px). The two edge columns pin to their own edge
-   instead; every column between them keeps the centered default. */
-.menuEnd {
-  left: auto;
-  right: 0;
-  transform: none;
-}
 .vaDayAddMenu {
   position: absolute;
   left: 50%;
@@ -161,6 +145,34 @@
   border: 1px solid var(--border);
   box-shadow: var(--sh-lg);
 }
+
+/* ── Menu alignment overrides ────────────────────────────────────────────
+   AFTER `.vaDayAddMenu`, and DOUBLED. Both matter, and the ordering is the
+   one that was actually broken: these two rules and `.vaDayAddMenu` are all
+   (0,1,0), so at equal specificity the later declaration wins — and
+   `.menuStart` used to sit ABOVE it, which meant `left: 0` lost to
+   `left: 50%` and `align="start"` did nothing at any callsite. It read as
+   correct in review for as long as it shipped. Doubling makes the win
+   independent of position as well, so a future re-order cannot silently
+   revert it again. */
+
+/* Rail / agenda menus open left-aligned (bundle .va-dayaddmenu.wk); the DayA
+   full-width row keeps the centered default. */
+.menuStart.menuStart {
+  left: 0;
+  transform: none;
+}
+/* Right-aligned. The menu is 300px and a week COLUMN is ~170px, so a centered
+   menu on the last column overhangs its track by ~65px and the week's
+   horizontal scroll container clips it (measured live: 39px lost off the right
+   edge on a 5-day week at 1440px). The two edge columns pin to their own edge
+   instead; every column between them keeps the centered default. */
+.menuEnd.menuEnd {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
 .addRowNew.addRowNew,
 .addRowEvent.addRowEvent {
   display: flex;

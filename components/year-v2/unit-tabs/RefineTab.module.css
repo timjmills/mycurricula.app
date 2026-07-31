@@ -88,7 +88,18 @@
   border-spacing: 0;
   font-size: var(--t-13);
   /* Wide enough that every column stays readable; the card scrolls to reach it
-     rather than crushing Objective to nothing. */
+     rather than crushing Objective to nothing.
+
+     BUDGETED AGAINST THE COMPACT MODAL, not chosen by feel. ExplorerShell's
+     dialog is `width: min(820px, 100%)` (ExplorerShell.module.css:59), leaving
+     ~770px of table container once the body padding is taken out. The first cut
+     of the column widths below summed to 864px, so at a 1440px desktop the
+     right-most column — "Planned", the completeness roll-up a teacher scans the
+     table FOR — sat half off the edge behind a horizontal scrollbar. The widths
+     now total ~736px so the whole table fits without scrolling in the compact
+     dialog; the internal scroll stays for genuinely narrow viewports, where it
+     is the right answer. `box-sizing: border-box` is global (tokens.css:1118),
+     so those numbers include cell padding. */
   min-width: 720px;
 }
 
@@ -129,7 +140,12 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-400);
-  padding: 9px 8px;
+  /* 6px, not 8: the uppercase nowrap header labels ("ASSESSMENT" is the
+     widest) drive the table's natural width, and at 8px they pushed it to
+     788px against a 778px container — stranding the last column behind a
+     scrollbar at desktop. Two pixels per side across eight columns buys back
+     32px, which is the whole deficit and then some. */
+  padding: 9px 6px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
@@ -139,7 +155,7 @@
 }
 
 .table td {
-  padding: 5px 8px;
+  padding: 5px 6px;
   border-bottom: 1px solid var(--hairline);
   vertical-align: middle;
   color: var(--ink-900);
@@ -231,34 +247,36 @@
 
 /* ── Column widths ─────────────────────────────────────────────────────────── */
 
+/* Fixed widths total ~406px; the two `min-width` columns (Lesson, Objective)
+   absorb whatever the container has spare. See `.table` for the budget. */
 .cNum {
-  width: 40px;
+  width: 36px;
   text-align: center;
 }
 .cTitle {
-  min-width: 180px;
+  min-width: 150px;
 }
 .cTitle .input {
   font-weight: 700;
 }
 .cObj {
-  min-width: 200px;
+  min-width: 180px;
 }
 .cStd {
-  width: 116px;
+  width: 90px;
 }
 .cDur {
-  width: 68px;
+  width: 56px;
 }
 .cAss {
-  width: 124px;
+  width: 100px;
 }
 .cRes {
-  width: 52px;
+  width: 44px;
   text-align: center;
 }
 .cDone {
-  width: 84px;
+  width: 80px;
   text-align: center;
 }
 
@@ -398,7 +416,7 @@
 
 @media (max-width: 900px) {
   .table {
-    min-width: 640px;
+    min-width: 620px;
   }
   /* The week/day line repeats what the Lessons tab already shows, and it is the
      first thing worth losing when width is scarce. */
