@@ -1,0 +1,330 @@
+/* YearB.module.css — the /year PAPER frame (Frame B · Bright Workspace).
+ *
+ * Design authority: the 7.21.26 handoff `source-home/views.css` :262-273
+ * (.vb-year / .vb-srow / .sl / .vb-prog / .vb-track2 / .vb-seg / .vb-upill /
+ * .pct), with the night block at `source-home/themes.css` :356-373.
+ *
+ * The handoff writes those two states as literal colours — `background:#fff` on
+ * the row, `#fff` seg dividers, `color-mix(… , white)` pill tints, then a
+ * `[data-theme="night"]` block that overrides each one back to a dark rgba. This
+ * file expresses the SAME two appearances through the repo's tone tokens
+ * (--panel-bg / --ink / --muted / --border / --hairline), which already flip on
+ * `data-tone`. That is CLAUDE.md §4's legibility contract — branch on tone, not
+ * on the theme — and it makes the row hold on all seven themes rather than the
+ * two the handoff hard-codes.
+ *
+ * Subject colour arrives through the `.cp-subj.<cls>` cascade (var(--c) accent /
+ * --cl soft tint / --cd deep ink). Every mix targets --panel-bg, never raw
+ * white. Buttons double their class (`.upill.upill`) so the `.cp-root button`
+ * reset (0,1,1) cannot strip their padding/background.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px 32px;
+  min-width: 0;
+}
+
+/* Slim context sub-line — the handoff's `.vhead-subonly > .vsub`. The app's
+   ViewTitle chrome owns the "The Year" heading; this is the caption under it. */
+.vsub {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--t-13, 13px);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
+/* ── Toolbar (carried capability, not in the handoff row) ────────────────── */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  min-width: 0;
+}
+.statcards {
+  min-width: 0;
+}
+.tools {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── .vb-year — the progress list ────────────────────────────────────────── */
+.year {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 880px;
+  width: 100%;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* ── .vb-srow — one subject row ──────────────────────────────────────────── */
+.srow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 20px;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--border);
+  /* Handoff: `background:#fff`, overridden to rgba(28,30,44,.92) under night.
+     --panel-bg IS that pair, resolved by tone. A hair of subject tint on top
+     reads the row as "this subject's" without touching legibility. */
+  background: color-mix(in oklab, var(--c) 4%, var(--panel-bg));
+  box-shadow: var(--sh-sm);
+  transition:
+    box-shadow 0.18s ease,
+    outline-color 0.18s ease;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  min-width: 0;
+}
+
+/* Deep-link focus — brief subject-hued highlight when arrived via ?subject=. */
+.srow[data-deeplink-focus] {
+  outline-color: var(--c);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--c) 22%, transparent);
+}
+
+/* ── .sl — glyph + name + "Now:" ─────────────────────────────────────────── */
+.sl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 170px;
+}
+.slText {
+  min-width: 0;
+}
+.nm {
+  font-family: var(--font-display-sm);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cu {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── .vb-prog — segmented track over the unit pills ──────────────────────── */
+.prog {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+/* .vb-track2 — one flex segment per unit, clipped to a pill. */
+.track {
+  display: flex;
+  height: 9px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  overflow: hidden;
+}
+.seg {
+  flex: 1;
+  height: 100%;
+  /* Handoff's `border-right:2px solid #fff` — the divider is the surface
+     showing through, so it follows the panel rather than being white. */
+  border-right: 2px solid var(--panel-bg);
+}
+.seg:last-child {
+  border-right: none;
+}
+.segDone {
+  background: var(--c);
+}
+.segPartial {
+  background: color-mix(in oklab, var(--c) 55%, var(--panel-bg));
+}
+.segTodo {
+  background: var(--hairline);
+}
+
+/* ── .vb-upill — the unit chips. Real buttons: each opens the unit workspace,
+      exactly as the handoff's `UE.Chip onOpen={unit}` does. ─────────────── */
+.units {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.upill.upill {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  /* --upill-mix is set inline (0% unstarted → 18–40% by progress, the
+     handoff's `18 + progress*22`); the COLOUR stays here. */
+  background: color-mix(
+    in oklab,
+    var(--c) var(--upill-mix, 0%),
+    var(--hairline)
+  );
+  color: var(--body);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+/* Once a unit has been started its pill carries subject ink, per the handoff's
+   `color:cv(s.ink)` on the tinted branch. Keyed off a data attribute, never off
+   the inline `style` string — React's serialization of a custom property is not
+   a contract worth matching a selector against. */
+.upill.upill[data-started] {
+  color: var(--cd);
+}
+.upill.upill:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--sh-sm);
+}
+.upill.upill:focus-visible {
+  outline: 2px solid var(--c);
+  outline-offset: 2px;
+}
+
+/* ── .pct ────────────────────────────────────────────────────────────────── */
+.pct {
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Empty copy inside a row / for the whole list ────────────────────────── */
+.empty,
+.noRows {
+  font-size: var(--t-12, 12.5px);
+  color: var(--muted);
+  font-weight: 600;
+  font-style: italic;
+  padding: 4px 2px;
+  margin: 0;
+}
+.noRows {
+  text-align: center;
+  padding: 20px 2px;
+}
+
+/* ── Touch targets — ≥44px on coarse pointers + phone/tablet tiers ───────── */
+@media (any-pointer: coarse), (max-width: 900px) {
+  /* inline-BLOCK, not inline-flex: the label is a bare text child, and
+     `text-overflow: ellipsis` has nothing to act on inside a flex container —
+     the clamped phone pills below clipped mid-word with no ellipsis. The tall
+     line-height does the vertical centring a flex box would have. */
+  .upill.upill {
+    min-height: 44px;
+    display: inline-block;
+    line-height: 38px;
+    padding: 3px 14px;
+  }
+}
+
+/* ── Phone + tablet — the row's three columns become name+% over the track ──
+   Kept in LOCKSTEP with the 44px rule above, deliberately at the same 900px
+   edge. Once a pill is 44px tall the wrapped track column runs ~320px, and the
+   handoff's `align-items:center` then parks the subject name and the % halfway
+   down an otherwise empty left column, visually detached from the track they
+   describe. Stacking gives the track the full row width (so the pills wrap in
+   two or three lines instead of five) and puts the name back beside the %. ── */
+@media (any-pointer: coarse), (max-width: 900px) {
+  .srow {
+    grid-template-columns: 1fr auto;
+    gap: 12px 10px;
+    align-items: start;
+  }
+  /* The rows are stated EXPLICITLY: auto-placement runs in DOM order, and
+     .prog sits before .pct there, so leaving it implicit pushed the % onto a
+     third row of its own, stranded at the bottom of the card. */
+  .sl {
+    grid-row: 1;
+    grid-column: 1;
+    min-width: 0;
+  }
+  .pct {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .prog {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Phone only ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .root {
+    padding: 16px 14px 28px;
+  }
+  .srow {
+    padding: 14px 14px;
+  }
+
+  /* The stat dashboard's own phone rule collapses it to ONE column, which
+     stacks five full-width cards — about 1000px of chrome before the first
+     subject row, on a 780px-tall phone. The year list is the point of this
+     surface, so the cards become a swipeable strip instead: everything stays
+     visible and reachable, and the scroll is INTERNAL, which §4 allows (only
+     the document must never scroll sideways).
+
+     `> *` reaches the dashboard's own grid root, whose class is a hashed
+     CSS-module name this file cannot reference. Layout-only, from the parent
+     that owns the slot; it sets no colour and no type. */
+  .statcards {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px;
+  }
+  .statcards::-webkit-scrollbar {
+    display: none;
+  }
+  .statcards > * {
+    grid-template-columns: repeat(5, 190px);
+    width: max-content;
+  }
+  /* Two pills per line rather than one. At a 44px touch height an unclamped
+     pill takes a full line each, so a seven-unit subject became a ~900px card
+     and the year stopped being a glance. The full unit name stays available on
+     long-press (`title`) and in the tooltip. */
+  .upill.upill {
+    max-width: calc(50% - 3px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ── Reduced motion — drop the hover lift ────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .srow,
+  .upill.upill {
+    transition: none;
+  }
+  .upill.upill:hover {
+    transform: none;
+  }
+}

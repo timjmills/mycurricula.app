@@ -1,8 +1,12 @@
 // Public surface of the v2 Year frames (Wave 6). Consumers import from the
 // folder (`@/components/year-v2`), never a deep file.
 //
-// YearShell is the /year frame router (glass → YearA · paper → the legacy
-// TimelineYear · color → YearC), and NOTHING MORE — it stopped hosting a Unit
+// YearShell is the /year frame router (glass → YearA · paper → TimelineYear ·
+// color → YearC), plus the shared data-state guard that keeps every frame from
+// painting a confident "0% complete" over an unhydrated store, plus the
+// non-destructive `?preview=` switch that swaps in a CANDIDATE paper Year
+// (subject-led / frame-b) for live comparison. NOTHING MORE — it stopped
+// hosting a Unit
 // Explorer modal in ee34749 (B5.3). All three frames now call the ONE global
 // opener instead; the workspace is mounted once by UnitWorkspaceProvider in
 // app/(planner)/layout.tsx, above the frame branch, which is why switching
@@ -15,9 +19,19 @@
 // deep-imports it to avoid an import cycle through this barrel — see that
 // folder's index.ts.
 
-export { YearShell } from "./YearShell";
-export type { YearSubjectLane, YearUnitNode } from "./YearShell";
+export { YearShell, buildLanes } from "./YearShell";
+export type {
+  YearSubjectLane,
+  YearUnitNode,
+  YearShellProps,
+} from "./YearShell";
+// Server-safe on purpose — app/(planner)/year/page.tsx CALLS this parser during
+// a server render, which a "use client" export cannot be.
+export { parseYearPreview } from "./year-preview";
+export type { YearPreview } from "./year-preview";
 export { YearA } from "./YearA";
+export { YearB } from "./YearB";
+export type { YearBProps } from "./YearB";
 export { YearC } from "./YearC";
 export { UnitExplorer } from "./UnitExplorer";
 export type { UnitExplorerProps } from "./UnitExplorer";
