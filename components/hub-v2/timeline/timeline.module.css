@@ -10,7 +10,36 @@
      --tl-col  one day column's width
      --tl-lbl  the pinned subject-label column's width
    Every band, dot, rule and track width is a calc() over them, so widening a
-   column for touch is one declaration rather than a re-render. */
+   column for touch is one declaration rather than a re-render.
+
+   ── THE DOUBLING CONVENTION — READ BEFORE ADDING A RULE ─────────────────────
+   Several selectors here are written twice over (`.dot.dot`, `.band.band`,
+   `.row.row`, `.rowDot.rowDot`, …). That is not a typo and not style: it is a
+   specificity counterweight, and it has now failed silently three separate
+   times in one day. Three distinct mechanisms, all of which end with a rule
+   that reads as applied and is not:
+
+   1. `.cp-root button` (app/tokens.css:1128) is (0,1,1); a single-class module
+      rule is (0,1,0). Every rule targeting a <button> by ONE class is dead
+      inside `.cp-root` — it silently loses padding, border, background,
+      font-size and cursor. Measured: the two axis-scroll arrows computed to
+      5.1 × 28px bare glyphs. Remedy: double the class → (0,2,0).
+   2. A doubled BASE outranks a single-class OVERRIDE — including inside a
+      `@media` block, because media queries add no specificity at all. So
+      `@media (…) { .dot { … } }` (0,1,0) is dead against `.dot.dot` (0,2,0).
+      ⚠ IF YOU DOUBLE A CLASS, DOUBLE IT IN EVERY MEDIA QUERY THAT OVERRIDES IT.
+   3. A doubled base also outranks a single-class MODIFIER on the same element.
+      `.rowDot` (0,1,0) lost every property it shares with `.dot.dot` (0,2,0),
+      so the list's row dot kept the lane's `position:absolute` and
+      `translate(-50%,-50%)` and was clipped by its own row
+      (scripts/probe-timeline-row-dot.mjs measured 22px of it outside the row on
+      a coarse pointer, overlapping the lesson title by 22px). Only `flex`
+      survived — the one property the base does not declare, which is why the
+      rule looked alive. ⚠ A MODIFIER MUST MATCH ITS BASE'S DOUBLING, and must
+      be declared BELOW it: at equal specificity, source order decides.
+
+   tests/timeline-css-specificity.test.ts enforces all three against this file
+   and the components that consume it. */
 
 .card {
   /* ── Column width: base · floor · user, resolved in that order ──────────
@@ -875,12 +904,27 @@
   width: 4px;
   background: var(--c);
 }
-.rowDot {
+/* The same mark the timeline draws, in a list row. It has to UNDO the lane
+   positioning, so every property here collides with `.dot.dot` — and a
+   single-class `.rowDot` (0,1,0) loses all four of them to (0,2,0). DOUBLED,
+   and declared below `.dot.dot`, per mechanism 3 at the top of this file.
+
+   `flex` is the tell that made the dead rule look alive: it is the one
+   declaration `.dot.dot` does not make, so it applied while the other four did
+   not, and the rendered dot was 20% of what the source says.
+
+   `--tl-dot` is pinned rather than inherited. The coarse-pointer block bumps it
+   to 18px so a lane mark stays visible beside a 44px hit area on a dense axis;
+   a list row has neither — the ROW is the target and this span is aria-hidden.
+   Inherited, the mark would exactly fill its own 18px box on touch, which is
+   the one size at which the box stops doing anything. */
+.rowDot.rowDot {
   position: static;
   transform: none;
   flex: 0 0 auto;
   width: 18px;
   height: 18px;
+  --tl-dot: 14px;
 }
 .rowTitle {
   font-size: 13px;
