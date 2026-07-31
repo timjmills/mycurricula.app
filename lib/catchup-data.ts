@@ -108,9 +108,22 @@ export interface CatchupItem {
   resources: number;
   /** Teacher-supplied note about why this didn't happen, if any. */
   reasonNotDone: string;
-  /** How many instructional days late the item is. Negative is impossible
-   *  (we don't surface future items here) — clamped to 0 if computed lower. */
-  daysLate: number;
+  /**
+   * How many instructional days late the item is, measured against TODAY —
+   * counted in the CONFIGURED school week's days, clamped at 0.
+   *
+   * 0 means "not late": due today, or due later and not yet missed. Negative is
+   * never surfaced — "3 days early" is not a thing this screen says.
+   *
+   * `null` means "we do not know", and the row prints NO lateness at all. That
+   * is a real state, not a defensive fiction: lateness needs today's position
+   * in the plan, and there isn't one when today falls outside the configured
+   * academic year (`currentWeekBasis` is a CLAMP, not a derivation — see
+   * lib/now-anchor) or when today is not a school day (no column in the school
+   * week). Silence is honest there; a number would not be. Consumers must
+   * branch on null explicitly rather than leaning on `> 0` coercion.
+   */
+  daysLate: number | null;
   isPersonal: boolean;
   modified: boolean;
 }
@@ -118,13 +131,44 @@ export interface CatchupItem {
 // ── Filters / groupings ──────────────────────────────────────────────────
 
 export type CatchupScope = "lastWeek" | "last4" | "term" | "year";
+
+// ── Today ────────────────────────────────────────────────────────────────
+
+/**
+ * Where TODAY sits in the plan's week/day grid — the anchor `daysLate` is
+ * measured against.
+ *
+ * Both fields come from state the app already derives; do NOT re-derive a
+ * parallel clock here:
+ *   • `week` — `useAppState().currentWeek`, and ONLY when
+ *     `useAppState().currentWeekBasis === "in-range"`. The other bases are
+ *     clamps ("your year hasn't started — showing Week 1"), and measuring
+ *     lateness against a clamp would report every lesson in the plan as
+ *     months late the day before term begins.
+ *   • `day` — `todayColumnIndex(new Date(), days)` (lib/now-anchor): today's
+ *     0-based POSITION in the configured school week, not a `Date.getDay()`
+ *     value. It is null on a non-school day, which is one of the reasons the
+ *     whole anchor is nullable.
+ *
+ * Note this is deliberately NOT the same number as `DeriveOptions.currentWeek`,
+ * which is the planner's FOCUSED week and acts as the eligibility horizon. A
+ * teacher paging back to week 5 has not travelled in time.
+ */
+export interface CatchupToday {
+  /** 1-based plan week containing today. */
+  week: number;
+  /** Today's 0-based position in the configured school week. */
+  day: number;
+}
 export type CatchupGroupBy = "subject" | "chrono" | "standard" | "unit";
 
 // ── Derivation ───────────────────────────────────────────────────────────
 
 interface DeriveOptions {
-  /** The week the planner is currently focused on. Items at or beyond this
-   *  week are excluded — they are upcoming, not uncovered. */
+  /** The week the planner is currently focused on. Items beyond this week are
+   *  excluded — they are upcoming, not uncovered. This is an ELIGIBILITY
+   *  HORIZON, not a clock: it moves when the teacher pages to another week.
+   *  Lateness is measured against `today` below, never against this. */
   currentWeek: number;
   /**
    * The CONFIGURED school week as ordered day columns — `useOrderedWeekdays()`
@@ -140,9 +184,10 @@ interface DeriveOptions {
    *     read "Sun · Wk 11" against a lesson that is on a Monday. `day` is an
    *     index INTO the configured week, not an absolute Sun=0..Sat=6 position,
    *     so indexing a Sun-first fixture array mislabels every column.
-   *   • `daysLate` is not rendered today, so its 5-day arithmetic was wrong
-   *     silently. It is computed here anyway, and would ship wrong the day
-   *     anything surfaces it.
+   *   • `daysLate` was not rendered anywhere when this was written, so its
+   *     5-day arithmetic was wrong silently. It IS rendered now
+   *     (CatchUpRowMeta), which is exactly the "would ship wrong the day
+   *     anything surfaces it" this note predicted.
    * Making this required rather than defaulting to Sun–Thu is the point: a
    * default would let a new callsite reintroduce the bug without a word from
    * the compiler, which is exactly how the original const survived.
@@ -159,6 +204,22 @@ interface DeriveOptions {
    * three places (CatchupRow, CatchUpModal, CatchUpBrowse).
    */
   units: readonly Unit[];
+  /**
+   * Where today sits in the plan — see {@link CatchupToday}. `null` or omitted
+   * means "today is not resolvable", and every item's `daysLate` comes back
+   * `null` (no lateness claim) rather than a number.
+   *
+   * OPTIONAL, unlike `schoolWeek` and `units` above, and for the opposite
+   * reason. Those are required because omitting them yielded a WRONG value; a
+   * default would let a new callsite reintroduce the bug in silence. Omitting
+   * this one yields NO value — it fails closed. A callsite that has not been
+   * taught about today loses the number instead of inheriting the previous
+   * arithmetic, which measured every lesson from the END of its own week and so
+   * reported a lesson planned for today as several days late. Two of the three
+   * callsites (components/catchup/CatchupScreen, hub-v2/browse/CatchUpBrowse)
+   * do not render `daysLate` at all; when one starts to, it must pass this.
+   */
+  today?: CatchupToday | null;
   /** Optional per-item action overlay (e.g. "Mark done"). When an action
    *  is present and resolves to "done", the item is dropped from the result. */
   actions?: Map<string, CatchupAction>;
@@ -171,7 +232,7 @@ export function deriveCatchupItems(
   lessons: readonly Lesson[],
   opts: DeriveOptions,
 ): CatchupItem[] {
-  const { currentWeek, schoolWeek, units, actions } = opts;
+  const { currentWeek, schoolWeek, units, today, actions } = opts;
   // One pass over the catalog rather than a find() per lesson.
   const unitById = new Map(units.map((u) => [u.id, u]));
   const out: CatchupItem[] = [];
@@ -199,7 +260,7 @@ export function deriveCatchupItems(
       standards: [...lesson.standards],
       resources: lesson.resources.length,
       reasonNotDone: lesson.reasonNotDone,
-      daysLate: daysLate(lesson.week, lesson.day, currentWeek, schoolWeek),
+      daysLate: daysLate(lesson.week, lesson.day, today ?? null, schoolWeek),
       isPersonal: lesson.isPersonal,
       modified: lesson.modified,
     });
@@ -208,25 +269,46 @@ export function deriveCatchupItems(
 }
 
 /**
- * How many instructional days late a lesson is, measured in the CONFIGURED
- * school week's days — so a 3-day school counts three days per week elapsed,
- * not five. Clamped at 0: a current-week lesson still ahead of the week's end
- * is not late, and negative lateness is not a thing this surface shows.
+ * How many instructional days late a lesson is: the distance from its slot to
+ * TODAY's slot, counted in the CONFIGURED school week's days — so a 3-day
+ * school counts three days per elapsed week, not five.
  *
- * A zero-length week (no configured days) would make every gap 0; the school
- * week can never be empty — `useSchoolWeek()`'s normalize() refuses to shrink
- * below one day — but the guard keeps the arithmetic total rather than relying
- * on a contract enforced two modules away.
+ * ── The bug this replaced ────────────────────────────────────────────────
+ * This used to be
+ *
+ *   max(0, (currentWeek - week) * dayCount + (dayCount - 1 - day))
+ *
+ * which never consulted today at all. That trailing term is "how many days
+ * remain in the lesson's own week after it", so every lesson was measured from
+ * the END of its week: on a five-day week a lesson planned for TODAY, on the
+ * week's first day, reported "4 days late", and one planned for THURSDAY of
+ * this week — which has not happened — reported "2 days late". Catch-Up is the
+ * screen a teacher decides what to re-teach from, and CatchUpRowMeta prints the
+ * number verbatim, so the surface was making a confident false claim about work
+ * that was not yet due.
+ *
+ * ── The rule now ─────────────────────────────────────────────────────────
+ * Clamped at 0, so "due today" and "due later this week" both read as not late
+ * rather than as negative lateness. `null` when today is unresolvable (see
+ * {@link CatchupToday}) — the caller renders nothing, which is the only honest
+ * output when the anchor is missing.
+ *
+ * A zero-length week is likewise `null` rather than 0: with no configured days
+ * the arithmetic has no unit, and 0 would read as "not late" — a claim. The
+ * school week can never actually be empty (`useSchoolWeek()`'s normalize()
+ * refuses to shrink below one day), but the guard keeps this function total
+ * rather than relying on a contract enforced two modules away.
  */
 function daysLate(
   week: number,
   day: number,
-  currentWeek: number,
+  today: CatchupToday | null,
   schoolWeek: readonly OrderedWeekday[],
-): number {
+): number | null {
+  if (!today) return null;
   const dayCount = schoolWeek.length;
-  if (dayCount <= 0) return 0;
-  return Math.max(0, (currentWeek - week) * dayCount + (dayCount - 1 - day));
+  if (dayCount <= 0) return null;
+  return Math.max(0, (today.week - week) * dayCount + (today.day - day));
 }
 
 /** Resolve a lesson's effective status given an optional per-item action

@@ -72,7 +72,7 @@ import {
   type CatchupScopeV2,
 } from "@/lib/catchup-scope";
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
-import { todayColumnIndex } from "@/lib/now-anchor";
+import { todayColumnIndex, todayIsInConfiguredYear } from "@/lib/now-anchor";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { stripHtml } from "@/lib/html-text";
@@ -273,10 +273,14 @@ const FOCUSABLE = [
  * it). The modal itself stays internal (single-modal invariant, see below).
  */
 export function CatchUpRowMeta({ item }: { item: CatchupItem }): ReactNode {
-  // Nothing when the lesson isn't late yet: "0 days late" is noise, and a
-  // current-week lesson still ahead of the week's end is legitimately 0.
+  // Nothing when the lesson isn't late yet — "0 days late" is noise, and a
+  // lesson due today or later this week is legitimately 0 — and nothing when
+  // lateness is UNKNOWN (`null`: today outside the academic year, or a
+  // non-school day). The two absences render identically on purpose: neither
+  // one licenses printing a number, and an invented one is what this row used
+  // to do. Explicit null check, not `> 0` — see lib/catchup-data.
   const late =
-    item.daysLate > 0
+    item.daysLate !== null && item.daysLate > 0
       ? `${item.daysLate} ${item.daysLate === 1 ? "day" : "days"} late`
       : "";
   // Free teacher text — may be empty, and may carry markup if it was authored
@@ -461,7 +465,11 @@ function CatchUpModalBody({
     bumpLesson,
   } = usePlanner();
   const dataState = usePlannerDataState();
-  const { week } = useAppState();
+  // `week` is the FOCUSED week — the eligibility horizon for what counts as
+  // uncovered. `currentWeek` + `currentWeekBasis` are where NOW is, and are the
+  // only legitimate input to a lateness claim: paging back to week 5 must not
+  // make week 6 look like the future. See lib/catchup-data's CatchupToday.
+  const { week, currentWeek, currentWeekBasis } = useAppState();
   const { actions } = useCatchup();
   const { days } = useSchoolWeek();
   // The SAME configured week as `days` above, paired with each day's display
@@ -496,15 +504,35 @@ function CatchUpModalBody({
   useEffect(() => setMounted(true), []);
 
   // ── Derived data ──────────────────────────────────────────────────────────
+
+  // The lateness anchor. It is null — and every row then shows no lateness at
+  // all — in three real cases, each of which would otherwise produce a
+  // confident wrong number:
+  //   • before the first paint, while `todayCol` is still unresolved;
+  //   • on a non-school day, where today has no column in the school week;
+  //   • when `currentWeekBasis` is a CLAMP rather than a derivation — today
+  //     outside the configured academic year. That is not hypothetical: a
+  //     school whose year starts in August is in `before-start` right now, and
+  //     measuring lateness against the clamped Week 1 would report the whole
+  //     plan as late before term begins.
+  const today = useMemo(
+    () =>
+      todayCol !== null && todayIsInConfiguredYear(currentWeekBasis)
+        ? { week: currentWeek, day: todayCol }
+        : null,
+    [todayCol, currentWeek, currentWeekBasis],
+  );
+
   const allItems = useMemo(
     () =>
       deriveCatchupItems(lessons, {
         currentWeek: week,
         schoolWeek,
         units,
+        today,
         actions,
       }),
-    [lessons, week, schoolWeek, units, actions],
+    [lessons, week, schoolWeek, units, today, actions],
   );
   const coverage = useMemo(
     () => coverageSummary(lessons, { currentWeek: week, actions }),

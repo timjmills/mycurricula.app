@@ -179,6 +179,12 @@
 }
 .chip.chip {
   appearance: none;
+  /* Flex so the touch tier below can grow the box with min-height and keep the
+     label optically centred; a min-height on the default inline-block button
+     pads only the bottom. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: var(--r-pill, 999px);
@@ -429,7 +435,14 @@
     width: 44px;
     height: 44px;
   }
+  /* Padding alone left these at ~40.8px (11 + 11 + 16.8 line-box + 2 border),
+     inside a block headed "≥44px primary targets". min-height states the
+     contract instead of arithmetic that moves with the font — the same way
+     .action.action below sets an explicit height rather than guessing padding.
+     Doubled INSIDE the media block too: a single `.chip` here would lose to the
+     doubled `.chip.chip` base rule regardless of source order. */
   .chip.chip {
+    min-height: 44px;
     padding-top: 11px;
     padding-bottom: 11px;
   }

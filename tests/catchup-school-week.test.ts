@@ -32,9 +32,12 @@ import type { Lesson, Unit } from "@/lib/types";
 //     every Math row claimed "Unit 3 · Fractions on a Number Line" whatever
 //     unit its lesson was really in. Wrong on the mock path too, not only over
 //     Supabase.
-//   • `daysLate` is computed but rendered NOWHERE today, so its 5-day
-//     arithmetic was silently wrong. It is asserted here so that whenever
-//     something does surface it, it is already right.
+//   • `daysLate` was computed but rendered NOWHERE when this file was written,
+//     so its 5-day arithmetic was silently wrong. It IS rendered now
+//     (CatchUpRowMeta), and it was wrong in a second way too — measured from
+//     the END of the lesson's week instead of from today. See
+//     tests/catchup-days-late.test.ts, which owns that property; what is left
+//     here is the configured-week COUNT.
 //
 // The options are REQUIRED rather than defaulted-to-Sun–Thu on purpose: a
 // default would let the next callsite reintroduce the bug in silence, which is
@@ -84,11 +87,17 @@ function lesson(over: Partial<Lesson> = {}): Lesson {
   } as unknown as Lesson;
 }
 
-function derive(lessons: Lesson[], days: Weekday[], currentWeek = 12) {
+function derive(
+  lessons: Lesson[],
+  days: Weekday[],
+  currentWeek = 12,
+  today: { week: number; day: number } | null = null,
+) {
   return deriveCatchupItems(lessons, {
     currentWeek,
     schoolWeek: orderedWeekdaysFrom(days),
     units: [UNIT_A, UNIT_B],
+    today,
   });
 }
 
@@ -124,24 +133,33 @@ describe("the day label follows the configured school week", () => {
 });
 
 describe("daysLate counts the configured week's days", () => {
+  // These three assertions used to read 14 / 8 / 0 with no `today` argument,
+  // because `daysLate` was measured from the END of the lesson's week rather
+  // than from today — the falsehood tests/catchup-days-late.test.ts documents
+  // and now owns in full (case table, both school-week lengths, the null
+  // anchor, and the rendered row). What is kept HERE is only this file's own
+  // subject: that the count comes from the CONFIGURED week, five days for a
+  // five-day school and three for a three-day one.
+  //
+  // Today is Tuesday (index 1) of week 12 in both schools.
+  const TODAY = { week: 12, day: 1 };
+
   it("counts five days per elapsed week for a five-day school", () => {
-    // Week 10 day 0, viewed from week 12: two whole weeks elapsed (10 days)
-    // plus the 4 days remaining in week 10 after day 0.
-    const [item] = derive([lesson({ week: 10, day: 0 })], MON_FRI, 12);
-    expect(item.daysLate).toBe(14);
+    // Week 10 day 0 → two elapsed weeks (10 days) + 1 day into week 12.
+    const [item] = derive([lesson({ week: 10, day: 0 })], MON_FRI, 12, TODAY);
+    expect(item.daysLate).toBe(11);
   });
 
   it("counts THREE days per elapsed week for a three-day school", () => {
-    // The assertion the old code could not satisfy at any label: 2 elapsed
-    // weeks × 3 days + 2 days left in week 10 after day 0 = 8. The old constant
-    // returned 14 here — it reported a three-day school as six days later than
-    // it was, and would have done so on whatever surface first rendered it.
-    const [item] = derive([lesson({ week: 10, day: 0 })], MON_WED, 12);
-    expect(item.daysLate).toBe(8);
+    // The assertion no hard-coded count can satisfy: same lesson, same today,
+    // 2 × 3 + 1 = 7 where the five-day school says 11.
+    const [item] = derive([lesson({ week: 10, day: 0 })], MON_WED, 12, TODAY);
+    expect(item.daysLate).toBe(7);
   });
 
   it("never reports negative lateness", () => {
-    const [item] = derive([lesson({ week: 12, day: 4 })], MON_FRI, 12);
+    // Day 4 of the CURRENT week, three days after today — not late, not -3.
+    const [item] = derive([lesson({ week: 12, day: 4 })], MON_FRI, 12, TODAY);
     expect(item.daysLate).toBe(0);
   });
 });
