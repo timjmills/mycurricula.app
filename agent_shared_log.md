@@ -7095,3 +7095,146 @@ creatable in 2s, and non-GET writes are what onboarding stamps anyway).
 where the console nav is clickable and inert**, on every load, for everyone.
 Same pre-hydration class as the Tools-popover zero-items mystery. Recorded, not
 raised as a finding.
+
+---
+
+## 🔴 createLesson was 100% broken on prod — a COMPUTED foreign key (team-lead 7.31)
+
+Found by running §4c STEP 3. The runbook's thesis — "only a WRITE can tell a
+widened read from an unwidened one" — paid off, just not for its stated reason.
+**No teacher could add a lesson on production.** Every subject, every teacher,
+every workspace. Fixed + deployed: `801692b`.
+
+`createLesson` COMPUTED the FK it was about to insert —
+`slugToUuid("subject", input.subject)` — on the premise stated in the comment
+above it: *"the importer keys subjects by the slug-derived uuid."* True only of
+the ORIGINALLY SEEDED grade; every grade minted since the multi-workspace
+cutover carries RANDOM subject uuids.
+
+| layer | what it said |
+|---|---|
+| browser | 500 on the `/daily` server action, digest `3871031841` |
+| UI | "Couldn't add the lesson — check your connection and try again" |
+| Postgres | `violates foreign key constraint "personal_authored_lessons_subject_id_fkey"` ×3 |
+| proof | all 8 locked subject slugs hash to uuids appearing **ZERO** times in `public.subjects` |
+
+The teacher was told to check their **wifi** for a foreign-key bug. A comment
+asserting an invariant is not the invariant holding; this one had been false
+since the cutover.
+
+**Instrument honesty — the transferable part.** The first run showed 4
+`ERR_FAILED` + one 500. **Four of the five were MY OWN** `teacher_preferences`
+route aborts — `route.abort()` surfaces as `ERR_FAILED`, indistinguishable from
+a real fault. A control run with the guard DISABLED gave zero aborts and the
+IDENTICAL 500 + digest; only then was the failure attributable to the app. The
+probe now labels aborts as mine and carries `--no-pref-guard`.
+[[qa-contrast-and-attribution-technique]]
+
+**Fix + §4a (Codex, sandbox read-only, diff on stdin): no Critical/High, 5
+Medium, 4 fixed in the same commit.** Resolve against the grade's real rows
+before the insert (that index was already loaded AFTER it — now loaded once and
+reused, so no extra round-trip). Then: ZERO-OR-ONE not first-wins (`subjects`
+has no uniqueness constraint on (grade_level_id, scope, colour), so first-wins
+could file a lesson under a wrong-but-plausible row); grade validated BEFORE
+being queried with (an unresolved grade used to report "no such subject" — the
+same misdirection the fix exists to end); no table names/ids in thrown messages;
+and a regression test proven against `git show HEAD:`, the real pre-fix code,
+not a fixture.
+
+**5th finding DOCUMENTED, NOT FIXED:** `slugToUuid("unit", …)` rests on the
+identical premise. Inert only because `addLesson` hardcodes `unit: ""`. Anything
+filing a lesson by unit SLUG breaks the same way. The test asserts it as CURRENT
+state so the debt is visible in the suite, not just in a comment.
+
+---
+
+## §4c runbook — two defects found BEFORE any prod write (team-lead 7.31, `ff20191`)
+
+**1. STEP 2 is NOT EXECUTABLE.** It says "use the app's Add-unit flow". None
+exists in any frame: `Add unit` lives in `YearView.tsx:377`, a component **zero
+files import**; `AddUnitDialog` writes `localStorage`, never Supabase; there is
+**no `createUnit` in `lib/planner`** and no `.insert()` against `public.units`
+anywhere. The plan's OWN stop condition also fires — no unit-archive control
+exists (`UnitPatch.archived` is implemented server-side, zero UI callers).
+Creating the scratch unit needed raw SQL against prod and would have stranded an
+unremovable row.
+
+**2. STEP 3's assertion 1 is VACUOUS.** It claims "value visible immediately, no
+reload" proves the post-mutation reload path returned it, and says *do not
+shortcut it*. Writes are fully optimistic and the serial queue's `send`
+**DISCARDS** `updateLesson`'s return (`planner-store.tsx:3045-3046`) — and that
+queue is its ONLY caller app-wide. So `reloadLesson`/`reloadAuthoredLesson` —
+the exact pair the four-callsite rule protects — are **never rendered**.
+Assertion 1 passes either way. The static snapshot test is the better gate; a
+live check must assert on the reload's NETWORK RESPONSE.
+
+**Also fixed:** five stale comments asserting the opposite of the code. The
+`*_COLS` note (`supabase-source.ts:398`) + three per-row-shape comments said
+Track-B was "NOT in" the selects (B2 put it in); `PlanPage.tsx:334` said "B2's
+fields debounce" — there is no debounce, every keystroke writes.
+
+---
+
+## Retroactive §4a on cc93952..f5d8540 (team-lead 7.31)
+
+Those five commits were pushed and auto-deployed WITHOUT the gate. Retroactive:
+**1 High, 6 Medium.** Also: prod had been serving `cc93952` since 7.25 — three
+consecutive deploys were CANCELLED, so `b259845` sat undeployed six days. **A
+green local history says nothing about what production serves.**
+[[merge-to-master-fast]]
+
+**Codex operational fact:** on a COMMITTED range the verbatim review prompt
+DEFEATS the piped diff — Codex obeys "run `git diff`" over the stdin block,
+reviews the working tree, and exits 0. A silent success. Name the `<stdin>`
+block as the change under review and declare the tree out of scope.
+
+**HIGH (fixed, `b205df4`):** the allowlist granted FOUR arbitrary-execution /
+prod-DB paths — `Bash(git *)` (a shell via `git config alias.x '!sh -c …'`),
+`Bash(supabase db *)` (`db push` applies migrations to PROD, `db reset` drops
+it), `Bash(node -e ' *)`, and Supabase `execute_sql`. Two pre-authorise away the
+standing "agents never mutate prod DB" rule. Still open: `.gitignore:49` lists
+`/.claude/` but the file is force-tracked since `743f44a`, so every clone
+inherits it.
+
+**Three holes in `b27981d`'s own guards (fixed, `13f34aa`)** — in a commit whose
+thesis is "refuse the runs that can lie":
+- `--oracle-sha=HEAD` walked through the mandatory-oracle guard ("HEAD" is
+  truthy; the next check exempted it) — and it was the flag's PREVIOUS DEFAULT,
+  so the likeliest input reproduced exactly the failure the guard prevented.
+- The exit code ignored every environment-invalidating condition: broken
+  `codeHas()` paths, mid-run build drift, a failed canary — each printed a
+  warning and exited **0**. It now answers "is this run EVIDENCE?".
+Each guard was RUN and its exit code checked, not asserted.
+
+**MEDIUM, live on prod (fix pending §4b):** the Year chip's `::after` is keyed to
+`any-pointer: coarse` while its `opacity: 1` reveal is keyed to `pointer:
+coarse`. On a touchscreen laptop driven by its TRACKPAD those diverge, leaving a
+46×46 **invisible** hit zone over ~40px of a ~95px card, stealing clicks aimed at
+the unit title. The obvious fix (`pointer-events: none`, re-enabled on hover)
+does NOT work — entering the card sets `:hover`, re-arming it exactly when the
+user is about to click. Gate the `::after` on the REVEAL instead.
+
+---
+
+## §4c Step 5 — the buildLesson fuse guard (team-lead 7.31, `02996e6`)
+
+The runbook asked to "assert every `buildLesson` callsite spreads
+`trackBArgsFromRow`". Written literally that FAILS today on the legitimately
+unspread fifth callsite and would have been reverted within a week. Encoded the
+implication: **createLesson's body names ANY Track-B column ⇒ it MUST spread**,
+plus a separate assertion pinning today's "names none" premise so it cannot pass
+vacuously.
+
+Proven to fail three ways: count flipped 5→6; probe list widened so the real
+`notes: null` arms it; and the REAL source armed in memory with
+`duration_minutes` (fires) then given the spread (clears).
+
+**Two traps.** The ⚠ docblock QUOTES `...trackBArgsFromRow(inserted)` twice, so
+an unstripped count reports 6 and inverts every assertion. And the first draft
+asserted `raw > stripped` on the LIVE file — which breaks the build the moment
+someone merely REWORDS that comment. **A test that fails when a comment is
+improved is a tax on improving comments;** it now asserts on a synthetic fixture.
+
+**The fuse is shorter than the comment claims:** `input.unit` is already threaded
+in and already resolved to a real units.id (`:1898-1902`), so the plumbing for a
+create-time unit-defaults lookup exists in full. Only lookup-and-apply is missing.
