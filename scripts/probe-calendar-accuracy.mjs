@@ -1,7 +1,23 @@
 // scripts/probe-calendar-accuracy.mjs — calendar-math accuracy probe.
 //
-// PURPOSE
-// ───────
+// ⚠ STALE INSTRUMENT — its §2 no longer describes the app.
+// ────────────────────────────────────────────────────────
+// This probe mirrors `lib/mock/calendar.ts` (the fictional 2025-11-02 anchor,
+// `dayIndex` as a raw day offset). No live surface uses that helper any more:
+// week→date now resolves through `lib/week-dates.ts` from the CONFIGURED
+// academic year + school week, and is covered by `tests/week-dates.test.ts`
+// (30 assertions, including a round-trip against `resolveCurrentWeek` and DST
+// strides).
+//
+// The probe still PASSES, because it re-implements the mock in plain JS rather
+// than importing it — so its green result says nothing about production. Its
+// `lib/year-calendar.ts` sections (§1, §3+) remain meaningful; section 2
+// ("dateNumberForWeekDay — week→date conversion") validates a calendar the app
+// has stopped rendering. Rewrite it against `lib/week-dates.ts` or delete it;
+// do not read a pass here as evidence about the dates a teacher sees.
+//
+// PURPOSE (historical)
+// ────────────────────
 // Task #40 (lane-bh-calendar-audit) — independently re-derive the values
 // that `lib/year-calendar.ts` and `lib/mock/calendar.ts` produce and
 // compare them to what those modules return for the same inputs.

@@ -383,8 +383,16 @@ function CatchUpModalBody({
   const { week } = useAppState();
   const { actions } = useCatchup();
   const { days } = useSchoolWeek();
-  // Same configured week as `days` above, paired with its display labels — a
-  // catch-up row's day label is an index INTO it (see lib/catchup-data).
+  // The SAME configured week as `days` above, paired with each day's display
+  // labels and its position. Both are in scope here, so to be explicit about
+  // which is which:
+  //   • `days`       — raw Weekday tokens ("sun"…"sat"). todayColumnIndex maps
+  //                    a real calendar date onto this to find TODAY's column.
+  //   • `schoolWeek` — the same days as ordered COLUMNS, carrying `.index` and
+  //                    `.label`.
+  // A lesson's `day` (and `todayCol`) is a POSITION in that order — 0 is the
+  // school's first instructional day, not Sunday — so it indexes `schoolWeek`,
+  // never a Sun-first weekday array. See lib/catchup-data's `day` field doc.
   const schoolWeek = useOrderedWeekdays();
 
   const titleId = useId();
