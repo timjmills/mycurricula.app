@@ -58,6 +58,18 @@ export interface Unit {
   name: string;
   /** Human label for the week span, e.g. "Wk 9–14". */
   weeks: string;
+  /**
+   * 1-based academic week the unit starts in (`units.start_week`).
+   *
+   * The columns have existed since 20260518102823_initial_schema.sql:351-352
+   * and were already SELECTed, but the mapper collapsed them to the `weeks`
+   * display string above, so no consumer could do week arithmetic. Optional
+   * because the mock source has no equivalent and older rows may be null —
+   * `lib/plan-timeline/bands.ts:unitWeekRange` falls back to parsing `weeks`.
+   */
+  startWeek?: number;
+  /** 1-based academic week the unit ends in, inclusive (`units.end_week`). */
+  endWeek?: number;
   /** Shade level (1–3) for unit color cycling. */
   shade: number;
 

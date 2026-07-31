@@ -28,6 +28,7 @@ import {
   ResourceBrowse,
   CatchUpBrowse,
 } from "./browse";
+import { PlanTimeline } from "./timeline";
 import type { HubArea, HubDoc, HubOpenDoc } from "./types";
 import styles from "./hub.module.css";
 
@@ -37,7 +38,9 @@ export function PlannerHub(): ReactNode {
   const [docs, setDocs] = useState<HubDoc[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [home, setHome] = useState(true); // showing a browse area vs a doc
-  const [area, setArea] = useState<HubArea>("lessons");
+  // The LANDING is the timeline, not a browse picker — see the HubArea doc
+  // comment in ./types.ts and docs/audits/2026-07-31-plan-tab.md §A1.
+  const [area, setArea] = useState<HubArea>("timeline");
   const [query, setQuery] = useState("");
   // Unit doc keys whose explorer modal the teacher has explicitly closed. A
   // unit doc's modal is open UNLESS its key is here — this keeps per-doc modal
@@ -168,6 +171,7 @@ export function PlannerHub(): ReactNode {
                 </button>
               ))}
             </nav>
+            {area === "timeline" && <PlanTimeline query={query} onOpenDoc={openDoc} />}
             {area === "lessons" && <LessonBrowse query={query} onOpenDoc={openDoc} />}
             {area === "units" && <UnitBrowse query={query} onOpenDoc={openDoc} />}
             {area === "resources" && <ResourceBrowse query={query} onOpenDoc={openDoc} />}
@@ -192,8 +196,9 @@ export function PlannerHub(): ReactNode {
   );
 }
 
-// ── Area nav (Lessons / Units / Resources / Catch-up) ──────────────────────
+// ── Area nav (Plan / Lessons / Units / Resources / Catch-up) ───────────────
 const AREAS: ReadonlyArray<{ key: HubArea; label: string }> = [
+  { key: "timeline", label: "Plan" },
   { key: "lessons", label: "Lessons" },
   { key: "units", label: "Units" },
   { key: "resources", label: "Resources" },

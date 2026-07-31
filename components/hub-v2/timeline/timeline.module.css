@@ -1,0 +1,508 @@
+/* timeline.module.css — the Plan tab's timeline landing.
+
+   Token discipline matches the rest of hub-v2: APP tokens only. The handoff's
+   `--phx-*` tier is prototype-local and is deliberately not ported — the
+   equivalents here are --surface / --border / --hairline / --ink-* / --muted,
+   with subject colour arriving through the .cp-subj cascade (var(--c),
+   var(--cl), var(--cd)) exactly as every other subject-coloured surface.
+
+   TWO CSS VARIABLES CARRY ALL THE GEOMETRY:
+     --tl-col  one day column's width
+     --tl-lbl  the pinned subject-label column's width
+   Every band, dot, rule and track width is a calc() over them, so widening a
+   column for touch is one declaration rather than a re-render. */
+
+.card {
+  --tl-col: 34px; /* the handoff's "cozy" default (ph-units.jsx:304) */
+  --tl-lbl: 190px; /* ph-units.css:41 */
+  --tl-lane-h: 64px;
+  --tl-band-h: 42px;
+  --tl-band-top: 11px;
+  /* Vertical step between stacked band levels (ph-units.jsx:566,585). */
+  --tl-level-step: 46px;
+  /* The line everything on a lane hangs off: the vertical centre of the FIRST
+     band row, measured from the lane's TOP. Anchoring to the top rather than
+     to 50% is what keeps a stacked lane's lowest band inside its own row — a
+     midpoint anchor moves as the lane grows, so the band that was pushed down
+     furthest ends up painting over the next subject. */
+  --tl-row-axis: calc(var(--tl-band-top) + var(--tl-band-h) / 2);
+  --tl-dot: 14px;
+  --tl-hit: 22px;
+
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+}
+
+/* ── Page head ─────────────────────────────────────────────────────────── */
+.pageHead {
+  margin-bottom: 20px;
+}
+.crumb {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.title {
+  font-family: var(--font-display-sm, var(--font-display));
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+  margin: 2px 0 4px;
+}
+.sub {
+  font-size: 13.5px;
+  color: var(--ink-500);
+}
+
+/* ── Toolbar + legend ──────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.hint {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-500);
+  margin: 0;
+}
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+/* (The `.legendDot` overrides live AFTER `.dot` — see the note there.) */
+
+/* ── Scroll region ─────────────────────────────────────────────────────── */
+/* The document must never scroll sideways (CLAUDE.md §4); a year-long axis
+   scrolls INSIDE this box, which the same rule explicitly permits. */
+.scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+}
+.inner {
+  position: relative;
+  min-width: 100%;
+}
+
+/* ── Axis header ───────────────────────────────────────────────────────── */
+.head {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--hairline);
+}
+.headRow {
+  display: flex;
+}
+.headSpacer {
+  flex: 0 0 var(--tl-lbl);
+  width: var(--tl-lbl);
+  border-right: 1px solid var(--hairline);
+  position: sticky;
+  left: 0;
+  background: inherit;
+  z-index: 2;
+}
+.month {
+  flex: 0 0 auto;
+  font-family: var(--font-display-sm, var(--font-display));
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--ink-700);
+  padding: 8px 10px 2px;
+  border-left: 1px solid var(--hairline);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.day {
+  flex: 0 0 var(--tl-col);
+  width: var(--tl-col);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 0 6px;
+  font-size: 10px;
+  border-left: 1px solid transparent;
+}
+.day[data-week-start] {
+  border-left-color: var(--hairline);
+}
+.dayWkd {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 8.5px;
+  opacity: 0.7;
+}
+.dayNum {
+  color: var(--ink-700);
+  font-weight: 700;
+}
+.day[data-holiday] .dayNum,
+.day[data-holiday] .dayWkd {
+  opacity: 0.35;
+}
+.day[data-today] .dayNum {
+  color: var(--on-accent, #fff);
+  background: var(--chrome-accent);
+  border-radius: var(--r-pill);
+  min-width: 17px;
+  text-align: center;
+  padding: 0 3px;
+}
+
+/* ── Underlay ──────────────────────────────────────────────────────────── */
+.lanes {
+  position: relative;
+}
+.grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--tl-lbl);
+  pointer-events: none;
+  z-index: 1;
+  background-image: linear-gradient(
+    90deg,
+    var(--hairline) 1px,
+    transparent 1px
+  );
+  background-size: var(--tl-col) 100%;
+}
+.currentWeek {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--chrome-accent) 7%, transparent);
+}
+.holiday {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--ink-500) 14%, transparent),
+    color-mix(in srgb, var(--ink-500) 14%, transparent) 4px,
+    transparent 4px,
+    transparent 9px
+  );
+}
+.weekRule {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+.todayLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--chrome-accent);
+  z-index: 3;
+}
+
+/* ── Lane ──────────────────────────────────────────────────────────────── */
+.lane {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--hairline);
+  /* Room for the deepest same-day dot stack in THIS lane. `--tl-stack` is set
+     inline per lane; the step is `--tl-hit`, so the lane grows exactly as much
+     as the coarse-pointer media query grows the targets. Without it, stacked
+     44px touch targets overlap and the lower ones cannot be tapped. */
+  min-height: max(
+    var(--tl-lane-h),
+    /* Room for every stacked BAND level: the top inset, N−1 steps down, the
+       band itself, and a matching bottom inset. */
+    calc(
+      var(--tl-band-top) * 2 + var(--tl-band-h) + (var(--tl-levels, 1) - 1) *
+        var(--tl-level-step)
+    ),
+    /* Room for the deepest same-day DOT stack. Dots fan DOWNWARD from the row
+       axis in `--tl-hit` steps, so the last one's centre is
+       axis + (N−1) × step and its target reaches half a step further. Without
+       this, stacked 44px touch targets on a phone overlap and the lower ones
+       cannot be tapped. */
+    calc(
+      var(--tl-row-axis) + (var(--tl-stack, 1) - 1) * var(--tl-hit) +
+        var(--tl-hit) / 2 + 10px
+    )
+  );
+  position: relative;
+  z-index: 2;
+}
+.lane:last-child {
+  border-bottom: 0;
+}
+.laneLabel {
+  flex: 0 0 var(--tl-lbl);
+  width: var(--tl-lbl);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px;
+  border-right: 1px solid var(--hairline);
+  /* Pinned so subject identity survives the horizontal scroll — the one thing
+     the handoff's timeline gets unambiguously right (ph-units.css:41). */
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--surface);
+}
+.laneSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  background: var(--c);
+}
+.laneText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.laneName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1.15;
+}
+.laneNow,
+.laneUndated {
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.laneUndated {
+  font-weight: 700;
+  color: var(--warn-ink);
+}
+.laneTrack {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+/* ── Unit band ─────────────────────────────────────────────────────────── */
+/* `.band.band` — NOT `.band`. The `.cp-root button` reset (app/tokens.css:1125)
+   is (0,1,1) and would strip a single-class module rule's border/background/
+   padding off these buttons. Doubling the class raises it to (0,2,0). */
+/* FIXED HEIGHT, anchored to the lane TOP — not `top: 11px; bottom: 11px`, and
+   not `top: 50%`. Inset-both-edges made a band grow with a lane that had been
+   heightened for a deep dot stack (a three-deep stack on a phone turned a unit
+   bar into a 150px block). Centring instead fixed the height but moved the
+   anchor: the lane's midpoint shifts down as the lane grows, so the lowest
+   stacked band painted over the NEXT subject's track. Top-anchored with a
+   fixed height is stable under both. */
+.band.band {
+  position: absolute;
+  top: var(--tl-band-top);
+  height: var(--tl-band-h);
+  border-radius: 9px;
+  border: 1.5px solid var(--c);
+  background: var(--c-surface, var(--cl));
+  color: var(--c-deep, var(--cd));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* The left inset clears the dot sitting on this band's FIRST day. Dots are
+     centred on their column and paint above the band (they have to stay
+     clickable), so a flat 10px pad had every unit reading "ace Value &
+     Decimals". Half a column plus the pad puts the label past that first
+     mark. A dot mid-band can still cross a long label — the handoff has the
+     same property — but the first one is the one that hits every band. */
+  padding: 0 10px 0 calc(var(--tl-col) / 2 + 10px);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    box-shadow 0.15s,
+    opacity 0.15s;
+}
+.band.band:hover {
+  box-shadow: 0 8px 22px -10px rgb(12 11 20 / 45%);
+  z-index: 2;
+}
+.band.band:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 2px;
+  z-index: 5;
+}
+.bandName {
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bandCount {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* ── Lesson dot ────────────────────────────────────────────────────────── */
+/* Doubled class for the same reset reason as .band. */
+.dot.dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: var(--tl-hit);
+  height: var(--tl-hit);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  z-index: 3;
+}
+/* The visible mark sits inside the (larger) hit area, so the target can grow
+   for touch without the marks colliding. */
+.dot.dot::before {
+  content: "";
+  width: var(--tl-dot);
+  height: var(--tl-dot);
+  border-radius: var(--r-pill);
+  border: 2.5px solid var(--c);
+  background: var(--surface);
+  box-sizing: border-box;
+  transition: transform 0.1s;
+}
+.dot.dot:hover::before {
+  transform: scale(1.3);
+}
+.dot.dot:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 0;
+  border-radius: var(--r-pill);
+  z-index: 5;
+}
+
+/* State — filled/hollow and border-style are SHAPE channels, so the encoding
+   is never colour alone. Each is also spoken in the button's aria-label. */
+.dot.dot[data-state="taught"]::before {
+  background: var(--c);
+}
+.dot.dot[data-state="needs_work"]::before {
+  border-style: dashed;
+  border-color: var(--warn);
+  background: var(--warn-tint);
+}
+.dot.dot[data-state="missed"]::before {
+  border-style: dashed;
+  border-color: var(--danger);
+  background: var(--danger-tint);
+}
+
+/* Fork tier (CLAUDE.md §2), absent from the handoff's marks entirely.
+   MODIFIED gets a RING, not a dashed border — dashed is already spoken for by
+   "needs work" above, and two meanings on one channel is no signal at all.
+   MOVED gets a squared-off mark: the contract's ↔ glyph is not legible at
+   14px, so the distinct non-colour channel is kept and the word "Moved" is
+   carried in the accessible name instead. */
+.dot.dot[data-fork="modified"]::before,
+.dot.dot[data-fork="both"]::before {
+  box-shadow:
+    0 0 0 1.5px var(--surface),
+    0 0 0 3px var(--cd);
+}
+.dot.dot[data-fork="moved"]::before,
+.dot.dot[data-fork="both"]::before {
+  border-radius: 4px;
+}
+
+/* The legend reuses the REAL mark so the shape channels (filled vs hollow,
+   dashed for needs-work, ring for a personal copy) are discoverable — the
+   handoff's legend is five identical squares differing only in background
+   (ph-units.css:14-15). It therefore has to undo the lane positioning.
+
+   THIS BLOCK MUST STAY BELOW `.dot.dot`. Both selectors are (0,2,0), so source
+   order alone decides, and while it sat above the legend's marks kept
+   `position:absolute` + `translate(-50%,-50%)` and sat on top of their own
+   labels. */
+.legendDot.legendDot {
+  position: static;
+  transform: none;
+  width: 16px;
+  height: 16px;
+  cursor: default;
+  --c: var(--ink-500);
+}
+.legendDot.legendDot::before {
+  width: 11px;
+  height: 11px;
+}
+
+/* Search dimming — non-matches fade, they do not vanish (ph-units.jsx:594,607).
+   Kept above 0.28 so a dimmed mark still clears a legibility floor. */
+.band.band[data-dim],
+.dot.dot[data-dim] {
+  opacity: 0.32;
+}
+
+/* ── Touch + small viewport ────────────────────────────────────────────── */
+/* `any-pointer`, NOT `pointer`: a touchscreen laptop reports `pointer: fine`
+   with `any-pointer: coarse` (see components/composer/ResMenu.module.css:113).
+   The handoff's 14px marks and 16px minimum column are both far below the
+   ≥44px contract; here the HIT area grows to 44px and the column with it, so
+   neighbouring dots still cannot overlap. */
+@media (any-pointer: coarse), (max-width: 900px) {
+  .card {
+    --tl-col: 46px;
+    --tl-lbl: 130px;
+    --tl-lane-h: 78px;
+    --tl-band-h: 52px;
+    --tl-dot: 18px;
+    --tl-hit: 44px;
+  }
+}
+
+@media (max-width: 560px) {
+  .card {
+    --tl-lbl: 116px;
+  }
+  .title {
+    font-size: 22px;
+  }
+  .legend {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .band.band,
+  .dot.dot::before {
+    transition: none;
+  }
+  .dot.dot:hover::before {
+    transform: none;
+  }
+}

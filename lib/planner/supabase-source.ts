@@ -970,6 +970,16 @@ function deriveMoved(
  *  mock seeds). Nullable Track-B columns map to `undefined` (so an un-migrated
  *  read — columns absent → the row simply lacks the keys — degrades to the bare
  *  scheduling unit, never a crash); `archived` derives from `archived_at`. */
+/** A usable 1-based academic week, or undefined. `units.start_week` is NOT
+ *  NULL in the schema, but this row arrives as untyped JSON from PostgREST —
+ *  so a null/0/NaN/fractional value is treated as "no week", never as week 0.
+ *  Integer, not merely finite: a `1.5` would place a band between two days. */
+function finiteWeek(value: number | null | undefined): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : undefined;
+}
+
 function mapUnitRow(
   row: UnitRow,
   subject: SubjectId,
@@ -984,6 +994,14 @@ function mapUnitRow(
     subject,
     name: row.name,
     weeks,
+    // The NUMBERS behind that label. `weeks` alone forced every consumer that
+    // needed week arithmetic (the Plan timeline's band geometry) to re-parse
+    // the display string; the columns were already selected, only the mapper
+    // dropped them. Guarded because the row is not schema-checked at runtime:
+    // a null start_week would otherwise become the number 0 and place a band
+    // in a week that does not exist.
+    startWeek: finiteWeek(row.start_week),
+    endWeek: finiteWeek(row.end_week),
     shade: 2,
     // ── Track-B editable workspace fields (nullable → undefined) ────────────
     notes: row.notes ?? undefined,

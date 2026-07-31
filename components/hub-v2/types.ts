@@ -42,5 +42,19 @@ export interface HubDoc extends HubOpenDoc {
   key: string;
 }
 
-/** Which browse picker shows when no document is active (the "Home" surface). */
-export type HubArea = "lessons" | "units" | "resources" | "catchup";
+/** Which surface shows when no document is active (the "Home" surface).
+ *
+ *  `"timeline"` is the LANDING — the 7.21 handoff's Plan landing is
+ *  `PHUnits.Timeline` (`ph-app.jsx:315`). The other four are the browse
+ *  pickers that shipped as the landing by mistake (the retired `hub.jsx`
+ *  surface; docs/audits/2026-07-31-plan-tab.md §0). They are KEPT and reachable
+ *  because their Lesson / Unit / Resource / Catch-up data is exactly what the
+ *  handoff's Unit Library and Lesson Library drawer needs (audit §E.8,
+ *  "Harvest, don't delete") — the drawer is a later wave, and until it lands
+ *  these tabs are how a teacher reaches that data. */
+export type HubArea =
+  | "timeline"
+  | "lessons"
+  | "units"
+  | "resources"
+  | "catchup";
