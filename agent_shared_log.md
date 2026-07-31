@@ -7397,3 +7397,61 @@ unchanged, bad-contrast picks ACCEPTED AND AUTO-ADJUSTED (never blocked, never m
 warned) · rotation ships WITH the calendar migration, not before · units distinguished by
 NUMBER AND NAME, never colour.
 
+
+---
+
+## 🆕 MASTER TO-DO — added 2026-07-31 (team-lead)
+
+### #35 · Full note/resource composer on EVERY add callsite — USER REQUEST, this session
+
+> "whenever a note/resource is added the full note resource box should be shown either
+> inline or in a popup. This is on the wall, lesson maker, day, week, year views etc.
+> The one that we have that looks similar to this."
+
+The user attached a screenshot of a Padlet-style composer and said we already have one
+that resembles it: a large **Subject** title field · an attach tray of icon tiles
+(upload · camera · AI image · link · web-search · **All tools**) captioned *"Add an image,
+video, audio, link, or file"* · a rich body field (*"Write something incredible…"*) · and a
+footer strip carrying a **colour swatch** ("White"), a **section selector**
+("Week 1: Entry Task and G…"), and **+ Fields**.
+
+**The complaint underneath the request:** some surfaces currently accept a note or resource
+through a thin affordance — a one-line input, a menu, a bare textarea — so the same object
+is created with fewer fields depending on where you happened to be standing. The ask is
+that the *full* box appear every time.
+
+**Explicitly OUR call:** inline vs popup. The user said "either".
+
+**Scope to confirm before building** (agent `composer-recon` is mapping it): which component
+is the real full composer; every add callsite across `/post`, the Lesson Planner, `/daily`,
+`/weekly`, `/year` and anywhere else; and whether *note* and *resource* are the same row or
+genuinely different shapes — that last one decides whether a single composer can serve every
+callsite or whether some can only ever show a subset.
+
+**Prior art that must be read before designing** (dated snapshots — verify against code):
+`docs/2026-06-08 notecard-resource-system ultraplan.md`,
+`docs/2026-06-11 notecard-resource-design-audit.md`,
+`docs/5.27.26 Resource Composer Rewrite Apply Notes Ultraplan.md`, and this log's
+**B4.5/B4.6 composer wiring** entry — together with the **CORRECTION** that follows it,
+since the first entry is partly wrong — plus the **ResMenu verdict** and **fix-resmenu-row**
+entries.
+
+**Two traps to design around, both already proven in this repo:**
+1. A composer that calls `usePlanner()` **throws** on any surface whose data comes from
+   `teachClient` — the exact shape that bit `BoardLibraryModule` earlier today.
+2. Day and Week can trigger an add from **inside an already-open lesson drawer**, so a
+   popup composer risks modal-inside-modal.
+
+### Open backlog carried into this entry
+
+`#10` migration gate (rollover clone · `team_settings` · subjects-as-data · rotation) ·
+`#12` §4b live QA still owed on part of `a571d87` · `#23` subject-colour system, including a
+**CSS-injection sink on a team-writable field** · `#24` two hydration mismatches ·
+`#25` `/post` first section-background pin silently discarded · `#26`/`#29` timeline QA +
+the dead `.rowDot` modifier · `#27` four handoff timeline pieces · `#28` Refine Flow column ·
+`#30` **CRITICAL — Photo-Bright unreadable, 6 AA failures, worst 1.13:1** · `#31`
+`/daily?lesson=` lands on an empty out-of-year week · `#32` test-quality findings ·
+`#33` eight user-facing strings that promise behaviour the code does not have, including
+Catch-Up reporting **today's** lesson as "4 days late" · `#34` Week add affordance missing
+below 900px.
+
