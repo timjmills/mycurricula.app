@@ -38,10 +38,10 @@ import {
   type ReactNode,
 } from "react";
 
-import { Tooltip, UndoToast } from "@/components/ui";
+import { PlannerEmpty, Tooltip, UndoToast } from "@/components/ui";
 import { OpenInBoardDialog } from "@/components/boards";
 import { useAppState } from "@/lib/app-state";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { todayColumnIndex } from "@/lib/now-anchor";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { useOrderedWeekdays } from "@/lib/week-order";
@@ -155,6 +155,15 @@ export interface ResourceWallProps {
    *  (unit ids are unique only within a subject). */
   focusUnit?: string | null;
   /**
+   * Identity of the deep link the URL is asking for: the RAW query values,
+   * before they are validated against the stores. It changes only on a real
+   * navigation — never while an anchor resolves — which is the one thing the
+   * resolved anchors above cannot express, and what lets a NEW deep link
+   * re-arm the anchor-follow after the teacher has picked a wall by hand.
+   * Omit it and the wall simply never re-arms.
+   */
+  anchorKey?: string;
+  /**
    * The canonical resource list for a lesson. Optional override: the full
    * answer is the de-duplicated union of a lesson's section-level rows (store-
    * owned) and its lesson-level rows, which only a caller holding the section
@@ -170,24 +179,90 @@ export interface ResourceWallProps {
 /** The wall currently on screen: a shared preset, or the teacher's own copy. */
 type WallMode = "preset" | "custom";
 
+// ── Deep-link anchors → the landing wall ─────────────────────────────────────
+
+/** The anchors a deep link carried, as this component receives them. */
+export interface WallAnchors {
+  focusLessonId?: string | null;
+  focusSubject?: SubjectId | null;
+  focusUnit?: string | null;
+}
+
+/**
+ * The wall a deep link's anchors point at. Narrowest anchor wins: a unit (which
+ * rides on a subject) → Unit View, a lesson → Current Lesson, a bare subject →
+ * Subject View, nothing → the everyday Today wall.
+ *
+ * THE LESSON TEST SITS ABOVE THE BARE-SUBJECT TEST ON PURPOSE. The route
+ * documents `/post?lesson=<id>` as "Current Lesson" (app/(planner)/post/page.tsx),
+ * but PostClient fills `focusSubject` from the FOCUS LESSON'S subject when the
+ * URL carries no subject of its own (PostClient.tsx:54). That derived subject
+ * exists so the subject-scoped presets have an anchor if the teacher switches to
+ * one — it is not a request to land on them. Tested after the bare subject, it
+ * shadowed the lesson branch completely: every `/post?lesson=X` opened Subject
+ * View (a section per unit of the whole subject) and the "Current Lesson" landing
+ * was unreachable, whatever the hydrate did.
+ */
+export function anchoredPreset({
+  focusLessonId,
+  focusSubject,
+  focusUnit,
+}: WallAnchors): WallPreset {
+  if (focusSubject && focusUnit) return "unit";
+  if (focusLessonId) return "lesson";
+  if (focusSubject) return "subject";
+  return "today";
+}
+
+/**
+ * Whether a (re-)resolved anchor may move the wall — the "never fight the
+ * teacher" rule for the re-resolve effect.
+ *
+ * It stands down permanently once the teacher has chosen a wall themselves:
+ * `teacherChoseWall` covers the switcher and every route onto one of their own
+ * walls, and the `wallMode` test covers the frame they are actually on one.
+ *
+ * It also refuses to follow an anchor BACKWARDS. "today" is the no-anchor
+ * fallback, so `anchored === "today"` while the store is unsettled means "the
+ * anchor cannot be resolved right now", not "the link had none": a re-hydrate
+ * (a workspace switch drops the document to EMPTY_DOC and re-loads) makes
+ * PostClient's `getLesson` return null again, and following that would bounce a
+ * deep-linked teacher Lesson → Today → Lesson for the length of the hydrate.
+ * Only a SETTLED store may move the wall back to Today, which is the case that
+ * matters: a real navigation from /post?lesson=X to /post.
+ */
+export function shouldFollowAnchor(state: {
+  anchored: WallPreset;
+  preset: WallPreset;
+  wallMode: WallMode;
+  teacherChoseWall: boolean;
+  settled: boolean;
+}): boolean {
+  if (state.teacherChoseWall) return false;
+  if (state.wallMode !== "preset") return false;
+  if (state.anchored === "today" && !state.settled) return false;
+  return state.anchored !== state.preset;
+}
+
 export function ResourceWall({
   focusLessonId,
   focusSubject,
   focusUnit,
+  anchorKey,
   resourcesFor,
 }: ResourceWallProps): ReactNode {
   const readOnly = usePhoneViewport();
 
-  // The landing preset honors whichever anchor the deep link carried, narrowest
-  // first: a unit (which rides on a subject) → Unit View, a subject → Subject
-  // View, a lesson → Current Lesson, else the everyday Today wall. Without this
-  // a /post?subject=math link would open on Today and silently ignore the anchor.
-  const [preset, setPreset] = useState<WallPreset>(() => {
-    if (focusSubject && focusUnit) return "unit";
-    if (focusSubject) return "subject";
-    if (focusLessonId) return "lesson";
-    return "today";
-  });
+  // The landing preset honors whichever anchor the deep link carried (see
+  // `anchoredPreset`). Without it a /post?subject=math link would open on Today
+  // and silently ignore the anchor.
+  //
+  // `anchored` is recomputed EVERY render and is NOT a constant: PostClient
+  // resolves `?lesson=` against the planner store, which is empty for the whole
+  // 11–16s Supabase hydrate, so a deep-linked lesson arrives here as `null` and
+  // turns real seconds later. The re-resolve effect below is what catches that.
+  const anchored = anchoredPreset({ focusLessonId, focusSubject, focusUnit });
+  const [preset, setPreset] = useState<WallPreset>(anchored);
   const [wallMode, setWallMode] = useState<WallMode>("preset");
   const [activeCustom, setActiveCustom] = useState<CustomWall | null>(null);
   const [customWalls, setCustomWalls] = useState<CustomWall[]>([]);
@@ -241,6 +316,9 @@ export function ResourceWall({
   // ── The scope input (this file's job) ─────────────────────────────────────
 
   const { lessons, units } = usePlanner();
+  // Whether the store can actually back a claim about what the plan holds. Read
+  // unconditionally — it gates a render branch, not a code path.
+  const settled = usePlannerDataState() === "settled";
   const { week } = useAppState();
   const { days } = useSchoolWeek();
   const weekdays = useOrderedWeekdays();
@@ -307,6 +385,58 @@ export function ResourceWall({
   const [override, setOverride] = useState<WallSection[] | null>(null);
   const sections = override ?? presetSections;
 
+  // RE-RESOLVE A LATE ANCHOR. `preset` seeds from `anchored` once, and a seed
+  // runs ONCE — so over Supabase it is taken while `focusLessonId` is still
+  // null, the wall lands on "today", and the deep link is dropped FOREVER: no
+  // error, no retry, and nothing on screen to tell the teacher the link they
+  // followed was ignored. (/daily has the same hazard and threads the RAW id
+  // through state so its seeding effect can retry — DailyView.tsx:284. This is
+  // that retry, expressed over the resolved anchor.) Whenever the anchored wall
+  // changes — the hydrate resolving it, or a NEW deep link arriving while the
+  // wall stays mounted — the wall follows it.
+  //
+  // `shouldFollowAnchor` is the whole "never fight the teacher" rule; see its
+  // docstring. No setOverride here: the effect only fires in preset mode, where
+  // `override` is already null (every setOverride to a non-null layout ships
+  // with setWallMode("custom")).
+  const teacherChoseWall = useRef(false);
+  const lastAnchorKey = useRef(anchorKey);
+  useEffect(() => {
+    // A NEW deep link is a fresh ask, so it re-arms the follow even for a
+    // teacher who had picked a wall by hand. `anchorKey` is the RAW query, so
+    // this cannot fire on the hydrate resolving the SAME link — which is the
+    // whole reason the resolved anchors are not used for the comparison.
+    if (anchorKey !== lastAnchorKey.current) {
+      lastAnchorKey.current = anchorKey;
+      teacherChoseWall.current = false;
+    }
+    // Landing on one of the teacher's own walls IS a wall choice, and it stays
+    // chosen after they delete that wall and drop back to a preset (deleteWall,
+    // and the library's delete-the-active-wall fallback, both return to preset
+    // mode). Latching here rather than at each call site means the auto-fork,
+    // Duplicate, New wall, and both delete paths are covered without any of them
+    // having to remember the rule.
+    // Deliberately AFTER the re-arm, which makes a custom wall the one place a
+    // new deep link does NOT move the teacher: leaving would mean dropping the
+    // wall they are looking at (wallMode + override + activeCustom) on a URL
+    // change. Their layout is safe either way — it is already persisted — so
+    // this is the conservative half of the trade, and nothing in the app links
+    // to /post with an anchor today. Revisit when the first such link ships.
+    if (wallMode === "custom") teacherChoseWall.current = true;
+    if (
+      !shouldFollowAnchor({
+        anchored,
+        preset,
+        wallMode,
+        teacherChoseWall: teacherChoseWall.current,
+        settled,
+      })
+    ) {
+      return;
+    }
+    setPreset(anchored);
+  }, [anchorKey, anchored, preset, wallMode, settled]);
+
   // localStorage reads are deferred to an effect: the server render and the
   // first client paint must agree (app SSR contract).
   useEffect(() => {
@@ -344,6 +474,7 @@ export function ResourceWall({
   );
 
   const openPreset = useCallback((p: WallPreset) => {
+    teacherChoseWall.current = true; // their choice outranks a late-resolving anchor
     setWallMode("preset");
     setPreset(p);
     setActiveCustom(null);
@@ -351,6 +482,8 @@ export function ResourceWall({
   }, []);
 
   const openCustom = useCallback((wall: CustomWall) => {
+    // No teacherChoseWall latch needed: the effect above latches on every frame
+    // in "custom" mode, which is every wall this opens.
     setWallMode("custom");
     setActiveCustom(wall);
     setOverride(wall.layout);
@@ -1051,10 +1184,35 @@ export function ResourceWall({
 
       {/* Sections */}
       <div className={styles.sections}>
+        {/* "Nothing on this wall yet" is only TRUE once the store can back it.
+            A preset's sections are `resolveWall(...)` over usePlanner().lessons,
+            and resolveWall returns [] for an empty lesson set (lib/wall-scope.ts)
+            — which is every /post load for the whole 11–16s Supabase hydrate. So
+            this line used to tell a teacher their wall was bare while their
+            resources were still on the wire, and told them the same thing when
+            the hydrate FAILED. Until the store settles the answer is unknown, so
+            it defers to <PlannerEmpty>, which already owns the pending skeleton
+            and the failed-hydrate copy. A SETTLED store still gets the plain
+            claim below — deferring forever would strand a genuinely bare wall in
+            a permanent skeleton, a worse bug than this one. (PlannerEmpty's own
+            settled branch is therefore unreachable from here; its `heading` is
+            the required-prop mirror of that claim, kept identical so loosening
+            this guard cannot silently change the copy a teacher reads.)
+            A CUSTOM wall (`override`) is exempt: its layout is the teacher's own,
+            loaded from wall-state, so its emptiness is authored rather than
+            un-hydrated and is honest to report immediately. */}
         {sections.length === 0 ? (
-          <p className={styles.wallEmpty}>
-            Nothing on this wall yet. Pick another wall, or add a section to start one.
-          </p>
+          settled || override !== null ? (
+            <p className={styles.wallEmpty}>
+              Nothing on this wall yet. Pick another wall, or add a section to start one.
+            </p>
+          ) : (
+            <PlannerEmpty
+              className={styles.wallEmpty}
+              size="sm"
+              heading="Nothing on this wall yet. Pick another wall, or add a section to start one."
+            />
+          )
         ) : (
           sections.map((section) => (
             <Section key={section.id} section={section} {...sectionProps} />

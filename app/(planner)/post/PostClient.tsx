@@ -53,6 +53,11 @@ export function PostClient({
       focusLessonId={focusLesson?.id ?? null}
       focusSubject={focusSubject ?? focusLesson?.subject ?? null}
       focusUnit={focusSubject ? unitId : null}
+      // The RAW query, unvalidated: the wall uses it as the deep link's IDENTITY,
+      // which the resolved anchors above cannot carry. They go null and back
+      // again every time the planner (re-)hydrates — `getLesson` has nothing to
+      // answer with until it lands — whereas this changes only when the URL does.
+      anchorKey={`${lessonId ?? ""}|${subjectId ?? ""}|${unitId ?? ""}`}
       resourcesFor={resourcesFor}
     />
   );
