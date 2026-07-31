@@ -182,7 +182,67 @@ const main = async () => {
   await page.waitForTimeout(6000);
   await page.screenshot({ path: path.join(OUT, "02-created.png"), fullPage: true });
 
-  console.log("\n  (created — verify in DB, then rename, then write fields)\n");
+  // ── open the lesson workspace ─────────────────────────────────────────────
+  // The seven Track-B editors live ONLY in components/lesson-plan-v2's
+  // LessonWorkspace, not in the /daily edit split. The Planner Hub is the
+  // reachable host for an UNFILED lesson (the unit-explorer route needs a unit,
+  // and this lesson can never have one — createLesson hardcodes `unit: ""` and
+  // no persisted verb can change it).
+  await page.goto(`${BASE}/planner`, { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.waitForTimeout(4000);
+  const lessonsNav = page.getByRole("button", { name: /^Lessons$/i }).first();
+  if (await lessonsNav.count()) {
+    await lessonsNav.click().catch(() => {});
+    await page.waitForTimeout(3000);
+  }
+  const card = page.getByText("New lesson", { exact: false }).first();
+  const opened = await card
+    .click({ timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+  await page.waitForTimeout(5000);
+  mark(opened ? "pass" : "abort", "opened the scratch lesson in the workspace");
+  await page.screenshot({ path: path.join(OUT, "03-workspace.png"), fullPage: true });
+
+  if (opened) {
+    // Advanced reveals `Builds & prep` and the purpose/notes textareas — they
+    // are not merely collapsed, they are NOT RENDERED in Simple mode on a
+    // lesson where both are empty.
+    const adv = page.getByRole("radio", { name: /^Advanced$/i }).first();
+    if (await adv.count()) {
+      await adv.click().catch(() => {});
+      await page.waitForTimeout(2000);
+    }
+    // Assessment kind must be set before the title input exists.
+    const formative = page.getByRole("radio", { name: /^Formative$/i }).first();
+    if (await formative.count()) {
+      await formative.click().catch(() => {});
+      await page.waitForTimeout(1500);
+    }
+
+    for (const f of FIELDS) {
+      const el = page.locator(`[aria-label="${f.aria}"]`).first();
+      if (!(await el.count())) {
+        mark("fail", `write ${f.col}`, "editor not found");
+        continue;
+      }
+      await el.scrollIntoViewIfNeeded().catch(() => {});
+      await el.fill(f.value).catch(() => {});
+      await page.waitForTimeout(1200);
+      mark("pass", `typed ${f.col}`, f.value);
+    }
+    // Every field commits per keystroke, but the serial queue is latest-wins
+    // with one in flight — give the tail of it time to land before asserting.
+    await page.waitForTimeout(6000);
+    await page.screenshot({ path: path.join(OUT, "04-written.png"), fullPage: true });
+
+    // ASSERTION "RELOAD": a full reload re-runs the hydrate chain, so what shows
+    // now came from the LIST-HYDRATE read path, not the optimistic reducer.
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 180000 });
+    await page.waitForTimeout(15000);
+    await page.screenshot({ path: path.join(OUT, "05-after-reload.png"), fullPage: true });
+    mark("note", "reloaded — compare 05-after-reload.png against the DB read");
+  }
 
   const mine = failed.filter((f) => /teacher_preferences/.test(f.url));
   const notMine = failed.filter((f) => !/teacher_preferences/.test(f.url));
