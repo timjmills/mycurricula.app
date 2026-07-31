@@ -34,7 +34,7 @@
 import { useLayoutEffect, useRef, useCallback, useState } from "react";
 import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import type { SubjectId } from "@/lib/types";
-import { WEEK_DAYS } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip } from "@/components/ui";
 import styles from "./AddLessonForm.module.css";
@@ -76,6 +76,11 @@ export function AddLessonForm({
   // addLesson is the W3.7 real create; the optional objective rides in its
   // input (audit #5), so no post-create edit tee is needed.
   const { subjects, addLesson } = usePlanner();
+
+  // The day badge names the CONFIGURED school day at position `day` (CLAUDE.md
+  // §1), not the hard-coded Sun–Thu mock — `day` is a 0-based index into the
+  // school week, so a Mon–Fri school reads "Monday" for day 0, not "Sunday".
+  const weekdays = useOrderedWeekdays();
 
   // Form field state — controlled inputs, all as strings so the native form
   // element values are always predictable.
@@ -221,7 +226,7 @@ export function AddLessonForm({
 
   if (!open) return null;
 
-  const dayLabel = WEEK_DAYS[day] ?? "Today";
+  const dayLabel = weekdays[day]?.longLabel ?? "Today";
 
   return (
     /* Backdrop — click outside to close. */

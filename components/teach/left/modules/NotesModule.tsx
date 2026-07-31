@@ -6,7 +6,8 @@
 
 import { type ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
-import { notesForDay, TEACHER_BY_ID, WEEK_DAYS } from "@/lib/mock";
+import { notesForDay, TEACHER_BY_ID } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import type { DailyNote } from "@/lib/types";
 import styles from "../TeachLeft.module.css";
 
@@ -23,8 +24,9 @@ function priorityClass(priority: DailyNote["priority"]): string {
 
 export function NotesModule(): ReactNode {
   const { selectedDay } = useAppState();
+  const weekdays = useOrderedWeekdays();
   const notes = notesForDay(selectedDay);
-  const dayLabel = WEEK_DAYS[selectedDay] ?? `Day ${selectedDay + 1}`;
+  const dayLabel = weekdays[selectedDay]?.longLabel ?? `Day ${selectedDay + 1}`;
 
   if (notes.length === 0) {
     return <p className={styles.muted}>No notes for {dayLabel}.</p>;

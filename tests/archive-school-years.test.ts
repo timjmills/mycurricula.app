@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -108,6 +108,20 @@ function statOf(html: string, label: string): string | null {
   ).exec(html);
   return m ? m[1] : null;
 }
+
+// Pay the component graph's cold transform ONCE, outside any test's measured
+// window. `render()` imports ArchiveScreen dynamically (the doMock cases below
+// need it re-importable), and that first import pulls a large React module graph
+// through vitest's transform — on this repo it alone exceeds the default 5000ms
+// testTimeout, so the FIRST test in the file timed out while every later test
+// passed on the warm cache. That is a harness artifact, not a product signal:
+// left unwarmed it fails a different test depending on ordering and on how much
+// transform contention the rest of the suite is creating, which is exactly the
+// kind of noise that gets a real finding dismissed as flake. The per-test 5000ms
+// budget is deliberately left alone so it still guards render cost itself.
+beforeAll(async () => {
+  await import("@/components/archive/ArchiveScreen");
+}, 120_000);
 
 beforeEach(() => {
   store.state = "settled";

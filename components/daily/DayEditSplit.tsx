@@ -30,7 +30,7 @@
 // this day, default to
 //   1. the lesson whose schedule block contains the current time, IF the
 //      viewed day is literally today (todayColumnIndex + calendar-date
-//      equality via dateForWeekDay; block→lesson resolution is the
+//      equality via useWeekDates().dateFor; block→lesson resolution is the
 //      ChromeClock recipe: linked lesson id first, else first same-subject
 //      lesson of the day);
 //   2. else the first lesson with status !== "done";
@@ -88,7 +88,8 @@ import { usePlanner } from "@/lib/planner-store";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { todayColumnIndex } from "@/lib/now-anchor";
 import { getDayBlocks, minuteOfDay } from "@/lib/schedule-data";
-import { lessonTime, dateForWeekDay } from "@/lib/mock";
+import { lessonTime } from "@/lib/mock";
+import { useWeekDates } from "@/lib/use-week-dates";
 import { LessonEditor } from "@/components/lesson-editor";
 import { UnitChip } from "@/components/unit-chip";
 import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
@@ -180,6 +181,9 @@ export function DayEditSplit({
   const { subjectById, editLesson } = usePlanner();
   const { editMode } = useAppState();
   const { days: schoolWeekDays } = useSchoolWeek();
+  // Week/day → calendar date from the CONFIGURED academic year + school week
+  // (lib/week-dates.ts), replacing the fictional anchor in lib/mock/calendar.
+  const { dateFor } = useWeekDates();
 
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -248,9 +252,15 @@ export function DayEditSplit({
     // CONFIGURED school week (the ChromeClock recipe) AND the viewed
     // week/day must resolve to today's calendar date (the view can sit on
     // any week, unlike ChromeClock which always shows literal today).
+    // A null date means the configuration cannot place this (week, day) on the
+    // calendar at all, so it certainly is not today — the explicit check keeps
+    // the auto-select OFF rather than letting an unresolvable day fall through
+    // to "today".
+    const viewedDate = dateFor(week, day);
     const isToday =
       todayColumnIndex(mountNow, schoolWeekDays) === day &&
-      sameCalendarDay(dateForWeekDay(week, day), mountNow);
+      viewedDate !== null &&
+      sameCalendarDay(viewedDate, mountNow);
 
     if (isToday) {
       // The schedule block containing the current minute (half-open
@@ -276,7 +286,7 @@ export function DayEditSplit({
 
     const firstOpen = dayLessons.find((l) => l.status !== "done");
     return (firstOpen ?? dayLessons[0]).id;
-  }, [dayLessons, mountNow, schoolWeekDays, week, day]);
+  }, [dayLessons, mountNow, schoolWeekDays, dateFor, week, day]);
 
   // Effective selection: DailyView's shared selectedId when it resolves on
   // this day, else the auto default. Derived (never effect-written) so the

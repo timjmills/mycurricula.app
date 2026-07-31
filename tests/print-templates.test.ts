@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { createElement, type ComponentType, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
@@ -242,6 +242,17 @@ async function renderYear(): Promise<string> {
     createElement(mod.default as unknown as ComponentType),
   );
 }
+
+// Pay both print pages' cold transform ONCE, outside any test's measured
+// window. See the same note in tests/archive-school-years.test.ts: the first
+// dynamic import of each route's module graph costs more than the default
+// 5000ms testTimeout, so whichever test happened to reach a given page first
+// timed out on warm-up cost rather than on anything it asserts. The per-test
+// budget stays at the default so it still guards the render.
+beforeAll(async () => {
+  await import("@/app/(planner)/weekly/print/page");
+  await import("@/app/(planner)/year/print/page");
+}, 120_000);
 
 const WEEKLY_CSS = new URL(
   "../app/(planner)/weekly/print/print.module.css",

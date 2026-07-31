@@ -9,7 +9,7 @@
 
 import type { ReactNode } from "react";
 import type { Lesson, LessonStatus } from "@/lib/types";
-import { WEEK_DAYS } from "@/lib/mock";
+import { useOrderedWeekdays, type OrderedWeekday } from "@/lib/week-order";
 import { StandardPill } from "@/components/ui";
 import styles from "./year-day-cards.module.css";
 
@@ -19,8 +19,11 @@ export interface YearDayCardsProps {
   onPick: (id: string) => void;
 }
 
-function dayName(day: number): string {
-  return WEEK_DAYS[day] ?? `Day ${day + 1}`;
+// `day` is a 0-based index INTO the configured school week, so the label comes
+// from the ordered weekdays the component reads via `useOrderedWeekdays()` —
+// passed in because this helper sits outside a component and can't call a hook.
+function dayName(day: number, weekdays: OrderedWeekday[]): string {
+  return weekdays[day]?.longLabel ?? `Day ${day + 1}`;
 }
 
 function IconCheck(): ReactNode {
@@ -87,6 +90,9 @@ export function YearDayCards({
   selectedId,
   onPick,
 }: YearDayCardsProps): ReactNode {
+  // Called before the early return so the hook order stays stable.
+  const weekdays = useOrderedWeekdays();
+
   if (lessons.length === 0) {
     return <div className={styles.empty}>No lessons planned for this week.</div>;
   }
@@ -107,7 +113,7 @@ export function YearDayCards({
             aria-current={sel}
           >
             <span className={styles.head}>
-              <span className={styles.day}>{dayName(l.day)}</span>
+              <span className={styles.day}>{dayName(l.day, weekdays)}</span>
               <span
                 className={`${styles.status} ${styles[statusClasses[st.cls]]}`}
                 title={st.label}

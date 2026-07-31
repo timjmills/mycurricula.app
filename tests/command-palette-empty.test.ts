@@ -3,7 +3,7 @@ import { createElement, createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { CommandPaletteBody } from "@/components/shell/command-palette";
-import type { Lesson } from "@/lib/types";
+import type { Lesson, Subject } from "@/lib/types";
 
 // Regression tests for the ⌘K command palette false-empty — the same defect
 // class as the four Planner Hub browse pickers (tests/hub-browse-empty.test.ts,
@@ -54,13 +54,14 @@ import type { Lesson } from "@/lib/types";
 const store = vi.hoisted(() => ({
   state: "settled" as "pending" | "error" | "settled",
   lessons: [] as Lesson[],
+  subjects: [] as Subject[],
 }));
 
 // Spread the real module so every OTHER export its graph pulls stays real —
-// only the two readings under test are swapped.
+// only the readings under test are swapped.
 vi.mock("@/lib/planner-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/planner-store")>()),
-  usePlanner: () => ({ lessons: store.lessons }),
+  usePlanner: () => ({ lessons: store.lessons, subjects: store.subjects }),
   usePlannerDataState: () => store.state,
 }));
 
@@ -122,9 +123,17 @@ function render(query: string) {
   );
 }
 
+const READING = {
+  id: "reading",
+  name: "Reading",
+  cls: "reading",
+  icon: "Re",
+} as unknown as Subject;
+
 beforeEach(() => {
   store.state = "settled";
   store.lessons = [];
+  store.subjects = [];
 });
 
 describe("a lesson-title query over an unhydrated store never denies the match", () => {
@@ -173,6 +182,18 @@ describe("the guard does not hide real content", () => {
     expect(html).not.toContain(LOADING);
   });
 
+  it("renders a matching subject once the catalog has settled", () => {
+    // The other half of the source that moved onto the store. Without this, the
+    // subject bucket has no assertion in this file at all after its removal from
+    // STATIC_QUERIES — and a fix that dropped subjects entirely would pass.
+    store.state = "settled";
+    store.subjects = [READING];
+    const html = render("reading");
+    expect(html).toContain("Reading");
+    expect(html).not.toContain(DENIAL);
+    expect(html).not.toContain(LOADING);
+  });
+
   it("renders lesson hits that arrive DURING the hydrate", () => {
     // A realistic mid-hydrate frame: the store has begun filling but hydration
     // has not flipped. Results must win over the skeleton — the guard sits on
@@ -193,9 +214,17 @@ describe("the guard does not hide real content", () => {
 // replace all of them with 11–16s of skeleton. That is a worse regression than
 // the false-empty this file exists to prevent, and these pin against it.
 describe("queries answerable without the store are answered instantly while pending", () => {
+  // SUBJECTS ARE NO LONGER ON THIS LIST, and their removal is the point rather
+  // than a concession. They used to be a module constant built from lib/mock's
+  // eight fixture subjects, so `"reading"` resolved mid-hydrate — instantly, and
+  // for every school on earth including the ones that teach no Reading. The
+  // catalog now comes off usePlanner() (tests/palette-subject-catalog.test.ts),
+  // which means a subject query mid-hydrate is genuinely UNKNOWN and correctly
+  // skeletons instead. Views and the appearance axes are still frozen module
+  // data with no per-school variation, so they still must answer instantly, and
+  // the anti-overshoot guarantee this block exists for still binds through them.
   const STATIC_QUERIES: ReadonlyArray<readonly [string, string, string]> = [
     ["view", "weekly", "Weekly planner"],
-    ["subject", "reading", "Reading"],
     ["appearance", "night", "Theme: Night"],
   ];
 

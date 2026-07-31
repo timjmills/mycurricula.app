@@ -1,7 +1,28 @@
 // Mock fixture: a tiny prototype-only week→date helper.
 //
-// PURPOSE
-// ───────
+// ⚠ SUPERSEDED — DO NOT ADD CALLERS.
+// ─────────────────────────────────
+// The real resolver is `lib/week-dates.ts` (pure, unit-tested in
+// tests/week-dates.test.ts), reached from React via `useWeekDates()` in
+// lib/use-week-dates.ts. It derives dates from the team's CONFIGURED academic
+// year (lib/use-academic-year.ts) and CONFIGURED school week
+// (lib/use-school-week.ts), and it fixes two defects this file has:
+//
+//   • The anchor below is FICTIONAL. Every date every surface showed — the
+//     Daily week strip, the Schedule day chips, the holiday matcher — was
+//     derived from 2025-11-02, a date picked to make a screenshot line up. It
+//     never consulted the school's academic year.
+//   • `dayIndex` is added as a RAW DAY OFFSET, which is only correct when the
+//     school week is a contiguous run starting on the anchor's weekday. A
+//     Mon/Wed/Fri school gets Mon/Tue/Wed.
+//
+// `dateForWeekDay` is also banned by the mock ratchet
+// (tests/no-mock-in-live-surfaces.test.ts) for exactly this reason. The one
+// remaining caller is `lib/home/today.ts`, the v1 /home fixture module, whose
+// conversion is a separate ticket.
+//
+// PURPOSE (historical)
+// ────────────────────
 // The Daily view's new in-column week strip needs to show a real-looking
 // date number under each weekday pill (Sun 18 / Mon 19 / Tue 20 / …). The
 // fixtures elsewhere only know about a week INDEX (1, 2, 3, …) and a day
@@ -51,6 +72,10 @@ const WEEK_1_DAY_0 = { year: 2025, month: 10, day: 2 } as const; // month is 0-i
  * Construct the local-time Date for `week` / `dayIndex` against the
  * fictional anchor. Pure helper; no I/O, no timezone math beyond what the
  * `Date` constructor does locally.
+ *
+ * @deprecated Fictional anchor + raw day offset. Use `dateForWeekDay` from
+ * lib/week-dates.ts (or `useWeekDates().dateFor`), which reads the configured
+ * academic year and school week.
  */
 export function dateForWeekDay(week: number, dayIndex: number): Date {
   // Build the anchor as a *local* midnight Date so day arithmetic doesn't
@@ -76,6 +101,9 @@ export function dateForWeekDay(week: number, dayIndex: number): Date {
  * Date number ("18") for a given week + day index. Thin wrapper around
  * {@link dateForWeekDay} — kept as its own export because the week strip
  * almost exclusively wants the day-of-month number, not the full Date.
+ *
+ * @deprecated Use `dateNumberForWeekDay` from lib/week-dates.ts (or
+ * `useWeekDates().dateNumberFor`).
  */
 export function dateNumberForWeekDay(week: number, dayIndex: number): number {
   return dateForWeekDay(week, dayIndex).getDate();

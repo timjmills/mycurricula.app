@@ -74,6 +74,7 @@ import {
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { todayColumnIndex } from "@/lib/now-anchor";
 import { useSchoolWeek } from "@/lib/use-school-week";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { stripHtml } from "@/lib/html-text";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { PlannerEmpty, Tooltip } from "@/components/ui";
@@ -372,6 +373,7 @@ function CatchUpModalBody({
   const {
     lessons,
     subjectById,
+    units,
     describeStandard,
     setLessonStatus,
     relocateLesson,
@@ -381,6 +383,9 @@ function CatchUpModalBody({
   const { week } = useAppState();
   const { actions } = useCatchup();
   const { days } = useSchoolWeek();
+  // Same configured week as `days` above, paired with its display labels — a
+  // catch-up row's day label is an index INTO it (see lib/catchup-data).
+  const schoolWeek = useOrderedWeekdays();
 
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -403,8 +408,14 @@ function CatchUpModalBody({
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const allItems = useMemo(
-    () => deriveCatchupItems(lessons, { currentWeek: week, actions }),
-    [lessons, week, actions],
+    () =>
+      deriveCatchupItems(lessons, {
+        currentWeek: week,
+        schoolWeek,
+        units,
+        actions,
+      }),
+    [lessons, week, schoolWeek, units, actions],
   );
   const coverage = useMemo(
     () => coverageSummary(lessons, { currentWeek: week, actions }),

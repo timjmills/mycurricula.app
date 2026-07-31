@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Lesson, SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
-import { WEEK_DAYS_SHORT } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { Button, Tooltip } from "@/components/ui";
 
 // ── Focus-trap selector (mirrors command-palette.tsx) ─────────────────────
@@ -60,6 +60,13 @@ export function RelocatePicker({
   // hydrated grade's subjects. RelocatePicker only renders under the planner
   // shell (WeeklyGrid), so the provider is always present.
   const { subjects } = usePlanner();
+
+  // Day options come from the CONFIGURED school week (CLAUDE.md §1), not the
+  // hard-coded Sun–Thu mock: a Mon–Fri school must not be offered "Sun", and a
+  // 6-day school must not silently lose a target day. Each entry's `.index` is
+  // the 0-based position a lesson's `day` field must equal — the same meaning
+  // the old positional map had.
+  const weekdays = useOrderedWeekdays();
 
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -217,9 +224,9 @@ export function RelocatePicker({
               Day
             </legend>
             <div style={{ display: "flex", gap: 4 }}>
-              {WEEK_DAYS_SHORT.map((label, i) => (
+              {weekdays.map(({ token, index: i, label }) => (
                 <Tooltip
-                  key={label}
+                  key={token}
                   content={`Move this lesson to ${label} of the target week.`}
                   side="bottom"
                 >

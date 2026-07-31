@@ -8,11 +8,13 @@
 // as a vertical stack of <ListRow> items ordered by time slot.
 //
 // ── School-week coupling ───────────────────────────────────────────────
-// The day count and labels come from WEEK_DAYS / WEEK_DAYS_SHORT, which
-// are exported from lib/mock — the same source the WeeklyGrid uses for
-// its column headers. This keeps the day column set consistent and avoids
-// duplicating constants. When the school-week config layer lands, swap
-// this import for the configured-week selector.
+// The day count and labels come from `useOrderedWeekdays()` (lib/week-order),
+// which reads the team's CONFIGURED school week — the same contract the
+// WeeklyGrid uses for its column headers. This keeps the day column set
+// consistent without duplicating constants, and it is a correctness
+// requirement, not a nicety (CLAUDE.md §1): the legacy WEEK_DAYS mock was
+// hard-locked to Sun–Thu, so a Mon–Fri school saw wrong labels and a 6-day
+// school silently lost its last day section.
 //
 // ── Grouping ───────────────────────────────────────────────────────────
 // We group by lesson.day (0-based index into the school-week config).
@@ -31,7 +33,7 @@ import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels } from "@/lib/labels";
-import { WEEK_DAYS } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import type { Lesson } from "@/lib/types";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
 import { PlannerEmpty, Tooltip } from "@/components/ui";
@@ -139,31 +141,34 @@ export function WeeklyList(): ReactNode {
   const labels = useLabels();
   const { week, setSelectedDay, setSelectedLessonId } = useAppState();
   const { lessons } = usePlanner();
+  // The configured school week — one entry per day column, in order. Drives
+  // the day COUNT (holiday lookup, bucket array) and the section labels.
+  const weekdays = useOrderedWeekdays();
   // Holiday lookup for this week — used to decorate each day section with
   // a subtle grey wash + the holiday name. F#20 (audit-deferred holiday
   // visualization) was originally scoped to /year only; this lights up the
   // /weekly List mode with the same UnitBar.module.css `.holiday` recipe.
-  const holidaysByDay = useHolidaysByDay(week, WEEK_DAYS.length);
+  const holidaysByDay = useHolidaysByDay(week, weekdays.length);
 
   // Filter to lessons in the active week, then group by day index.
-  // The useMemo deps are [lessons, week] — the grouped object is rebuilt
-  // only when the lesson data or the active week changes.
+  // Rebuilt when the lesson data, the active week, or the configured school
+  // week (which sizes the buckets) changes.
   const grouped = useMemo<Lesson[][]>(() => {
     const weekLessons = lessons.filter((l) => l.week === week);
 
-    // Build an array indexed by day (0..WEEK_DAYS.length-1).
-    const buckets: Lesson[][] = WEEK_DAYS.map(() => []);
+    // Build an array indexed by day (0..weekdays.length-1).
+    const buckets: Lesson[][] = weekdays.map(() => []);
     for (const lesson of weekLessons) {
       // Guard against lessons whose day index falls outside the
       // configured week (can happen in edge-case mock data).
-      if (lesson.day >= 0 && lesson.day < WEEK_DAYS.length) {
+      if (lesson.day >= 0 && lesson.day < weekdays.length) {
         buckets[lesson.day].push(lesson);
       }
     }
 
     // Sort each bucket by time slot.
     return buckets.map((bucket) => [...bucket].sort(compareByTime));
-  }, [lessons, week]);
+  }, [lessons, week, weekdays]);
 
   // Navigate to the Daily view focused on the clicked lesson.
   function handleRowClick(lesson: Lesson): void {
@@ -196,11 +201,11 @@ export function WeeklyList(): ReactNode {
       </div>
 
       {/* ── Day sections — one per configured school day ── */}
-      {WEEK_DAYS.map((dayName, dayIndex) => (
+      {weekdays.map(({ token, index: dayIndex, longLabel }) => (
         <DaySection
-          key={dayIndex}
+          key={token}
           dayIndex={dayIndex}
-          dayName={dayName}
+          dayName={longLabel}
           lessons={grouped[dayIndex] ?? []}
           holiday={holidaysByDay.get(dayIndex) ?? null}
           onRowClick={handleRowClick}

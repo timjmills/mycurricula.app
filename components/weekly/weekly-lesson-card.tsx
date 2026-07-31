@@ -64,8 +64,9 @@ import { Badge, Button, Tooltip } from "@/components/ui";
 import { SaveTargetDialog } from "@/components/weekly/save-target-dialog";
 import { NotePopover } from "@/components/weekly/note-popover";
 import type { Lesson, LessonStatus, WeeklyCardDeck } from "@/lib/types";
-import { ME, WEEK_DAYS } from "@/lib/mock";
+import { ME } from "@/lib/mock";
 import { lessonTime } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { useSubjectColor } from "@/lib/palette";
 import { useTheme } from "@/lib/theme";
 import { Icon } from "@/components/lesson-card/icon";
@@ -292,6 +293,9 @@ export function WeeklyLessonCard({
 }: WeeklyLessonCardProps) {
   const { style, frame } = useTheme();
   const color = useSubjectColor(lesson.subject);
+  // Day labels follow the CONFIGURED school week, never a hard-coded Sun–Thu
+  // fixture — `lesson.day` is a 0-based index into these ordered columns.
+  const weekdays = useOrderedWeekdays();
 
   // W3.8 seam — opens this lesson in the full editor modal. Null outside
   // the <WeeklyShell> provider (the affordance hides itself).
@@ -1105,7 +1109,7 @@ export function WeeklyLessonCard({
                         lesson.moved === "across-weeks"
                           ? `Moved to another week by ${ME.name} · personally modified from Team Curriculum`
                           : lesson.moved === "same-week"
-                            ? `Moved to ${WEEK_DAYS[lesson.day] ?? "another day"} by ${ME.name} · personally modified from Team Curriculum`
+                            ? `Moved to ${weekdays[lesson.day]?.longLabel ?? "another day"} by ${ME.name} · personally modified from Team Curriculum`
                             : `Personally modified from the Team Curriculum by ${ME.name}`
                       }
                       side="top"

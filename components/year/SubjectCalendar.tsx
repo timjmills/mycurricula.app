@@ -17,7 +17,6 @@
 
 import { useMemo, useRef, useEffect, useCallback } from "react";
 import { usePlanner } from "@/lib/planner-store";
-import { CURRENT_WEEK } from "@/lib/mock";
 import { useAcademicYear } from "@/lib/use-academic-year";
 import { DEFAULT_SCHOOL_WEEK } from "@/lib/year-calendar";
 import type { SubjectId } from "@/lib/types";
@@ -25,6 +24,8 @@ import type { YearMonthBand } from "@/lib/year-calendar";
 import { QuarterMonthWeekHeader } from "./QuarterMonthWeekHeader";
 import { LaneCard } from "./LaneCard";
 import { UnitBar } from "./UnitBar";
+import { useAppState } from "@/lib/app-state";
+import { todayIsInConfiguredYear } from "@/lib/now-anchor";
 import { TodayMarker } from "./TodayMarker";
 import { subjectClassName } from "./roadTones";
 import type { UnitBarStatus } from "./UnitBar";
@@ -101,9 +102,21 @@ export function SubjectCalendar({
   const subject = subjectById[subjectId];
   const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
   const { start: yearStart } = useAcademicYear();
+  const { currentWeek, currentWeekBasis } = useAppState();
 
-  // CURRENT_WEEK is 1-based in the fixture; convert to 0-based for index math.
-  const currentWeekIdx = CURRENT_WEEK - 1;
+  // The week that actually contains today, derived from the configured
+  // academic year (lib/school-week-now.ts) rather than the frozen mock
+  // `CURRENT_WEEK` fixture this used to read (= 12, so "today" sat in
+  // October whatever the date). 1-based → 0-based for index math.
+  const currentWeekIdx = currentWeek - 1;
+  // The TODAY marker/highlight is withheld when the current week was CLAMPED
+  // rather than derived — today is outside the configured year, so there is
+  // no week to mark. Unit status + scroll below keep using currentWeekIdx:
+  // the clamped week is meaningful for those (before the year starts nothing
+  // has started; after it ends everything has). See lib/now-anchor.
+  const todayWeekIdx = todayIsInConfiguredYear(currentWeekBasis)
+    ? currentWeekIdx
+    : undefined;
 
   const timelineWidthPx = weeks.length * columnWidthPx;
 
@@ -213,7 +226,7 @@ export function SubjectCalendar({
         <QuarterMonthWeekHeader
           months={months}
           weeks={weeks}
-          todayWeekIdx={currentWeekIdx}
+          todayWeekIdx={todayWeekIdx}
           columnWidthPx={columnWidthPx}
           leftRailWidthPx={leftRailWidthPx}
           subjectId={subjectId}
@@ -251,7 +264,7 @@ export function SubjectCalendar({
               {weeks.map((_, i) => (
                 <div
                   key={i}
-                  className={`${styles.bgLine} ${i > 0 ? styles.weekBorder : ""} ${i === currentWeekIdx ? styles.bgLineToday : ""}`}
+                  className={`${styles.bgLine} ${i > 0 ? styles.weekBorder : ""} ${i === todayWeekIdx ? styles.bgLineToday : ""}`}
                 />
               ))}
             </div>
@@ -266,11 +279,13 @@ export function SubjectCalendar({
               />
             ))}
 
-            <TodayMarker
-              todayWeekIdx={currentWeekIdx}
-              columnWidthPx={columnWidthPx}
-              leftRailWidthPx={0}
-            />
+            {todayWeekIdx !== undefined && (
+              <TodayMarker
+                todayWeekIdx={todayWeekIdx}
+                columnWidthPx={columnWidthPx}
+                leftRailWidthPx={0}
+              />
+            )}
           </div>
         </div>
       </div>

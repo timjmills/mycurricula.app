@@ -12,8 +12,10 @@
 // components → data, components → state) avoids the import cycle that
 // otherwise plagues "Provider co-located with types" stores.
 
-import { UNITS, WEEK_DAYS_SHORT } from "@/lib/mock";
-import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
+// `import type` ONLY — erased at build, so this module gains no runtime edge to
+// lib/week-order (a "use client" module) and stays importable from anywhere.
+import type { OrderedWeekday } from "@/lib/week-order";
+import type { Lesson, LessonStatus, SubjectId, Unit } from "@/lib/types";
 
 // ── Action vocabulary ────────────────────────────────────────────────────
 
@@ -24,8 +26,15 @@ export type CatchupActionKind = "done" | "skipped" | "carried";
 
 export interface CatchupAction {
   kind: CatchupActionKind;
-  /** When kind === "carried", an optional "wk{N}:d{0-4}" target,
-   *  e.g. "wk13:d1". Empty string means "decide later — destination TBD". */
+  /** When kind === "carried", an optional "wk{N}:d{i}" target, e.g. "wk13:d1",
+   *  where `i` indexes the CONFIGURED school week (0 = the school's first day).
+   *  The range is the configured week's length, not 0-4 — this doc said "d{0-4}"
+   *  while `DAYS_PER_WEEK = 5` sat below it, and both assumed the beta school's
+   *  Sun–Thu week (CLAUDE.md §1 forbids that). Nothing parses the string today:
+   *  `lib/catchup-state` round-trips it opaquely and the only writer
+   *  (CatchupScreen's "carry over") passes "". Whoever adds a destination picker
+   *  owns the parse, and must read the day count from `useSchoolWeek()`.
+   *  Empty string means "decide later — destination TBD". */
   carriedTo?: string;
 }
 
@@ -68,7 +77,22 @@ export interface CatchupItem {
    *  exist in the mock we render against the week index. */
   dayLabel: string;
   week: number;
-  /** Day index 0..4 in the school week. */
+  /**
+   * The lesson's POSITION in the configured school week — NOT a JS weekday.
+   *
+   * 0 is the school's FIRST instructional day, whatever weekday that happens to
+   * be: Sunday for the Sun–Thu beta school, Monday for a Mon–Fri school. It is
+   * never a `Date.getDay()` value and never an absolute Sun=0..Sat=6 index, so
+   * it must NEVER be used to index a Sun-first weekday array — that is precisely
+   * the bug this field's `dayLabel` carried, printing "Sun" against Mondays for
+   * every school that does not start on Sunday.
+   *
+   * The range is 0..(configured week length - 1), NOT 0..4 as this doc used to
+   * claim. To turn it into a weekday, index the ordered week the caller
+   * supplies: `schoolWeek[day]` (see `useOrderedWeekdays()` in lib/week-order),
+   * and handle the miss — a week that has since been SHORTENED leaves lessons
+   * holding a position it no longer has.
+   */
   day: number;
   title: string;
   preview: string;
@@ -96,17 +120,45 @@ export interface CatchupItem {
 export type CatchupScope = "lastWeek" | "last4" | "term" | "year";
 export type CatchupGroupBy = "subject" | "chrono" | "standard" | "unit";
 
-/** Five instructional days per week — the mock school runs Sun–Thu. The
- *  schedule is configurable in production (CLAUDE.md §1), but every
- *  fixture in the repo assumes a 5-day instructional week today. */
-const DAYS_PER_WEEK = 5;
-
 // ── Derivation ───────────────────────────────────────────────────────────
 
 interface DeriveOptions {
   /** The week the planner is currently focused on. Items at or beyond this
    *  week are excluded — they are upcoming, not uncovered. */
   currentWeek: number;
+  /**
+   * The CONFIGURED school week as ordered day columns — `useOrderedWeekdays()`
+   * at the callsite, which reads `useSchoolWeek()`.
+   *
+   * REQUIRED, deliberately. This used to be a module const `DAYS_PER_WEEK = 5`
+   * plus `WEEK_DAYS_SHORT` from lib/mock, both locked to the beta school's
+   * Sun–Thu week, and the comment on the const conceded it. CLAUDE.md §1 is
+   * explicit that the school week is configured per school and that no calendar
+   * surface may hard-code it. Two things were wrong, and only one of them was
+   * invisible:
+   *   • `dayLabel` IS rendered (CatchupRow, CatchUpBrowse), so a Mon–Fri school
+   *     read "Sun · Wk 11" against a lesson that is on a Monday. `day` is an
+   *     index INTO the configured week, not an absolute Sun=0..Sat=6 position,
+   *     so indexing a Sun-first fixture array mislabels every column.
+   *   • `daysLate` is not rendered today, so its 5-day arithmetic was wrong
+   *     silently. It is computed here anyway, and would ship wrong the day
+   *     anything surfaces it.
+   * Making this required rather than defaulting to Sun–Thu is the point: a
+   * default would let a new callsite reintroduce the bug without a word from
+   * the compiler, which is exactly how the original const survived.
+   */
+  schoolWeek: readonly OrderedWeekday[];
+  /**
+   * The grade's unit catalog — `usePlanner().units` at the callsite.
+   *
+   * REQUIRED for the same reason. The unit name used to come from
+   * `UNITS[lesson.subject].name` — the lib/mock fixture map of ONE active unit
+   * per subject — which threw `lesson.unit` away entirely. Every Math row was
+   * labelled "Unit 3 · Fractions on a Number Line" no matter which unit its
+   * lesson belonged to, on the mock path as much as over Supabase. Rendered in
+   * three places (CatchupRow, CatchUpModal, CatchUpBrowse).
+   */
+  units: readonly Unit[];
   /** Optional per-item action overlay (e.g. "Mark done"). When an action
    *  is present and resolves to "done", the item is dropped from the result. */
   actions?: Map<string, CatchupAction>;
@@ -119,7 +171,9 @@ export function deriveCatchupItems(
   lessons: readonly Lesson[],
   opts: DeriveOptions,
 ): CatchupItem[] {
-  const { currentWeek, actions } = opts;
+  const { currentWeek, schoolWeek, units, actions } = opts;
+  // One pass over the catalog rather than a find() per lesson.
+  const unitById = new Map(units.map((u) => [u.id, u]));
   const out: CatchupItem[] = [];
   for (const lesson of lessons) {
     if (lesson.archived) continue;
@@ -131,8 +185,12 @@ export function deriveCatchupItems(
     out.push({
       lessonId: lesson.id,
       subject: lesson.subject,
-      unit: UNITS[lesson.subject].name,
-      dayLabel: formatDayLabel(lesson.day, lesson.week),
+      // "" when the lesson's unit isn't in the catalog (a unit deleted out from
+      // under it, or a catalog still hydrating). Every consumer already treats
+      // the unit as optional — `shortUnit("")`, `filter(Boolean)`, a `? :` — so
+      // an absent unit renders as nothing rather than as another lesson's unit.
+      unit: unitById.get(lesson.unit)?.name ?? "",
+      dayLabel: formatDayLabel(lesson.day, lesson.week, schoolWeek),
       week: lesson.week,
       day: lesson.day,
       title: lesson.title,
@@ -141,16 +199,34 @@ export function deriveCatchupItems(
       standards: [...lesson.standards],
       resources: lesson.resources.length,
       reasonNotDone: lesson.reasonNotDone,
-      daysLate: Math.max(
-        0,
-        (currentWeek - lesson.week) * DAYS_PER_WEEK +
-          (DAYS_PER_WEEK - 1 - lesson.day),
-      ),
+      daysLate: daysLate(lesson.week, lesson.day, currentWeek, schoolWeek),
       isPersonal: lesson.isPersonal,
       modified: lesson.modified,
     });
   }
   return out;
+}
+
+/**
+ * How many instructional days late a lesson is, measured in the CONFIGURED
+ * school week's days — so a 3-day school counts three days per week elapsed,
+ * not five. Clamped at 0: a current-week lesson still ahead of the week's end
+ * is not late, and negative lateness is not a thing this surface shows.
+ *
+ * A zero-length week (no configured days) would make every gap 0; the school
+ * week can never be empty — `useSchoolWeek()`'s normalize() refuses to shrink
+ * below one day — but the guard keeps the arithmetic total rather than relying
+ * on a contract enforced two modules away.
+ */
+function daysLate(
+  week: number,
+  day: number,
+  currentWeek: number,
+  schoolWeek: readonly OrderedWeekday[],
+): number {
+  const dayCount = schoolWeek.length;
+  if (dayCount <= 0) return 0;
+  return Math.max(0, (currentWeek - week) * dayCount + (dayCount - 1 - day));
 }
 
 /** Resolve a lesson's effective status given an optional per-item action
@@ -372,9 +448,21 @@ export function countForWeek(
 /** Format a day index + week as the artboard's "Tue · Wk 11" label. We
  *  use week numbers (not calendar dates) because the mock fixture is
  *  date-free — real dates substitute the week label when the backend
- *  lands. */
-function formatDayLabel(day: number, week: number): string {
-  const dayName = WEEK_DAYS_SHORT[day] ?? "—";
+ *  lands.
+ *
+ *  `day` is a 0-based index INTO the configured school week (0 = the school's
+ *  first day, whatever weekday that is), which is why the label is looked up
+ *  positionally in `schoolWeek` rather than in a Sun-first weekday array. The
+ *  "—" fallback covers a lesson whose day index is past the end of a week that
+ *  has since been SHORTENED — a real state (a school drops Thursday and its
+ *  Thursday lessons keep `day: 4`), and the same case lib/plan-timeline/lanes.ts
+ *  calls out as live. */
+function formatDayLabel(
+  day: number,
+  week: number,
+  schoolWeek: readonly OrderedWeekday[],
+): string {
+  const dayName = schoolWeek[day]?.label ?? "—";
   return `${dayName} · Wk ${week}`;
 }
 

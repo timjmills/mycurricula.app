@@ -43,8 +43,8 @@ import React, {
 import { Button, PlannerEmpty } from "@/components/ui";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import { CURRENT_WEEK } from "@/lib/mock";
 import { useOrderedWeekdays } from "@/lib/week-order";
+import { isTodayEmphasisWeek, todayColumnIndex } from "@/lib/now-anchor";
 import type {
   ContextAction,
   ContextActionPayload,
@@ -73,7 +73,7 @@ function weekBounds(lessons: Lesson[]): { min: number; max: number } {
 export function WeeklyBoard(): ReactNode {
   // Week navigation is shared planner state — the top-bar week jumper and
   // this view's WeekNavigator both drive it.
-  const { week, setWeek } = useAppState();
+  const { week, currentWeek, currentWeekBasis, setWeek } = useAppState();
 
   // ── Planner store — single source of truth for lessons ─────────────────
   // All lesson mutations route through the store so they join the shared
@@ -135,6 +135,37 @@ export function WeeklyBoard(): ReactNode {
   // See lib/week-order.ts. SSR-safe by inheritance from useSchoolWeek().
   const weekdays = useOrderedWeekdays();
   const DAY_COUNT = weekdays.length;
+
+  // ── Today emphasis ────────────────────────────────────────────────────
+  // Which column is today? SSR-safe house pattern (WeeklyGrid / WeekColumns
+  // / WeekC): null on the server and the first client paint so the two
+  // agree, real value in a post-mount effect, 60s re-check to migrate the
+  // highlight across midnight in a long-running tab.
+  //
+  // This replaces two hard-codes that between them made the day header lie
+  // twice: the week came from the frozen mock `CURRENT_WEEK` (= 12), and the
+  // DAY was literally `dayIdx === 0` — so the first school day of week 12
+  // was "today", every day of the year.
+  const schoolWeekTokens = useMemo(
+    () => weekdays.map((d) => d.token),
+    [weekdays],
+  );
+  const [todayIdx, setTodayIdx] = useState<number | null>(null);
+  useEffect(() => {
+    const sync = (): void => {
+      setTodayIdx(todayColumnIndex(new Date(), schoolWeekTokens));
+    };
+    sync();
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
+  }, [schoolWeekTokens]);
+  const emphasizedTodayIdx = isTodayEmphasisWeek(
+    week,
+    currentWeek,
+    currentWeekBasis,
+  )
+    ? todayIdx
+    : null;
 
   // ── Lesson bucketing ─────────────────────────────────────────────────
   // byDay[dayIndex] → Lesson[] for the currently displayed week, all
@@ -332,7 +363,7 @@ export function WeeklyBoard(): ReactNode {
           (styles.navbar).  We reuse it as-is; it's the shared navigation chrome. */}
       <WeekNavigator
         week={week}
-        currentWeek={CURRENT_WEEK}
+        currentWeek={currentWeek}
         minWeek={minWeek}
         maxWeek={maxWeek}
         onChange={setWeek}
@@ -401,7 +432,7 @@ export function WeeklyBoard(): ReactNode {
                   dayIndex={dayIdx}
                   dayName={dayName}
                   dayNameShort={dayNameShort}
-                  isToday={week === CURRENT_WEEK && dayIdx === 0}
+                  isToday={emphasizedTodayIdx === dayIdx}
                   lessons={byDay[dayIdx] ?? []}
                   draggingId={draggingId}
                   dragOver={dragOverDay === dayIdx}

@@ -27,7 +27,7 @@ import type {
   FormEvent,
   CSSProperties,
 } from "react";
-import { WEEK_DAYS } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { Button, Tooltip } from "@/components/ui";
 import styles from "./AddEventForm.module.css";
 
@@ -38,10 +38,10 @@ export interface AddEventFormProps {
   onClose: () => void;
   /** 0-based day index for the currently-selected day — shown in the header. */
   day: number;
-  /** Configured weekday label ("Sunday") for the header. Falls back to the
-   *  Sun–Thu WEEK_DAYS mock BY POSITIONAL INDEX when omitted — which is wrong
-   *  for any other configured school week, so planner callers should pass the
-   *  real label from their ordered-week source. */
+  /** Configured weekday label ("Sunday") for the header. When omitted the
+   *  header resolves the label itself from the CONFIGURED school week by
+   *  positional index (`useOrderedWeekdays()[day]`), so it is correct for any
+   *  school week — a caller only needs to pass this to override the wording. */
   dayLabel?: string;
   /** Optional viewport point (px) to anchor the popover near. Used by the
    *  weekly frames so the dialog opens beside the triggering cell instead of
@@ -88,6 +88,11 @@ export function AddEventForm({
   anchor,
 }: AddEventFormProps): ReactNode {
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Fallback day label comes from the CONFIGURED school week (CLAUDE.md §1),
+  // not the hard-coded Sun–Thu mock. `day` is a 0-based position in that week.
+  // Called unconditionally, above the `if (!open)` early return below.
+  const weekdays = useOrderedWeekdays();
 
   const defaultStart = nextRoundTime();
   const defaultEnd = addMinutes(defaultStart, 30);
@@ -195,7 +200,7 @@ export function AddEventForm({
 
   if (!open) return null;
 
-  const resolvedDayLabel = dayLabel ?? WEEK_DAYS[day] ?? "Today";
+  const resolvedDayLabel = dayLabel ?? weekdays[day]?.longLabel ?? "Today";
   const timeError = start >= end ? "End must be after start" : null;
 
   // When a caller supplies an anchor point, position the fixed dialog beside it

@@ -36,6 +36,7 @@ import type {
   CatchupScope,
 } from "@/lib/catchup-data";
 import { usePlanner } from "@/lib/planner-store";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { useLabels } from "@/lib/labels";
 import { Tooltip } from "@/components/ui";
 import { BulkActionBar } from "./BulkActionBar";
@@ -111,7 +112,13 @@ export function CatchupScreen() {
   // Subject labels now come from the planner catalog (catalog migration). Flag
   // OFF `subjectById` mirrors the mock SUBJECT_BY_ID byte-identically; flag ON
   // it resolves the hydrated grade's subjects.
-  const { lessons, subjectById } = usePlanner();
+  const { lessons, subjectById, units } = usePlanner();
+  // The configured school week + the grade's unit catalog, both threaded into
+  // deriveCatchupItems (which no longer reads either from lib/mock).
+  // A lesson's `day` is a POSITION in this ordered week — 0 is the school's
+  // first instructional day, not Sunday — so the label is `schoolWeek[day]`,
+  // never a Sun-first weekday array. See lib/catchup-data's `day` field doc.
+  const schoolWeek = useOrderedWeekdays();
   const { week, currentUser } = useAppState();
   const { enabled, actions, setAction, setNote, getNote } = useCatchup();
   const labels = useLabels();
@@ -140,8 +147,14 @@ export function CatchupScreen() {
   // ── Derived data ──────────────────────────────────────────────────────
 
   const allItems = useMemo(
-    () => deriveCatchupItems(lessons, { currentWeek: week, actions }),
-    [lessons, week, actions],
+    () =>
+      deriveCatchupItems(lessons, {
+        currentWeek: week,
+        schoolWeek,
+        units,
+        actions,
+      }),
+    [lessons, week, schoolWeek, units, actions],
   );
 
   const scopedItems = useMemo(

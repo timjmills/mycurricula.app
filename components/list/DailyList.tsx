@@ -4,9 +4,12 @@
 //
 // Renders a single-column vertical list of all lessons planned for the
 // currently selected day (useAppState().selectedDay). Shows:
-//   • Header: "DAILY PLAN · LIST VIEW" eyebrow, the day title derived from
-//     WEEK_DAYS + dateNumberForWeekDay, and a live stat subtitle
-//     ("{X} lessons planned · {N} done").
+//   • Header: "DAILY PLAN · LIST VIEW" eyebrow, the day title derived from the
+//     CONFIGURED school week (useOrderedWeekdays) + the configured academic
+//     year's date resolver (useWeekDates().dateFor), and a live stat subtitle
+//     ("{X} lessons planned · {N} done"). The date is NULLABLE — when the
+//     (week, day) pair names no real school day the title shows the weekday
+//     alone rather than a fabricated date.
 //   • Body: one <ListRow> per lesson, sorted by time slot earliest-first.
 //     Lessons without a time fall back to the configured schedule order
 //     (SCHEDULE from lib/mock/schedule). Ties keep insertion order.
@@ -33,7 +36,9 @@ import type { ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { WEEK_DAYS, SCHEDULE, dateForWeekDay } from "@/lib/mock";
+import { SCHEDULE } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
+import { useWeekDates } from "@/lib/use-week-dates";
 import { ListRow } from "@/components/list/ListRow";
 import { PlannerEmpty, Tooltip } from "@/components/ui";
 import styles from "./DailyList.module.css";
@@ -74,8 +79,13 @@ function sortByTime(lessons: Lesson[]): Lesson[] {
 }
 
 // ── Day-title helper ─────────────────────────────────────────────────────────
-// Produces "Sunday · Jan 18" from the week + day index.
+// Produces "Sunday · Jan 18" from an already-resolved weekday label + date.
 // Month is the abbreviated English name; matches the design screenshot.
+//
+// Both inputs are resolved by the COMPONENT (useOrderedWeekdays / useWeekDates
+// are hooks and cannot be called from this module-scope helper), which is also
+// what keeps the label tied to the configured school week rather than a
+// hard-coded Sun–Thu list.
 
 const MONTH_LABELS = [
   "Jan",
@@ -92,9 +102,13 @@ const MONTH_LABELS = [
   "Dec",
 ] as const;
 
-function formatDayTitle(week: number, dayIndex: number): string {
-  const dayName = WEEK_DAYS[dayIndex] ?? "Day";
-  const date = dateForWeekDay(week, dayIndex);
+function formatDayTitle(dayName: string, date: Date | null): string {
+  // NULLABLE by contract (lib/week-dates): `dateFor` returns null when the
+  // (week, day) pair names no real school day — day index outside the
+  // configured week, week < 1, unusable year start. Render the ABSENCE (the
+  // weekday alone), never a substituted date: a plausible-but-wrong date is
+  // exactly the defect the resolver was built to remove.
+  if (!date) return dayName;
   const month = MONTH_LABELS[date.getMonth()];
   const dateNum = date.getDate();
   return `${dayName} · ${month} ${dateNum}`;
@@ -168,6 +182,11 @@ interface DailyListProps {
 export function DailyList({ onOpenAddLesson }: DailyListProps): ReactNode {
   const { week, selectedDay, setSelectedLessonId } = useAppState();
   const { lessons } = usePlanner();
+  // Day label + calendar date both follow the team's configuration: the
+  // ordered school week for the name, the configured academic year for the
+  // date. `selectedDay` is a 0-based position in that week.
+  const weekdays = useOrderedWeekdays();
+  const { dateFor } = useWeekDates();
 
   // Filter to the active week + day, then sort by time.
   const dayLessons = useMemo(() => {
@@ -181,8 +200,12 @@ export function DailyList({ onOpenAddLesson }: DailyListProps): ReactNode {
   const doneCount = dayLessons.filter((l) => l.status === "done").length;
   const totalCount = dayLessons.length;
 
-  // Day title: "Sunday · Jan 18"
-  const dayTitle = formatDayTitle(week, selectedDay);
+  // Day title: "Sunday · Jan 18" — or just "Sunday" when the date resolver
+  // returns null (see formatDayTitle).
+  const dayTitle = formatDayTitle(
+    weekdays[selectedDay]?.longLabel ?? "Day",
+    dateFor(week, selectedDay),
+  );
 
   // Row click: set the globally selected lesson id so the existing lesson
   // detail experience reflects the selection. We stay on /daily.

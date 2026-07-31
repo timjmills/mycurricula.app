@@ -157,7 +157,6 @@ import { useTheme } from "@/lib/theme";
 import { useViewEditMode } from "@/lib/edit-mode-state";
 import { usePhoneViewport } from "@/lib/use-phone-viewport";
 import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
-import { CURRENT_WEEK } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
 import styles from "./WeeklyShell.module.css";
 
@@ -594,6 +593,7 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // `resourcesPanelOpen` alongside the existing two.
   const {
     week,
+    currentWeek,
     setWeek,
     selectedDay,
     selectedLessonId,
@@ -737,17 +737,27 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   //    min/max of every lesson's `week`. Memoized on the full lesson list
   //    so it only recomputes when lessons are added/removed. Falls back to
   //    the current week when there are no lessons (empty fixture) so the
-  //    navigator never produces NaN bounds. */
+  //    navigator never produces NaN bounds.
+  //
+  //    NOTE — this is a week-RANGE clamp for the degenerate zero-lesson case,
+  //    not a today-marker: it collapses prev/next to a single navigable week so
+  //    the navigator can't step into a void. It used to pin that lone week to
+  //    the frozen mock `CURRENT_WEEK` (= 12); it now pins it to the week that
+  //    actually contains today, which is also the week the shell opens on, so
+  //    an empty plan lands the teacher on a week that matches its own heading
+  //    instead of stranding them on week 12. The clamped-basis rule that gates
+  //    today-RINGS deliberately does not apply here — navigation wants the
+  //    closest week to now in every basis. */
   const { minWeek, maxWeek } = useMemo<{
     minWeek: number;
     maxWeek: number;
   }>(() => {
     if (lessons.length === 0) {
-      return { minWeek: CURRENT_WEEK, maxWeek: CURRENT_WEEK };
+      return { minWeek: currentWeek, maxWeek: currentWeek };
     }
     const weeks = lessons.map((l) => l.week);
     return { minWeek: Math.min(...weeks), maxWeek: Math.max(...weeks) };
-  }, [lessons]);
+  }, [lessons, currentWeek]);
 
   // ── Selected lesson object — resolves selectedLessonId → Lesson | null ─
   // When a card is selected the Resources panel scopes to that lesson;
@@ -1447,7 +1457,7 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           schedule mode and trap the teacher there. */}
         <WeekNavigator
           week={week}
-          currentWeek={CURRENT_WEEK}
+          currentWeek={currentWeek}
           minWeek={minWeek}
           maxWeek={maxWeek}
           onChange={setWeek}

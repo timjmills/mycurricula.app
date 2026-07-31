@@ -271,9 +271,25 @@ export function getDayBlocks(day: number): readonly TimelineBlock[] {
   return SCHEDULE_BY_DAY[day] ?? [];
 }
 
-/** Return blocks for every day of the school week, ordered by day index. */
-export function getWeekBlocks(): ReadonlyArray<readonly TimelineBlock[]> {
-  return [0, 1, 2, 3, 4].map((d) => getDayBlocks(d));
+/**
+ * Return blocks for every day of the school week, ordered by day index.
+ *
+ * `dayCount` is REQUIRED rather than defaulted: it used to be the literal
+ * `[0, 1, 2, 3, 4]`, a hard-coded 5-day week (CLAUDE.md §1 forbids that), and a
+ * default of 5 would preserve exactly the landmine — the next caller would
+ * inherit the beta school's week without being asked. Pass
+ * `useSchoolWeek().days.length` (or `useOrderedWeekdays().length`).
+ *
+ * Currently unused; the schedule surfaces render per-column via
+ * `getDayBlocks`. Kept because it is the natural shape for a whole-week
+ * export/print pass.
+ */
+export function getWeekBlocks(
+  dayCount: number,
+): ReadonlyArray<readonly TimelineBlock[]> {
+  return Array.from({ length: Math.max(dayCount, 0) }, (_, d) =>
+    getDayBlocks(d),
+  );
 }
 
 /** Re-export the row shape for consumers. */
@@ -319,11 +335,28 @@ export function formatNow(min: number): string {
 
 // ── Today resolution ─────────────────────────────────────────────────────
 
-/** Mock "today" for the prototype. The mock fixture's current week (12)
- *  centers on Monday — we surface Monday as today so the now-line + today
- *  border land on the most-developed sample day. Production reads from
- *  the system clock + school calendar. */
-export function todayDayIndex(): number {
+/**
+ * MOCK "today" — a frozen constant, NOT a clock read.
+ *
+ * It returns 1 (Monday) unconditionally so the fixture's now-line and today
+ * border land on the most-developed sample day. It has never consulted the
+ * date, and it cannot consult the configured school week, so on a Mon–Fri
+ * school it points at Tuesday and on a 3-day Mon/Wed/Fri week at Wednesday.
+ *
+ * The real answer is `todayColumnIndex(now, schoolWeekDays)` in
+ * lib/now-anchor.ts — a pure resolution of the injected clock against the
+ * CONFIGURED school week, returning null when today is not a school day. Every
+ * live surface now uses it (the schedule route, the schedule drawer, the
+ * timeline, the weekly grid, the daily view, the chrome clock).
+ *
+ * The single remaining caller is `lib/home/today.ts`, the v1 /home fixture
+ * module, whose whole purpose is to be deterministic — converting it is the
+ * separate "/home reads a mock helper" ticket, not a rename.
+ *
+ * @deprecated Mock fixture. New code must call `todayColumnIndex` from
+ * lib/now-anchor.ts.
+ */
+export function mockTodayDayIndex(): number {
   return 1; // Monday
 }
 

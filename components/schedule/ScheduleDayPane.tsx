@@ -41,8 +41,8 @@ import {
   isMinuteWithinDay,
   minuteOfDay,
 } from "@/lib/schedule-data";
-import { WEEK_DAYS } from "@/lib/mock";
-import { dateForWeekDay } from "@/lib/mock/calendar";
+import { useOrderedWeekdays } from "@/lib/week-order";
+import { useWeekDates } from "@/lib/use-week-dates";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { useNowTick } from "@/lib/use-now-tick";
@@ -69,7 +69,20 @@ const MONTH_LABELS_LONG = [
 ] as const;
 
 export interface ScheduleDayPaneProps {
-  /** Day index into the school week (0 = Sun … 4 = Thu). */
+  /**
+   * 0-based POSITION in the CONFIGURED school week — 0 is the school's first
+   * teaching day, whichever weekday that is. Same contract as a lesson's `day`
+   * field (lib/week-order.ts) and as `todayColumnIndex` (lib/now-anchor.ts),
+   * which this component compares `day` against to decide `isToday`.
+   *
+   * This doc used to read "0 = Sun … 4 = Thu" — an ABSOLUTE Sun=0..Sat=6
+   * weekday — while two of the four call sites already passed a position
+   * (`selectedDay`, from the Daily views) and the internals compared against
+   * one. The two spaces are identical for the Sun–Thu beta school, so the
+   * contradiction rendered correctly here and would have broken on the first
+   * Mon–Fri tenant. Every caller now passes a POSITION; do not pass
+   * `WEEKDAY_INDEX[token]`.
+   */
   day: number;
   /**
    * "rail" → compact chrome for the Daily side-mount (≈320px fixed width,
@@ -89,6 +102,8 @@ export function ScheduleDayPane({
   const { week } = useAppState();
   const { getLesson } = usePlanner();
   const { days: schoolWeekDays } = useSchoolWeek();
+  const weekdays = useOrderedWeekdays();
+  const { dateFor } = useWeekDates();
 
   const [tab, setTab] = useState<ScheduleTab>("bell");
 
@@ -116,11 +131,20 @@ export function ScheduleDayPane({
 
   const blocks = getDayBlocks(day);
 
-  // Resolve the date strip's "Sunday, May 18" string from the mock calendar.
-  // Production: derive from the school calendar (term start, holidays).
-  const date = dateForWeekDay(week, day);
-  const dayName = WEEK_DAYS[day] ?? "Day";
-  const dateLabel = `${dayName}, ${MONTH_LABELS_LONG[date.getMonth()]} ${date.getDate()}`;
+  // Resolve the date strip's "Sunday, May 18" string from the team's CONFIGURED
+  // academic year + school week (lib/week-dates.ts), not the old fictional
+  // anchor in lib/mock/calendar.ts.
+  //
+  // `dateFor` is nullable by design: when the configuration cannot date this
+  // column, the strip degrades to the day name alone. A pane headed "Sunday"
+  // is honest; one headed "Sunday, November 2" against a made-up calendar is
+  // the defect being removed.
+  const date = dateFor(week, day);
+  const dayName = weekdays[day]?.longLabel ?? "Day";
+  const dateLabel =
+    date === null
+      ? dayName
+      : `${dayName}, ${MONTH_LABELS_LONG[date.getMonth()]} ${date.getDate()}`;
 
   return (
     <section

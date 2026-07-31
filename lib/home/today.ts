@@ -3,14 +3,18 @@
 // home screen agrees with the planner. Deterministic (no real `Date`) to stay
 // SSR/hydration-safe — the greeting derives from the mock clock, not wall time.
 
-import { getDayBlocks, todayDayIndex, nowMinuteMock } from "@/lib/schedule-data";
+import {
+  getDayBlocks,
+  mockTodayDayIndex,
+  nowMinuteMock,
+} from "@/lib/schedule-data";
 import { LESSONS, CURRENT_WEEK, lessonsForWeek } from "@/lib/mock/lessons";
 import { TODOS, TAG_BY_ID } from "@/lib/mock/todos";
 import { notesForDay } from "@/lib/mock/notes";
 import { shoutboxForDay } from "@/lib/mock/shoutbox";
 import { dateForWeekDay } from "@/lib/mock/calendar";
 
-export const TODAY = todayDayIndex();
+export const TODAY = mockTodayDayIndex();
 export const WEEK = CURRENT_WEEK;
 
 type Tag = (typeof TAG_BY_ID)[string];

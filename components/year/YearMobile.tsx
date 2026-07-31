@@ -16,7 +16,7 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui";
 import { usePlanner } from "@/lib/planner-store";
-import { CURRENT_WEEK } from "@/lib/mock";
+import { useAppState } from "@/lib/app-state";
 import { subjectCompletePct, lessonToFlatIndex } from "@/lib/year-calendar";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { pacingFor, pacingLabel } from "@/lib/year-pacing";
@@ -61,13 +61,23 @@ interface SubjectSummary {
 
 export function YearMobile() {
   const { lessons, subjects: catalogSubjects } = usePlanner();
+  const { currentWeek } = useAppState();
   // TEAM-scoped school week (CLAUDE.md §1 — configurable, never hard-coded).
   // YearMobile only consumes the length for flat-index + pacing math; it
   // doesn't render per-weekday columns.
   const { days: schoolWeek } = useSchoolWeek();
   const schoolWeekLen = schoolWeek.length;
-  const currentWeekIdx = CURRENT_WEEK - 1;
-  const todaySchoolDayIdx = lessonToFlatIndex(CURRENT_WEEK, 0, schoolWeekLen);
+  // Both derive from the week that actually contains today (the configured
+  // academic year via lib/school-week-now.ts), not the frozen mock
+  // `CURRENT_WEEK` fixture — which pinned "the current unit" and every pacing
+  // read to week 12 whatever the date.
+  //
+  // No basis gate here: this surface draws no TODAY marker. It picks the
+  // active-or-next unit and computes pacing, and the CLAMPED week is the right
+  // answer for both — before the year starts unit 1 is "upcoming" and nothing
+  // is behind; after it ends the last unit is current and everything is due.
+  const currentWeekIdx = currentWeek - 1;
+  const todaySchoolDayIdx = lessonToFlatIndex(currentWeek, 0, schoolWeekLen);
 
   const subjects = useMemo<SubjectSummary[]>(() => {
     return catalogSubjects.map((subject) => {

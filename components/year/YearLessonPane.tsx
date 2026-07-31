@@ -26,7 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Lesson, LessonStatus, Subject } from "@/lib/types";
-import { WEEK_DAYS } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels, pluralize } from "@/lib/labels";
 import { InstanceRenameLabel } from "@/components/rename";
@@ -124,6 +124,7 @@ export function YearLessonPane({
 }: YearLessonPaneProps): ReactNode {
   const { describeStandard, unitById } = usePlanner();
   const labels = useLabels();
+  const weekdays = useOrderedWeekdays();
   const [tab, setTab] = useState<Tab>("Overview");
 
   // Reset to Overview whenever the selected lesson changes — a fresh lesson
@@ -208,7 +209,7 @@ export function YearLessonPane({
   }, [siblings, lesson]);
 
   const bucket = statusBucket(lesson.status);
-  const dayName = WEEK_DAYS[lesson.day] ?? `Day ${lesson.day + 1}`;
+  const dayName = weekdays[lesson.day]?.longLabel ?? `Day ${lesson.day + 1}`;
 
   return (
     <aside

@@ -111,13 +111,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import {
-  TODOS,
-  dateForWeekDay,
-  dateNumberForWeekDay,
-  notesForDay,
-  shoutboxForDay,
-} from "@/lib/mock";
+import { TODOS, notesForDay, shoutboxForDay } from "@/lib/mock";
+import { useWeekDates } from "@/lib/use-week-dates";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
@@ -614,7 +609,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 interface WeekStripProps {
-  /** Active week — drives the date numbers via dateNumberForWeekDay. */
+  /** Active week — drives the date numbers via useWeekDates().dateNumberFor. */
   week: number;
   /** Active day index (0 = first instructional day of the school week). */
   selectedDay: number;
@@ -631,6 +626,9 @@ function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
   // Day columns derive from the configured school week (never a hard-coded
   // 5-day Sun-first fixture). See lib/week-order.ts.
   const weekdays = useOrderedWeekdays();
+  // Date numbers come from the CONFIGURED academic year + school week
+  // (lib/week-dates.ts), not the fictional anchor in lib/mock/calendar.ts.
+  const { dateNumberFor } = useWeekDates();
   const holidaysByDay = useHolidaysByDay(week, weekdays.length);
   return (
     <div
@@ -646,11 +644,15 @@ function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
           const topNote = dayNotes[0];
           const holiday = holidaysByDay.get(i) ?? null;
           const isActive = i === selectedDay;
-          const dateNumber = dateNumberForWeekDay(week, i);
+          // Nullable by design (lib/week-dates.ts): a day the configuration
+          // cannot date shows its name and no number.
+          const dateNumber = dateNumberFor(week, i);
 
           // Compose the pill label — keyboard-only users hear the holiday
           // context too, since the tooltip is hover/focus-visible only.
-          const baseAriaLabel = `Select ${dayName} ${dateNumber} — Week ${week}`;
+          const baseAriaLabel = `Select ${dayName}${
+            dateNumber === null ? "" : ` ${dateNumber}`
+          } — Week ${week}`;
           const ariaLabel = holiday
             ? `${baseAriaLabel}. This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`
             : baseAriaLabel;
@@ -677,7 +679,9 @@ function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
                   isActive ? styles.weekStripDateWrapActive : ""
                 }`}
               >
-                <span className={styles.weekStripDate}>{dateNumber}</span>
+                <span className={styles.weekStripDate}>
+                  {dateNumber === null ? "" : dateNumber}
+                </span>
               </span>
               {/* Priority dot for personal notes — only on non-selected days
                 (the selected day's notes appear in the notes banner just
@@ -872,6 +876,10 @@ export function DailyViewV1({
   // Sun-first fixture. See lib/week-order.ts.
   const weekdays = useOrderedWeekdays();
 
+  // Calendar date ↔ (week, day), bound to the CONFIGURED academic year + school
+  // week (lib/week-dates.ts). `positionOf` inverts the `?date=` deep link.
+  const { positionOf } = useWeekDates();
+
   // Lessons come from the planner store so completions, edits, and undo/redo
   // are immediately reflected in the left pane list and right pane detail.
   // `hydration` gates the deep-link resolver below: under the Supabase flag the
@@ -1005,10 +1013,15 @@ export function DailyViewV1({
 
   // `/daily?date=<YYYY-MM-DD>` deep link (UX roadmap item 07) — the sibling of
   // the lesson seed above, skipped whenever that seed resolves (a lesson pins
-  // its own week + day). The date→(week, day) math inverts
-  // lib/mock/calendar.ts dateForWeekDay: anchor = Week 1 day 0, calendar weeks
-  // advance by 7 days regardless of the configured school week. Out-of-range /
-  // pre-anchor dates degrade to the default view.
+  // its own week + day).
+  //
+  // The date→(week, day) inversion is `positionOf` (lib/week-dates.ts
+  // weekDayForDate), the exact inverse of the resolver the week strip uses,
+  // anchored on the CONFIGURED academic year. It replaces two defects: the
+  // anchor used to be a fictional 2025-11-02, and the day used to be
+  // `diffDays % 7` clamped into the week — which silently mapped a Saturday
+  // onto a real school column. Out-of-range / pre-year / non-school-day dates
+  // now degrade to the default view.
   useEffect(() => {
     if (!initialDate) return;
     if (initialLessonId && lessons.some((l) => l.id === initialLessonId)) {
@@ -1020,21 +1033,12 @@ export function DailyViewV1({
       // Local-midnight Date — the codebase deliberately avoids UTC date math
       // (see lib/use-academic-year.ts) so the calendar day stays stable.
       const target = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-      const anchor = dateForWeekDay(1, 0);
-      // Math.round absorbs DST hour drift between two local midnights.
-      const diffDays = Math.round(
-        (target.getTime() - anchor.getTime()) / 86_400_000,
-      );
-      const targetWeek = Math.floor(diffDays / 7) + 1;
-      // Same 1–99 bound the weekly link parser enforces; out-of-range or
-      // pre-anchor dates degrade to the default view.
-      if (diffDays >= 0 && targetWeek <= 99) {
-        const dayIndex = Math.min(
-          diffDays % 7,
-          Math.max(weekdays.length - 1, 0),
-        );
-        if (targetWeek !== week) setWeek(targetWeek);
-        if (dayIndex !== selectedDay) setSelectedDay(dayIndex);
+      const pos = positionOf(target);
+      // Same 1–99 bound the weekly link parser enforces. A null `pos` (before
+      // the year, or a non-school day) degrades to the default view.
+      if (pos !== null && pos.week <= 99) {
+        if (pos.week !== week) setWeek(pos.week);
+        if (pos.dayIndex !== selectedDay) setSelectedDay(pos.dayIndex);
       }
     }
     // Strip the consumed params on every path — valid, malformed, and

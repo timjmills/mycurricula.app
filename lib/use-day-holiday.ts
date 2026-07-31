@@ -7,20 +7,25 @@
 // SAME date arithmetic — keeping the F#20 holiday visualization (year +
 // weekly + daily) consistent.
 //
-// The matching rule is calendar-date equality: we ask `dateForWeekDay`
-// (lib/mock/calendar.ts) for the local Date of the given (week, dayIndex),
-// format it as YYYY-MM-DD locally (NOT via toISOString — that would shift to
-// UTC and silently miss matches in negative-offset locales), and look it up
-// in the holidays list.
+// The matching rule is calendar-date equality: we ask the week→date resolver
+// for the local Date of the given (week, dayIndex), format it as YYYY-MM-DD
+// locally (NOT via toISOString — that would shift to UTC and silently miss
+// matches in negative-offset locales), and look it up in the holidays list.
 //
-// Mock-calendar note: dateForWeekDay currently lives in lib/mock and is a
-// prototype helper. When the real calendar service lands (school-week
-// configuration + Ramadan timetable + week renumbering), this hook should
-// keep working as long as the replacement exports a `dateForWeekDay(week,
-// dayIndex) → Date` with the same contract.
+// The resolver is `useWeekDates()` (lib/use-week-dates.ts → lib/week-dates.ts),
+// which derives dates from the team's CONFIGURED academic year and school week.
+// It replaced `dateForWeekDay` from lib/mock/calendar.ts, which was anchored to
+// a fictional Sunday and treated `dayIndex` as a raw day offset — so before this
+// change, holidays were matched against dates from a made-up calendar, and any
+// school whose week is not a contiguous run (Mon/Wed/Fri) matched the wrong days
+// on top of that.
+//
+// The resolver returns null for a (week, dayIndex) that names no real day. That
+// is NOT a holiday and NOT an error: it means the day does not exist in this
+// school's configuration, so there is nothing to match and we return no holiday.
 
 import { useMemo } from "react";
-import { dateForWeekDay } from "@/lib/mock/calendar";
+import { useWeekDates } from "@/lib/use-week-dates";
 import { useHolidays, type Holiday } from "@/lib/use-holidays";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -50,11 +55,14 @@ function dateToLocalIso(d: Date): string {
  */
 export function useDayHoliday(week: number, dayIndex: number): Holiday | null {
   const { holidays } = useHolidays();
+  const { dateFor } = useWeekDates();
   return useMemo(() => {
     if (holidays.length === 0) return null;
-    const iso = dateToLocalIso(dateForWeekDay(week, dayIndex));
+    const date = dateFor(week, dayIndex);
+    if (date === null) return null; // not a day this school teaches
+    const iso = dateToLocalIso(date);
     return holidays.find((h) => h.date === iso) ?? null;
-  }, [holidays, week, dayIndex]);
+  }, [holidays, dateFor, week, dayIndex]);
 }
 
 /**
@@ -70,6 +78,7 @@ export function useHolidaysByDay(
   dayCount: number,
 ): Map<number, Holiday> {
   const { holidays } = useHolidays();
+  const { dateFor } = useWeekDates();
   return useMemo(() => {
     const out = new Map<number, Holiday>();
     if (holidays.length === 0) return out;
@@ -81,10 +90,11 @@ export function useHolidaysByDay(
       if (!byIso.has(h.date)) byIso.set(h.date, h);
     }
     for (let d = 0; d < dayCount; d++) {
-      const iso = dateToLocalIso(dateForWeekDay(week, d));
-      const match = byIso.get(iso);
+      const date = dateFor(week, d);
+      if (date === null) continue; // not a day this school teaches
+      const match = byIso.get(dateToLocalIso(date));
       if (match) out.set(d, match);
     }
     return out;
-  }, [holidays, week, dayCount]);
+  }, [holidays, dateFor, week, dayCount]);
 }

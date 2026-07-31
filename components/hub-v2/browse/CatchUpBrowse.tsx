@@ -12,6 +12,7 @@ import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { deriveCatchupItems, coverageSummary } from "@/lib/catchup-data";
 import type { CatchupItem } from "@/lib/catchup-data";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { stripHtml } from "@/lib/html-text";
 import { PlannerEmpty } from "@/components/ui";
 import type { LessonStatus, SubjectId } from "@/lib/types";
@@ -20,9 +21,15 @@ import { queryMatches } from "./browse-data";
 import styles from "./browse.module.css";
 
 export function CatchUpBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
-  const { lessons, subjects, subjectById } = usePlanner();
+  const { lessons, subjects, subjectById, units } = usePlanner();
   const dataState = usePlannerDataState();
   const { week } = useAppState();
+  // The configured school week + the grade's unit catalog — deriveCatchupItems
+  // needs both to label a row's day and unit (see lib/catchup-data).
+  // A lesson's `day` is a POSITION in this ordered week (0 = the school's first
+  // instructional day), NOT a JS weekday — so it indexes `schoolWeek`, never a
+  // Sun-first array.
+  const schoolWeek = useOrderedWeekdays();
 
   const summary = useMemo(
     () => coverageSummary(lessons, { currentWeek: week }),
@@ -30,9 +37,12 @@ export function CatchUpBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
   );
 
   const groups = useMemo(() => {
-    const items = deriveCatchupItems(lessons, { currentWeek: week }).filter(
-      (it) =>
-        queryMatches(query, it.title, it.unit, subjectById[it.subject]?.name),
+    const items = deriveCatchupItems(lessons, {
+      currentWeek: week,
+      schoolWeek,
+      units,
+    }).filter((it) =>
+      queryMatches(query, it.title, it.unit, subjectById[it.subject]?.name),
     );
     return subjects
       .map((subject) => ({
@@ -40,7 +50,7 @@ export function CatchUpBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
         items: items.filter((it) => it.subject === subject.id),
       }))
       .filter((g) => g.items.length > 0);
-  }, [lessons, week, subjects, subjectById, query]);
+  }, [lessons, week, subjects, subjectById, units, schoolWeek, query]);
 
   return (
     <>

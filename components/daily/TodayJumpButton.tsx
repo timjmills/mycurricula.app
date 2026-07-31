@@ -6,19 +6,19 @@
 // current month): one click returns the teacher to today after they have
 // navigated away.
 //
-// "Today" = the current week (CURRENT_WEEK — the same current-week
-// source WeeklyShell/WeekNavigator use) + the column of now's weekday in
-// the CONFIGURED school week (lib/now-anchor's todayColumnIndex — correct
-// for Sun–Thu, Mon–Fri, and custom weeks; CLAUDE.md §1). On a non-school
-// day (e.g. Saturday) the jump still returns to the current week and
-// leaves the selected day alone — there is no "today" column to land on.
+// "Today" = the week that actually contains today (`useAppState().currentWeek`,
+// derived from the configured academic year by lib/school-week-now.ts) + the
+// column of now's weekday in the CONFIGURED school week (lib/now-anchor's
+// todayColumnIndex — correct for Sun–Thu, Mon–Fri, and custom weeks;
+// CLAUDE.md §1). On a non-school day (e.g. Saturday) the jump still returns
+// to the current week and leaves the selected day alone — there is no
+// "today" column to land on.
 //
-// PHASE-1B: CURRENT_WEEK is the mock fixture's frozen current week
-// (lib/mock) — the right source while mock data drives the planner, wrong
-// once the Supabase flag is ON (the current week must resolve from the
-// configured academic year's calendar instead). When the 1B wave moves
-// WeeklyShell/WeekNavigator off the fixture, this button moves with them —
-// one shared current-week source, never a second clock.
+// This used to read the frozen mock `CURRENT_WEEK` (= 12), so a button
+// labelled "Today" navigated the teacher to a fixture week whatever the
+// date — and to a DIFFERENT week from the one the planner had just opened
+// on, since app-state seeds `week` from the same derivation this now reads.
+// One shared current-week source, never a second clock.
 //
 // State-only navigation: writes useAppState week/selectedDay, exactly what
 // the WeekStrip pills and WeekNavigator do — no scrollIntoView, no router
@@ -35,7 +35,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
-import { CURRENT_WEEK } from "@/lib/mock";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { todayColumnIndex } from "@/lib/now-anchor";
 import styles from "./TodayJumpButton.module.css";
@@ -48,7 +47,8 @@ export interface TodayJumpButtonProps {
 export function TodayJumpButton({
   className,
 }: TodayJumpButtonProps): ReactNode {
-  const { week, selectedDay, setWeek, setSelectedDay } = useAppState();
+  const { week, currentWeek, selectedDay, setWeek, setSelectedDay } =
+    useAppState();
   const { days: schoolWeekDays } = useSchoolWeek();
 
   // ── Today resolution — SSR-safe house pattern (finding M4) ──────────────
@@ -74,10 +74,10 @@ export function TodayJumpButton({
   // server HTML and first client paint match, and the real state arrives
   // one effect later.
   const atToday =
-    week === CURRENT_WEEK && (todayIdx === null || selectedDay === todayIdx);
+    week === currentWeek && (todayIdx === null || selectedDay === todayIdx);
 
   function handleJump(): void {
-    setWeek(CURRENT_WEEK);
+    setWeek(currentWeek);
     if (todayIdx !== null) setSelectedDay(todayIdx);
   }
 

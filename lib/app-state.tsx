@@ -218,12 +218,20 @@ export interface AppStateValue {
    * is looking; this is where "now" is — they differ as soon as anyone
    * navigates.
    *
-   * MIGRATION SEAM. Roughly a dozen surfaces still answer "is this the current
-   * week?" by comparing against the frozen mock constant
-   * (`week === CURRENT_WEEK`, e.g. components/week-v2/WeekA.tsx:137,
-   * components/daily/TodayJumpButton.tsx:77). Every one of those should read
-   * this instead; until they do, their today-ring points at mock week 12. See
-   * the handover notes for the full list.
+   * MIGRATION COMPLETE (Wave 3). Every week-scoped surface that answers "is
+   * this the current week?" now reads this instead of the frozen mock
+   * `CURRENT_WEEK` constant: the Weekly canvases (WeekA / WeekC / WeekColumns /
+   * WeeklyGrid / weekly-board), Daily (DailyView, NowLine, TodayJumpButton),
+   * the `T` keyboard shortcut, the WeekNavigator's "Today" button, and the Year
+   * surfaces (TimelineYear, YearView, YearMobile, SubjectCalendar, RoadmapView,
+   * ProgressionView).
+   *
+   * Two deliberate exceptions, both frozen v1 rollback copies reachable only
+   * under NEXT_PUBLIC_V2=0: components/weekly/WeeklyShellV1.tsx and
+   * lib/home/today.ts (which feeds components/home, the v1 "Quiet Dawn" home).
+   *
+   * `tests/current-week-adoption.test.ts` holds the line: it fails if a live
+   * surface imports CURRENT_WEEK again.
    */
   currentWeek: number;
 
@@ -232,7 +240,15 @@ export interface AppStateValue {
    * derivation, or `"before-start"` / `"after-end"` / `"unconfigured"` when it
    * was clamped. Exposed so a surface can TELL the teacher ("your school year
    * hasn't started — showing Week 1") instead of silently landing them
-   * somewhere they can't account for. Nothing consumes it yet.
+   * somewhere they can't account for.
+   *
+   * What consumes it today: every TODAY marker. `isTodayEmphasisWeek` /
+   * `todayIsInConfiguredYear` (lib/now-anchor) withhold the today-ring, the
+   * Year TODAY line, and the Daily now-line whenever this is anything but
+   * `"in-range"` — a clamped week is the right place to NAVIGATE to, but
+   * painting "today" on it would assert a day is happening now when it isn't.
+   * Done-vs-todo splits and pacing deliberately do NOT gate on it; the clamped
+   * week is a correct pivot for those in every basis.
    */
   currentWeekBasis: CurrentWeekBasis;
 

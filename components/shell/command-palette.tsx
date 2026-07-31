@@ -4,24 +4,35 @@
 //
 // A centered modal with a search input and a filtered results list. It
 // searches across:
-//   • Views — Weekly, Daily, Subject (8 subjects)
+//   • Views — Weekly, Daily, Schedule, Archive
+//   • Subjects — the grade's OWN subjects (usePlanner().subjects)
 //   • Lessons — by title (plain-text match against usePlanner().lessons)
 //
 // Selecting a result navigates with router.push or updates app-state (for
 // subject-scoped navigation). Arrow keys move through results; Enter
 // activates the focused result; Esc closes.
 //
+// SUBJECTS ARE REAL DATA, NOT A CONSTANT. This list used to be
+// `SUBJECTS.map(...)` at MODULE scope — computed once from the lib/mock fixture
+// at import time, never re-derived, and reachable by no feature flag. A school
+// that teaches Science and History got a palette offering Math, UFLI, Grammar,
+// Spelling and Explorers, each of which navigated to `/year?subject=<id>` for a
+// subject it does not have, while its own subjects were unreachable. Module
+// scope was the defect as much as the fixture was: a `const` derived from data
+// can never react to the data changing. Read `subjects` off the store, inside
+// the component, and let it re-derive.
+//
 // Data readiness — why the "No results" line is guarded:
-//   Five of the six result sources are module constants (VIEW_RESULTS, the
-//   subject list, and the three appearance axes), so they answer the instant a
-//   teacher types. Only the LESSON bucket comes out of usePlanner(), which is
-//   empty for the whole 11–16s Supabase hydrate. The denial is reached only when
-//   EVERY source came back empty — i.e. exactly when the one unknown source is
-//   the one that decides the answer — so a teacher who opens ⌘K on arrival and
-//   types a lesson title was told, definitively, that it does not exist. Since
-//   the palette has no source filter, there is no reachable state in which the
-//   denial rests on static data alone; the guard therefore covers the denial
-//   whole. See the render branch for where it sits and why not one level up.
+//   Two of the four result sources are module constants (VIEW_RESULTS and the
+//   three appearance axes), so they answer the instant a teacher types. The
+//   LESSON and SUBJECT buckets come out of usePlanner(), which is empty for the
+//   whole 11–16s Supabase hydrate. The denial is reached only when EVERY source
+//   came back empty — i.e. exactly when the unknown sources are the ones that
+//   decide the answer — so a teacher who opens ⌘K on arrival and types a lesson
+//   title was told, definitively, that it does not exist. Since the palette has
+//   no source filter, there is no reachable state in which the denial rests on
+//   static data alone; the guard therefore covers the denial whole. See the
+//   render branch for where it sits and why not one level up.
 //
 // A11y contract — mirrors save-target-dialog.tsx:
 //   • role="dialog" + aria-modal="true" + aria-labelledby the heading.
@@ -48,8 +59,6 @@ import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { Skeleton } from "@/components/ui";
 import { useTheme } from "@/lib/theme";
 import type { ThemeSetting, ThemeStyle, ThemePalette } from "@/lib/theme";
-import { SUBJECTS } from "@/lib/mock";
-import type { SubjectId } from "@/lib/types";
 import styles from "./command-palette.module.css";
 
 // ── Result shape ───────────────────────────────────────────────────────────────
@@ -119,17 +128,6 @@ const VIEW_RESULTS: ViewResultDef[] = [
     href: "/archive",
   },
 ];
-
-// One "Subject — <name>" entry per subject, so teachers can jump directly to
-// the subject view for Math, Reading, etc.
-const SUBJECT_VIEW_RESULTS: Omit<PaletteResult, "action">[] = SUBJECTS.map(
-  (s) => ({
-    id: `subject-${s.id}`,
-    kind: "subject" as const,
-    label: s.name,
-    meta: "Subject",
-  }),
-);
 
 // ── Appearance options (theme + card style) ─────────────────────────────────
 //
@@ -342,7 +340,8 @@ export function CommandPaletteBody({
 
   const router = useRouter();
   const { setSubjectView, setSearch } = useAppState();
-  const { lessons } = usePlanner();
+  // `subjects` is the GRADE'S subject list, not a fixture — see the header note.
+  const { lessons, subjects } = usePlanner();
   // Read alongside `lessons`, not instead of it: the list above still renders
   // whatever the store has produced so far, and this only decides what to say
   // when it has produced nothing.
@@ -365,22 +364,27 @@ export function CommandPaletteBody({
       },
     }));
 
-    // Subject view results — filter by subject name.
-    const subjectViews: PaletteResult[] = SUBJECT_VIEW_RESULTS.filter(
-      (r) => !q || matches(r.label, q),
-    ).map((r) => {
-      const subjectId = r.id.replace("subject-", "") as SubjectId;
-      return {
-        ...r,
+    // Subject view results — one row per subject the grade actually teaches,
+    // filtered by name. Derived here rather than at module scope so it tracks
+    // the store: a school's subjects arrive with the hydrate and can change
+    // under the teacher (workspace switch, a subject added in Settings).
+    // The id travels on the subject object, so no parsing it back out of a
+    // DOM id — the round-trip that made the old list look like a constant.
+    const subjectViews: PaletteResult[] = subjects
+      .filter((s) => !q || matches(s.name, q))
+      .map((s) => ({
+        id: `subject-${s.id}`,
+        kind: "subject" as const,
+        label: s.name,
+        meta: "Subject",
         action: () => {
-          setSubjectView(subjectId);
+          setSubjectView(s.id);
           // Curriculum view merged into Yearly — land on /year focused on the
           // subject (TimelineYear reads ?subject= and drills the scope).
-          router.push(`/year?subject=${subjectId}`);
+          router.push(`/year?subject=${encodeURIComponent(s.id)}`);
           onClose();
         },
-      };
-    });
+      }));
 
     // Appearance results — apply an app-wide theme or card style without
     // leaving the keyboard. Each closes the palette on select (like every
@@ -462,6 +466,7 @@ export function CommandPaletteBody({
   }, [
     query,
     lessons,
+    subjects,
     router,
     setSubjectView,
     setSearch,

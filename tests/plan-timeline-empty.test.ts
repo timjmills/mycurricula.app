@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -114,6 +114,16 @@ async function render(query = ""): Promise<string> {
     createElement(PlanTimeline, { query, onOpenDoc: () => {} }),
   );
 }
+
+// Pay PlanTimeline's cold transform ONCE, outside any test's measured window.
+// See the same note in tests/archive-school-years.test.ts: the first dynamic
+// import of this component graph costs more than the default 5000ms testTimeout,
+// so without this the first three tests time out on a warm-up cost that has
+// nothing to do with what they assert. The per-test budget stays at the default
+// so it still guards the render itself.
+beforeAll(async () => {
+  await import("@/components/hub-v2/timeline/PlanTimeline");
+}, 120_000);
 
 beforeEach(() => {
   store.state = "settled";

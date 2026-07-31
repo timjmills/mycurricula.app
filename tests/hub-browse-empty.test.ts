@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -151,6 +151,17 @@ async function render(
     createElement(mod[picker.export], { query, onOpenDoc: () => {} }),
   );
 }
+
+// Pay all four picker graphs' cold transform ONCE, outside any test's measured
+// window. See the same note in tests/archive-school-years.test.ts. This file is
+// the worst case: `describe.each` means the first test of EACH picker pays its
+// own cold import, so four separate tests timed out on warm-up cost — and which
+// four moved between runs with suite-wide transform contention. Warming every
+// picker up front makes the failures deterministic, and leaves the default
+// 5000ms per-test budget guarding the render.
+beforeAll(async () => {
+  await Promise.all(PICKERS.map((p) => p.load()));
+}, 120_000);
 
 beforeEach(() => {
   store.state = "settled";

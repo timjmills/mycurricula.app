@@ -36,7 +36,6 @@ import { useAppState } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { usePlanner } from "@/lib/planner-store";
 import { useNotebookState } from "@/lib/notebook-state";
-import { CURRENT_WEEK } from "@/lib/mock";
 import { useAcademicYear } from "@/lib/use-academic-year";
 import { weeksInRange } from "@/lib/year-calendar";
 import type {
@@ -162,13 +161,30 @@ interface MonthSeg {
   label: string;
 }
 
-/** Roll a set of lesson statuses up into a single week marker state. */
-function rollUpWeek(week: number, lessons: Lesson[]): WeekGroup["state"] {
-  if (lessons.length === 0) return week < CURRENT_WEEK ? "done" : "todo";
+/**
+ * Roll a set of lesson statuses up into a single week marker state.
+ *
+ * `currentWeek` is a PARAMETER, not an import: this is a module-scope pure
+ * function and cannot call the `useAppState` hook that owns the derivation.
+ * Threading it through keeps ONE current-week source (lib/school-week-now.ts,
+ * via the store) — it used to read the frozen mock `CURRENT_WEEK` fixture
+ * directly, which marked every week before 12 "done" and week 12 "in progress"
+ * whatever the date.
+ *
+ * No basis gate here, deliberately: this is a done-vs-todo SPLIT, not a today
+ * marker, and the clamped week is the correct pivot in every basis — before
+ * the year starts nothing is done, after it ends everything is.
+ */
+function rollUpWeek(
+  week: number,
+  lessons: Lesson[],
+  currentWeek: number,
+): WeekGroup["state"] {
+  if (lessons.length === 0) return week < currentWeek ? "done" : "todo";
   const allDone = lessons.every((l) => l.status === "done");
   if (allDone) return "done";
   const inProgress =
-    week === CURRENT_WEEK ||
+    week === currentWeek ||
     lessons.some(
       (l) =>
         l.status === "partial" || l.status === "carried" || l.status === "done",
@@ -205,6 +221,7 @@ function buildSubjectGroups(
   subject: Subject,
   lessons: Lesson[],
   allUnits: Unit[],
+  currentWeek: number,
 ): UnitGroup[] {
   const units = allUnits.filter((u) => u.subject === subject.id);
 
@@ -224,7 +241,11 @@ function buildSubjectGroups(
       .sort((a, b) => a[0] - b[0])
       .map(([week, ls]) => {
         const sorted = [...ls].sort((a, b) => a.day - b.day);
-        return { week, lessons: sorted, state: rollUpWeek(week, sorted) };
+        return {
+          week,
+          lessons: sorted,
+          state: rollUpWeek(week, sorted, currentWeek),
+        };
       });
 
     const parsed = parseSpan(unit.weeks);
@@ -272,7 +293,8 @@ function unitAllDone(g: UnitGroup): boolean {
 
 export function TimelineYear(): ReactNode {
   const { lessons, subjects, units: allUnits } = usePlanner();
-  const { viewMode, setViewMode, filters, updateFilters } = useAppState();
+  const { viewMode, setViewMode, filters, updateFilters, currentWeek } =
+    useAppState();
   const router = useRouter();
   // W3.7 — the v2 frame axis picks the ALL-scope center (see the `center`
   // selection below): Frame C (color) reads the year as a per-subject
@@ -396,9 +418,9 @@ export function TimelineYear(): ReactNode {
     () =>
       subjects.map((s) => ({
         subject: s,
-        groups: buildSubjectGroups(s, lessons, allUnits),
+        groups: buildSubjectGroups(s, lessons, allUnits, currentWeek),
       })),
-    [lessons, subjects, allUnits],
+    [lessons, subjects, allUnits, currentWeek],
   );
 
   // Archived-excluded lessons (the store keeps soft-deleted rows in `lessons`).

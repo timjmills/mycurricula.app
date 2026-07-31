@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePlanner } from "@/lib/planner-store";
-import { WEEK_DAYS } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { PlannerEmpty, StandardPill } from "@/components/ui";
 import type { StandardsCoverage } from "@/lib/year-standards-coverage";
 import styles from "./standards-coverage-panel.module.css";
@@ -92,6 +92,7 @@ export function StandardsCoveragePanel({
   onOpenLesson,
 }: StandardsCoveragePanelProps): ReactNode {
   const { describeStandard } = usePlanner();
+  const weekdays = useOrderedWeekdays();
   const [tab, setTab] = useState<FilterTab>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -290,7 +291,9 @@ export function StandardsCoveragePanel({
                               {l.title}
                             </span>
                             <span className={styles.lessonMeta}>
-                              {WEEK_DAYS[l.day] ?? `Day ${l.day + 1}`} · Wk{" "}
+                              {weekdays[l.day]?.longLabel ??
+                                `Day ${l.day + 1}`}{" "}
+                              · Wk{" "}
                               {l.week}
                             </span>
                           </button>

@@ -36,10 +36,10 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import { dateForWeekDay, CURRENT_WEEK } from "@/lib/mock";
+import { useWeekDates } from "@/lib/use-week-dates";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useSchoolWeek } from "@/lib/use-school-week";
-import { todayColumnIndex } from "@/lib/now-anchor";
+import { isTodayEmphasisWeek, todayColumnIndex } from "@/lib/now-anchor";
 import { useDayHoliday } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 // W3.8b — the per-view View↔Edit mode (builder B's lib; the cc_editmode
@@ -161,8 +161,15 @@ export function DailyView({
 }: DailyViewProps = {}): ReactNode {
   const router = useRouter();
   // selectedDay is shared planner state — the top bar may also change it.
-  const { week, selectedDay, setSelectedDay, setWeek, setSelectedLessonId } =
-    useAppState();
+  const {
+    week,
+    currentWeek,
+    currentWeekBasis,
+    selectedDay,
+    setSelectedDay,
+    setWeek,
+    setSelectedLessonId,
+  } = useAppState();
 
   // Renameable hierarchy captions — a school may rename "Week" → "Module",
   // etc. Read once for the breadcrumb caption below.
@@ -176,6 +183,11 @@ export function DailyView({
   // The configured school-week weekday tokens — feeds the "which column is
   // today?" rule (todayColumnIndex indexes into this ordered set).
   const { days: schoolWeekDays } = useSchoolWeek();
+
+  // Week/day → calendar date, bound to the team's CONFIGURED academic year +
+  // school week (lib/week-dates.ts). Drives the header date line and the
+  // `?date=` deep link's inverse lookup.
+  const { dateFor, positionOf } = useWeekDates();
 
   // Today's column index in the configured school week — the SAME SSR-safe
   // recipe TodayJumpButton / NowLine / WeeklyGrid use: null on the server and
@@ -339,10 +351,16 @@ export function DailyView({
 
   // `/daily?date=<YYYY-MM-DD>` deep link (UX roadmap item 07) — the sibling of
   // the lesson seed above, skipped whenever that seed resolves (a lesson pins
-  // its own week + day). The date→(week, day) math inverts
-  // lib/mock/calendar.ts dateForWeekDay: anchor = Week 1 day 0, calendar weeks
-  // advance by 7 days regardless of the configured school week. Out-of-range /
-  // pre-anchor dates degrade to the default view.
+  // its own week + day).
+  //
+  // The date→(week, day) inversion is `positionOf` (lib/week-dates.ts
+  // weekDayForDate), the exact inverse of the resolver the week strip and date
+  // labels use, anchored on the CONFIGURED academic year. It replaces two
+  // defects at once: the anchor used to be a fictional 2025-11-02, and the day
+  // used to be `diffDays % 7` clamped into the week — which silently mapped a
+  // Saturday onto a real school column and navigated the teacher to a day they
+  // never asked for. `positionOf` returns null for such a date instead, and
+  // out-of-range / pre-year dates degrade to the default view.
   useEffect(() => {
     if (!initialDate) return;
     if (initialLessonId && lessons.some((l) => l.id === initialLessonId)) {
@@ -354,21 +372,12 @@ export function DailyView({
       // Local-midnight Date — the codebase deliberately avoids UTC date math
       // (see lib/use-academic-year.ts) so the calendar day stays stable.
       const target = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-      const anchor = dateForWeekDay(1, 0);
-      // Math.round absorbs DST hour drift between two local midnights.
-      const diffDays = Math.round(
-        (target.getTime() - anchor.getTime()) / 86_400_000,
-      );
-      const targetWeek = Math.floor(diffDays / 7) + 1;
-      // Same 1–99 bound the weekly link parser enforces; out-of-range or
-      // pre-anchor dates degrade to the default view.
-      if (diffDays >= 0 && targetWeek <= 99) {
-        const dayIndex = Math.min(
-          diffDays % 7,
-          Math.max(weekdays.length - 1, 0),
-        );
-        if (targetWeek !== week) setWeek(targetWeek);
-        if (dayIndex !== selectedDay) setSelectedDay(dayIndex);
+      const pos = positionOf(target);
+      // Same 1–99 bound the weekly link parser enforces. A null `pos` (before
+      // the year, or a non-school day) degrades to the default view.
+      if (pos !== null && pos.week <= 99) {
+        if (pos.week !== week) setWeek(pos.week);
+        if (pos.dayIndex !== selectedDay) setSelectedDay(pos.dayIndex);
       }
     }
     // Strip the consumed params on every path — valid, malformed, and
@@ -503,23 +512,29 @@ export function DailyView({
   // ── Day / date labels for the canvas header ────────────────────────────
   const dayLabel = weekdays[selectedDay]?.longLabel ?? "Day";
 
-  // "Jun 14 · 2026" — derived from the same week/day → Date helper the week
-  // strip and date resolver use (lib/mock/calendar.ts dateForWeekDay).
+  // "Jun 14 · 2026" — derived from the same week/day → Date resolver the week
+  // strip and the deep link use (lib/week-dates.ts, via useWeekDates).
+  // The resolver is nullable by design: a day the configuration cannot date
+  // renders the empty string, so the header shows no date line rather than a
+  // plausible wrong one. Empty rather than null keeps the `dateLabel: string`
+  // prop contract that the three day-v2 variants share.
   const dateLabel = useMemo(() => {
-    const d = dateForWeekDay(week, selectedDay);
+    const d = dateFor(week, selectedDay);
+    if (d === null) return "";
     const month = d.toLocaleDateString("en-US", { month: "short" });
     return `${month} ${d.getDate()} · ${d.getFullYear()}`;
-  }, [week, selectedDay]);
+  }, [dateFor, week, selectedDay]);
 
   // Whether the visible day IS today — the canvas gates its live "now"/
   // "upcoming" split on this (false → no false "now" ring; B/C focus falls
   // back to selection → first lesson). Reuses the app-wide "today" rule
-  // (TodayJumpButton / NowLine / WeeklyGrid): the viewed week is the frozen
-  // current week AND the viewed day is today's school-week column. CURRENT_WEEK
-  // is the mock fixture's current-week source; it resolves from the backend
-  // once the Supabase flag is on (see TodayJumpButton's PHASE-1B note).
+  // (TodayJumpButton / NowLine / WeeklyGrid): the viewed week is the week that
+  // actually contains today — derived from the configured academic year, not
+  // the frozen mock `CURRENT_WEEK` this used to read — AND the viewed day is
+  // today's school-week column. A CLAMPED current week draws no "now" split at
+  // all; see isTodayEmphasisWeek in lib/now-anchor.
   const isToday =
-    week === CURRENT_WEEK &&
+    isTodayEmphasisWeek(week, currentWeek, currentWeekBasis) &&
     todayColIdx !== null &&
     todayColIdx === selectedDay;
 

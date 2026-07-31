@@ -50,6 +50,7 @@ import {
   useId,
   useMemo,
   useRef,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -57,10 +58,10 @@ import {
 import { createPortal } from "react-dom";
 import { useAppState } from "@/lib/app-state";
 import { useLabels } from "@/lib/labels";
-import { useSchoolWeek, WEEKDAY_INDEX } from "@/lib/use-school-week";
-import { WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
-import { dateNumberForWeekDay } from "@/lib/mock/calendar";
-import { todayDayIndex } from "@/lib/schedule-data";
+import { useSchoolWeek } from "@/lib/use-school-week";
+import { useOrderedWeekdays } from "@/lib/week-order";
+import { useWeekDates } from "@/lib/use-week-dates";
+import { todayColumnIndex } from "@/lib/now-anchor";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { Button, Tooltip } from "@/components/ui";
 import { ScheduleDayPane } from "./ScheduleDayPane";
@@ -70,9 +71,12 @@ import styles from "./SchedulePanel.module.css";
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-// School-week days are derived from useSchoolWeek() inside the component
+// School-week days are derived from useOrderedWeekdays() inside the component
 // (CLAUDE.md §1). The /schedule route uses the same hook so the strip and
-// the drawer stay in lockstep.
+// the drawer stay in lockstep — including the indexing semantic: `day` is a
+// 0-based POSITION in the configured school week, never an absolute
+// Sun=0..Sat=6 weekday. See the header note in app/(planner)/schedule/page.tsx
+// for the bug that mixing the two spaces caused.
 
 // ── Close (×) icon ──────────────────────────────────────────────────────────
 function CloseIcon(): ReactNode {
@@ -112,9 +116,24 @@ export function SchedulePanel({
 }: SchedulePanelProps): ReactNode {
   const { week, selectedDay, setSelectedDay } = useAppState();
   const labels = useLabels();
-  const focusedDay = selectedDay;
-  const { days: configuredDays } = useSchoolWeek();
-  const schoolWeekDays = configuredDays.map((d) => WEEKDAY_INDEX[d]);
+  const weekdays = useOrderedWeekdays();
+  const { days: schoolWeekDays } = useSchoolWeek();
+  const { dateNumberFor } = useWeekDates();
+  // `selectedDay` persists across sessions, so it can outlive a shrinking
+  // school week (5-day → 3-day). Clamp, matching the /schedule route.
+  const focusedDay = Math.min(selectedDay, Math.max(weekdays.length - 1, 0));
+
+  // Today resolution — SSR-safe house pattern, shared with the route. Replaces
+  // `todayDayIndex()`, which returned a hard-coded 1 (Monday).
+  const [todayIdx, setTodayIdx] = useState<number | null>(null);
+  useEffect(() => {
+    const sync = (): void => {
+      setTodayIdx(todayColumnIndex(new Date(), schoolWeekDays));
+    };
+    sync();
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
+  }, [schoolWeekDays]);
 
   const headingId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -211,7 +230,10 @@ export function SchedulePanel({
   );
 
   // ── Accessible heading text ───────────────────────────────────────────────
-  const dayLabel = useMemo(() => WEEK_DAYS[focusedDay] ?? "Day", [focusedDay]);
+  const dayLabel = useMemo(
+    () => weekdays[focusedDay]?.longLabel ?? "Day",
+    [weekdays, focusedDay],
+  );
   const headingText = `Schedule — ${dayLabel}, ${labels.week} ${week}`;
 
   if (!open) return null;
@@ -266,17 +288,19 @@ export function SchedulePanel({
 
         {/* ── Day-strip selector ───────────────────────────────────── */}
         <nav className={styles.dayStrip} aria-label="Choose a day to view">
-          {schoolWeekDays.map((d) => {
-            const isActive = d === focusedDay;
-            const isToday = d === todayDayIndex();
-            const chipDayLabel = WEEK_DAYS_SHORT[d] ?? "Day";
-            const dateNum = dateNumberForWeekDay(week, d);
+          {weekdays.map(({ index, label }) => {
+            const isActive = index === focusedDay;
+            const isToday = todayIdx !== null && todayIdx === index;
+            // Nullable by design (lib/week-dates.ts) — a day the configuration
+            // cannot date shows its name and no number, never a plausible
+            // wrong date.
+            const dateNum = dateNumberFor(week, index);
+            const dateText = dateNum === null ? "" : ` ${dateNum}`;
+            const chipTitle = `Show the schedule for ${label}${
+              dateNum === null ? "" : ` (date ${dateNum})`
+            }${isToday ? " — today" : ""}`;
             return (
-              <Tooltip
-                key={d}
-                content={`Show the schedule for ${chipDayLabel} (date ${dateNum})${isToday ? " — today" : ""}`}
-                side="bottom"
-              >
+              <Tooltip key={index} content={chipTitle} side="bottom">
                 <button
                   type="button"
                   className={[
@@ -286,15 +310,15 @@ export function SchedulePanel({
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  onClick={() => setSelectedDay(d)}
+                  onClick={() => setSelectedDay(index)}
                   aria-pressed={isActive}
-                  aria-label={`${chipDayLabel} ${dateNum}${isToday ? " (today)" : ""}`}
-                  title={`Show the schedule for ${chipDayLabel} (date ${dateNum})${
-                    isToday ? " — today" : ""
-                  }`}
+                  aria-label={`${label}${dateText}${isToday ? " (today)" : ""}`}
+                  title={chipTitle}
                 >
-                  <span className={styles.chipDay}>{chipDayLabel}</span>
-                  <span className={styles.chipDate}>{dateNum}</span>
+                  <span className={styles.chipDay}>{label}</span>
+                  {dateNum !== null && (
+                    <span className={styles.chipDate}>{dateNum}</span>
+                  )}
                 </button>
               </Tooltip>
             );

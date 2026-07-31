@@ -5,7 +5,7 @@
 // Wires the app-wide single-key and modifier shortcuts described in KEYBOARD-001:
 //   [  previous week         setWeek(week - 1)
 //   ]  next week             setWeek(week + 1)
-//   T  jump to current week  setWeek(CURRENT_WEEK)
+//   T  jump to current week  setWeek(currentWeek)
 //   1  navigate to /weekly
 //   2  navigate to /daily
 //   3  navigate to /year?subject=<current subjectView> (the merged Yearly view)
@@ -34,7 +34,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
-import { CURRENT_WEEK } from "@/lib/mock";
 
 // ── Two-key sequence state ────────────────────────────────────────────
 // vim-style chord: pressing `g` arms a 1.5-second window during which a
@@ -94,7 +93,7 @@ export function useKeyboardShortcuts({
   onOpenShortcuts,
 }: KeyboardShortcutsOptions): void {
   const router = useRouter();
-  const { week, setWeek, subjectView, setSearch } = useAppState();
+  const { week, currentWeek, setWeek, subjectView, setSearch } = useAppState();
 
   // Two-key chord state — outside the useCallback so the arm-state survives
   // every handler re-creation (the callback rebuilds whenever week changes).
@@ -198,9 +197,12 @@ export function useKeyboardShortcuts({
 
         case "T":
         case "t":
-          // Jump to the current real week.
+          // Jump to the week that actually contains today, derived from the
+          // configured academic year (lib/school-week-now.ts via app-state) —
+          // NOT the frozen mock fixture this used to read, which sent every
+          // teacher to week 12 whatever the date.
           e.preventDefault();
-          setWeek(CURRENT_WEEK);
+          setWeek(currentWeek);
           break;
 
         case "1":
@@ -265,6 +267,7 @@ export function useKeyboardShortcuts({
     },
     [
       week,
+      currentWeek,
       setWeek,
       subjectView,
       setSearch,

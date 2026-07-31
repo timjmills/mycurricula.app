@@ -32,8 +32,8 @@ import {
   PX_PER_MIN,
   getDayBlocks,
 } from "@/lib/schedule-data";
-import { WEEK_DAYS_SHORT } from "@/lib/mock";
-import { dateNumberForWeekDay } from "@/lib/mock/calendar";
+import { useOrderedWeekdays } from "@/lib/week-order";
+import { useWeekDates } from "@/lib/use-week-dates";
 import { useAppState } from "@/lib/app-state";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { todayColumnIndex } from "@/lib/now-anchor";
@@ -48,7 +48,13 @@ import { ScheduleBlock } from "./ScheduleBlock";
 import styles from "./ScheduleColumn.module.css";
 
 export interface ScheduleColumnProps {
-  /** Day index into the school week (0 = Sun … 4 = Thu). */
+  /**
+   * 0-based POSITION in the CONFIGURED school week — 0 is the school's first
+   * teaching day, whichever weekday that is. Same contract as a lesson's `day`
+   * field (lib/week-order.ts) and as `todayColumnIndex` (lib/now-anchor.ts),
+   * which this component compares `day` against for `isToday`. Not an absolute
+   * Sun=0..Sat=6 weekday — do not pass `WEEKDAY_INDEX[token]`.
+   */
   day: number;
   /**
    * When false, blocks with `type === "non_academic"` are filtered out.
@@ -71,6 +77,8 @@ export function ScheduleColumn({
 }: ScheduleColumnProps): ReactNode {
   const { week } = useAppState();
   const { days: schoolWeekDays } = useSchoolWeek();
+  const weekdays = useOrderedWeekdays();
+  const { dateNumberFor } = useWeekDates();
 
   // ── Today resolution — SSR-safe house pattern (findings M3/M4) ──────────
   // Initial null → server HTML carries no emphasis; the real clock answer
@@ -92,8 +100,10 @@ export function ScheduleColumn({
     ? allBlocks
     : allBlocks.filter((b) => b.type !== "non_academic");
 
-  const dayLabel = WEEK_DAYS_SHORT[day] ?? "Day";
-  const dateNum = dateNumberForWeekDay(week, day);
+  const dayLabel = weekdays[day]?.label ?? "Day";
+  // Nullable by design (lib/week-dates.ts): when the configuration cannot date
+  // this column the header shows the day name alone rather than a wrong number.
+  const dateNum = dateNumberFor(week, day);
 
   return (
     <div className={styles.column}>
@@ -109,7 +119,9 @@ export function ScheduleColumn({
           .join(" ")}
       >
         <span className={styles.dayLabel}>{dayLabel}</span>
-        {!compact && <span className={styles.dateNum}>{dateNum}</span>}
+        {!compact && dateNum !== null && (
+          <span className={styles.dateNum}>{dateNum}</span>
+        )}
       </div>
 
       {/* Body — fixed-height ink-50 surface, hour gridlines, absolutely-

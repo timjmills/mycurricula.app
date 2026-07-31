@@ -20,11 +20,15 @@
 //
 //   • `weeksInRange` / `allYearWeeksFor` (lib/year-calendar.ts:391,407) build
 //     the Year view's week columns as plain 7-day strides from `start`.
-//   • `dateForWeekDay` (lib/mock/calendar.ts:67) maps week→date as
-//     `(week - 1) * 7 + dayIndex` days from the Week-1 anchor, and its header
-//     states the rule outright: "Calendar weeks always advance by 7 days
-//     regardless of which weekdays the school runs — the school week selects
-//     WHICH columns appear, not how fast the calendar moves."
+//   • `dateForWeekDay` (lib/week-dates.ts) maps week→date by placing each
+//     CONFIGURED school day inside the 7-day block `[yearStart + (week-1)*7,
+//     yearStart + week*7)`. Calendar weeks advance by 7 days regardless of
+//     which weekdays the school runs — the school week selects WHICH columns
+//     appear, not how fast the calendar moves. `weekDayForDate` in the same
+//     module is its inverse, and tests/week-dates.test.ts asserts the round
+//     trip against THIS function, so the two cannot drift apart silently.
+//     (It supersedes the old lib/mock/calendar.ts helper, which counted from a
+//     fictional anchor and treated `dayIndex` as a raw day offset.)
 //
 // Two consequences fall out of that, and both are deliberate:
 //

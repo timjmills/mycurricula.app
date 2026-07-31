@@ -76,10 +76,9 @@ import type {
 import { useAppState } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { useSubjectColor } from "@/lib/palette";
-import { CURRENT_WEEK } from "@/lib/mock";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
-import { todayColumnIndex } from "@/lib/now-anchor";
+import { isTodayEmphasisWeek, todayColumnIndex } from "@/lib/now-anchor";
 import type { Weekday } from "@/lib/use-school-week";
 import type {
   ContextAction,
@@ -141,8 +140,15 @@ export function WeeklyGrid(): ReactNode {
   // `day` field must equal to land in that column.
   const weekdays = useOrderedWeekdays();
   const DAY_COUNT = weekdays.length;
-  const { week, search, filters, selectedLessonId, setSelectedLessonId } =
-    useAppState();
+  const {
+    week,
+    currentWeek,
+    currentWeekBasis,
+    search,
+    filters,
+    selectedLessonId,
+    setSelectedLessonId,
+  } = useAppState();
   const prefersReducedMotion = useReducedMotion();
 
   // ── Planner store — single source of truth for lessons and layouts ─────────
@@ -271,19 +277,21 @@ export function WeeklyGrid(): ReactNode {
   // a holiday on today suppresses the emphasis entirely (the holiday
   // treatment carries the orientation instead — per the item-03 spec).
   //
-  // PHASE-1B: `CURRENT_WEEK` is the mock fixture's frozen current week
-  // (lib/mock) — the right source while mock data drives the planner, wrong
-  // once the Supabase flag is ON (the current week must resolve from the
-  // configured academic year's calendar, not a fixture constant). The 1B
-  // wave must swap this comparison to the store's current-week resolution —
-  // the same hydration-aware seam WeeklyShell's initial-link apply documents.
+  // "The current week" is `useAppState().currentWeek`, derived from the
+  // configured academic year (lib/school-week-now.ts) — NOT the frozen mock
+  // `CURRENT_WEEK` fixture this used to compare against, which painted the
+  // emphasis on week 12 for every teacher whatever the date. The gate also
+  // reads `currentWeekBasis` so a CLAMPED week draws no emphasis at all; see
+  // isTodayEmphasisWeek's header.
   const schoolWeekTokens = useMemo(
     () => weekdays.map((d) => d.token),
     [weekdays],
   );
   const todayIdx = useTodayColumnIndex(schoolWeekTokens);
   const emphasizedTodayIdx =
-    week === CURRENT_WEEK && todayIdx !== null && !holidaysByDay.has(todayIdx)
+    isTodayEmphasisWeek(week, currentWeek, currentWeekBasis) &&
+    todayIdx !== null &&
+    !holidaysByDay.has(todayIdx)
       ? todayIdx
       : null;
 

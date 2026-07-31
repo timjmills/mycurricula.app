@@ -42,13 +42,14 @@
 // can never disagree at hydration time.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { CURRENT_WEEK } from "@/lib/mock";
+import { useAppState } from "@/lib/app-state";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { useNowTick } from "@/lib/use-now-tick";
 import { useDayHoliday } from "@/lib/use-day-holiday";
 import {
   resolveNow,
   todayColumnIndex,
+  todayIsInConfiguredYear,
   type PeriodsForDay,
 } from "@/lib/now-anchor";
 import { getDayBlocks, minuteToTop, formatNow } from "@/lib/schedule-data";
@@ -101,6 +102,11 @@ export function NowLine({
   autoScroll = true,
 }: NowLineProps): ReactNode {
   const { days: schoolWeekDays } = useSchoolWeek();
+  // The week that actually contains today, derived from the configured
+  // academic year — every host of this component (Daily, the Weekly schedule
+  // canvas, the Schedule route + drawer) renders inside the planner shell, so
+  // the store is always available.
+  const { currentWeek, currentWeekBasis } = useAppState();
 
   // ── Today resolution — SSR-safe house pattern (finding M4) ──────────────
   // Initial state null → server HTML and first client paint render nothing;
@@ -132,12 +138,24 @@ export function NowLine({
 
   // Holiday suppression — the spec says holidays hide both the line and
   // (elsewhere) the emphasis; the Today chip surfaces the holiday banner
-  // instead. Hook order: called unconditionally (before any early return),
-  // with a benign day index when today isn't resolved / isn't a school day.
-  const holiday = useDayHoliday(CURRENT_WEEK, todayIdx ?? 0);
+  // instead. The lookup is scoped to `currentWeek` (not any viewed week)
+  // because the question is "is TODAY a holiday" — this component only ever
+  // paints on today's column. It used to ask that of the frozen mock
+  // `CURRENT_WEEK` (= 12), so it read week 12's holidays whatever the date.
+  // Hook order: called unconditionally (before any early return), with a
+  // benign day index when today isn't resolved / isn't a school day.
+  const holiday = useDayHoliday(currentWeek, todayIdx ?? 0);
+
+  // A CLAMPED current week means today falls OUTSIDE the configured academic
+  // year (see lib/school-week-now.ts). There is no "now" inside the year to
+  // draw a line at, and the minutes-of-day this component would position from
+  // belong to a day the plan does not cover — so it renders nothing, matching
+  // the today-emphasis rule every week surface uses.
+  const nowIsInYear = todayIsInConfiguredYear(currentWeekBasis);
 
   const minuteOfDay = anchor?.minuteOfDay ?? null;
   const visible =
+    nowIsInYear && // today is inside the configured academic year
     minuteOfDay !== null && // mounted + school day + within school hours
     anchor?.dayIndex === day && // hosting pane is showing today
     holiday === null; // not a holiday

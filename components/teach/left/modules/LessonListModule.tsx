@@ -12,7 +12,8 @@ import { type ReactNode, useMemo } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { useSubjectColor } from "@/lib/palette";
-import { SUBJECT_BY_ID, WEEK_DAYS_SHORT } from "@/lib/mock";
+import { SUBJECT_BY_ID } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { PlannerEmpty } from "@/components/ui";
 import type { Lesson } from "@/lib/types";
 import type { TeachWorkspaceAction } from "@/components/teach/TeachWorkspace";
@@ -38,7 +39,8 @@ function LessonRow({
 }): ReactNode {
   const subjectColor = useSubjectColor(lesson.subject);
   const subject = SUBJECT_BY_ID[lesson.subject];
-  const dayLabel = WEEK_DAYS_SHORT[lesson.day] ?? `Day ${lesson.day + 1}`;
+  const weekdays = useOrderedWeekdays();
+  const dayLabel = weekdays[lesson.day]?.label ?? `Day ${lesson.day + 1}`;
   const meta = lesson.time ? `${dayLabel} · ${lesson.time}` : dayLabel;
 
   return (

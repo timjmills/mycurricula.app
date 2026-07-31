@@ -37,11 +37,10 @@ import { useLabels } from "@/lib/labels";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
 import { useSubjectOrder } from "@/lib/subject-order";
-import { todayColumnIndex } from "@/lib/now-anchor";
+import { isTodayEmphasisWeek, todayColumnIndex } from "@/lib/now-anchor";
 import { deriveDayStatus } from "@/lib/day-status";
 import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
-import { CURRENT_WEEK } from "@/lib/mock";
 import type { Weekday } from "@/lib/use-school-week";
 // Shared v2 planner atoms (lifted from day-v2 by Builder A). Until the
 // planner-v2 barrel lands this import resolves to nothing — a transient
@@ -92,8 +91,15 @@ function useTodayColumnIndex(
 
 export function WeekC(): ReactNode {
   const labels = useLabels();
-  const { week, search, filters, selectedLessonId, setSelectedLessonId } =
-    useAppState();
+  const {
+    week,
+    currentWeek,
+    currentWeekBasis,
+    search,
+    filters,
+    selectedLessonId,
+    setSelectedLessonId,
+  } = useAppState();
   const { lessons, subjects, addLesson, activeGradeId } = usePlanner();
   const openLessonEditor = useContext(OpenLessonEditorContext);
   const nowMin = useNowMin();
@@ -129,15 +135,18 @@ export function WeekC(): ReactNode {
   const holidaysByDay = useHolidaysByDay(week, DAY_COUNT);
 
   // ── Today emphasis ────────────────────────────────────────────────────────
-  // Only when the visible week IS the current week AND today is a configured,
-  // non-holiday school day (a holiday carries orientation instead).
+  // Only when the visible week IS the week that actually contains today AND
+  // today is a configured, non-holiday school day (a holiday carries
+  // orientation instead). See isTodayEmphasisWeek for the clamped-basis rule.
   const schoolWeekTokens = useMemo(
     () => weekdays.map((d) => d.token),
     [weekdays],
   );
   const todayIdx = useTodayColumnIndex(schoolWeekTokens);
   const emphasizedTodayIdx =
-    week === CURRENT_WEEK && todayIdx !== null && !holidaysByDay.has(todayIdx)
+    isTodayEmphasisWeek(week, currentWeek, currentWeekBasis) &&
+    todayIdx !== null &&
+    !holidaysByDay.has(todayIdx)
       ? todayIdx
       : null;
 

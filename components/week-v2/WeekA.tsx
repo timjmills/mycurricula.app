@@ -46,8 +46,7 @@ import { useOrderedWeekdays } from "@/lib/week-order";
 import { WEEKDAY_INDEX, type Weekday } from "@/lib/use-school-week";
 import { getDayBlocks } from "@/lib/schedule-data";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
-import { todayColumnIndex } from "@/lib/now-anchor";
-import { CURRENT_WEEK } from "@/lib/mock";
+import { isTodayEmphasisWeek, todayColumnIndex } from "@/lib/now-anchor";
 import {
   deriveWeekPeriods,
   assignLessonPeriod,
@@ -96,8 +95,15 @@ function useTodayColumnIndex(
 
 export function WeekA(): ReactNode {
   const labels = useLabels();
-  const { week, search, filters, selectedLessonId, setSelectedLessonId } =
-    useAppState();
+  const {
+    week,
+    currentWeek,
+    currentWeekBasis,
+    search,
+    filters,
+    selectedLessonId,
+    setSelectedLessonId,
+  } = useAppState();
   const { lessons, subjects, subjectById, addLesson } = usePlanner();
   const openLessonEditor = useContext(OpenLessonEditorContext);
   const nowMin = useNowMin();
@@ -129,12 +135,17 @@ export function WeekA(): ReactNode {
     [weekdays],
   );
   const todayIdx = useTodayColumnIndex(schoolWeekTokens);
-  // Emphasis applies only when the visible week is the current week AND today is
-  // a configured school day with no holiday (a holiday carries its own marker) —
-  // verbatim gate from WeekColumns/WeekC. Off-emphasis columns never show a
-  // "now" ring (deriveDayStatus's isToday=false collapses non-done to idle).
+  // Emphasis applies only when the visible week is the week that actually
+  // contains today AND today is a configured school day with no holiday (a
+  // holiday carries its own marker) — verbatim gate from WeekColumns/WeekC.
+  // Off-emphasis columns never show a "now" ring (deriveDayStatus's
+  // isToday=false collapses non-done to idle). `isTodayEmphasisWeek` also
+  // withholds the emphasis when the current week was CLAMPED rather than
+  // derived; see its header for why.
   const emphasizedTodayIdx =
-    week === CURRENT_WEEK && todayIdx !== null && !holidaysByDay.has(todayIdx)
+    isTodayEmphasisWeek(week, currentWeek, currentWeekBasis) &&
+    todayIdx !== null &&
+    !holidaysByDay.has(todayIdx)
       ? todayIdx
       : null;
 

@@ -250,8 +250,11 @@ export const DEFAULT_SCHOOL_WEEK: readonly string[] = [
 ] as const;
 
 /**
- * Default term-start date: aligns with the mock fixture anchor in
- * lib/mock/calendar.ts (Week 1 = 2025-11-02).
+ * Default term-start date — a FALLBACK for surfaces that have no configured
+ * academic year to read. It was chosen to align with the old mock calendar
+ * anchor (Week 1 = 2025-11-02); that helper is superseded by lib/week-dates.ts,
+ * which takes the year start as an argument and gets it from
+ * `useAcademicYear()`. Prefer the configured year over this constant.
  * The Year view shows Q1 which starts Week 1 of the academic year.
  */
 export const DEFAULT_TERM_START = new Date(2025, 10, 2); // 2025-11-02

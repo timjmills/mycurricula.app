@@ -58,9 +58,8 @@ import { useAppState } from "@/lib/app-state";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
-import { todayColumnIndex } from "@/lib/now-anchor";
+import { isTodayEmphasisWeek, todayColumnIndex } from "@/lib/now-anchor";
 import type { Weekday } from "@/lib/use-school-week";
-import { CURRENT_WEEK } from "@/lib/mock";
 import {
   type DragState,
   type Density,
@@ -105,8 +104,15 @@ export function WeekColumns(): ReactNode {
   // in that column. SSR-safe by inheritance (see lib/week-order.ts).
   const weekdays = useOrderedWeekdays();
   const DAY_COUNT = weekdays.length;
-  const { week, search, filters, selectedLessonId, setSelectedLessonId } =
-    useAppState();
+  const {
+    week,
+    currentWeek,
+    currentWeekBasis,
+    search,
+    filters,
+    selectedLessonId,
+    setSelectedLessonId,
+  } = useAppState();
   const prefersReducedMotion = useReducedMotion();
 
   // ── Planner store — single source of truth for lessons ────────────────────
@@ -149,14 +155,17 @@ export function WeekColumns(): ReactNode {
   // Applies ONLY when the visible week IS the current week AND today is a
   // configured school day; a holiday on today suppresses the emphasis (the
   // holiday treatment carries the orientation instead). Verbatim derivation
-  // from WeeklyGrid.tsx lines 280-288, incl. the CURRENT_WEEK mock caveat.
+  // from WeeklyGrid.tsx, incl. the clamped-basis gate — see
+  // isTodayEmphasisWeek in lib/now-anchor.
   const schoolWeekTokens = useMemo(
     () => weekdays.map((d) => d.token),
     [weekdays],
   );
   const todayIdx = useTodayColumnIndex(schoolWeekTokens);
   const emphasizedTodayIdx =
-    week === CURRENT_WEEK && todayIdx !== null && !holidaysByDay.has(todayIdx)
+    isTodayEmphasisWeek(week, currentWeek, currentWeekBasis) &&
+    todayIdx !== null &&
+    !holidaysByDay.has(todayIdx)
       ? todayIdx
       : null;
 

@@ -21,8 +21,8 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useAppState } from "@/lib/app-state";
+import { todayIsInConfiguredYear } from "@/lib/now-anchor";
 import { usePlanner } from "@/lib/planner-store";
-import { CURRENT_WEEK } from "@/lib/mock";
 import {
   allYearWeeksFor,
   allYearMonthsFor,
@@ -232,11 +232,24 @@ const LEFT_RAIL_WIDTH_PX = 200;
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function YearView() {
-  const { viewMode, setViewMode } = useAppState();
+  const { viewMode, setViewMode, currentWeek, currentWeekBasis } =
+    useAppState();
   const { lessons, subjects } = usePlanner();
 
-  // CURRENT_WEEK is 1-based; convert to 0-based for index math.
-  const currentWeekIdx = CURRENT_WEEK - 1;
+  // The week that actually contains today, derived from the configured
+  // academic year (lib/school-week-now.ts) rather than the frozen mock
+  // `CURRENT_WEEK` fixture this used to read — that constant is 12, so the
+  // roadmap's TODAY line sat in October no matter the date. 1-based → 0-based
+  // for the column index math below.
+  const currentWeekIdx = currentWeek - 1;
+  // …and the index the TODAY marker paints at, which is `undefined` whenever
+  // the current week was CLAMPED rather than derived (today outside the
+  // configured year): drawing a "TODAY" line on a week that isn't today is a
+  // false claim, where SCROLLING to the nearest week is still useful. See
+  // todayIsInConfiguredYear in lib/now-anchor.
+  const todayWeekIdx = todayIsInConfiguredYear(currentWeekBasis)
+    ? currentWeekIdx
+    : undefined;
 
   // ── Curriculum (subject) filter ──────────────────────────────────────
   const {
@@ -518,7 +531,7 @@ export function YearView() {
             <QuarterMonthWeekHeader
               months={months}
               weeks={weeks}
-              todayWeekIdx={currentWeekIdx}
+              todayWeekIdx={todayWeekIdx}
               columnWidthPx={COLUMN_WIDTH_PX}
               leftRailWidthPx={LEFT_RAIL_WIDTH_PX}
               subjectId={activeSubjectId}

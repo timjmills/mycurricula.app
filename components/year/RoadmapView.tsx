@@ -24,13 +24,14 @@
 import { useMemo, useEffect, useRef } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels, pluralize } from "@/lib/labels";
-import { CURRENT_WEEK } from "@/lib/mock";
 import {
   subjectCompletePct,
   lessonToFlatIndex,
   allYearWeeksFor,
 } from "@/lib/year-calendar";
 import { useAcademicYear } from "@/lib/use-academic-year";
+import { useAppState } from "@/lib/app-state";
+import { todayIsInConfiguredYear } from "@/lib/now-anchor";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
@@ -161,9 +162,22 @@ export function RoadmapView({
   // constraint affects the lessons-count math but not the visual stripe
   // (per the Lane DG spec — a per-cell lesson-dot overlay is a follow-up).
   const { units: customUnits } = useCustomUnits();
+  const { currentWeek, currentWeekBasis } = useAppState();
 
-  // CURRENT_WEEK is 1-based in the fixture; convert to 0-based for index math.
-  const currentWeekIdx = CURRENT_WEEK - 1;
+  // The week that actually contains today, derived from the configured
+  // academic year (lib/school-week-now.ts) rather than the frozen mock
+  // `CURRENT_WEEK` fixture this used to read (= 12, so "today" sat in
+  // October whatever the date). 1-based → 0-based for index math.
+  const currentWeekIdx = currentWeek - 1;
+  // The TODAY marker/highlight is withheld when the current week was CLAMPED
+  // rather than derived — today is outside the configured year, so there is
+  // no week to mark. Unit status, pacing, and the initial scroll below keep
+  // using currentWeekIdx: the clamped week is meaningful for those (before
+  // the year starts nothing has started; after it ends everything has).
+  // See lib/now-anchor.
+  const todayWeekIdx = todayIsInConfiguredYear(currentWeekBasis)
+    ? currentWeekIdx
+    : undefined;
 
   // ── Chameleon: notify parent which lane is topmost ───────────────────
   const laneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -201,8 +215,8 @@ export function RoadmapView({
 
   // 0-based flat school-day index for "today" — passed to pacingFor.
   const todaySchoolDayIdx = useMemo(
-    () => lessonToFlatIndex(CURRENT_WEEK, 0, schoolWeekLen),
-    [schoolWeekLen],
+    () => lessonToFlatIndex(currentWeek, 0, schoolWeekLen),
+    [currentWeek, schoolWeekLen],
   );
 
   // ── Per-subject lane data ─────────────────────────────────────────────
@@ -472,7 +486,7 @@ export function RoadmapView({
                     {weekLabels.map((_, i) => (
                       <div
                         key={i}
-                        className={`${styles.bgLine} ${i > 0 ? styles.weekBorder : ""} ${i === currentWeekIdx ? styles.bgLineToday : ""}`}
+                        className={`${styles.bgLine} ${i > 0 ? styles.weekBorder : ""} ${i === todayWeekIdx ? styles.bgLineToday : ""}`}
                       />
                     ))}
                   </div>
@@ -487,11 +501,13 @@ export function RoadmapView({
                     />
                   ))}
 
-                  <TodayMarker
-                    todayWeekIdx={currentWeekIdx}
-                    columnWidthPx={WEEK_COL_PX}
-                    leftRailWidthPx={0}
-                  />
+                  {todayWeekIdx !== undefined && (
+                    <TodayMarker
+                      todayWeekIdx={todayWeekIdx}
+                      columnWidthPx={WEEK_COL_PX}
+                      leftRailWidthPx={0}
+                    />
+                  )}
                 </div>
               )}
             </div>

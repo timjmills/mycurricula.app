@@ -22,6 +22,7 @@
 // `minuteToTop()` to position a now-line.
 
 import { WEEKDAY_ORDER, type Weekday } from "@/lib/use-school-week";
+import type { CurrentWeekBasis } from "@/lib/school-week-now";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,62 @@ export function todayColumnIndex(
   const token = weekdayTokenOf(now);
   const idx = schoolWeekDays.indexOf(token);
   return idx === -1 ? null : idx;
+}
+
+// ── Week-level "is now here?" gate ─────────────────────────────────────────
+
+/**
+ * Should a week-scoped surface draw its TODAY emphasis (the today-ring, the
+ * "Today" column chip, the Year today-marker) while showing `viewedWeek`?
+ *
+ * The companion to {@link todayColumnIndex} one level up: that answers "which
+ * COLUMN is today?", this answers "is today even in the week on screen?". Both
+ * must agree, so the two rules live together rather than being re-derived at
+ * each of the dozen surfaces that draw the emphasis.
+ *
+ * ── Why `basis` is a parameter and not ignored ────────────────────────────
+ * `resolveCurrentWeek` never invents a week: when today falls outside the
+ * configured academic year it CLAMPS (to week 1 before the year starts, to the
+ * last week after it ends) and reports which rule fired. Clamping is the right
+ * answer for NAVIGATION — "the closest week to now" is where a teacher wants to
+ * land, and it is where the planner already opens. It is the wrong answer for
+ * EMPHASIS: painting "Today" on Sunday of week 1 while the school year has not
+ * begun asserts that that day is happening now, which is false. As of
+ * 2026-07-31 that is not a hypothetical — a school whose year starts in August
+ * is in exactly the `before-start` case today.
+ *
+ * So the emphasis is drawn only on a real derivation. Absence is the honest
+ * rendering: there genuinely is no "today" inside the year yet.
+ *
+ * Note this is deliberately NOT the rule for a done-vs-todo split (e.g. the
+ * Year timeline's "weeks before now are done"). There the clamped week is
+ * meaningful in every basis — before the year starts nothing is done, after it
+ * ends everything is — so those surfaces compare against `currentWeek`
+ * directly.
+ *
+ * @param viewedWeek  The 1-based week the surface is showing.
+ * @param currentWeek `useAppState().currentWeek` — where now is.
+ * @param basis       `useAppState().currentWeekBasis` — how that was derived.
+ */
+export function isTodayEmphasisWeek(
+  viewedWeek: number,
+  currentWeek: number,
+  basis: CurrentWeekBasis,
+): boolean {
+  return todayIsInConfiguredYear(basis) && viewedWeek === currentWeek;
+}
+
+/**
+ * The half of {@link isTodayEmphasisWeek} that doesn't involve a viewed week —
+ * "is there a real today inside the configured academic year at all?".
+ *
+ * Surfaces that show the WHOLE year at once (the Year roadmap's TODAY marker,
+ * the progression grid's today column) have no "viewed week" to compare, and
+ * the Daily now-line only ever paints on today's own column. They all ask this
+ * question instead. Same policy, same reasoning — see above.
+ */
+export function todayIsInConfiguredYear(basis: CurrentWeekBasis): boolean {
+  return basis === "in-range";
 }
 
 // ── resolveNow ─────────────────────────────────────────────────────────────

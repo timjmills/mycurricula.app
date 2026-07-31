@@ -18,7 +18,6 @@
 
 import { useMemo, useEffect, useRef } from "react";
 import { usePlanner } from "@/lib/planner-store";
-import { CURRENT_WEEK } from "@/lib/mock";
 import {
   buildSchoolDays,
   groupByMonth,
@@ -28,6 +27,8 @@ import {
   allYearWeeksFor,
 } from "@/lib/year-calendar";
 import { useAcademicYear } from "@/lib/use-academic-year";
+import { useAppState } from "@/lib/app-state";
+import { todayIsInConfiguredYear } from "@/lib/now-anchor";
 import { useSchoolWeek, type Weekday } from "@/lib/use-school-week";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
@@ -96,6 +97,7 @@ export function ProgressionView({
 }: ProgressionViewProps = {}) {
   const { lessons, subjects } = usePlanner();
   const { isMinimized, toggle } = useMinimizedSubjects();
+  const { currentWeek, currentWeekBasis } = useAppState();
   // TEAM-scoped academic year. Drives the day-column count + the
   // term-start date the buildSchoolDays helper anchors against.
   const { start: yearStart, end: yearEnd } = useAcademicYear();
@@ -155,11 +157,20 @@ export function ProgressionView({
   // here — the QuarterMonthWeekHeader carries the month bands now.
   void groupByMonth(schoolDays);
 
-  // Today's flat school-day index.
+  // Today's flat school-day index — from the week that actually contains
+  // today (derived from the configured academic year) rather than the frozen
+  // mock `CURRENT_WEEK` fixture this used to read. Drives pacing and the
+  // initial scroll, both of which want the clamped week when today falls
+  // outside the year.
   const todayFlatIdx = useMemo(
-    () => lessonToFlatIndex(CURRENT_WEEK, 0, schoolWeekLen),
-    [schoolWeekLen],
+    () => lessonToFlatIndex(currentWeek, 0, schoolWeekLen),
+    [currentWeek, schoolWeekLen],
   );
+  // The TODAY column highlight is a claim about now, so it is withheld when
+  // the current week was clamped rather than derived (lib/now-anchor).
+  const todayHighlightIdx = todayIsInConfiguredYear(currentWeekBasis)
+    ? todayFlatIdx
+    : null;
 
   // Per-subject glyph maps and completion percentages.
   const subjectData = useMemo(() => {
@@ -285,13 +296,15 @@ export function ProgressionView({
                   style={{ width: totalCols * COL }}
                 >
                   {/* TODAY column highlight */}
-                  {todayFlatIdx >= 0 && todayFlatIdx < totalCols && (
-                    <div
-                      className={styles.todayHighlight}
-                      style={{ left: todayFlatIdx * COL, width: COL }}
-                      aria-hidden="true"
-                    />
-                  )}
+                  {todayHighlightIdx !== null &&
+                    todayHighlightIdx >= 0 &&
+                    todayHighlightIdx < totalCols && (
+                      <div
+                        className={styles.todayHighlight}
+                        style={{ left: todayHighlightIdx * COL, width: COL }}
+                        aria-hidden="true"
+                      />
+                    )}
 
                   {/* LESSONS row — per-day StatusGlyph cells */}
                   <div className={styles.glyphRow}>

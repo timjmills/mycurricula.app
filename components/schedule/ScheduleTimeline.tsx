@@ -8,11 +8,14 @@
 // can mount the same component without re-creating the geometry math.
 //
 // Two scopes:
-//   • scope="week" — five day columns side-by-side with the time gutter
-//                    on the left (Sun → Thu by default; the configured
-//                    school week will drive this once the backend lands).
+//   • scope="week" — one column per CONFIGURED school day, side-by-side with
+//                    the time gutter on the left. The column set comes from
+//                    `useOrderedWeekdays()` (CLAUDE.md §1) — it used to be the
+//                    literal `[0,1,2,3,4]`, which silently dropped a column on
+//                    a Mon–Sat school and rendered a phantom one on a 3-day week.
 //   • scope="day"  — single day column with the time gutter; the day prop
-//                    selects which day (default: today).
+//                    selects which day (default: today's column, or the first
+//                    school day when today is not a school day).
 //
 // The `showNonAcademic` prop is propagated to each ScheduleColumn which
 // filters its block list accordingly. Filtering happens at the column so
@@ -22,18 +25,21 @@
 // `1fr` day columns. `position: relative` on the grid is the parent the
 // now-line and the absolute hour gridlines anchor to.
 
-import type { ReactNode } from "react";
-import { todayDayIndex } from "@/lib/schedule-data";
+import { useEffect, useState, type ReactNode } from "react";
+import { todayColumnIndex } from "@/lib/now-anchor";
+import { useSchoolWeek } from "@/lib/use-school-week";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { ScheduleColumn } from "./ScheduleColumn";
 import { ScheduleTimeGutter } from "./ScheduleTimeGutter";
 import styles from "./ScheduleTimeline.module.css";
 
 export interface ScheduleTimelineProps {
-  /** "week" → 5 columns (Sun–Thu); "day" → single column. */
+  /** "week" → one column per configured school day; "day" → single column. */
   scope: "day" | "week";
   /**
-   * Day index for `scope: "day"`. Defaults to todayDayIndex() when omitted.
-   * Ignored when scope is "week".
+   * Day index for `scope: "day"` — a 0-based POSITION in the configured school
+   * week, matching a lesson's `day` field. Defaults to today's column when
+   * omitted. Ignored when scope is "week".
    */
   day?: number;
   /**
@@ -44,18 +50,33 @@ export interface ScheduleTimelineProps {
   showNonAcademic: boolean;
 }
 
-/** The five school-week days the week-scope timeline renders. Stays in
- *  lock-step with `getWeekBlocks()`; once the school-week config is wired
- *  we'll derive this from the configured weekdays instead. */
-const WEEK_DAY_INDICES: readonly number[] = [0, 1, 2, 3, 4];
-
 export function ScheduleTimeline({
   scope,
   day,
   showNonAcademic,
 }: ScheduleTimelineProps): ReactNode {
-  const focusedDay = day ?? todayDayIndex();
-  const columns = scope === "week" ? WEEK_DAY_INDICES : [focusedDay];
+  const weekdays = useOrderedWeekdays();
+  const { days: schoolWeekDays } = useSchoolWeek();
+
+  // Today's column — SSR-safe house pattern (null on the server render, real
+  // answer post-mount). Replaces `todayDayIndex()`, which returned a hard-coded
+  // 1 (Monday) regardless of the date or the configured week.
+  const [todayIdx, setTodayIdx] = useState<number | null>(null);
+  useEffect(() => {
+    const sync = (): void => {
+      setTodayIdx(todayColumnIndex(new Date(), schoolWeekDays));
+    };
+    sync();
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
+  }, [schoolWeekDays]);
+
+  // Fall back to the first school day when the caller named no day and today
+  // is a weekend / not yet resolved — a single column is required, and column 0
+  // always exists whenever the school week does.
+  const focusedDay = day ?? todayIdx ?? 0;
+  const columns =
+    scope === "week" ? weekdays.map((w) => w.index) : [focusedDay];
 
   return (
     <div className={styles.canvas}>
