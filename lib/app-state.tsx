@@ -24,7 +24,13 @@ import {
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { LessonStatus, SubjectId } from "@/lib/types";
-import { CURRENT_WEEK, ME } from "@/lib/mock";
+import { ME } from "@/lib/mock";
+import { resolveCurrentWeek } from "@/lib/school-week-now";
+import type {
+  CurrentWeekBasis,
+  CurrentWeekResolution,
+} from "@/lib/school-week-now";
+import { useAcademicYear } from "@/lib/use-academic-year";
 import { createClient } from "@/lib/supabase/client";
 import {
   PROFILE_EVENT,
@@ -206,6 +212,30 @@ export interface AppStateValue {
   week: number;
   setWeek: (w: number) => void;
 
+  /**
+   * The week that ACTUALLY contains today, derived from the team's configured
+   * academic year (lib/school-week-now.ts). `week` above is where the teacher
+   * is looking; this is where "now" is — they differ as soon as anyone
+   * navigates.
+   *
+   * MIGRATION SEAM. Roughly a dozen surfaces still answer "is this the current
+   * week?" by comparing against the frozen mock constant
+   * (`week === CURRENT_WEEK`, e.g. components/week-v2/WeekA.tsx:137,
+   * components/daily/TodayJumpButton.tsx:77). Every one of those should read
+   * this instead; until they do, their today-ring points at mock week 12. See
+   * the handover notes for the full list.
+   */
+  currentWeek: number;
+
+  /**
+   * Why `currentWeek` has the value it does — `"in-range"` for a real
+   * derivation, or `"before-start"` / `"after-end"` / `"unconfigured"` when it
+   * was clamped. Exposed so a surface can TELL the teacher ("your school year
+   * hasn't started — showing Week 1") instead of silently landing them
+   * somewhere they can't account for. Nothing consumes it yet.
+   */
+  currentWeekBasis: CurrentWeekBasis;
+
   /** Day index into the configured school week (0-based) — the Daily view's
    * focused day. The day count comes from the school-week config, not a
    * fixed 5. */
@@ -306,7 +336,52 @@ export function AppStateProvider({
 }: AppStateProviderProps): ReactNode {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [editMode, setEditMode] = useState<EditMode>("personal");
-  const [week, setWeek] = useState<number>(CURRENT_WEEK);
+  // The week every week-scoped view opens on. Derived from the team's
+  // configured academic year (see lib/school-week-now.ts), NOT from the mock
+  // `CURRENT_WEEK` fixture it used to seed from — that constant is frozen at
+  // 12, so the live site greeted every teacher with "Week 12 — THIS WEEK"
+  // regardless of the date.
+  //
+  // Hydration: `useAcademicYear` deliberately returns its HEURISTIC defaults on
+  // the first render and syncs the stored/onboarding values in a post-mount
+  // effect (localStorage is unreadable during SSR). We follow that same shape —
+  // the initializer derives against whatever the hook can offer at render time
+  // so server and client HTML agree, and the effect below re-derives once the
+  // real dates arrive.
+  const { start: academicYearStart, end: academicYearEnd } = useAcademicYear();
+  const [currentWeekInfo, setCurrentWeekInfo] = useState<CurrentWeekResolution>(
+    () => resolveCurrentWeek(new Date(), academicYearStart, academicYearEnd),
+  );
+  // Seeded from the derivation, then free to diverge as the teacher navigates.
+  const [week, setWeekState] = useState<number>(currentWeekInfo.week);
+
+  // Has the week been set deliberately — by the teacher, a keyboard shortcut,
+  // or a ?week= deep link? Once it has, the derivation must never overwrite it.
+  // Child effects (e.g. WeeklyShell's URL sync) run BEFORE this parent's
+  // effect, so an explicit deep link claims the week first and wins.
+  const weekTouchedRef = useRef(false);
+  const setWeek = useCallback((next: number): void => {
+    weekTouchedRef.current = true;
+    setWeekState(next);
+  }, []);
+
+  // Re-derive when the academic year settles (heuristic → stored/onboarding) or
+  // a teacher edits the year in Settings. Guarded so it can only ever move a
+  // week nobody has claimed.
+  useEffect(() => {
+    const next = resolveCurrentWeek(
+      new Date(),
+      academicYearStart,
+      academicYearEnd,
+    );
+    // `currentWeek` tracks the real world unconditionally — it is "where now
+    // is", not "where the teacher is looking", so navigation must not freeze
+    // it. Only the VIEWED week is guarded.
+    setCurrentWeekInfo(next);
+    if (weekTouchedRef.current) return;
+    setWeekState(next.week);
+  }, [academicYearStart, academicYearEnd]);
+
   const [selectedDay, setSelectedDay] = useState<number>(0);
   const [subjectView, setSubjectView] = useState<SubjectId>("math");
   const [filters, setFilters] = useState<PlannerFilters>(EMPTY_FILTERS);
@@ -515,6 +590,8 @@ export function AppStateProvider({
       setEditMode,
       week,
       setWeek,
+      currentWeek: currentWeekInfo.week,
+      currentWeekBasis: currentWeekInfo.basis,
       selectedDay,
       setSelectedDay,
       subjectView,
@@ -543,6 +620,8 @@ export function AppStateProvider({
       viewMode,
       editMode,
       week,
+      setWeek,
+      currentWeekInfo,
       selectedDay,
       subjectView,
       filters,
