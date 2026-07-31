@@ -1890,9 +1890,63 @@ export const plannerSupabaseSource: PlannerDataSource = {
     const client = await sb();
     const grade = gradeLevelId ?? input.gradeLevelId;
     // Resolve the subject slug → its DB uuid for this grade (the column is a
-    // NOT-NULL FK to subjects). The importer keys subjects by the slug-derived
-    // uuid, so the deterministic bridge resolves it without a round-trip.
-    const subjectUuid = slugToUuid("subject", input.subject);
+    // NOT-NULL FK to subjects).
+    //
+    // ⚠ THIS USED TO BE `slugToUuid("subject", input.subject)`, on the stated
+    // premise that "the importer keys subjects by the slug-derived uuid, so the
+    // deterministic bridge resolves it without a round-trip". THAT PREMISE IS
+    // FALSE ON PRODUCTION, and it made lesson creation fail 100% of the time:
+    //
+    //   insert or update on table "personal_authored_lessons" violates foreign
+    //   key constraint "personal_authored_lessons_subject_id_fkey"
+    //
+    // Only the ORIGINAL seeded grade carries slug-derived subject ids. Every
+    // grade minted since (the multi-workspace cutover onward) has RANDOM
+    // subject uuids, so the derived value matches no row: measured 2026-07-31
+    // against prod, all eight locked subject slugs resolved to uuids appearing
+    // ZERO times in `public.subjects`. The insert 500'd and the teacher got
+    // "Couldn't add the lesson — check your connection and try again", which
+    // sent them looking at their wifi for a foreign-key bug.
+    //
+    // So resolve against the grade's ACTUAL rows. The same index is reused
+    // after the insert to map the row back, so this costs no extra round-trip
+    // on the success path — it moves a load that already happened.
+    // §4a: validate the grade BEFORE the lookup. Without this, an unresolved
+    // grade queries `subjects` with "" and reports "subject has no row", which
+    // sends the reader after the wrong bug — the same misdirection this whole
+    // fix exists to end.
+    if (!grade || !isUuid(grade)) {
+      throw new Error(
+        `Planner repository create lesson failed: unresolved grade level. ` +
+          `A lesson row cannot be keyed without it.`,
+      );
+    }
+    const { uuidToSubjectId: subjectsByUuid } = await loadSubjectIndex(client, grade);
+    const matches: string[] = [];
+    for (const [uuid, slug] of subjectsByUuid) {
+      if (slug === input.subject) matches.push(uuid);
+    }
+    // §4a: ZERO-OR-ONE, not first-wins. `subjects` has no uniqueness constraint
+    // on (grade_level_id, scope, colour), so a bad import or a shared-course
+    // collision can leave two team rows claiming the same slug. First-wins would
+    // silently file the lesson under whichever sorted first by display_order —
+    // a wrong-but-plausible row, which is worse than a refusal.
+    if (matches.length !== 1) {
+      // The detail goes to the SERVER log only. The thrown message is
+      // deliberately free of table names and ids: it reaches a Next.js server
+      // action boundary, and while prod redacts it to a digest, that redaction
+      // is not a thing to rely on for what we choose to put in the string.
+      console.error(
+        `[planner] createLesson subject resolve failed: slug=${input.subject} ` +
+          `grade=${grade} matches=${matches.length} [${matches.join(", ")}]`,
+      );
+      throw new Error(
+        matches.length === 0
+          ? `Planner repository create lesson failed: this grade has no subject "${input.subject}".`
+          : `Planner repository create lesson failed: this grade has ${matches.length} subjects named "${input.subject}"; cannot choose one.`,
+      );
+    }
+    const subjectUuid = matches[0];
     // Unit id (Codex #6): the column is a nullable FK to `units.id` (real uuid).
     // `input.unit` may already BE a real units.id uuid (the DB read path exposes
     // the unit as its uuid — see loadUnitIndex) or a fixture SLUG (`u-m3`). Only
@@ -1904,6 +1958,20 @@ export const plannerSupabaseSource: PlannerDataSource = {
     // authored lesson keyed by a real units.id uuid won't match those slug-based
     // groupings until the unit catalog is routed through the store. Out of scope
     // here (needs the store + catalog change); flagged so it isn't lost.
+    // ⚠ THE SUBJECT BUG'S TWIN, STILL LIVE — flagged, deliberately not fixed here
+    // (§4a Medium, 2026-07-31). The `slugToUuid("unit", …)` arm rests on exactly
+    // the premise that just cost us lesson creation on prod: that the importer's
+    // slug-derived uuid IS the row's id. For any grade minted since the
+    // multi-workspace cutover it is not, so a SLUG-form unit would hash to a
+    // nonexistent uuid and violate the unit FK the same way.
+    //
+    // Why it is not biting today, and why that is luck rather than design: every
+    // caller reaching this line supplies either a real uuid (the read path
+    // exposes units AS their uuid) or "" — `addLesson` hardcodes `unit: ""`
+    // (planner-store.tsx), so `unitUuid` is null on the only live create path.
+    // The moment anything files a lesson by unit SLUG, this breaks exactly as
+    // the subject arm did. Fix by resolving through a grade-scoped unit index
+    // (loadUnitIndex is already loaded below), not by widening the hash.
     const unitUuid = input.unit
       ? isUuid(input.unit)
         ? input.unit
@@ -1943,13 +2011,17 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
     // Map the inserted row back to a FLAT Lesson. Resolve subject/unit/standard
     // slugs against the lesson's grade so the domain id matches the read path.
-    const [{ uuidToSubjectId }, { uuidToUnitSlug }, standards] =
-      await Promise.all([
-        loadSubjectIndex(client, grade),
-        loadUnitIndex(client, grade),
-        loadStandardsIndex(client, grade),
-      ]);
-    const subjectId = uuidToSubjectId.get(inserted.subject_id) ?? input.subject;
+    //
+    // `subjectsByUuid` is the index loaded BEFORE the insert to resolve the FK —
+    // reused here rather than re-fetched, so validating the subject costs no
+    // extra round-trip. It cannot go stale within this call: it was read from
+    // the same client moments earlier, and `inserted.subject_id` is a value
+    // taken FROM it.
+    const [{ uuidToUnitSlug }, standards] = await Promise.all([
+      loadUnitIndex(client, grade),
+      loadStandardsIndex(client, grade),
+    ]);
+    const subjectId = subjectsByUuid.get(inserted.subject_id) ?? input.subject;
     // The read path exposes a unit AS its DB uuid (loadUnitIndex maps id→id), so
     // the authored lesson's `unit` round-trips to the SAME real units.id it was
     // written with — listLessons resolves it identically.
