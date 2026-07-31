@@ -253,20 +253,21 @@ async function partB(browser, frame, viewport, label, bg = "photo") {
  * nothing and cheerfully measures the DEFAULT state. Clicking cannot lie about
  * that: the assertion below fails outright if `.inverse` is not on the section.
  *
- * IT APPLIES TWICE ON PURPOSE, AND THAT IS A BUG IN THE APP, NOT A QUIRK HERE.
- * The FIRST pin on a preset wall is silently discarded. `onApplyBg` calls
- * `onEdit()`, which auto-forks the preset into a custom wall ("Current Lesson"
- * -> "My Current Lesson") in the same action; the background is saved under the
- * OLD wallKey while Section's bg effect immediately re-reads under the NEW one,
- * finds nothing, and sets bg back to null. Measured:
+ * IT USED TO APPLY TWICE, because the FIRST pin on a preset wall was silently
+ * discarded (task #25). `onApplyBg` calls `onEdit()`, which auto-forks the
+ * preset into a custom wall ("Current Lesson" -> "My Current Lesson") in the
+ * same action; the background was saved under the OLD wallKey while Section's
+ * bg effect immediately re-read under the NEW one, found nothing, and set bg
+ * back to null. Measured then:
  *
  *   apply #1 (preset)  inverse=false hasBg=false  wrote cc_secbg_lesson:math:…
  *   apply #2 (forked)  inverse=true  hasBg=true   wrote cc_secbg_cw16aea111…:math:…
  *
- * So a teacher's first click on a colour does nothing visible and orphans a
- * localStorage record. Reported separately — it is in the wall-state/fork seam,
- * not in the chips. The second apply is what this part needs, and the first is
- * left in as the documented workaround rather than hidden behind a retry loop.
+ * FIXED: the write now uses the key `onEdit()` returns — the post-fork one — so
+ * one click sticks. The second apply is gone and the single apply below is now
+ * itself the regression assertion: if it stops inverting the section, the race
+ * is back. (tests/wall-bg-fork.test.ts pins the same behaviour deterministically,
+ * including the orphan record this used to leave behind.)
  */
 async function partC(browser, bg, label) {
   const ctx = await context(browser, "paper", { width: 1440, height: 900 }, bg);
@@ -308,22 +309,16 @@ async function partC(browser, bg, label) {
   ok(`${label} .inverse — the ink swatch is reachable through the real popover`, first === "ok", first);
   if (first !== "ok") { await ctx.close(); return; }
 
-  // Pin the app bug in passing, so a fix that makes the first apply stick shows
-  // up here as a change rather than going unnoticed.
-  const midway = await page.evaluate(MEASURE_CHIP);
-  ok(
-    ".inverse — KNOWN BUG: the first pin on a preset is discarded by the auto-fork",
-    midway.inverse === false,
-    "if this now FAILS the bug is fixed — drop the second apply below",
-  );
-
-  const second = await applyInk();
-  ok(`${label} .inverse — second apply, now on the forked custom wall`, second === "ok", second);
-
   const after = await page.evaluate(MEASURE_CHIP);
-  // The gate: if this is false the measurement below describes the default
-  // state and every ratio under it is meaningless.
-  ok(`${label} .inverse — section adopted the dark treatment`, after.inverse === true);
+  // Two jobs in one assertion. It is the GATE: if this is false the measurement
+  // below describes the default state and every ratio under it is meaningless.
+  // It is also the task #25 regression — ONE click now has to stick, through a
+  // fork that changes the wall underneath it.
+  ok(
+    `${label} .inverse — the first pin stuck and the section adopted the dark treatment`,
+    after.inverse === true,
+    "if false, the pin is being discarded again — the write is back on the pre-fork wallKey",
+  );
   ok(
     `${label} .inverse — chip re-inked (its colour actually changed)`,
     after.fg.join() !== before.fg.join(),

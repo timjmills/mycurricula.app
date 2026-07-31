@@ -42,6 +42,21 @@
   position: relative;
   z-index: 1;
 }
+/* …but the HEADER has to OUT-RANK the card grid, not merely tie with it.
+   `> *` above gives .head and .grid the same z-index, and .head — now carrying
+   a z-index other than `auto` — becomes a stacking context. That seals the
+   header's popovers (.pop / .tagPop, z-index: 40) inside a layer the
+   later-in-DOM .grid paints straight over: at equal z-index, source order
+   decides. Measured on /post: with a photo pinned, the top-most element at the
+   photo swatch's own centre was a Card title, so the background popover opened
+   but nothing in it could be clicked — pinning a photo made that section's
+   background impossible to change or clear. Only a PHOTO background is
+   affected; the other kinds set no z-index here, so the popover still wins on
+   its own. Latent until the first pin on a preset started sticking (task #25) —
+   before that a section never held a photo long enough for anyone to try. */
+.hasPhoto > .head {
+  z-index: 2;
+}
 
 /* Only for backgrounds we KNOW are dark (see needsInverseInk). */
 .inverse {
