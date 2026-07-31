@@ -267,6 +267,14 @@ export function ResourceWall({
   const [activeCustom, setActiveCustom] = useState<CustomWall | null>(null);
   const [customWalls, setCustomWalls] = useState<CustomWall[]>([]);
 
+  // Identity of the wall on screen — the custom wall's id, else the preset id.
+  // Scopes each section's "this section" background so it can't bleed onto
+  // another wall that (post-fork/duplicate) shares the same section ids.
+  // Declared up here because `ensurePersonal` closes over it: a fork has to
+  // return the key storage should use, and reading it from further down the
+  // body would make that dependency invisible.
+  const wallKey = wallMode === "custom" ? (activeCustom?.id ?? preset) : preset;
+
   const [view, setView] = useState<WallView>("med");
   const [layout, setLayout] = useState<WallLayout>("natural");
   const [presetBackgrounds, setPresetBackgrounds] = useState<
@@ -495,13 +503,27 @@ export function ResourceWall({
   /**
    * The lazy fork. Editing a preset copies the CURRENT projection into a new
    * "My Walls" entry and switches to it; editing an existing custom wall is a
-   * no-op. Returns the sections the caller should mutate, because setState is
-   * async — a mutator that re-read `sections` here would still see the pre-fork
-   * value.
+   * no-op.
+   *
+   * Returns BOTH halves of the post-fork world, because setState is async and a
+   * caller that re-read either from the enclosing render would still see the
+   * pre-fork value:
+   *   • `sections` — what a mutator must transform.
+   *   • `wallKey` — where wall-scoped STORAGE for this edit belongs. A fork
+   *     mints a new wall id, and `wallKey` is derived from it, so a writer using
+   *     the render's `wallKey` writes under the wall it just left. That is
+   *     exactly how the first section-background pin on a preset was lost: it
+   *     landed under `cc_secbg_<preset>:…` while the section re-read under
+   *     `cc_secbg_<newWallId>:…`, found nothing, and reverted — a click that
+   *     appeared to do nothing, plus an orphan record under a key that no longer
+   *     addresses anything.
    */
-  const ensurePersonal = useCallback((): WallSection[] => {
+  const ensurePersonal = useCallback((): {
+    sections: WallSection[];
+    wallKey: string;
+  } => {
     const current = override ?? presetSections;
-    if (wallMode === "custom") return current;
+    if (wallMode === "custom") return { sections: current, wallKey };
     const wall: CustomWall = {
       id: newWallId(),
       name: `My ${WALL_PRESET_LABEL[preset]}`,
@@ -518,13 +540,13 @@ export function ResourceWall({
     setWallMode("custom");
     setOverride(current);
     say("Copied to My Walls — you're editing your version");
-    return current;
-  }, [override, presetSections, wallMode, preset, view, say]);
+    return { sections: current, wallKey: wall.id };
+  }, [override, presetSections, wallMode, wallKey, preset, view, say]);
 
   /** Apply a change to the wall's sections, forking first if needed. */
   const withFork = useCallback(
     (mutate: (sections: WallSection[]) => WallSection[]) => {
-      const base = ensurePersonal();
+      const { sections: base } = ensurePersonal();
       setOverride(mutate(base));
     },
     [ensurePersonal],
@@ -795,11 +817,6 @@ export function ResourceWall({
     [solo, sections],
   );
 
-  // Identity of the wall on screen — the custom wall's id, else the preset id.
-  // Scopes each section's "this section" background so it can't bleed onto
-  // another wall that (post-fork/duplicate) shares the same section ids.
-  const wallKey = wallMode === "custom" ? (activeCustom?.id ?? preset) : preset;
-
   const sectionProps = {
     wallKey,
     bgRevision,
@@ -812,7 +829,9 @@ export function ResourceWall({
     sectionDragging,
     cardDragging,
     onCardDragState: setCardDragging,
-    onEdit: ensurePersonal,
+    // Section's only use of this is "fork if needed, then tell me where this
+    // edit's wall-scoped storage lives" — hence the key, not the sections.
+    onEdit: (): string => ensurePersonal().wallKey,
     onOpen: (item: WallItem, list: WallItem[]) =>
       setLight({
         slides: list,

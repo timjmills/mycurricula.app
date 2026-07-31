@@ -198,7 +198,10 @@ export interface SectionProps {
   cardDragging: boolean;
   onCardDragState: (active: boolean) => void;
   /** Any edit → the wall auto-forks a preset into "My Walls" before applying. */
-  onEdit: () => void;
+  /** Fork the wall if it is still a shared preset, and return the wall key this
+   *  edit's wall-scoped storage belongs under — which is NOT the `wallKey` prop
+   *  when the call itself forks. */
+  onEdit: () => string;
   onOpen: (item: WallItem, list: WallItem[]) => void;
   onEnlarge: (item: WallItem) => void;
   onBoard: (item: WallItem, fromLessonId?: string) => void;
@@ -309,21 +312,35 @@ export function Section({
         bgOpen={bgOpen}
         setBgOpen={setBgOpen}
         onApplyBg={(next, scope) => {
-          onEdit();
+          // WRITE UNDER THE POST-FORK KEY, never the `wallKey` prop. Pinning a
+          // background on a shared preset IS an edit, so onEdit() auto-forks the
+          // wall (CLAUDE.md §2) and the wall's identity changes in this very
+          // action — while `wallKey` still holds the pre-fork value for the rest
+          // of this render. Writing under it put the record on the wall the
+          // teacher had just left: the section's load effect re-read under the
+          // NEW key, found nothing, and reset the background to null. The first
+          // pin on any preset wall therefore did nothing visible (every later
+          // one worked, because by then the fork had happened), and left an
+          // orphan record behind. onEdit() is a no-op on an already-custom wall,
+          // where it just hands back the same key.
+          const key = onEdit();
           setBg(next);
-          saveSectionBackground(wallKey, section.id, section.subjectId, next, scope);
+          saveSectionBackground(key, section.id, section.subjectId, next, scope);
           // Storage is written; tell the wall so EVERY mounted section re-reads
           // (a "Whole subject" apply must reach its siblings, not just this one).
           onBgChange();
           setBgOpen(false);
         }}
         onResetBg={(scope) => {
-          onEdit();
+          // Same post-fork key as the apply above: a reset on a preset forks
+          // too, and clearing the OLD wall's records would leave the new wall's
+          // untouched — "Follow page style" that changes nothing.
+          const key = onEdit();
           setBg(null);
           if (scope === "subject") {
-            resetSubjectBackground(wallKey, section.subjectId);
+            resetSubjectBackground(key, section.subjectId);
           } else {
-            resetSectionBackground(wallKey, section.id, section.subjectId);
+            resetSectionBackground(key, section.id, section.subjectId);
           }
           onBgChange();
           setBgOpen(false);

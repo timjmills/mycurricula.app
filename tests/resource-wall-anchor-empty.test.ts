@@ -9,6 +9,7 @@ import {
   type ResourceWallProps,
 } from "@/components/resource-wall-v2/ResourceWall";
 import type { Lesson, Unit } from "@/lib/types";
+import { mountReact, type ReactHarness } from "./mount-react";
 
 // Regression tests for the two /post defects — the same false-empty class as the
 // hub browse pickers (tests/hub-browse-empty.test.ts) plus a deep link that was
@@ -39,9 +40,10 @@ import type { Lesson, Unit } from "@/lib/types";
 //
 // Bug 2(b) is a transition, not a snapshot, so a static render cannot see it: the
 // re-resolve is an effect and `renderToStaticMarkup` runs none. The last block
-// mounts the real component with react-dom/client over a linkedom document — no
-// new dependency, linkedom already ships for lib/sanitize-html's server path —
-// and drives the anchor from null to resolved the way the hydrate does.
+// mounts the real component with react-dom/client over a linkedom document
+// (tests/mount-react.ts — no new dependency, linkedom already ships for
+// lib/sanitize-html's server path) and drives the anchor from null to resolved
+// the way the hydrate does.
 
 const store = vi.hoisted(() => ({
   state: "settled" as "pending" | "error" | "settled",
@@ -309,7 +311,7 @@ describe("the wall re-resolves an anchor that arrives mid-hydrate", () => {
 
     expect(dom.wallName()).toBe("Current Lesson");
     expect(dom.html()).toContain("Number line applet");
-    dom.unmount();
+    await dom.unmount();
   });
 
   it("leaves the teacher on the wall they picked during the hydrate", async () => {
@@ -332,7 +334,7 @@ describe("the wall re-resolves an anchor that arrives mid-hydrate", () => {
 
     // The anchor resolving must not yank them off the wall they chose.
     expect(dom.wallName()).toBe("This Week · Mixed");
-    dom.unmount();
+    await dom.unmount();
   });
 
   it("holds the lesson wall through a RE-hydrate that drops the anchor", async () => {
@@ -356,7 +358,7 @@ describe("the wall re-resolves an anchor that arrives mid-hydrate", () => {
     store.lessons = [LESSON];
     await dom.render({ focusLessonId: "l1", focusSubject: "math" });
     expect(dom.wallName()).toBe("Current Lesson");
-    dom.unmount();
+    await dom.unmount();
   });
 
   it("honors a NEW deep link even after the teacher picked a wall by hand", async () => {
@@ -377,7 +379,7 @@ describe("the wall re-resolves an anchor that arrives mid-hydrate", () => {
     // A different lesson's link arrives while the wall stays mounted.
     await dom.render({ ...link("l2"), focusLessonId: "l2", focusSubject: "math" });
     expect(dom.wallName()).toBe("Current Lesson");
-    dom.unmount();
+    await dom.unmount();
   });
 
   it("stays put after the teacher makes a wall of their own and then deletes it", async () => {
@@ -403,89 +405,28 @@ describe("the wall re-resolves an anchor that arrives mid-hydrate", () => {
     store.units = [UNIT];
     await dom.render({ focusLessonId: "l1", focusSubject: "math" });
     expect(dom.wallName()).toBe("Today's Lessons (Mixed)");
-    dom.unmount();
+    await dom.unmount();
   });
 });
 
 /**
- * A real React mount over a linkedom document, so effects actually run.
- * `environment: "node"` and no jsdom in the repo, but react-dom/client only
- * needs a DOM good enough to create elements and delegate events — linkedom
- * (already a dependency) is. Globals are installed lazily, inside this helper,
- * so the static renders above still run with no `window` in scope.
+ * The mount harness, plus the one accessor these tests read: the wall on screen.
+ * It comes off the switcher's own label rather than the whole document, because
+ * every preset LABEL is in the DOM whenever the switcher popover is open, so a
+ * substring match over the markup would pass for a wall the teacher merely
+ * browsed past. It is also where the toast copy lives ("Deleted 'New wall'"),
+ * which is not the wall either.
  */
-async function mountable(): Promise<{
-  render: (props: Partial<ResourceWallProps>) => Promise<void>;
-  click: (match: (el: Element) => boolean) => Promise<void>;
-  html: () => string;
-  wallName: () => string;
-  unmount: () => void;
-}> {
-  const { parseHTML } = await import("linkedom");
-  const dom = parseHTML(
-    "<!doctype html><html><body><div id='root'></div></body></html>",
-  );
-  const g = globalThis as unknown as Record<string, unknown>;
-  const w = dom.window as unknown as Record<string, unknown>;
-  // react-dom/client reads window.location.protocol at import time (its DevTools
-  // banner) and usePhoneViewport calls window.matchMedia on mount; linkedom
-  // ships neither.
-  w.location = { protocol: "http:", href: "http://localhost/" };
-  w.matchMedia = () => ({
-    matches: false,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  });
-  g.window = dom.window;
-  g.document = dom.document;
-  g.HTMLElement = dom.HTMLElement;
-  g.Element = dom.Element;
-  g.Node = dom.Node;
-  g.MutationObserver = dom.MutationObserver;
-  // linkedom has no frame loop; the toast and the popovers schedule through one.
-  g.requestAnimationFrame = (cb: FrameRequestCallback) =>
-    setTimeout(() => cb(0), 0) as unknown as number;
-  g.cancelAnimationFrame = (id: number) => clearTimeout(id);
-  g.IS_REACT_ACT_ENVIRONMENT = true;
-  Object.defineProperty(globalThis, "navigator", {
-    value: dom.navigator,
-    configurable: true,
-  });
-
-  const { createRoot } = await import("react-dom/client");
-  const { act } = await import("react");
-  const container = dom.document.getElementById("root") as unknown as HTMLElement;
-  const root = createRoot(container);
-
+async function mountable(): Promise<
+  ReactHarness<Partial<ResourceWallProps>> & { wallName: () => string }
+> {
+  const harness = await mountReact(ResourceWall);
   return {
-    async render(props) {
-      await act(async () => {
-        root.render(createElement(ResourceWall, props));
-      });
-    },
-    async click(match) {
-      const target = Array.from(
-        dom.document.querySelectorAll("button"),
-      ).find((b) => match(b as unknown as Element));
-      if (!target) throw new Error("no button matched — the harness is lying");
-      await act(async () => {
-        // linkedom ships no MouseEvent constructor; a bubbling Event of type
-        // "click" is enough for React's delegated root listener, which reads the
-        // type and the target and synthesises the rest.
-        target.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
-      });
-    },
-    html: () => container.innerHTML,
-    // The wall on screen, read off the switcher's own label rather than the
-    // whole document: every preset LABEL is in the DOM whenever the switcher
-    // popover is open, so a substring match over the markup would pass for the
-    // wall a teacher merely browsed past. It is also where the toast copy lives
-    // ("Deleted “New wall”"), which is not the wall either.
+    ...harness,
     wallName: () => {
-      const el = container.querySelector('[class*="ddName"]');
+      const el = harness.query('[class*="ddName"]');
       if (!el) throw new Error("no wall name on screen — the harness is lying");
       return el.textContent ?? "";
     },
-    unmount: () => root.unmount(),
   };
 }
