@@ -68,6 +68,19 @@
 .inverse .count {
   color: var(--ink-50);
 }
+/* …and the count badge needs its FILL back on this path. `.count` above is now
+   opaque `--surface`, which under a light app tone is near-white — and
+   `.inverse` is exactly the case where the app tone is LIGHT while the section
+   itself is dark, so the rule above would have put --ink-50 (near-white) text
+   on a near-white pill. Translucent light-over-dark here, matching the
+   `.inverse .tagMore` idiom at the foot of this file. Wins over the base
+   `.count` on specificity (0,2,0 vs 0,1,0), so source order is not load-bearing
+   — but it does need to stay a SEPARATE rule from the grouped `color` one
+   above, because that group is shared with .title and .meta, which have no
+   fill. */
+.inverse .count {
+  background: color-mix(in srgb, var(--ink-50) 12%, transparent);
+}
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 .head {
@@ -141,11 +154,21 @@
   flex: 0 0 auto;
 }
 
+/* The fill composites over --surface, NOT over `transparent`.
+   ────────────────────────────────────────────────────────────────────────────
+   This was `--ink-900 8%, transparent`: an 8% DARK wash over whatever happened
+   to be behind the section. On a wall with no pinned background that is the
+   stage photo, so the badge DARKENED its own backdrop — measured 199 where the
+   veiled stage around it was 239, and --ink-500 on 199 is 4.14:1 against a 4.5
+   floor (task #38). Mixing into --surface instead keeps the identical 8% ink
+   tint but makes the pill opaque, so its contrast is a property of the pill
+   rather than of the photograph behind it. --surface inverts by tone, so this
+   one declaration is correct in both. */
 .count {
   font-size: var(--t-12);
   font-weight: 700;
   color: var(--ink-500);
-  background: color-mix(in srgb, var(--ink-900) 8%, transparent);
+  background: color-mix(in srgb, var(--ink-900) 8%, var(--surface));
   border-radius: 999px;
   padding: 2px 8px;
   flex: 0 0 auto;
@@ -195,7 +218,15 @@
   max-width: min(130px, 34vw);
   padding: 2px 8px 2px 6px;
   border-radius: var(--r-pill, 999px);
-  background: color-mix(in oklab, var(--sc, var(--brand-500)) 14%, transparent);
+  /* Mixed into --surface, not into `transparent` — the 14% is unchanged, but
+     it now sits on the chip's own opaque surface instead of on whatever is
+     behind the wall. Over the stage photo the old translucent fill dragged the
+     backdrop down to 213-218 and the label to 3.71:1 (floor 4.5); on Wash,
+     where the backdrop already WAS the surface, the very same recipe measured
+     5.12:1. Making the fill opaque is what makes every axis behave like Wash.
+     --surface inverts by tone, and the dark register keeps its own strength in
+     the [data-tone="dark"] branch below. */
+  background: color-mix(in oklab, var(--sc, var(--brand-500)) 14%, var(--surface));
   color: color-mix(in oklab, var(--sc, var(--brand-500)) 48%, var(--ink-900));
   font-size: var(--t-11, 11px);
   font-weight: 700;
@@ -292,7 +323,7 @@
    nothing at all, so the chip would lose the subject identity that is its whole
    job. Nothing else belongs in here. */
 :global([data-tone="dark"]) .tag {
-  background: color-mix(in oklab, var(--sc, var(--brand-500)) 30%, transparent);
+  background: color-mix(in oklab, var(--sc, var(--brand-500)) 30%, var(--surface));
 }
 
 /* A section carrying its own KNOWN-DARK pinned background (needsInverseInk) is

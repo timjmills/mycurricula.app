@@ -46,7 +46,13 @@
   border: none;
   border-radius: var(--r-sm);
   background: transparent;
-  color: var(--muted);
+  /* --ink-500, not --muted. This is a 14px/700 CONTROL label on the opaque
+     `--hairline` track above, not muted metadata — and --muted measured
+     4.69:1 there on most themes but 4.41:1 on blossom, whose wash retints
+     --hairline. A control that drops below AA on one theme is a control that
+     drops below AA. --ink-500 clears 7:1 on the same track, on every theme.
+     The active segment still separates itself by carrying --wf-blue-accent. */
+  color: var(--ink-500);
   font-size: var(--t-14);
   font-weight: 700;
   cursor: pointer;
@@ -156,14 +162,37 @@
 }
 
 /* ── Sidebar ───────────────────────────────────────────────────────────────── */
+/* The column carries a surface of its own, because its text cannot contract
+   with a photograph.
+   ────────────────────────────────────────────────────────────────────────────
+   /boards rendered its entire page directly on the stage — no panel anywhere
+   (audit B2). The nav headings are 11px/700 --ink-400, and over the stage they
+   measured 3.76:1 against a 4.5 floor; the arithmetic says --ink-400 needs a
+   backdrop at L≈0.85 to clear AA, which no veil over a photograph can supply
+   without erasing the photo. So the fix belongs here: an opaque-enough surface
+   under the text, per CLAUDE.md §4 ("Glass is the signature material — frosted
+   over photo"). --surface inverts by tone, so the one declaration serves both.
+
+   Deliberately NOT a full-page panel: this is the column that failed, and
+   widening it to `.root` would be a surface redesign rather than a legibility
+   fix. The rest of B2 stays open. */
 .sidebar {
   flex: 0 0 auto;
   width: 234px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-right: 16px;
-  border-right: 1px solid var(--border);
+  padding: 12px 8px 12px 4px;
+  margin-right: 8px;
+  border-radius: var(--r-lg, 16px);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  /* The `border-right: 1px solid var(--border)` that used to live here is gone:
+     it was the only thing separating this column from .main, and the panel now
+     does that job. A hairline running down the open side of a rounded panel
+     reads as a leftover, not a divider. The narrow-width rule below already
+     removed it for the stacked layout. */
   overflow-y: auto;
 }
 
@@ -824,9 +853,12 @@
     flex-wrap: wrap;
     align-items: flex-start;
     gap: 8px;
-    padding-right: 0;
+    padding-right: 8px;
     padding-bottom: 12px;
-    border-right: none;
+    /* Full-width when stacked, so the desktop panel's right gutter would inset
+       it off-centre. The panel background itself is kept — the nav headings
+       need a surface at every width, not only on desktop. */
+    margin-right: 0;
     border-bottom: 1px solid var(--ink-150);
     overflow-x: auto;
   }
