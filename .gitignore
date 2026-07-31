@@ -45,8 +45,14 @@ next-env.d.ts
 # dev server logs
 /dev-*.log
 
-# claude code (agent worktrees, local state)
-/.claude/
+# claude code (agent worktrees, local state). The project-level skills dir is
+# the deliberate exception: a skill installed there must travel with the repo
+# and reach every git worktree, so it is un-ignored below. `!/.claude/` alone
+# cannot work — git will not descend into an excluded directory, so the parent
+# is `/.claude/*` and the negation re-admits skills/ and its contents.
+/.claude/*
+!/.claude/skills/
+!/.claude/skills/**
 
 # cloudflare / opennext
 /.open-next/
@@ -65,6 +71,10 @@ lib/home/insights.data.json
 # QA working artifacts (§4b Live QA Audit Gate output — per-pass, never committed)
 QA-REPORT.md
 QA-REPORT-*.md
+
+# design-audit skill capture output (screenshots + axe JSON, regenerated per
+# pass). Keeps audit runs out of the curated docs/screenshots/<wave>/ folders.
+.audit/
 
 # Throwaway probe scripts. `scripts/` is NOT otherwise ignored, so an untracked
 # tmp probe is one `git add scripts/` away from being committed — and on
