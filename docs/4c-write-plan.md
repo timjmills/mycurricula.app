@@ -11,6 +11,78 @@ and a completely-unwidened one render identically. **Only a write can tell them 
 
 ---
 
+## ⛔ EXECUTION HALTED 2026-07-31 — READ BEFORE RUNNING ANY STEP
+
+Pre-flight recon against `f5d8540` found two defects in this plan. **STEP 1 ran and
+passed. STEP 2 must not be attempted. STEP 3's headline assertion does not work.**
+Both were found by reading the code, before a single write. Verify against current
+code before assuming either is still true.
+
+### 1. STEP 2 IS NOT EXECUTABLE — there is no Add-unit flow, and no unit archive
+
+STEP 2a says "Use the app's Add-unit flow (`/year` → add unit)". **That flow does not
+exist**, in any frame:
+
+- The `Add unit` button lives only in `components/year/YearView.tsx:377-386`, and
+  `YearView` is imported by **zero** files — dead code, never mounted by any route.
+- `AddUnitDialog` persists to `window.localStorage`
+  (`lib/use-custom-units.ts:398`), **never to Supabase**.
+- There is **no `createUnit` in `lib/planner/` at all**, and no `.insert()` against
+  `public.units` anywhere in the repo. The only write that touches `units` is
+  `patchUnit` — an `UPDATE` (`supabase-source.ts:2657-2666`).
+
+**This plan's own STOP condition is therefore met.** STEP 2's reversal says: "Archive
+the scratch unit through the UI if an archive control exists. **If none exists, STOP
+and tell me.**" No archive control exists — the `archived` arm of `UnitPatch` is fully
+implemented server-side (`supabase-source.ts:2124-2127`) with **zero UI callers**, so
+`patch.archived` is always `undefined`.
+
+Creating the scratch unit would therefore require raw SQL against production — which
+agents must never do — and would strand a row with **no reviewed way to remove it**,
+since this plan deliberately refuses a raw `DELETE` on `units` with unaudited FK
+cascades. Do not work around this by writing the row directly.
+
+### 2. STEP 3's ASSERTION 1 IS VACUOUS — it cannot detect the four-callsite bug
+
+STEP 3 says assertion 1 ("value visible in the editor immediately after the write, no
+reload") proves "the post-mutation reload path returned it", and instructs **"Do not
+shortcut assertion 1."** That reasoning is wrong.
+
+Every field write is **fully optimistic**: `editLesson` dispatches the patch into the
+reducer unconditionally, and the serial write queue's `send` **discards** the `Lesson`
+that `updateLesson` returns — `lib/planner-store.tsx:3045-3046`:
+
+```ts
+send: (p) => plannerClient.updateLesson(p.lessonId, p.patch, p.ownerId, p.saveTarget),
+```
+
+That queue is the **only** caller of `plannerClient.updateLesson` in the entire app.
+So the values built by `reloadLesson` (`:2777`) and `reloadAuthoredLesson` (`:2877`) —
+the exact pair the four-callsite rule exists to protect — **are never rendered**. The
+editor shows the optimistic reducer value either way, so **assertion 1 passes whether
+or not those two callsites spread `trackBArgsFromRow`.** Running it as written yields a
+confident false "verified".
+
+Two consequences:
+
+- **"The value is on screen" is not evidence of a write, anywhere in this plan.** Only
+  a full page reload (assertion 3) or the DB (assertion 4) tests persistence.
+- **The four-callsite invariant is better covered statically than live.**
+  `tests/track-b-workspace-fields.test.ts` pins all three `*_COLS` select strings by
+  exact snapshot and asserts the spread count per callsite (`02996e6`). Keep that as
+  the real gate. If a live check is still wanted, assert on the **network response** of
+  the post-write reload SELECT, not on the rendered editor.
+
+### Also corrected in code, same pass
+
+Four stale comments that asserted the opposite of reality were fixed alongside this:
+the `*_COLS` note at `supabase-source.ts:398` and the three per-row-shape comments
+(`:436/:471/:505`) claimed Track-B was "NOT in" the selects — B2 put it in.
+`PlanPage.tsx:334` claimed "B2's fields debounce" — there is no debounce; every
+keystroke writes.
+
+---
+
 ## 0. Preamble — traps that will otherwise cost you an hour
 
 These are measured facts from the read pass, not cautions.

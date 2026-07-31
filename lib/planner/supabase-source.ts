@@ -398,13 +398,22 @@ function statusFromText(raw: string | null): LessonStatus {
 // ── Row shapes (snake_case, as the migration declares them) ───────────────────
 //
 // TRACK-B FIELDS (migration 20260728120000) are declared OPTIONAL on the row
-// shapes below so B2/B1.7 can build the read mapper against them — but they are
-// DELIBERATELY ABSENT from the *_COLS select strings in this tranche, so they are
-// `undefined` at runtime until B2 adds them to the selects (coupled to the
-// migration apply, exactly like the color/tint_scope launch coupling on
-// SECTION_COLS). Reading NULL columns must never break current prod: selecting a
-// column that does not yet exist is the v2-cutover failure mode, so the columns
-// join the selects ONLY when the migration is guaranteed applied.
+// shapes below so B2/B1.7 could build the read mapper before the selects caught
+// up. THAT TRANCHE IS OVER: B1.7 landed the unit selects and B2 landed the
+// lesson ones, so all eleven Track-B columns ARE named in MASTER_COLS,
+// COPY_COLS and AUTHORED_COLS today, and arrive populated at runtime. The exact
+// select strings are pinned by snapshot in tests/track-b-workspace-fields.test.ts
+// — that test, not this comment, is the authority.
+//
+// The `?` on each field below is therefore now a VESTIGE of the staged rollout,
+// not a live "this is undefined at runtime" signal. Left in place deliberately:
+// the columns are nullable in SQL, so a row can still carry null, and widening
+// the TS shape to required would be a lie in the other direction.
+//
+// The launch-coupling RULE the original note recorded still stands and is why
+// the staging existed: selecting a column that does not yet exist is the
+// v2-cutover failure mode, so a column joins a select ONLY once its migration is
+// guaranteed applied.
 
 /** A `master_core_lesson_events` row (the columns this source reads). After the
  *  scale-hardening migration the table carries a local `grade_level_id`. */
@@ -424,7 +433,7 @@ interface MasterEventRow {
   display_order_within_day: number;
   differentiation: unknown; // jsonb: LessonDifferentiation | null
   deleted_at: string | null;
-  // Track-B (20260728120000) — NOT in MASTER_COLS yet (see note above).
+  // Track-B (20260728120000) — IN MASTER_COLS since B2 (see note above).
   taught_at?: string | null;
   duration_minutes?: number | null;
   assessment_kind?: string | null;
@@ -459,7 +468,7 @@ interface PersonalCopyRow {
   is_diverged_from_master: boolean;
   differentiation: unknown; // jsonb: LessonDifferentiation | null
   archived_at: string | null;
-  // Track-B (20260728120000) — NOT in COPY_COLS yet (see note above).
+  // Track-B (20260728120000) — IN COPY_COLS since B2 (see note above).
   taught_at?: string | null;
   duration_minutes?: number | null;
   assessment_kind?: string | null;
@@ -493,7 +502,7 @@ interface AuthoredLessonRow {
   reason_not_done: string | null;
   differentiation: unknown; // jsonb: LessonDifferentiation | null
   deleted_at: string | null;
-  // Track-B (20260728120000) — NOT in AUTHORED_COLS yet (see note above).
+  // Track-B (20260728120000) — IN AUTHORED_COLS since B2 (see note above).
   taught_at?: string | null;
   duration_minutes?: number | null;
   assessment_kind?: string | null;

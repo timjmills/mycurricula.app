@@ -331,7 +331,10 @@ export function PlanPage({
       // NEVER close on a background click — the same rule UnitExplorer states
       // for the unit side of this dialog, which until now Lesson mode did not
       // follow: a stray click behind the SAME modal closed it in one mode and
-      // not the other. This body is an editor. B2's fields debounce and B5.7
+      // not the other. This body is an editor — B2's fields commit on EVERY
+      // keystroke (no debounce anywhere; the 700ms COALESCE_WINDOW_MS in
+      // planner-store is undo-history grouping, not write batching), so a stray
+      // scrim click lands mid-edit by construction. B5.7
       // made this the surface /weekly's "Open in editor" opens, replacing a
       // popup whose header called out exactly this hazard ("a scrim click
       // mid-resize must never eat their work-in-progress"). ✕ and Escape both
