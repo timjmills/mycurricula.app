@@ -38,7 +38,7 @@ import {
 import { useBoardAnnotations } from "@/lib/use-board-annotations";
 import { useTeachShortcuts } from "@/lib/use-teach-shortcuts";
 import { useTeachViewport } from "@/lib/use-teach-viewport";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { lessonResources } from "@/lib/lesson-resources";
 import { shoutboxForDay } from "@/lib/mock";
@@ -63,6 +63,7 @@ import type {
   BoardPage,
   BoardTemplate,
   CanvasPosition,
+  Lesson,
   SubjectId,
   TeachResource,
   Widget,
@@ -87,9 +88,57 @@ export interface TeachWorkspaceProps {
   initialSandbox?: boolean;
 }
 
-// The default seeded lesson with the rich board mix, so a deep-link-less open
-// lands on a populated preview (Wave-2 wiring requirement 1).
-const DEFAULT_LESSON_ID = "m-12-0";
+// The MOCK FIXTURE lesson carrying the rich board mix (lib/mock/lessons.ts
+// "m-12-0" + the only `defaultBoardSet` in lib/mock/boards.ts), so a
+// deep-link-less open on the PROTOTYPE still lands on a populated preview
+// (Wave-2 wiring requirement 1).
+//
+// It is a fixture slug, NOT a product default. Under
+// NEXT_PUBLIC_PLANNER_USE_SUPABASE the planner's lesson ids are db uuids, so
+// this string matches nothing the store holds — which is why it may only ever
+// reach `selectLesson` through `resolveDefaultLessonId` below, never on faith.
+const FIXTURE_DEFAULT_LESSON_ID = "m-12-0";
+
+/**
+ * The lesson a deep-link-less open should select, or `null` to select nothing.
+ *
+ * THE INVARIANT: the workspace never selects an id it has not seen in the
+ * hydrated store. That is what makes this correct under BOTH id regimes without
+ * naming either — a fixture slug is seeded only where the store's ids ARE
+ * slugs, and is dropped where they are uuids.
+ *
+ * This replaces an unconditional `dispatch({ lessonId: "m-12-0" })`. Because
+ * `getLesson` is an `id ===` scan over the store's lessons, that slug could
+ * never match under Supabase: a bare `/teach` open sat on an unresolvable
+ * lesson PERMANENTLY (not for the hydrate window), while the boards strip below
+ * it still filled — lib/teach/supabase-source.ts routes the slug through
+ * `slugToUuid`, so the BOARDS resolved when the lesson card could not, leaving
+ * a teacher looking at a board set they had no way to name.
+ *
+ * WHY NOT MAP THE SEED THROUGH `slugToUuid` instead, as the board repository
+ * does? Because that bridge is ENTITY-DEPENDENT, and reaching for it here would
+ * be betting on the half that happens to hold. LESSONS are slug-derived on prod
+ * (`slugToUuid("lesson","m-12-0")` is a real row) — but SUBJECTS are NOT: all 8
+ * subject slugs match zero rows, which is what took lesson creation down on
+ * 2026-07-31. Even for lessons the premise only holds for a workspace IMPORTED
+ * from these fixtures; a school whose lessons were created through the app gets
+ * ids the bridge never minted, so mapping the seed would fix the beta tenant and
+ * reproduce this bug verbatim everywhere else. Checking the store needs no such
+ * premise.
+ *
+ * Exported for unit testing (tests/teach-default-lesson-seed.test.ts); the
+ * workspace is its only caller.
+ */
+export function resolveDefaultLessonId(
+  lessons: readonly Pick<Lesson, "id" | "archived">[],
+): string | null {
+  // Archived matches the LessonListModule filter, so a seeded lesson always has
+  // a row to highlight in the list beside it.
+  const seedable = lessons.some(
+    (l) => l.id === FIXTURE_DEFAULT_LESSON_ID && l.archived !== true,
+  );
+  return seedable ? FIXTURE_DEFAULT_LESSON_ID : null;
+}
 
 // Sandbox (lesson-less) board scope: the repository key for the teacher's
 // lesson-less ephemeral scratch boards. The sentinel's single source of truth is
@@ -218,6 +267,9 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const viewport = useTeachViewport();
   const sensors = useDndSensors();
   const { lessons, getSections } = usePlanner();
+  // Whether the planner document has landed — the default-lesson seed must not
+  // decide against a store that is still hydrating (see the seed effect below).
+  const plannerDataState = usePlannerDataState();
   const { week, selectedDay, currentUser } = useAppState();
   const { showConsequence } = useConsequenceToast();
 
@@ -436,21 +488,53 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   }, [standaloneRequested, ownerId, props.initialBoardId]);
 
   // ── Default lesson seed (only when not deep-linked / sandbox / standalone) ──
-  // Runs once on mount, but waits for any standalone open to settle first so it
-  // can't seed the default lesson over a board the teacher explicitly opened.
+  // Fires AT MOST ONCE, waits for any standalone open to settle so it can't seed
+  // over a board the teacher explicitly opened, and — the fix — only ever seeds
+  // an id `resolveDefaultLessonId` has found in the hydrated store.
+  //
+  // When nothing resolves we select NOTHING, and LessonCardModule's "No lesson
+  // selected. Pick a lesson from the Lessons tab, or build a sandbox board."
+  // stands beside an already-open Lessons list. That is a true statement with a
+  // next action, where a guess would not be: nothing inside the (teach) route
+  // group knows which lesson the teacher is about to teach. It mounts its OWN
+  // AppStateProvider (app/(teach)/layout.tsx), so on every entry
+  // `selectedLessonId` is null and `week` is the mock `CURRENT_WEEK` — a
+  // "current week/day" heuristic would only move the fixture assumption out of
+  // an id literal and into a number literal. Every real entry point (Day, Week,
+  // Year, Lesson Plan, Catch-Up, Boards home) deep-links `?lesson=`, and none of
+  // that path is touched here.
   const didDefaultSeed = useRef(false);
   useEffect(() => {
     if (didDefaultSeed.current) return;
     if (!standaloneResolved) return; // a standalone open is still resolving
-    didDefaultSeed.current = true;
     if (
-      state.activeLessonId == null &&
-      !state.sandbox &&
-      standaloneBoard == null
+      state.activeLessonId != null ||
+      state.sandbox ||
+      standaloneBoard != null
     ) {
-      dispatch({ type: "selectLesson", lessonId: DEFAULT_LESSON_ID });
+      // A deep link, the sandbox, or a standalone board already owns the
+      // selection. Latch, so no later store change can seed over the teacher's
+      // view — the old code got this from seeding synchronously on mount.
+      didDefaultSeed.current = true;
+      return;
     }
-  }, [standaloneResolved, standaloneBoard, state.activeLessonId, state.sandbox]);
+    // The candidate is checked AGAINST the store, and the store's `lessons` is
+    // empty for the whole 11–16s Supabase hydrate — deciding then would spend
+    // the one shot on data that has not arrived. "error" is terminal (the store
+    // gives up rather than retrying), so decide there rather than waiting
+    // forever.
+    if (plannerDataState === "pending") return;
+    didDefaultSeed.current = true;
+    const seed = resolveDefaultLessonId(lessons);
+    if (seed) dispatch({ type: "selectLesson", lessonId: seed });
+  }, [
+    standaloneResolved,
+    standaloneBoard,
+    state.activeLessonId,
+    state.sandbox,
+    plannerDataState,
+    lessons,
+  ]);
 
   // ── Load boards for the active lesson ──────────────────────────────────────
   const activeLessonId = state.activeLessonId;
