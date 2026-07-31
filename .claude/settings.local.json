@@ -14,7 +14,6 @@
       "Bash(grep -iE \"design.*\\\\.\\(html|css|md\\)$\")",
       "PowerShell(npm ls *)",
       "PowerShell(Get-Command *)",
-      "Bash(supabase db *)",
       "Bash(git update-index *)",
       "Bash(echo \"refresh-exit:$?\")",
       "Bash(git stash *)",
@@ -25,9 +24,7 @@
       "Read(//c/Users/losey/Projects/mc-wave2-audit/**)",
       "Bash(npx next *)",
       "Bash(echo \"dev exited: $?\")",
-      "Bash(node -e ' *)",
       "Bash(break)",
-      "mcp__plugin_supabase_supabase__execute_sql",
       "mcp__playwright__browser_navigate",
       "Bash(git grep *)",
       "Bash(curl -s -D - -o /dev/null \"http://localhost:3017/weekly\")",
@@ -49,7 +46,13 @@
       "Bash(git remote *)",
       "Bash(echo \"remote:        $\\(git remote get-url origin\\)\")",
       "Bash(echo \"vs origin/master: $\\(git rev-list --left-right --count HEAD...origin/master\\) \\(left=ahead right=behind\\)\")",
-      "Bash(git *)"
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git diff *)",
+      "Bash(git rev-parse *)",
+      "Bash(git branch *)",
+      "Bash(git worktree list *)"
     ]
   },
   "enabledPlugins": {
