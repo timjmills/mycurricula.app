@@ -59,7 +59,15 @@ export function CatchUpBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
       </div>
 
       {groups.length === 0 ? (
-        query.trim() ? (
+        // A query-specific denial is only TRUE once the store can back it.
+        // `groups` derives from usePlanner().lessons, empty for the whole
+        // 11–16s Supabase hydrate — so this told a teacher who searched on
+        // arrival that nothing matched, about a lesson that exists. The subhead
+        // above already branched on `dataState`; the gate was in scope here and
+        // simply not applied. Not settled → defer to <PlannerEmpty>, which owns
+        // the pending skeleton and the failed-hydrate copy (both right with or
+        // without a query). A SETTLED store still answers the query.
+        dataState === "settled" && query.trim() ? (
           <p className={styles.empty}>
             {`Nothing to catch up matches “${query.trim()}”.`}
           </p>

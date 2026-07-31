@@ -8,7 +8,7 @@
 // raw injection — and offers "open its lesson" to jump into planning.
 
 import { useMemo, useState, type ReactNode } from "react";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { stripHtml } from "@/lib/html-text";
 import { ResourceEmbed } from "@/components/resources";
 import { PlannerEmpty } from "@/components/ui";
@@ -39,6 +39,9 @@ export function ResourceBrowse({
   onOpenDoc,
 }: HubBrowseProps): ReactNode {
   const { lessons, subjectById } = usePlanner();
+  // Whether the store can actually back a claim about what the catalog holds.
+  // Read unconditionally — it gates a render branch, not a code path.
+  const settled = usePlannerDataState() === "settled";
   const [filter, setFilter] = useState<KindFilter>("all");
 
   const refs = useMemo(() => {
@@ -84,7 +87,14 @@ export function ResourceBrowse({
       </div>
 
       {refs.length === 0 ? (
-        query.trim() || filter !== "all" ? (
+        // "No resources match your filters" is only TRUE once the store can
+        // back it. `refs` flattens usePlanner().lessons, empty for the whole
+        // 11–16s Supabase hydrate. This is the cheapest of the four for a
+        // teacher to hit: the branch fires on `filter !== "all"` too, so merely
+        // clicking a kind chip on arrival — nothing typed — used to assert the
+        // filter had come up empty. Until settled, defer to <PlannerEmpty> for
+        // BOTH triggers; a SETTLED store still answers the filter honestly.
+        settled && (query.trim() || filter !== "all") ? (
           <p className={styles.empty}>No resources match your filters.</p>
         ) : (
           <PlannerEmpty size="sm" heading="No resources attached yet." />

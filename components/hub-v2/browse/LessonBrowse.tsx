@@ -7,7 +7,7 @@
 // live search string. A row click opens the lesson as a LessonDoc.
 
 import { useMemo, type ReactNode } from "react";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { stripHtml } from "@/lib/html-text";
 import { StatusDot } from "@/components/planner-v2";
@@ -20,6 +20,10 @@ import styles from "./browse.module.css";
 
 export function LessonBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
   const { lessons, subjects, subjectById, units } = usePlanner();
+  // Whether the store can actually back a claim about what the catalog holds.
+  // Read unconditionally (never inside the empty branch) — it gates a return
+  // path, and a conditionally-called hook would desync as `groups` fills.
+  const settled = usePlannerDataState() === "settled";
   const weekdays = useOrderedWeekdays();
 
   const dayLabel = useMemo(() => {
@@ -58,7 +62,19 @@ export function LessonBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
     return (
       <>
         <Head />
-        {query.trim() ? (
+        {/* A query-specific denial is only TRUE once the store can back it.
+            `groups` derives from usePlanner().lessons, which is empty for the
+            whole 11–16s Supabase hydrate — so this branch used to tell a
+            teacher who searched on arrival "No lessons match “X”." about a
+            lesson that exists. Same conflation of "empty" with "not loaded
+            yet" that shipped the /daily false-empty (components/day-v2/
+            day-empty.ts). Until the store settles the answer is unknown, so the
+            search branch defers to <PlannerEmpty> alongside the no-query one:
+            it already owns the pending skeleton and the failed-hydrate copy,
+            both of which are the right thing to say with or without a query.
+            A SETTLED store still answers the query — a permanent skeleton
+            would strand the search loading forever, a worse bug than this. */}
+        {settled && query.trim() ? (
           <p className={styles.empty}>
             {`No lessons match “${query.trim()}”.`}
           </p>

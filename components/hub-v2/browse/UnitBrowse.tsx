@@ -7,7 +7,7 @@
 // as a UnitDoc. Units order by first taught week (mirrors YearShell.buildLanes).
 
 import { useMemo, type ReactNode } from "react";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { unitLessons, unitProgress } from "@/lib/year-v2-data";
 import { SubjGlyph } from "@/components/planner-v2";
 import { PlannerEmpty } from "@/components/ui";
@@ -18,6 +18,10 @@ import styles from "./browse.module.css";
 
 export function UnitBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
   const { lessons, subjects, units } = usePlanner();
+  // Whether the store can actually back a claim about what the catalog holds.
+  // Read unconditionally (never inside the empty branch) — it gates a return
+  // path, and a conditionally-called hook would desync as `sections` fills.
+  const settled = usePlannerDataState() === "settled";
 
   const sections = useMemo(() => {
     return subjects
@@ -47,7 +51,14 @@ export function UnitBrowse({ query, onOpenDoc }: HubBrowseProps): ReactNode {
     return (
       <>
         <Head />
-        {query.trim() ? (
+        {/* A query-specific denial is only TRUE once the store can back it.
+            `sections` derives from usePlanner().units, empty for the whole
+            11–16s Supabase hydrate — so this told a teacher who searched on
+            arrival "No units match “X”." about a unit that exists. Until the
+            store settles, defer to <PlannerEmpty>, which owns the pending
+            skeleton and the failed-hydrate copy. A SETTLED store still answers
+            the query — see components/hub-v2/browse/LessonBrowse.tsx. */}
+        {settled && query.trim() ? (
           <p className={styles.empty}>{`No units match “${query.trim()}”.`}</p>
         ) : (
           <PlannerEmpty size="sm" heading="No units yet." />
