@@ -1966,11 +1966,43 @@
        above would win over the tier's `height: 26px` and inflate it. */
     min-height: 0;
   }
-  /* The ::after hit-area inflation that used to live here now sits in the
-     `any-pointer: coarse` block directly below — it is the one arm of this
-     tier that a hybrid device also needs. Everything above stays keyed to
-     `pointer: coarse` for the reasons in the comment at the top of this
+  /* Touch-primary: the chip is permanently visible (just above), so inflating
+     its hit area is unconditional and honest here — there is no invisible zone,
+     because there is nothing invisible. The HYBRID arm of this same inflation
+     lives in the `any-pointer: coarse` block below and is gated on the reveal,
+     because there the chip can be transparent while the zone is live. Everything
+     else stays keyed to `pointer: coarse` for the reasons at the top of this
      block. */
+  .root[data-hier="grid"][data-scope="all"] .uws.uws::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+}
+
+/* The WIDTH arm, for hybrids — the half the original 44px fix left behind.
+   `.uws { width: 44px }` sits in the `pointer: coarse` block above, so on a
+   touchscreen laptop (any-pointer coarse, pointer fine) the outline-row and
+   subject-scope openers stayed 40px — under the CLAUDE.md §4 floor, which is
+   exactly the gap `scripts/probe-uws-hybrid.mjs` was written to measure.
+
+   Safe to widen here, unlike the all-scope grid arm: those two tiers are
+   ≥200px rows/cards where a 44px trailing column costs nothing, and ≤900px
+   already ships precisely this. The all-scope grid is deliberately EXCLUDED —
+   its cards are ~95px, where a 44px column would leave ~50px for the unit name,
+   which is the whole reason that tier earns its target from an inset ::after
+   instead. */
+@media (min-width: 901px) and (any-pointer: coarse) {
+  .uws.uws {
+    width: 44px;
+    min-height: 44px;
+  }
+  .root[data-hier="grid"][data-scope="all"] .uws.uws {
+    /* Keep the corner chip 26×26 PAINTED — the width/min-height above must not
+       reach it. Same reset as the `pointer: coarse` tier, same reason. */
+    width: 26px;
+    min-height: 0;
+  }
 }
 
 /* ── The hit area only, widened to hybrids ────────────────────────────────
@@ -2020,7 +2052,47 @@
    `max-width: 900px` FALSE in the same observation, or the ≤900px arm
    supplies the pass instead. */
 @media (min-width: 901px) and (any-pointer: coarse) {
-  .root[data-hier="grid"][data-scope="all"] .uws.uws::after {
+  /* THE INFLATION IS GATED ON THE CHIP BEING VISIBLE. That gate is the whole
+     point, so do not simplify it back to an unconditional `.uws::after`.
+
+     `any-pointer: coarse` matches a HYBRID — a touchscreen laptop — including
+     while it is being driven by its trackpad. But the resting `opacity: 1` one
+     block up is keyed to `pointer: coarse` (PRIMARY input), which such a laptop
+     does NOT match. Those two conditions therefore diverge on exactly the
+     device this block targets, and the unconditional form left a 46×46 hit zone
+     live around a chip that was still `opacity: 0`:
+
+       • ~40px of a ~95px card, anchored top-right, covering the unit title's
+         whole first line;
+       • invisible, so nothing on screen explains why the tap opened a workspace
+         instead of drilling into the unit;
+       • and NOT rescued by "the pointer must be inside `.unode` to reach it" —
+         that argument holds for the 26px chip, whose bounds are the chip you can
+         see. A −10px inset reaches 10px PAST the visible affordance, so a click
+         aimed at title text next to the chip is silently taken.
+
+     Gating on the reveal keeps the ≥44px target for the gesture that can
+     actually use it (hover/focus, then click) and returns those 10px to the
+     title the rest of the time. Touch-primary devices are handled separately in
+     the `pointer: coarse` block above, where the chip is permanently visible and
+     the inflation is therefore unconditional and honest.
+
+     ⚠ RESIDUAL, MEASURED, NOT FIXED — do not read this rule as "solved".
+     `scripts/probe-uws-anypointer.mjs`, 52 cards at 1280 on a real hybrid:
+
+       at rest      52/52 clean (was 52/52 stealing 24px while INVISIBLE)
+       while hovered 52/52 still lose 24px of the title line, of which
+                     8–10px lies PAST the visible chip edge
+
+     So the invisible-theft case — the serious one, where nothing on screen
+     explains why a tap opened a workspace — is gone. A hovering mouse user on a
+     hybrid still loses a few px they can see no reason for. That is the same
+     trade the `pointer: coarse` tier already accepts, but it lands on a MOUSE
+     user here, which is weaker justification. Closing it properly means
+     shrinking the inset or moving the target off the title's inline box; both
+     change the layout, so they are a deliberate design change, not this fix. */
+  .root[data-hier="grid"][data-scope="all"] .unode:hover .uws.uws::after,
+  .root[data-hier="grid"][data-scope="all"] .unode:focus-within .uws.uws::after {
     content: "";
     position: absolute;
     inset: -10px;

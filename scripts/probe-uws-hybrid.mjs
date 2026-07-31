@@ -21,6 +21,31 @@
 // that rejection also covers the 40→44 WIDTH is the open question, and it is
 // the thing this probe puts numbers on.
 //
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-07-31 — THE EMULATION ABOVE WAS WRONG, AND IT NOW FAILS TOWARD A FALSE
+// "THE GAP IS STILL OPEN".
+//
+// The reasoning at the gate below ("no RULE queries any-pointer, so a hybrid
+// and a fine-pointer desktop resolve the SAME cascade") was true when written
+// and is FALSE now: TimelineYear.module.css carries two `any-pointer: coarse`
+// blocks — the hit-area inflation and the width arm. `Emulation.setEmulatedMedia`
+// silently ignores `any-pointer`, so this probe measured `anyCoarse: false` — a
+// plain mouse desktop — and would report the 40px width gap as unfixed after the
+// fix landed. Measured 2026-07-31 at 1280px: `{"anyCoarse":false}`.
+//
+// FIXED HERE, minimally:
+//   • the hybrid now comes from the Chrome LAUNCH FLAG (the only route that
+//     works — see scripts/probe-uws-anypointer.mjs for the full table);
+//   • the gate asserts `any-pointer: coarse` TRUE and `max-width: 900px` FALSE
+//     in the same observation, instead of the old fall-through proxy;
+//   • the Grid/List switcher is reached by its real trigger. The old selector
+//     targeted `[aria-label="Filters and view"]`, which is the POPOVER
+//     (YearFiltersPopover.tsx :358) and does not exist until the trigger is
+//     clicked — so the outline tier silently went unmeasured every run.
+//
+// It remains INVESTIGATION ONLY: it measures and changes nothing. The
+// regression test is scripts/probe-uws-anypointer.mjs.
+//
 // Usage: CLAUDE_BYPASS_TOKEN=… node scripts/probe-uws-hybrid.mjs
 
 import { chromium } from "playwright";
@@ -39,7 +64,17 @@ const log = (s) => {
   console.log(s);
 };
 
-const browser = await chromium.launch({ channel: "chrome" });
+/** Blink capability bits (ui/base/pointer/pointer_device.h):
+ *  PointerType NONE=1 COARSE=2 FINE=4 · HoverType NONE=1 HOVER=2.
+ *  COARSE|FINE available with FINE primary = a touchscreen laptop. This is a
+ *  LAUNCH flag; it cannot be toggled per page, which is why it is here. */
+const browser = await chromium.launch({
+  channel: "chrome",
+  args: [
+    "--blink-settings=availablePointerTypes=6,primaryPointerType=4," +
+      "availableHoverTypes=2,primaryHoverType=2",
+  ],
+});
 
 /** A HYBRID context.
  *
@@ -76,16 +111,10 @@ async function hybridContext(width) {
 
 async function openYear(ctx) {
   const page = await ctx.newPage();
-  // Force the hybrid media state BEFORE first paint.
-  const cdp = await ctx.newCDPSession(page);
-  await cdp.send("Emulation.setEmulatedMedia", {
-    features: [
-      { name: "pointer", value: "fine" },
-      { name: "any-pointer", value: "coarse" },
-      { name: "hover", value: "hover" },
-      { name: "any-hover", value: "hover" },
-    ],
-  });
+  // The hybrid media state comes from the LAUNCH FLAG above.
+  // `Emulation.setEmulatedMedia` is deliberately NOT used: it accepts an
+  // `any-pointer` feature and silently ignores it, which is what made every
+  // earlier run of this probe a fine-pointer desktop wearing a hybrid's label.
   await page.goto(`${BASE}/year`, { waitUntil: "domcontentloaded", timeout: 240000 });
   // READINESS: a chip that has not rendered and a chip that measures 40px are
   // different things, and getBoundingClientRect returns a box for either — so
@@ -128,23 +157,18 @@ const mq = await page.evaluate(() => ({
 }));
 log(`\n── CONTEXT ────────────────────────────────────────────────────────`);
 log(`  ${JSON.stringify(mq)}`);
-// THE GATE THAT MATTERS. Emulating `any-pointer: coarse` turned out to be
-// both impossible here (hasTouch also flips `pointer` to coarse; CDP
-// setEmulatedMedia ignores `any-pointer`) and UNNECESSARY — verified by grep,
-// no RULE in TimelineYear.module.css queries `any-pointer`; the only mention
-// is the :1937 comment explaining why it was rejected. With no rule
-// distinguishing them, a hybrid and a fine-pointer mouse desktop resolve the
-// SAME cascade, so the geometry below is exactly what a hybrid renders. What
-// differs between them is the user's finger, not the CSS.
-//
-// So the condition to gate on is the FALL-THROUGH: wide enough to miss the
-// ≤900px branch, and not coarse enough to hit the ≥901+coarse branch.
-const fallThrough = mq.width > 900 && !mq.pointerCoarse;
+// THE GATE THAT MATTERS. `any-pointer: coarse` TRUE **and** `max-width: 900px`
+// FALSE, in the SAME observation. The old fall-through proxy (>900px and not
+// pointer-coarse) is no longer sufficient: two `any-pointer: coarse` blocks now
+// exist in TimelineYear.module.css, so a fine-pointer desktop and a hybrid no
+// longer resolve the same cascade, and the proxy would happily accept the
+// desktop and report the width gap as unfixed.
+const isHybrid = mq.width > 900 && !mq.pointerCoarse && mq.anyCoarse;
 log(
-  `  fall-through case (>900px AND pointer not coarse): ${fallThrough ? "YES — this is the geometry a hybrid gets" : "NO — measurements below are a DIFFERENT branch"}`,
+  `  real hybrid (any-pointer coarse, pointer fine, >900px): ${isHybrid ? "YES" : "NO — measurements below would be a DIFFERENT device"}`,
 );
-if (!fallThrough) {
-  log(`  ABORTING: measuring the wrong branch would answer a question nobody asked.`);
+if (!isHybrid) {
+  log(`  ABORTING: measuring the wrong device would answer a question nobody asked.`);
   await browser.close();
   process.exit(1);
 }
@@ -306,12 +330,19 @@ log(
 // default "grid"), so the only way there above 900px is the UI switcher.
 log(`\n── OUTLINE/LIST TIER (chip in-flow) ───────────────────────────────`);
 let reachedList = false;
-const filterBtn = page.locator('[aria-label="Filters and view"]').first();
+// THE TRIGGER, not the popover. `aria-label="Filters and view"` belongs to the
+// dialog (YearFiltersPopover.tsx :358), which does not exist until the trigger
+// is clicked — the old selector therefore matched nothing and this whole tier
+// went unmeasured on every run.
+const filterBtn = page
+  .locator('button[aria-haspopup="dialog"]')
+  .filter({ hasText: /Filters\s*&\s*View/i })
+  .first();
 if (await filterBtn.count()) {
   await filterBtn.click().catch(() => {});
   await page.waitForTimeout(600);
 }
-const listOpt = page.locator('button, [role="radio"], label').filter({ hasText: /^List$/i }).first();
+const listOpt = page.locator('[role="radio"][aria-label="List view"]').first();
 if (await listOpt.count()) {
   await listOpt.click().catch(() => {});
   await page.waitForTimeout(1200);
