@@ -98,6 +98,10 @@ import { UnitChip } from "@/components/unit-chip";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { usePlanner } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
+import { dedupeLessonResources } from "@/lib/resources-dedup";
+// The shared composer seam (B4.0). The OPTIONAL accessor by deliberate
+// choice — see the `composer` const's comment at the usePlanner() block.
+import { useComposerOptional } from "@/components/composer";
 import styles from "./weekly-lesson-card.module.css";
 import "@/components/lesson-card/lesson-card.css";
 
@@ -311,7 +315,6 @@ export function WeeklyLessonCard({
   // here, so reading the catalog from the same hook is safe.
   const {
     getSections,
-    addSectionResource,
     bumpLesson,
     archiveLesson,
     unarchiveLesson,
@@ -322,7 +325,27 @@ export function WeeklyLessonCard({
     subjectById,
   } = usePlanner();
   const subject = subjectById[lesson.subject];
-  const sectionResources = lessonResources(getSections(lesson.id));
+
+  // The shared composer, or null outside <ComposerProvider>. OPTIONAL rather
+  // than the throwing useComposer() on purpose: this card is the most widely
+  // reused surface in the app (WeeklyGrid, GridCell, WeekColumns,
+  // weekly-board), /teach already borrows components out of components/daily,
+  // and a throwing hook turns any future reuse outside the planner shell into
+  // a hard crash instead of a missing button. Matches RefineTab's precedent.
+  const composer = useComposerOptional();
+
+  // BUG-006 follow-up — a lesson carries resources in TWO seams: the
+  // per-section arrays AND the lesson-level `Lesson.resources`. The composer
+  // writes to BOTH (section route → addSectionResource, "Whole lesson" route →
+  // editLesson({resources})), so reading only the section seam — as this card
+  // did — renders a whole-lesson commit INVISIBLE: the teacher adds a resource
+  // here and nothing appears. Merge both seams through the same dedup helper
+  // the canonical right-rail panel uses (ResourcesPanel :1373-1401), so all
+  // three surfaces agree on one list and each resource paints exactly once.
+  const cardResources = dedupeLessonResources({
+    sectionResources: lessonResources(getSections(lesson.id)),
+    lessonResources: lesson.resources,
+  });
 
   // Respect prefers-reduced-motion (spec §2.5 / §2.4): under reduced motion,
   // skip height/layout animation and use opacity-only fade instead.
@@ -1516,9 +1539,10 @@ export function WeeklyLessonCard({
                     } else if (key === "resources") {
                       sectionLabel = "Resources";
                       sectionContent = (
-                        // BUG-006: use canonical section-derived resources so
-                        // card, right-rail, and daily detail all agree.
-                        <ResourceList resources={sectionResources} />
+                        // BUG-006: use the canonical merged list (both resource
+                        // seams, deduped) so card, right-rail, and daily detail
+                        // all agree — see `cardResources`.
+                        <ResourceList resources={cardResources} />
                       );
                     } else if (key === "standards") {
                       sectionLabel = "Standards";
@@ -1548,10 +1572,25 @@ export function WeeklyLessonCard({
                   {/* Footer affordances — "+ Add resource" and the editor
                       hand-off. POLISH-010/CARD-001: "Add resource" is a
                       persistent keyboard-accessible button so teachers can
-                      attach a resource without a mouse hover. It appends a link
-                      resource to the first section (the canonical resource
-                      container) via addSectionResource — the same action the
-                      right-rail and daily detail use (BUG-006).
+                      attach a resource without a mouse hover.
+
+                      It opens the SHARED COMPOSER (components/composer), the
+                      one resource-authoring surface in the app. It previously
+                      called addSectionResource(lesson.id, sections[0]?.id, {
+                      type:"link", label:"New resource" }) — committing a blind
+                      placeholder row with no URL, no title and no body into
+                      whichever section happened to be first, leaving the
+                      teacher an empty stub to fill in somewhere else. Two
+                      distinct defects: no authoring UI, and silent mis-filing
+                      into an arbitrary section.
+
+                      NO initialSectionId is passed. This button sits in the
+                      card FOOTER, below every section — it is lesson-scoped and
+                      genuinely does not know a section, so the composer's
+                      routing defaults to "Whole lesson" (ResourceComposer :580,
+                      `initialSectionId ?? ""`). Guessing sections[0] here is
+                      what the old code did wrong; the teacher can still pick a
+                      section in the composer's routing row.
 
                       ⚠⚠ TWO BUTTONS WERE REMOVED HERE, AND THE REASON IS A TRAP
                       FOR WHOEVER IMPLEMENTS THESE ACTIONS NEXT. "Add section"
@@ -1575,27 +1614,40 @@ export function WeeklyLessonCard({
                       standing ruling on controls that do not do what they say:
                       hide until they work. */}
                   <div className={styles.expandedFooter}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leadingIcon={<Icon name="plus" size={11} />}
-                      className={styles.footerBtn}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Attach a new link resource to the first available section.
-                        // If no sections exist yet the store creates a default section.
-                        const sections = getSections(lesson.id);
-                        const targetSectionId = sections[0]?.id ?? lesson.id;
-                        addSectionResource(lesson.id, targetSectionId, {
-                          type: "link",
-                          label: "New resource",
-                        });
-                      }}
-                      aria-label="Add resource to this lesson"
-                      tooltip="Attach a link, file, or video to this lesson — drops into the first section"
-                    >
-                      Add resource
-                    </Button>
+                    {/* Hidden when there is NO way to author a resource —
+                        neither the composer nor the editor hand-off is
+                        available. Per the standing ruling a few lines up: a
+                        control that cannot do what its label says is hidden
+                        until it works, never left inert. */}
+                    {(composer || openLessonEditor) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        leadingIcon={<Icon name="plus" size={11} />}
+                        className={styles.footerBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (composer) {
+                            composer.openComposer({
+                              lesson,
+                              mode: "resource",
+                            });
+                          } else {
+                            // No provider above us — hand off to the full
+                            // editor, which owns its own composer mount.
+                            openLessonEditor?.(lesson.id);
+                          }
+                        }}
+                        aria-label="Add a resource to this lesson"
+                        tooltip={
+                          composer
+                            ? "Attach a link, file, video, or note to this lesson — you choose where it files"
+                            : "Open this lesson in the editor to attach resources"
+                        }
+                      >
+                        Add resource
+                      </Button>
+                    )}
                     {/* W3.8 — week-expand host seam: hand off to the full
                         lesson editor (B5.7: the unit workspace's Lesson
                         Planner). Deliberately MINIMAL — the card's existing

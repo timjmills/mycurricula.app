@@ -499,6 +499,38 @@
 
 /* ── Resources pane ─────────────────────────────────────────────────── */
 
+.resPane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* The add-resource affordance that opens the shared composer.
+   DOUBLED CLASS (.resAddBtn.resAddBtn) on purpose: `.cp-root button` is
+   (0,1,1) and silently strips padding/border/background from any
+   single-class rule, so a (0,1,0) selector here would render a naked
+   button. Doubling lifts this to (0,2,0) and it wins. Every @media
+   override below must double too. */
+.resAddBtn.resAddBtn {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: var(--r-pill, 999px);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Coarse pointers get the ≥44px target the §4 contract requires. Keyed on
+   the input device, not width — a 1440px touchscreen needs it too, and a
+   narrow desktop window does not. */
+@media (pointer: coarse) {
+  .resAddBtn.resAddBtn {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+}
+
 .resList {
   display: flex;
   flex-direction: column;

@@ -60,8 +60,14 @@
 //   standards       → read-only rows from lesson.standards via
 //                     describeStandard().
 //   chat            → the existing <Shoutbox> for the lesson's day.
-//   resources       → read-only lesson.resources rows (ResourceTypePill
-//                     from the lesson-flow barrel + label + type).
+//   resources       → rows from BOTH resource seams — the per-section
+//                     arrays and lesson.resources — merged through
+//                     dedupeLessonResources (ResourceTypePill from the
+//                     lesson-flow barrel + label + type), plus an "Add
+//                     resource" button that opens the shared composer
+//                     (components/composer) on this lesson. Reading only
+//                     lesson.resources, as this pane used to, made every
+//                     section-attached resource invisible here.
 //
 // Rich-text toolbars — pane editors are chromeless (no per-editor docked
 // toolbar). They register with the shared command bus on focus, and the
@@ -83,6 +89,11 @@ import {
 import type { CSSProperties, DragEvent, KeyboardEvent, ReactNode } from "react";
 import type { Lesson, LessonDifferentiation } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
+import { lessonResources } from "@/lib/lesson-resources";
+import { dedupeLessonResources } from "@/lib/resources-dedup";
+// The shared composer seam (B4.0). OPTIONAL accessor — see the `composer`
+// const in the component body for why this must not be the throwing hook.
+import { useComposerOptional } from "@/components/composer";
 import { bundledDescriptions } from "@/lib/standards/items";
 import { RichTextEditor } from "@/components/rich-text";
 import { ResourceTypePill } from "@/components/lesson-flow";
@@ -289,9 +300,39 @@ export interface PlanningTabsProps {
 
 export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
   function PlanningTabs({ lesson }, ref): ReactNode {
-    const { editLesson, describeStandard, mergeStandards } = usePlanner();
+    const { editLesson, describeStandard, mergeStandards, getSections } =
+      usePlanner();
     const [standardsPickerOpen, setStandardsPickerOpen] = useState(false);
     const uid = useId();
+
+    // The shared composer, or null outside <ComposerProvider>. OPTIONAL
+    // rather than the throwing useComposer(): this file is actively being
+    // PORTED into other shells — components/lesson-plan-v2/tabs/{Standards,
+    // Differentiation}Tab.tsx both cite "Ported from PlanningTabs.tsx" in
+    // their headers — so its patterns get copied into hosts whose provider
+    // coverage is not this file's to guarantee. A missing button degrades;
+    // a throwing hook takes the whole surface down.
+    const composer = useComposerOptional();
+
+    // A lesson carries resources in TWO seams: the per-section arrays and the
+    // lesson-level `Lesson.resources`. This pane read ONLY `lesson.resources`,
+    // so every section-attached resource was invisible here and the empty
+    // state below could claim "No resources attached to this lesson yet" for a
+    // lesson that in fact had several — a false empty. Merge both seams
+    // through the same dedup helper the canonical right-rail panel uses
+    // (ResourcesPanel :1373-1401): sections are canonical and render first,
+    // lesson-level rows merge in only where identity is not already present.
+    const paneResources = dedupeLessonResources({
+      sectionResources: lessonResources(getSections(lesson.id)),
+      lessonResources: lesson.resources,
+    });
+
+    /** Open the shared composer on THIS lesson. No initialSectionId — the
+     *  pane is lesson-scoped and knows no section, so routing defaults to
+     *  "Whole lesson" rather than guessing one. */
+    const openResourceComposer = (): void => {
+      composer?.openComposer({ lesson, mode: "resource" });
+    };
 
     // ── Tool arrangement — SSR-safe persisted state ───────────────────
     // Server render + first client paint use the defaults; the saved
@@ -758,20 +799,43 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
           // its own week + day, so the thread tracks the selected lesson.
           return <Shoutbox week={lesson.week} day={lesson.day} />;
         case "resources":
-          return lesson.resources.length > 0 ? (
-            <div className={styles.resList}>
-              {lesson.resources.map((r, i) => (
-                <div key={`${r.label}-${i}`} className={styles.resRow}>
-                  <ResourceTypePill type={r.type} />
-                  <span className={styles.resLabel}>{r.label}</span>
-                  <span className={styles.resType}>{r.type}</span>
+          // The pane was READ-ONLY: a list, or a dead-end empty state with no
+          // way to act on it. It now opens the shared composer — the one
+          // resource-authoring surface in the app — for this lesson. The add
+          // affordance renders only when a composer is reachable, so it is
+          // never an inert button (see `composer` above).
+          return (
+            <div className={styles.resPane}>
+              {paneResources.length > 0 ? (
+                <div className={styles.resList}>
+                  {paneResources.map((r, i) => (
+                    <div key={`${r.label}-${i}`} className={styles.resRow}>
+                      <ResourceTypePill type={r.type} />
+                      <span className={styles.resLabel}>{r.label}</span>
+                      <span className={styles.resType}>{r.type}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <p className={styles.paneEmptyText}>
+                  {composer
+                    ? "No resources attached to this lesson yet — add the first one."
+                    : "No resources attached to this lesson yet."}
+                </p>
+              )}
+              {composer && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={styles.resAddBtn}
+                  onClick={openResourceComposer}
+                  aria-label="Add a resource to this lesson"
+                  tooltip="Attach a link, file, video, or note to this lesson — you choose where it files"
+                >
+                  + Add resource
+                </Button>
+              )}
             </div>
-          ) : (
-            <p className={styles.paneEmptyText}>
-              No resources attached to this lesson yet.
-            </p>
           );
       }
     }
