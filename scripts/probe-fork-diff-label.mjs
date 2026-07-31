@@ -76,17 +76,45 @@ page.on("console", (m) => {
 await page.goto(`${BASE}/weekly`, { waitUntil: "domcontentloaded", timeout: 240000 });
 check("stayed on /weekly", !page.url().includes("/onboarding"), page.url());
 
-// Hydration marker: `iconAriaLabel` is applied by React, so the card owning its
-// menu button IS hydration. Dev hydration here runs 5–17s.
-const hydrated = await page
-  .waitForFunction(
-    (sel) => !!document.querySelector(sel)?.querySelector('button[aria-label="More actions"]'),
-    CARD_SEL,
-    { timeout: 180000, polling: 1000 },
-  )
-  .then(() => true)
-  .catch(() => false);
-check("weekly hydrated; the fork fixture card owns its menu button", hydrated);
+// READINESS BY RESPONSE, not by existence.
+//
+// An earlier revision polled for `button[aria-label="More actions"]` and called
+// that hydration. It is not: that aria-label is a static prop, so it sits in the
+// SERVER-rendered HTML long before React attaches onClick. A click in that
+// window lands on a live element, does nothing, and every later "nothing
+// rendered" reading becomes indistinguishable from a real defect — which is
+// exactly how a healthy control got filed as dead elsewhere today. It matters
+// doubly here, because this probe's headline claim is an ABSENCE.
+//
+// So readiness is an interaction that PRODUCES A STATE CHANGE: retry the open
+// until the menu actually appears. The loop is the signal, not a longer sleep.
+const cardEl = page.locator(CARD_SEL).first();
+await cardEl.waitFor({ state: "attached", timeout: 180000 }).catch(() => {});
+await cardEl.scrollIntoViewIfNeeded().catch(() => {});
+
+const menuItem = page.locator("text=Compare with Team Curriculum").first();
+let hydrated = false;
+let attempts = 0;
+for (; attempts < 20 && !hydrated; attempts++) {
+  await cardEl
+    .locator('button[aria-label="More actions"]')
+    .first()
+    .click({ timeout: 5000 })
+    .catch(() => {});
+  hydrated = await menuItem
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!hydrated) {
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(1500);
+  }
+}
+check(
+  "READY — the ⋯ button RESPONDS to a click (state change, not mere presence)",
+  hydrated,
+  `after ${attempts} attempt(s)`,
+);
 if (!hydrated) {
   await page.screenshot({ path: path.join(OUT, "no-card.png") });
   for (const l of [...notes, ...failures]) console.error(l);
@@ -98,7 +126,22 @@ if (!hydrated) {
 // these come back null the CSS never reached the bundle and every later
 // absence assertion would be meaningless — so this doubles as a gate.
 const cls = await page.evaluate(() => {
-  const want = ["panel", "valueTag", "removed", "added", "value", "valueText", "rows", "row"];
+  // `fieldLabel` is the SIBLING CONTROL — a class in this same module that
+  // this change did NOT touch (10px / 700 / 0.5px / uppercase). It is
+  // measured in the SAME observation as `.valueTag` below, so a reading of
+  // "0px" or a wrong value from BOTH indicts the instrument rather than the
+  // stylesheet.
+  const want = [
+    "panel",
+    "valueTag",
+    "removed",
+    "added",
+    "value",
+    "valueText",
+    "rows",
+    "row",
+    "fieldLabel",
+  ];
   const found = {};
   for (const sheet of document.styleSheets) {
     let rules;
@@ -129,7 +172,17 @@ const cls = await page.evaluate(() => {
 info("resolved CSS-module classes", JSON.stringify(cls));
 // Every key must resolve, and each must carry this module's prefix. A partial
 // resolve would silently degrade the harness into measuring unstyled divs.
-const wantAll = ["panel", "valueTag", "removed", "added", "value", "valueText", "rows", "row"];
+const wantAll = [
+  "panel",
+  "valueTag",
+  "removed",
+  "added",
+  "value",
+  "valueText",
+  "rows",
+  "row",
+  "fieldLabel",
+];
 const missing = wantAll.filter((k) => !cls[k]);
 const foreign = wantAll.filter((k) => cls[k] && !cls[k].startsWith("fork-diff-panel_"));
 check(
@@ -150,18 +203,15 @@ if (missing.length || foreign.length) {
 
 // ══ PART A — REACHABILITY, on the real surface ══════════════════════════════
 
-const card = page.locator(CARD_SEL).first();
-await card.scrollIntoViewIfNeeded();
-await card.locator('button[aria-label="More actions"]').first().click();
-
 // CONTROL 1 — the menu really opened and really has the item. Without this a
-// later "no panel" reads identically to "the menu never opened".
-const menuItem = page.locator("text=Compare with Team Curriculum").first();
+// later "no panel" reads identically to "the menu never opened". The readiness
+// loop above left it OPEN (that response is what proved hydration), so this
+// re-checks rather than clicking again — a second click would toggle it shut.
 const itemThere = await menuItem
   .waitFor({ state: "visible", timeout: 10000 })
   .then(() => true)
   .catch(() => false);
-check("CONTROL: the ⋯ menu opens and offers 'Compare with Team Curriculum'", itemThere);
+check("CONTROL: the ⋯ menu is open and offers 'Compare with Team Curriculum'", itemThere);
 if (!itemThere) {
   await page.screenshot({ path: path.join(OUT, "no-menu.png") });
   for (const l of [...notes, ...failures]) console.error(l);
@@ -291,6 +341,8 @@ await page.evaluate(
     const panel = el("div", [c.panel]);
     const rows = el("ul", [c.rows]);
     const li = el("li", [c.row]);
+    // The untouched sibling, rendered alongside so both are measured together.
+    li.append(el("span", [c.fieldLabel], "Preview"));
     li.append(side("removed", "Team", master), side("added", "Yours", personal));
     rows.append(li);
     panel.append(rows);
@@ -306,29 +358,46 @@ const HARNESS = "#probe-forkdiff-harness";
 // ── B1. Conformance, off the live cascade ────────────────────────────────
 const typo = await page.evaluate(
   ({ h, c }) => {
-    const tag = document.querySelector(`${h} .${c.valueTag}`);
-    if (!tag) return null;
-    const cs = getComputedStyle(tag);
+    const read = (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const cs = getComputedStyle(el);
+      return {
+        fontSize: cs.fontSize,
+        letterSpacing: cs.letterSpacing,
+        fontWeight: cs.fontWeight,
+        transform: cs.textTransform,
+        boxW: Math.round(el.getBoundingClientRect().width * 10) / 10,
+      };
+    };
+    // BOTH in one observation: the changed class and the untouched sibling.
     return {
-      fontSize: cs.fontSize,
-      letterSpacing: cs.letterSpacing,
-      fontWeight: cs.fontWeight,
-      transform: cs.textTransform,
+      tag: read(`${h} .${c.valueTag}`),
+      control: read(`${h} .${c.fieldLabel}`),
     };
   },
   { h: HARNESS, c: cls },
+).then((r) => r ?? { tag: null, control: null });
+info("computed .valueTag (compiled CSS)", JSON.stringify(typo.tag));
+info("SIBLING CONTROL .fieldLabel (untouched by this change)", JSON.stringify(typo.control));
+// If the instrument were broken — wrong classes, nothing painted, harness not
+// mounted — the control would read wrong or zero TOO. It reading its
+// long-standing 10px is what licenses trusting the 11px beside it.
+check(
+  "CONTROL: the untouched .fieldLabel still measures its own 10px",
+  typo.control?.fontSize === "10px" && (typo.control?.boxW ?? 0) > 0,
+  `${typo.control?.fontSize} / box ${typo.control?.boxW}px`,
 );
-info("computed .valueTag (compiled CSS)", JSON.stringify(typo));
-check("font-size resolves to the Label role's 11px (--t-11)", typo?.fontSize === "11px", typo?.fontSize);
-check("weight is 700", typo?.fontWeight === "700", typo?.fontWeight);
-check("still UPPERCASE", typo?.transform === "uppercase", typo?.transform);
+check("font-size resolves to the Label role's 11px (--t-11)", typo.tag?.fontSize === "11px", typo.tag?.fontSize);
+check("weight is 700", typo.tag?.fontWeight === "700", typo.tag?.fontWeight);
+check("still UPPERCASE", typo.tag?.transform === "uppercase", typo.tag?.transform);
 // .09em of 11px = 0.99px. Asserting the RESOLVED px proves the em tracked the
 // new size, rather than a stale fixed 0.4px surviving the edit.
-const ls = parseFloat(typo?.letterSpacing ?? "NaN");
+const ls = parseFloat(typo.tag?.letterSpacing ?? "NaN");
 check(
   "letter-spacing is .09em resolved against 11px (≈0.99px)",
   Math.abs(ls - 0.99) < 0.06,
-  typo?.letterSpacing,
+  typo.tag?.letterSpacing,
 );
 
 // ── B2. Contrast, re-measured rather than inherited ──────────────────────

@@ -87,11 +87,25 @@ async function openYear(ctx) {
     ],
   });
   await page.goto(`${BASE}/year`, { waitUntil: "domcontentloaded", timeout: 240000 });
+  // READINESS: a chip that has not rendered and a chip that measures 40px are
+  // different things, and getBoundingClientRect returns a box for either — so
+  // "the element exists" is not enough to measure geometry from. Wait until the
+  // chips have a NON-ZERO LAID-OUT box AND a known-good sibling (the unit title)
+  // does too. Both being zero indicts the instrument, not the CSS.
   await page
-    .waitForFunction(() => document.querySelectorAll('[class*="uws"]').length > 0, null, {
-      timeout: 180000,
-      polling: 1000,
-    })
+    .waitForFunction(
+      () => {
+        const chip = document.querySelector('[class*="uws"]');
+        const unode = chip?.closest('[class*="unode"]');
+        const title = unode?.querySelector('[class*="unit"]:not([class*="unitGrid"])');
+        if (!chip || !title) return false;
+        return (
+          chip.getBoundingClientRect().width > 0 && title.getBoundingClientRect().width > 0
+        );
+      },
+      null,
+      { timeout: 180000, polling: 500 },
+    )
     .catch(() => {});
   return page;
 }
