@@ -220,6 +220,37 @@ const main = async () => {
       await page.waitForTimeout(1500);
     }
 
+    // `Builds & prep` is BOTH advanced-gated AND collapsed by default
+    // (DEFAULT_OPEN.buildsPrep = false), and collapsing is a conditional render,
+    // not a CSS hide — the editors do not exist in the DOM until it is opened.
+    // The first run missed both fields for exactly this reason and reported
+    // "editor not found", which is true but reads like a defect if you do not
+    // know the section is shut. Open it by its header, matched on the label span
+    // (the accessible name concatenates the summary, so a name match is
+    // unreliable).
+    const bpHeader = page
+      .locator("button[aria-expanded]")
+      .filter({ hasText: /Builds\s*&\s*prep/i })
+      .first();
+    if (await bpHeader.count()) {
+      const before = await bpHeader.getAttribute("aria-expanded");
+      if (before !== "true") {
+        await bpHeader.scrollIntoViewIfNeeded().catch(() => {});
+        await bpHeader.click().catch(() => {});
+        await page.waitForTimeout(1500);
+      }
+      const after = await bpHeader.getAttribute("aria-expanded");
+      // The flip is the readiness proof: a static attribute proves nothing, but
+      // false -> true proves the handler is live AND React state committed.
+      mark(
+        after === "true" ? "pass" : "fail",
+        "opened the `Builds & prep` section",
+        `aria-expanded ${before} -> ${after}`,
+      );
+    } else {
+      mark("fail", "`Builds & prep` header not found", "Advanced may not have engaged");
+    }
+
     for (const f of FIELDS) {
       const el = page.locator(`[aria-label="${f.aria}"]`).first();
       if (!(await el.count())) {
@@ -236,12 +267,51 @@ const main = async () => {
     await page.waitForTimeout(6000);
     await page.screenshot({ path: path.join(OUT, "04-written.png"), fullPage: true });
 
-    // ASSERTION "RELOAD": a full reload re-runs the hydrate chain, so what shows
-    // now came from the LIST-HYDRATE read path, not the optimistic reducer.
+    // ASSERTION "RELOAD" — the one that actually tests the read path.
+    //
+    // A reload re-runs the hydrate chain, so a value visible AFTERWARDS came
+    // from the LIST-HYDRATE read, not the optimistic reducer. The first run
+    // stopped at the reload and screenshotted the Hub's Lessons list — the doc
+    // tab does not survive a reload — so it proved nothing and was reported as
+    // unproven. Re-open the lesson and READ THE VALUES BACK.
     await page.reload({ waitUntil: "domcontentloaded", timeout: 180000 });
-    await page.waitForTimeout(15000);
+    await page.waitForTimeout(12000);
+
+    const search2 = page.locator('input[placeholder*="Search lessons"]').first();
+    if (await search2.count()) {
+      await search2.fill("New lesson").catch(() => {});
+      await page.waitForTimeout(3000);
+    }
+    const reopened = await page
+      .getByText("New lesson", { exact: false })
+      .first()
+      .click({ timeout: 20000 })
+      .then(() => true)
+      .catch(() => false);
+    await page.waitForTimeout(6000);
+    mark(reopened ? "pass" : "fail", "re-opened the lesson after reload");
+
+    if (reopened) {
+      const adv2 = page.getByRole("radio", { name: /^Advanced$/i }).first();
+      if (await adv2.count()) {
+        await adv2.click().catch(() => {});
+        await page.waitForTimeout(2000);
+      }
+      for (const f of FIELDS) {
+        const el = page.locator(`[aria-label="${f.aria}"]`).first();
+        if (!(await el.count())) {
+          mark("fail", `RELOAD ${f.col}`, "editor absent after reload");
+          continue;
+        }
+        const got = await el.inputValue().catch(() => "");
+        mark(
+          got === f.value ? "pass" : "fail",
+          `RELOAD ${f.col} survived the hydrate read`,
+          `want "${f.value}" got "${got}"`,
+        );
+      }
+    }
     await page.screenshot({ path: path.join(OUT, "05-after-reload.png"), fullPage: true });
-    mark("note", "reloaded — compare 05-after-reload.png against the DB read");
   }
 
   const mine = failed.filter((f) => /teacher_preferences/.test(f.url));
