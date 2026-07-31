@@ -27,7 +27,7 @@ import type { Lesson, Subject, SubjectId, Unit } from "@/lib/types";
 import { stripHtml } from "@/lib/html-text";
 import { slotOf } from "./axis";
 import { unitWeekRange, type WeekRange } from "./bands";
-import { lessonsOutsideRange } from "./drag";
+import { axisWeekCount, lessonsOutsideRange } from "./drag";
 import {
   dotStateFor,
   forkTierFor,
@@ -78,6 +78,20 @@ export interface LibraryUnit {
   taught: number;
   /** Lessons dated outside the unit's own declared weeks — see `drag.ts`. */
   lessonsOutside: number;
+  /**
+   * The unit declares a week range that lies wholly outside the configured
+   * academic year, so it has no place on the timeline at all.
+   *
+   * NOT prevented at the write seam, deliberately. A stored range does not go
+   * out of range by being written — it goes out of range when someone SHORTENS
+   * the academic year in Settings, with no write involved at all. Refusing the
+   * write would therefore fix nothing and would make a legitimately-stored unit
+   * unwritable after a config change. Surfacing it is the honest treatment, and
+   * it is what `lanes.ts:129` already does on the canvas (counting the unit
+   * under "N unscheduled"); this is the drawer's half of the same fact, which
+   * otherwise showed a confident "Wk 999–1000" for a unit nothing can display.
+   */
+  offAxis: boolean;
 }
 
 /** Why an item needs attention. Each maps to exactly one predicate. */
@@ -86,6 +100,7 @@ export type AttentionKind =
   | "thin"
   | "off_calendar"
   | "unscheduled_unit"
+  | "off_axis_unit"
   | "outside_range";
 
 /** One row of the Needs Attention list. */
@@ -219,7 +234,9 @@ export function buildLessonLibrary(
 }
 
 export function buildUnitLibrary(input: BuildLibraryInput): LibraryUnit[] {
-  const { subjects, units, lessons, hasResources } = input;
+  const { subjects, units, lessons, hasResources, schoolWeekLen, axisLength } =
+    input;
+  const maxWeek = axisWeekCount(axisLength, schoolWeekLen);
   const subjectName = new Map<string, string>(
     subjects.map((s) => [s.id, s.name]),
   );
@@ -259,6 +276,10 @@ export function buildUnitLibrary(input: BuildLibraryInput): LibraryUnit[] {
       lessonsOutside: weekRange
         ? lessonsOutsideRange(unitLessons, weekRange)
         : 0,
+      offAxis:
+        weekRange !== null &&
+        maxWeek > 0 &&
+        (weekRange.start > maxWeek || weekRange.end < 1),
     });
   }
   return rows;
@@ -310,7 +331,19 @@ export function buildNeedsAttention(
   }
 
   for (const u of unitRows) {
-    if (!u.weekRange) {
+    if (u.offAxis && u.weekRange) {
+      // Checked BEFORE the no-range case and instead of `outside_range`: a unit
+      // parked past the end of the year would otherwise report "N lessons
+      // dated outside Wk 999–1000", which is true, useless, and buries the
+      // actual problem.
+      items.push({
+        kind: "off_axis_unit",
+        subject: u.subject,
+        title: u.name,
+        detail: `Set for Wk ${u.weekRange.start}–${u.weekRange.end}, which is outside this academic year — it has no place on the timeline.`,
+        target: { kind: "unit", id: u.unitId },
+      });
+    } else if (!u.weekRange) {
       items.push({
         kind: "unscheduled_unit",
         subject: u.subject,
@@ -336,8 +369,9 @@ export function buildNeedsAttention(
     missed: 0,
     thin: 1,
     off_calendar: 2,
-    outside_range: 3,
-    unscheduled_unit: 4,
+    off_axis_unit: 3,
+    outside_range: 4,
+    unscheduled_unit: 5,
   };
   return items.sort(
     (a, b) => rank[a.kind] - rank[b.kind] || a.title.localeCompare(b.title),

@@ -174,6 +174,43 @@ export interface WallItem {
 }
 
 /**
+ * The distinct lessons tagging any content in a section, in first-seen order —
+ * the "Tagged to <lesson>" chips in the section header (7.21 handoff
+ * `source-home/resource-wall.jsx:204, :221-227`).
+ *
+ * Needs NO new data. `WallItem.lessons` above already carries every lesson
+ * tagging the same content, because `resolveWall` de-duplicates cards on
+ * content identity and keeps all the refs; all this adds is the second
+ * de-duplication, ACROSS the section's cards. Six cards from one lesson are one
+ * chip, and a single card shared by two lessons is two.
+ *
+ * Reads `items`, never `WallSection.lessonIds`: `lessonIds` is optional and is
+ * DROPPED when a saved custom wall rehydrates (`parseSection` in wall-state),
+ * while `parseWallItem` does persist `lessons` — so a header built on
+ * `lessonIds` would silently empty itself on a custom wall after a reload.
+ *
+ * Callers pass the section's FULL item list, not the type/search-filtered one:
+ * "which lessons does this section belong to" is a property of the section, and
+ * a chip strip that shrank while a teacher typed in the search box would read
+ * as the answer changing rather than the view narrowing.
+ *
+ * Lives here rather than inline in the header (where the handoff puts it, as an
+ * IIFE at `:204`) so it is reachable from this repo's node-only vitest.
+ */
+export function sectionTagLessons(
+  items: readonly WallItem[],
+): WallLessonRef[] {
+  const byId = new Map<string, string>();
+  for (const item of items) {
+    for (const ref of item.lessons) {
+      // A ref with no title would render as an empty pill — worse than absent.
+      if (ref.id && ref.title && !byId.has(ref.id)) byId.set(ref.id, ref.title);
+    }
+  }
+  return [...byId].map(([id, title]) => ({ id, title }));
+}
+
+/**
  * A blank note card, ready to compose — the "Add → note" seam. `lessonId` is
  * optional because a custom section need not belong to a lesson; such a note is
  * wall-local and its "send to board" resolves to an untagged board.

@@ -161,9 +161,15 @@ export function TimelineDrawer({
                       <span className={styles.rowTitle}>{u.name}</span>
                       <span className={styles.rowMeta}>{u.subjectName}</span>
                       <span className={styles.rowMeta}>
-                        {u.weekRange
-                          ? `Wk ${u.weekRange.start}–${u.weekRange.end}`
-                          : "No weeks set"}
+                        {/* A bare "Wk 999–1000" reads as a working schedule.
+                            When the range has no place in the configured year
+                            the row says so — the same fact the lane label
+                            already reports as "N unscheduled". */}
+                        {!u.weekRange
+                          ? "No weeks set"
+                          : u.offAxis
+                            ? `Wk ${u.weekRange.start}–${u.weekRange.end} · outside this year`
+                            : `Wk ${u.weekRange.start}–${u.weekRange.end}`}
                       </span>
                       <span className={styles.rowMeta}>
                         {u.ready}/{u.total} planned

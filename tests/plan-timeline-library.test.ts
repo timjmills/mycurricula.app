@@ -234,6 +234,50 @@ describe("buildUnitLibrary", () => {
   });
 });
 
+describe("buildUnitLibrary — off-axis units", () => {
+  it("flags a unit whose declared weeks lie past the end of the academic year", () => {
+    // NOT prevented at the write seam: a range goes out of range when someone
+    // SHORTENS the academic year in Settings, with no write involved. Refusing
+    // the write would fix nothing and would make a legitimately-stored unit
+    // unwritable after a config change — so it is surfaced instead.
+    const rows = buildUnitLibrary(
+      input({
+        axisLength: 50, // 10 weeks
+        units: [unit({ id: "u1", subject: "math", startWeek: 999, endWeek: 1000 })],
+      }),
+    );
+    expect(rows[0].offAxis).toBe(true);
+  });
+
+  it("does NOT flag a unit that merely overhangs the end", () => {
+    // Weeks 8–14 in a 10-week year still has seven days of itself on screen.
+    // Flagging it would put a unit a teacher can see in a list of units they
+    // cannot.
+    const rows = buildUnitLibrary(
+      input({
+        axisLength: 50,
+        units: [unit({ id: "u1", subject: "math", startWeek: 8, endWeek: 14 })],
+      }),
+    );
+    expect(rows[0].offAxis).toBe(false);
+  });
+
+  it("reports it as ONE finding, not as a lessons-outside pile-up", () => {
+    // "12 lessons dated outside Wk 999–1000" is true, useless, and buries the
+    // actual problem.
+    const rows = buildUnitLibrary(
+      input({
+        axisLength: 50,
+        units: [unit({ id: "u1", subject: "math", startWeek: 999, endWeek: 1000 })],
+        lessons: [lesson({ id: "l1", subject: "math", unit: "u1", week: 2 })],
+      }),
+    );
+    const items = buildNeedsAttention([], rows);
+    expect(items.map((i) => i.kind)).toEqual(["off_axis_unit"]);
+    expect(items[0].detail).toContain("outside this academic year");
+  });
+});
+
 describe("buildNeedsAttention", () => {
   const thin = { objective: "", resources: [], standards: [] };
 
@@ -273,6 +317,7 @@ describe("buildNeedsAttention", () => {
         ready: 0,
         taught: 0,
         lessonsOutside: 0,
+        offAxis: false,
       },
     ]);
     expect(items.map((i) => i.kind)).toEqual([

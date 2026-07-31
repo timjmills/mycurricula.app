@@ -30,7 +30,12 @@ import { useSubjectColor } from "@/lib/palette";
 import { Tooltip } from "@/components/ui";
 import { fromInteractive } from "@/components/planner-v2/util";
 import type { SubjectId } from "@/lib/types";
-import type { WallItem, WallSection, WallView } from "@/lib/wall-scope";
+import {
+  sectionTagLessons,
+  type WallItem,
+  type WallSection,
+  type WallView,
+} from "@/lib/wall-scope";
 import { Card } from "./Card";
 import {
   OPACITY_MAX,
@@ -150,30 +155,8 @@ const IconLink = (): ReactNode => (
 );
 
 // ── Section lesson tags ──────────────────────────────────────────────────────
-
-/** The distinct lessons tagging any content in this section, in first-seen
- *  order. `WallItem.lessons` already carries EVERY lesson tagging the same
- *  content (lib/wall-scope: `resolveWall` dedups on content identity and keeps
- *  all the refs), so this needs no new data — only the de-duplication across
- *  the section's cards.
- *
- *  Derived from the section's FULL item list, not the type/search-filtered one:
- *  "which lessons does this section belong to" is a property of the section,
- *  and a chip strip that shrank while you typed in the search box would read as
- *  the answer changing rather than the view narrowing. Matches the handoff,
- *  which reads `sec.items` (7.21 source-home/resource-wall.jsx:204). */
-function sectionTagLessons(
-  items: readonly WallItem[],
-): { id: string; title: string }[] {
-  const byId = new Map<string, string>();
-  for (const item of items) {
-    for (const ref of item.lessons) {
-      // A ref with no title would render as an empty pill — worse than absent.
-      if (ref.id && ref.title && !byId.has(ref.id)) byId.set(ref.id, ref.title);
-    }
-  }
-  return [...byId].map(([id, title]) => ({ id, title }));
-}
+// The derivation itself lives in lib/wall-scope (`sectionTagLessons`), beside
+// the `WallItem.lessons` contract it reads and where a node test can reach it.
 
 /** How many chips render inline before the rest fold into the "+N" popover.
  *  The handoff's number (resource-wall.jsx:222) — and the header is a single

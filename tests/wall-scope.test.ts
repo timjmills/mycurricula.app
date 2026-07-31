@@ -17,9 +17,11 @@ import {
   findUnit,
   resolveWall,
   scopeLessons,
+  sectionTagLessons,
   unitKey,
   wallItemCount,
   wallTypeOf,
+  type WallItem,
   type WallScopeInput,
 } from "@/lib/wall-scope";
 import type { Lesson, LessonResource, SubjectId, Unit } from "@/lib/types";
@@ -795,6 +797,81 @@ describe("flattened item fields", () => {
       expect(i.type).toBe(i.resource.type);
       expect(i.label).toBe(i.resource.label);
     }
+  });
+});
+
+// ── Section lesson tags ─────────────────────────────────────────────────────
+// The "Tagged to <lesson>" chips in each section header. The chips ship with a
+// render test too (tests/wall-section-tags.test.ts, which renders Section
+// through react-dom/server); these pin the DERIVATION on its own, where the
+// dedup rules are legible without a component in the way.
+
+describe("sectionTagLessons — the section header's lesson chips", () => {
+  let n = 0;
+  const item = (lessons: { id: string; title: string }[]): WallItem => {
+    n += 1;
+    return {
+      key: `k${n}`,
+      type: "link",
+      label: `Card ${n}`,
+      resource: { type: "link", label: `Card ${n}`, url: "https://x.test/a" },
+      subjectId: "math",
+      lessonId: lessons[0]?.id ?? "",
+      lessonTitle: lessons[0]?.title ?? "",
+      lessons,
+    } as WallItem;
+  };
+
+  const A = { id: "a", title: "Fractions on a number line" };
+  const B = { id: "b", title: "Decimals to hundredths" };
+
+  it("returns one entry per distinct lesson, in first-seen order", () => {
+    expect(sectionTagLessons([item([B]), item([A])])).toEqual([B, A]);
+  });
+
+  it("de-duplicates a lesson that tags several cards", () => {
+    // Six cards, one lesson. A flat map over items would return six.
+    const items = [item([A]), item([A]), item([A]), item([A]), item([A]), item([A])];
+    expect(sectionTagLessons(items)).toEqual([A]);
+  });
+
+  it("de-duplicates ACROSS a single card's own multi-lesson refs", () => {
+    // resolveWall dedups cards on CONTENT identity, so one card legitimately
+    // carries a ref per lesson sharing that content — the second dedup this
+    // helper exists for.
+    expect(sectionTagLessons([item([A, B]), item([B])])).toEqual([A, B]);
+  });
+
+  it("returns nothing for a wall-local section whose cards carry no refs", () => {
+    // A custom section: every card authored straight onto the wall.
+    expect(sectionTagLessons([item([]), item([])])).toEqual([]);
+  });
+
+  it("drops a ref with no title rather than yielding an empty pill", () => {
+    expect(sectionTagLessons([item([{ id: "z", title: "" }, A])])).toEqual([A]);
+  });
+
+  it("drops a ref with no id — it could not be keyed or navigated", () => {
+    expect(sectionTagLessons([item([{ id: "", title: "Ghost" }, A])])).toEqual([A]);
+  });
+
+  it("keeps the FIRST title when one lesson id arrives with two", () => {
+    // A stale ref and a fresh one for the same lesson: first-seen wins, so the
+    // strip cannot flicker between two names for one lesson.
+    const stale = { id: "a", title: "Old name" };
+    expect(sectionTagLessons([item([A]), item([stale])])).toEqual([A]);
+  });
+
+  it("survives an empty section", () => {
+    expect(sectionTagLessons([])).toEqual([]);
+  });
+
+  it("reads items, so a rehydrated custom wall still names its lessons", () => {
+    // WallSection.lessonIds is dropped by wall-state's parseSection on reload
+    // while parseWallItem keeps `lessons`. A header built on lessonIds would
+    // empty itself after a refresh; this one does not.
+    const rehydrated = [item([A]), item([B])];
+    expect(sectionTagLessons(rehydrated).map((l) => l.id)).toEqual(["a", "b"]);
   });
 });
 
