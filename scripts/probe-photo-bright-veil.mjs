@@ -290,7 +290,7 @@ const SURFACES = [
     root: "[data-sectags]",
     text: [
       ["section title", '[class*="Section_title__"]'],
-      ["section count badge (MUTATED — selector does not exist)", '[class*="Section_NOSUCHCLASS__"]'],
+      ["section count badge", '[class*="Section_count__"]'],
       ["tag chip label", '[data-sectags] [class*="Section_tagLabel__"]'],
     ],
   },
@@ -358,6 +358,13 @@ const VIEWPORTS = {
 // exactly what shipped before the fix. Editing the committed file to measure it
 // would put a sibling lane's dev server into a state nobody asked for.
 const BEFORE = argv.includes("--before");
+// `--gated-only` runs JUST the engine-derived case and skips the CSS-layer
+// stamped loop. That case is the strongest evidence this probe produces — both
+// halves seeded, the engine's own derivation, nothing stamped — so a fast
+// verification pass wants exactly it and nothing else. It also makes the
+// coverage arithmetic checkable by hand: intended collapses to
+// widths × surfaces × elements.
+const GATED_ONLY = argv.includes("--gated-only");
 const VEIL_SELECTOR =
   '[data-tone="light"][data-frame="glass"][data-bg="photo"] .stage::after';
 
@@ -567,9 +574,11 @@ async function run() {
   const widths = Object.keys(VIEWPORTS).filter(
     (w) => !ONLY_WIDTH.length || ONLY_WIDTH.includes(w),
   );
-  const stampedCases = THEMES.flatMap((t) =>
-    CASES.map((c) => derivedTone(t, SEED.glass, c.dim)),
-  ).filter(Boolean).length;
+  const stampedCases = GATED_ONLY
+    ? 0
+    : THEMES.flatMap((t) =>
+        CASES.map((c) => derivedTone(t, SEED.glass, c.dim)),
+      ).filter(Boolean).length;
   const intended =
     widths.length *
     SURFACES.reduce((k, s) => k + (1 + stampedCases) * s.text.length, 0);
@@ -677,8 +686,14 @@ async function run() {
         for (const [label, sel] of s.text) {
           const m = await measureText(page, sel, label);
           if (m.status !== "ok") {
+            // ABSENT, not FAIL. A missing element means the INSTRUMENT could
+            // not see — it is not a claim that the app's contrast is wrong.
+            // Routing it to FAIL put blindness and breakage on the same exit
+            // code, which is the distinction exit 2 exists to preserve. It is
+            // still loud, still counted in the coverage shortfall, and still
+            // ends the run non-zero.
             record(
-              "FAIL",
+              "ABSENT",
               `${w}/${s.id}/GATED ${SEED.theme}-${SEED.dim} — ${label}`,
               "REQUIRED element did not render — no ratio was computed",
             );
@@ -717,7 +732,7 @@ async function run() {
           .catch(() => {});
       }
 
-      for (const theme of THEMES) {
+      for (const theme of GATED_ONLY ? [] : THEMES) {
         for (const c of CASES) {
           // Ask the derivation what tone this combination actually produces,
           // rather than asserting one. Night forces dark; the light glass
@@ -744,8 +759,9 @@ async function run() {
             const m = await measureText(page, sel, label);
             const tag = `${w}/${s.id}/${theme}-${c.dim}(${tone},glass-${SEED.glass})`;
             if (m.status !== "ok") {
+              // ABSENT, not FAIL — see the note in the gated block above.
               record(
-                "FAIL",
+                "ABSENT",
                 `${tag} — ${label}`,
                 "REQUIRED element did not render — no ratio was computed",
               );
