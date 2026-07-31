@@ -92,6 +92,23 @@ if (!ORACLE) {
   );
   process.exit(2);
 }
+// The literal string "HEAD" is a REMOTE-BASE HOLE, not a convenience. It is
+// truthy, so the `!ORACLE` guard above waves it through, and it used to be this
+// flag's default — so it is also the most likely thing a hurried operator types.
+// That reintroduces the exact failure the guard exists to prevent: local HEAD
+// read as though it were the deployed artifact. Reject it explicitly; the
+// operator must state the sha the base is actually serving.
+if (!IS_LOCAL && ORACLE === "HEAD") {
+  console.error(
+    `\nREFUSING TO RUN: --oracle-sha=HEAD against the remote base ${BASE}.\n` +
+      `  "HEAD" is your LOCAL tip, not what the Worker serves — they are routinely\n` +
+      `  a dozen commits apart, which is the whole reason this flag is mandatory.\n` +
+      `  Pass the deployed sha, e.g. the head_sha of the last SUCCESSFUL deploy:\n` +
+      `    gh run list --workflow "Deploy to Cloudflare" --status success --limit 1 \\\n` +
+      `      --json headSha --jq '.[0].headSha'\n`,
+  );
+  process.exit(2);
+}
 if (ORACLE !== "HEAD" && !git("rev-parse", "--verify", `${ORACLE}^{commit}`)) {
   console.error(`\nREFUSING TO RUN: --oracle-sha=${ORACLE} is not a commit in this repo.\n`);
   process.exit(2);
@@ -1312,8 +1329,34 @@ async function finish() {
       console.log(`  - [${r.context}] ${r.label} — ${r.detail}`);
   }
   console.log(`\nresults.json + screenshots → ${SHOTS}`);
-  // A run that could not verify anything is NOT a pass.
-  process.exit(n("fail") > 0 || verified === 0 ? 1 : 0);
+  // EXIT CODE = "is this run EVIDENCE?", not "did the assertions pass?".
+  //
+  // A run that could not verify anything is NOT a pass. Neither is a run whose
+  // instrument was broken underneath it — and that was the hole here: a probe
+  // whose whole thesis is "refuse the runs that can lie" printed its broken-path
+  // and build-drift warnings and then exited 0, so CI, a wrapper script, or a
+  // hurried reader saw green. Every environment-invalidating condition must
+  // reach the exit code, or the warning is decoration.
+  //
+  //   • badCodeHasPaths — codeHas() answered a question it was never asked, so
+  //     any ABSENT citing those paths is meaningless (see the note at its defn).
+  //   • buildDrifted — the artifact changed mid-run, so early and late results
+  //     describe different builds and cannot be reconciled.
+  //   • canaryBad — the session went bad at an unknown point, which is why it
+  //     already marks contexts 2-6 SUSPECT. A run carrying suspect contexts is
+  //     not evidence about them, so it must not exit green either.
+  const tainted = BAD_CODEHAS_PATHS.length > 0 || !!drifted || canaryBad;
+  if (tainted) {
+    console.log(
+      `\nRUN IS NOT EVIDENCE — exiting non-zero despite ${n("fail")} failure(s):` +
+        (BAD_CODEHAS_PATHS.length
+          ? `\n  - ${BAD_CODEHAS_PATHS.length} broken probe path(s): ${BAD_CODEHAS_PATHS.join(", ")}`
+          : "") +
+        (drifted ? `\n  - the deployed build changed mid-run (fingerprint drift)` : "") +
+        (canaryBad ? `\n  - the session canary failed; contexts 2-6 are SUSPECT` : ""),
+    );
+  }
+  process.exit(n("fail") > 0 || verified === 0 || tainted ? 1 : 0);
 }
 
 // ── entrypoints ─────────────────────────────────────────────────────────────
