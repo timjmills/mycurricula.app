@@ -243,14 +243,40 @@ const FINISH_GRACE_MS = 90_000;
  * Behaviour: after mount it reads the async authoritative signal
  * (readFirstRunState) and combines it with the per-device `finished` flag and
  * the Supabase-configured gate via the pure `computeNeedsOnboarding` matrix. It
- * redirects ONLY on a RESOLVED decision — never while the answer is unresolved —
- * so there is no flash-bounce and it never races the bypass login:
+ * redirects ONLY on a RESOLVED decision — never while the answer is unresolved.
+ * That rule is what makes the gate safe: it never redirects on a GUESS, never
+ * bounces-and-returns, and never races the bypass login:
  *   • DEPLOYED path (Supabase configured): redirect only on remote === false
  *     (row exists, onboarded_at is null). remote === null (pre-migration, no
  *     session, read error) never redirects.
  *   • PROTOTYPE path (Supabase off): remote is always null → the local
  *     `finished` flag governs, exactly as before this gate existed.
  * No-op on /onboarding itself (so it can never loop) and during SSR.
+ *
+ * WHAT THIS DOES NOT PROMISE — the planner is shown FIRST.
+ * These lines used to conclude "so there is no flash-bounce". That is the wrong
+ * name for the property above and false as a user-facing claim, which is worth
+ * spelling out because the next reader will otherwise take it at face value.
+ * The redirect lives in a `useEffect`, and on the deployed path the decision
+ * additionally needs an async round-trip (`auth.getUser()` + the `teachers`
+ * read) — so it CANNOT run until after first paint and after React attaches. A
+ * never-onboarded teacher is therefore shown the planner, and can click it,
+ * before being replaced.
+ *
+ * Measured on prod (`onboarded_at` stubbed to null in the response body, so no
+ * row was touched; control run without the stub did not redirect at all):
+ * interactive at 827ms, redirected at 2931ms — a ~2.1s window in which the
+ * console nav is live, and `router.replace` leaves no back-button recovery for
+ * whatever the teacher started. Method + numbers: scripts/probe-firstrun-flash.mjs,
+ * commit 041f8f8.
+ *
+ * Recorded rather than fixed: it is once-ever per new teacher and lossless. If
+ * that first impression is ever judged to matter, the fixes are to decide
+ * server-side (middleware or the (planner) layout, so planner HTML is never
+ * sent) or to mirror `onboarded_at` into a cookie for an instant server-side
+ * read with the row still authoritative. NOT by holding the planner behind a
+ * resolving state — that taxes every returning teacher on every load to fix a
+ * first-load-only case.
  */
 export function useFirstRunRedirect(): void {
   const router = useRouter();

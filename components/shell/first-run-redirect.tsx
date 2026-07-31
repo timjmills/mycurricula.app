@@ -10,7 +10,13 @@
 // `router.replace`s to /onboarding ONLY on a resolved "needs onboarding". It is
 // a no-op on /onboarding itself (which lives outside the (planner) group, so no
 // loop is possible), during SSR, and — critically — while the answer is
-// unresolved, so it never flash-bounces and never races the bypass login.
+// unresolved: it never redirects on a GUESS, never bounces-and-returns, and
+// never races the bypass login.
+//
+// That is NOT the same as "the teacher never sees the planner first" — on the
+// deployed path a never-onboarded teacher demonstrably does, and can click it.
+// The measured window and the reasoning live in ONE place, useFirstRunRedirect's
+// docblock (lib/onboarding-v2-state.tsx); read it before changing this gate.
 //
 // This leaf renders nothing; it exists so the layout (a Server Component) can
 // mount the client hook without becoming a client component itself.
