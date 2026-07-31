@@ -28,6 +28,18 @@ export { packLevels, unitSpan, unitWeekRange } from "./bands";
 export type { UnitSpan, WeekRange } from "./bands";
 
 export {
+  MIN_UNIT_WEEKS,
+  axisWeekCount,
+  lessonsOutsideRange,
+  moveWeekRange,
+  resizeWeekRange,
+  weekOfSlot,
+  weekRangeEquals,
+  weekRangeSlots,
+  weeksLabel,
+} from "./drag";
+
+export {
   DOT_STATE_LABEL,
   FORK_TIER_LABEL,
   dotStateFor,

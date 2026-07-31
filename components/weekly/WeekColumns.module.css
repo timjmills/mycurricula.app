@@ -243,6 +243,54 @@
   text-align: center;
 }
 
+/* ── Per-day add row ────────────────────────────────────────────────────
+   Sits below the sortable stack, one per column. Recipe lifted from WeekA's
+   `.addCell` / `.addTrigger` so paper's add reads identically to glass's; the
+   trigger is doubled for `.cp-root button` reset immunity (tokens.css's
+   `.cp-root button` (0,1,1) would otherwise strip padding/border/background). */
+.addRow {
+  display: flex;
+  padding: 0 6px 6px;
+  min-width: 0;
+}
+.addTrigger.addTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  /* ≥44px touch target (CLAUDE.md §4) — unconditional here rather than behind
+     a coarse-pointer query, since this surface only ever renders >900px and
+     the row has the height to spare. */
+  min-height: 44px;
+  border: 1px dashed var(--border);
+  background: none;
+  border-radius: var(--r-md);
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: var(--t-12);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.addTrigger.addTrigger:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--brand-500) 8%, transparent);
+  border-style: solid;
+  color: var(--brand-600);
+}
+.addTrigger.addTrigger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.addPlus {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 /* ── Screen-reader only ─────────────────────────────────────────────── */
 .srOnly {
   position: absolute;

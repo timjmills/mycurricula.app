@@ -481,6 +481,15 @@ export const plannerMockSource: PlannerDataSource = {
     // and RLS authorization is a Supabase-only concern — so `_ownerId` is
     // parity-only here. Only the keys present in `patch` are overwritten, so an
     // absent field is never nulled.
+    //
+    // WEEK-RANGE PARITY (the Plan timeline's band drag). `UnitPatch` now also
+    // carries `startWeek` / `endWeek` / `weeks`, and the blanket assign is the
+    // RIGHT behaviour for all three here — unlike the Supabase source, which
+    // must drop `weeks` because there is no such column and `mapUnitRow`
+    // re-derives the label from the two numbers. The mock has no derivation
+    // step and no reload echo: what is assigned IS the canonical value, so
+    // dropping `weeks` here would leave a mock unit's label frozen at its old
+    // schedule and the flag-OFF path would diverge visibly from flag-ON.
     void _ownerId;
     Object.assign(unit, patch);
     return cloneUnit(unit);

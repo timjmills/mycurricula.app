@@ -169,6 +169,7 @@ export function DayC(props: DayViewV2Props): ReactNode {
             status={deriveDayStatus(sel, nowMin, isToday)}
             onPlan={onPlan}
             onTeach={(id) => router.push(`/teach?lesson=${id}`)}
+            onPost={(id) => router.push(`/post?lesson=${id}`)}
           />
         ) : (
           <div className={styles.heroEmpty}>
@@ -195,12 +196,14 @@ function Hero({
   status,
   onPlan,
   onTeach,
+  onPost,
 }: {
   lesson: Lesson;
   subjectName: string;
   status: DayStatus;
   onPlan: (id: string) => void;
   onTeach: (id: string) => void;
+  onPost: (id: string) => void;
 }): ReactNode {
   const { setLessonStatus, units } = usePlanner();
   const isDone = lesson.status === "done";
@@ -264,6 +267,17 @@ function Hero({
             Plan
           </button>
         </Tooltip>
+        {/* Handoff order is Plan · Post · Teach — 7.21
+            source-home/views-c.jsx:53-55. */}
+        <Tooltip content="Open this lesson's resources on the wall" side="top">
+          <button
+            type="button"
+            className={styles.vbBtn}
+            onClick={() => onPost(lesson.id)}
+          >
+            Post
+          </button>
+        </Tooltip>
         <Tooltip content="Open this lesson on the teaching board" side="top">
           <button
             type="button"
@@ -273,8 +287,6 @@ function Hero({
             Open in Teach
           </button>
         </Tooltip>
-        {/* Wave 9: a "Post" (resource wall) button lands here once the /post
-            route ships. */}
       </div>
     </div>
   );

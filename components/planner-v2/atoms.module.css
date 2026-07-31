@@ -137,6 +137,16 @@
   left: 0;
   transform: none;
 }
+/* Right-aligned. The menu is 300px and a week COLUMN is ~170px, so a centered
+   menu on the last column overhangs its track by ~130px and the week's
+   horizontal scroll container clips it (measured: 38px lost off the right edge
+   on a 5-day week at 1440px). The two edge columns pin to their own edge
+   instead; every column between them keeps the centered default. */
+.menuEnd {
+  left: auto;
+  right: 0;
+  transform: none;
+}
 .vaDayAddMenu {
   position: absolute;
   left: 50%;

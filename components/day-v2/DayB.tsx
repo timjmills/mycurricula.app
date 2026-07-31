@@ -171,6 +171,7 @@ export function DayB(props: DayViewV2Props): ReactNode {
             status={deriveDayStatus(sel, nowMin, isToday)}
             onPlan={onPlan}
             onTeach={(id) => router.push(`/teach?lesson=${id}`)}
+            onPost={(id) => router.push(`/post?lesson=${id}`)}
           />
         ) : (
           <div className={styles.focusEmpty}>
@@ -201,12 +202,14 @@ function FocusPanel({
   status,
   onPlan,
   onTeach,
+  onPost,
 }: {
   lesson: Lesson;
   subjectName: string;
   status: DayStatus;
   onPlan: (id: string) => void;
   onTeach: (id: string) => void;
+  onPost: (id: string) => void;
 }): ReactNode {
   const { subjectById, units, setLessonStatus } = usePlanner();
   const isDone = lesson.status === "done";
@@ -287,8 +290,20 @@ function FocusPanel({
               Lesson plan
             </button>
           </Tooltip>
-          {/* Wave 9: a "Post" (resource wall) button lands here once the
-              /post route ships. */}
+          {/* Handoff order is Teach · Lesson plan · Post — 7.21
+              source-home/views-b.jsx:47-49. */}
+          <Tooltip
+            content="Open this lesson's resources on the wall"
+            side="top"
+          >
+            <button
+              type="button"
+              className={styles.vbBtn}
+              onClick={() => onPost(lesson.id)}
+            >
+              Post
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>

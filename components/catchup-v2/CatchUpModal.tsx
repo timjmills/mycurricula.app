@@ -209,6 +209,21 @@ function IconTeach() {
     </svg>
   );
 }
+function IconClip() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 10.5 12.2 19.3a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 1 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.9-7.8" />
+    </svg>
+  );
+}
 function IconClose() {
   return (
     <svg
@@ -239,6 +254,71 @@ const FOCUSABLE = [
   .join(", ");
 
 // ── Row ──────────────────────────────────────────────────────────────────────
+
+/**
+ * The row's TRIAGE line — the second meta row under the identity line.
+ *
+ * `deriveCatchupItems` computes when a lesson was due (`dayLabel`), how late it
+ * is in CONFIGURED school days (`daysLate`), whether materials already exist
+ * (`resources`), why it didn't happen (`reasonNotDone`) and whose copy it is
+ * (`isPersonal` / `modified`) — and until now the modal rendered none of it, so
+ * a teacher triaging a backlog could not tell a lesson missed yesterday from
+ * one missed a month ago. The identity line (`.rowSub`) stays a single
+ * ellipsised line; these facts get their own wrapping row instead of being
+ * appended to it (appending would truncate, not wrap).
+ *
+ * Exported ONLY so it can be rendered in isolation by tests
+ * (tests/catchup-row-meta.test.ts) — it is presentational, takes no context,
+ * and is not part of the folder's public surface (index.ts does not re-export
+ * it). The modal itself stays internal (single-modal invariant, see below).
+ */
+export function CatchUpRowMeta({ item }: { item: CatchupItem }): ReactNode {
+  // Nothing when the lesson isn't late yet: "0 days late" is noise, and a
+  // current-week lesson still ahead of the week's end is legitimately 0.
+  const late =
+    item.daysLate > 0
+      ? `${item.daysLate} ${item.daysLate === 1 ? "day" : "days"} late`
+      : "";
+  // Free teacher text — may be empty, and may carry markup if it was authored
+  // in a rich-text field. Strip + trim before deciding whether it exists.
+  const reason = stripHtml(item.reasonNotDone).trim();
+  // One fork cue at most: "Modified" already implies a personal copy, so
+  // showing both would spend a chip to say the same thing twice.
+  const fork = item.modified ? "Modified" : item.isPersonal ? "Personal" : "";
+  const resourceLabel = `${item.resources} ${
+    item.resources === 1 ? "resource" : "resources"
+  }`;
+
+  return (
+    <div className={styles.rowMeta}>
+      <span className={styles.metaChip}>{item.dayLabel}</span>
+      {late ? (
+        <span className={`${styles.metaChip} ${styles.metaLate}`}>{late}</span>
+      ) : null}
+      {item.resources > 0 ? (
+        // `resources` is a COUNT, not a list, so this is a clip + number (the
+        // handoff's "📎 N"). Kept short on purpose: the action strip squeezes
+        // this column to ~200px on desktop. The full phrase rides the
+        // accessible name — and `title` so a touch user can long-press it.
+        <span
+          className={styles.metaChip}
+          title={`${resourceLabel} attached to this lesson`}
+          aria-label={`${resourceLabel} attached`}
+        >
+          <IconClip />
+          {item.resources}
+        </span>
+      ) : null}
+      {fork ? <span className={styles.metaChip}>{fork}</span> : null}
+      {reason ? (
+        <p className={styles.rowReason}>
+          <span className={styles.reasonLabel}>Why not: </span>
+          {reason}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 interface RowActionsProps {
   onMarkTaught: () => void;
@@ -316,6 +396,7 @@ function LessonRow({
       <div className={styles.rowMain}>
         <div className={styles.rowTitle}>{title}</div>
         <div className={styles.rowSub}>{sub}</div>
+        <CatchUpRowMeta item={item} />
       </div>
       <div className={styles.rowActions}>
         {pills.map((p) => (

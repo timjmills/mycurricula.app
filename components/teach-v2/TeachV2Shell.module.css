@@ -98,17 +98,83 @@
   border-bottom: 1px solid var(--hairline);
 }
 
+/* `flex: 1 1 auto` (was `none`): the title slot now holds a GROWING identity
+   block (lesson title + objective + standards), and a `flex: none` box sized to
+   its content would have shoved the switcher and the whole tool cluster off the
+   right edge instead of ellipsing. Growing + `min-width: 0` makes this the first
+   thing to give way under pressure, so the tools (flex: none) always survive. */
 .boardTitle {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: none;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
+/* `flex: 0 1 auto` (was `1 1 auto`): with two growing siblings the free width
+   split 50/50 and the objective ellipsed while half the header sat empty. The
+   spacer is now just the minimum gap; the identity absorbs the slack. */
 .headSpacer {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 8px;
+}
+
+/* ── Board-header lesson identity (BoardHeadIdentity) ─────────────────────── */
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The shrinkable column. `min-width: 0` is what lets the nowrap+ellipsis on the
+   title and objective actually engage inside a flex parent. */
+.identityText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.identityMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.subjectTag {
+  flex: none;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.objective {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+}
+
+.identityStandards {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.standardsMore {
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-400);
 }
 
 .boardGlyph {
@@ -294,6 +360,15 @@
     flex-wrap: wrap;
   }
   .headSpacer {
+    display: none;
+  }
+  /* Below 900px the header is already wrapping to two rows. The subject tag and
+     the standards pills are `flex: none`, so they would push it to a third and
+     eat the board. Drop them and keep the two lines that carry the meaning: the
+     lesson title, and the objective (both still ellipse). The subject is still
+     read by the glyph, and standards remain in the lesson rail. */
+  .subjectTag,
+  .identityStandards {
     display: none;
   }
 }

@@ -142,6 +142,43 @@ const IconPlus = (): ReactNode => (
     <path d="M12 5v14M5 12h14" />
   </svg>
 );
+const IconLink = (): ReactNode => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+);
+
+// ── Section lesson tags ──────────────────────────────────────────────────────
+
+/** The distinct lessons tagging any content in this section, in first-seen
+ *  order. `WallItem.lessons` already carries EVERY lesson tagging the same
+ *  content (lib/wall-scope: `resolveWall` dedups on content identity and keeps
+ *  all the refs), so this needs no new data — only the de-duplication across
+ *  the section's cards.
+ *
+ *  Derived from the section's FULL item list, not the type/search-filtered one:
+ *  "which lessons does this section belong to" is a property of the section,
+ *  and a chip strip that shrank while you typed in the search box would read as
+ *  the answer changing rather than the view narrowing. Matches the handoff,
+ *  which reads `sec.items` (7.21 source-home/resource-wall.jsx:204). */
+function sectionTagLessons(
+  items: readonly WallItem[],
+): { id: string; title: string }[] {
+  const byId = new Map<string, string>();
+  for (const item of items) {
+    for (const ref of item.lessons) {
+      // A ref with no title would render as an empty pill — worse than absent.
+      if (ref.id && ref.title && !byId.has(ref.id)) byId.set(ref.id, ref.title);
+    }
+  }
+  return [...byId].map(([id, title]) => ({ id, title }));
+}
+
+/** How many chips render inline before the rest fold into the "+N" popover.
+ *  The handoff's number (resource-wall.jsx:222) — and the header is a single
+ *  nowrap row sharing space with the title, meta, count and action strip. */
+const INLINE_TAGS = 3;
 
 // ── Size cycle ───────────────────────────────────────────────────────────────
 
@@ -440,7 +477,14 @@ function SectionHeader({
         // background-popover control) would tear the whole section out from
         // under the teacher's click. `fromInteractive` is the shared guard
         // (planner-v2/util) — a button/input/select/textarea/anchor ancestor.
-        if (fromInteractive(e)) {
+        // The lesson-tag strip needs its own exemption: its chips and its
+        // popover rows are SPANS, so `fromInteractive` does not see them, and a
+        // drag begun while reading the tag list would move the section. The
+        // handoff exempts the same region (resource-wall.jsx:213).
+        if (
+          fromInteractive(e) ||
+          (e.target as HTMLElement | null)?.closest?.("[data-sectags]")
+        ) {
           e.preventDefault();
           return;
         }
@@ -472,6 +516,7 @@ function SectionHeader({
           drag handle and swallows stray clicks). The chevron owns collapsing. */}
       <h3 className={styles.title}>{section.title}</h3>
       {section.meta && <span className={styles.meta}>{section.meta}</span>}
+      <SectionTags items={section.items} />
       <span className={styles.count} aria-label={`${count} resources`}>
         {count}
       </span>
@@ -517,6 +562,114 @@ function SectionHeader({
         </Tooltip>
       </span>
     </div>
+  );
+}
+
+// ── Section lesson-tag chips ─────────────────────────────────────────────────
+
+/**
+ * "Tagged to <lesson>" chips in the section header, plus a "+N" popover holding
+ * the rest (handoff: 7.21 source-home/resource-wall.jsx:221-227).
+ *
+ * The chips are LABELS, not links — matching the handoff, whose `.rw-sectag` is
+ * a span carrying a link GLYPH, not an anchor. A wall section can gather content
+ * from several lessons at once, so there is no single destination to navigate
+ * to; the chips answer "whose material is this", and the card itself already
+ * owns the per-resource open action.
+ *
+ * Returns null below one tag, so a wall-local custom section — every card
+ * authored straight onto the wall, `lessons: []` — gains no empty affordance.
+ */
+function SectionTags({ items }: { items: readonly WallItem[] }): ReactNode {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const tags = useMemo(() => sectionTagLessons(items), [items]);
+
+  // Click-out + Escape close — the same contract BackgroundPopover states: a
+  // popover with no way back except re-clicking the button it now covers is a
+  // modal wearing a popover's clothes.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent): void => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // A section whose cards carry no lesson refs shows nothing at all.
+  if (tags.length === 0) return null;
+
+  const inline = tags.slice(0, INLINE_TAGS);
+  const overflow = tags.length - inline.length;
+
+  return (
+    // `data-sectags` is read by the header's drag guard: `fromInteractive`
+    // catches the "+N" <button> but NOT the chip spans or the popover's rows,
+    // and a drag begun on either would tear the whole section out from under
+    // the teacher. The handoff teaches its drag + collapse handlers the same
+    // exemption (resource-wall.jsx:213, :215).
+    <span
+      className={styles.tags}
+      data-sectags=""
+      ref={wrapRef}
+      // The strip names each lesson once; the group carries the relationship so
+      // a screen reader hears it once rather than three times.
+      role="list"
+      aria-label="Lessons tagged to this section"
+    >
+      {inline.map((tag) => (
+        <span
+          key={tag.id}
+          role="listitem"
+          className={styles.tag}
+          title={`Tagged to ${tag.title}`}
+        >
+          <IconLink />
+          <span className={styles.tagLabel}>{tag.title}</span>
+        </span>
+      ))}
+      {overflow > 0 && (
+        <Tooltip
+          content="See every lesson whose resources are collected in this section"
+          tooltipId="rw-sec-tags"
+          side="top"
+        >
+          <button
+            type="button"
+            className={styles.tagMore}
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-label={`Show all ${tags.length} tagged lessons`}
+          >
+            +{overflow}
+          </button>
+        </Tooltip>
+      )}
+      {open && (
+        // Absolute, like the sibling BackgroundPopover (`.pop`) — same surface,
+        // same vocabulary. `.hasBg` puts `overflow: hidden` on `.sec`, which
+        // would clip a downward popover on a short section; the strip is hidden
+        // outright at `data-size="min"` (see the CSS), so the only section this
+        // opens over is a full-height one whose cards give it room.
+        <div className={styles.tagPop} onMouseDown={(e) => e.stopPropagation()}>
+          <div className={styles.tagPopHead}>Tagged lessons</div>
+          {tags.map((tag) => (
+            <span key={tag.id} className={styles.tagRow}>
+              <IconLink />
+              {tag.title}
+            </span>
+          ))}
+        </div>
+      )}
+    </span>
   );
 }
 

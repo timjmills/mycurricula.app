@@ -28,11 +28,34 @@
 //    border, because dashed is already spoken for by "needs work"
 //    (`ph-units.css:61`).
 //
-// ── WHAT IS NOT BUILT YET ────────────────────────────────────────────────
-// Drag-authoring (dot ripple, band re-pace, edge resize, paint-a-unit), the
-// zoom slider, the Units|Lessons + Timeline|List toggle pairs, the "N missed"
-// chip, and the Unit/Lesson Library + Needs Attention drawer. Bands and dots
-// OPEN their unit / lesson; nothing on this canvas moves anything yet.
+// ── AUTHORING, AND THE TWO THINGS THAT CONSTRAIN IT ──────────────────────
+// A band can be dragged (or Shift+arrowed) to re-pace its unit's WEEK RANGE,
+// and its right edge to change its length. Two constraints shape that, and
+// both are worth stating where the wiring lives:
+//
+//   • GRANULARITY IS WEEK. `units.start_week` / `end_week` exist; the
+//     day-level columns the prototype drags against are deferred by migration.
+//     A drag moves the unit's declared weeks and does NOT re-date its lessons
+//     — see the ruling in lib/plan-timeline/drag.ts, and `lessonsOutside`,
+//     which keeps the resulting divergence visible on the band.
+//   • UNITS ARE TEAM CONTENT. There is one shared `units` row and no personal
+//     fork, so `editUnitFields` refuses the write outright in Personal mode
+//     (planner-store.tsx:3752). Authoring is therefore disabled — visibly, with
+//     the reason on every band — rather than offered and then silently failing.
+//
+// UNDO IS NOT THE STORE'S UNDO, and that is a real limitation rather than a
+// choice: units live in the CATALOG, which planner-store.tsx:1371-1375 makes an
+// explicit SIBLING of the undo history ("editing a lesson must not put the
+// subject list on the undo stack"), and `editUnitFields` is documented
+// NON-undoable at :2352. So the 50-step history cannot carry a unit
+// reschedule. What this offers instead is an INVERSE-PATCH undo on the toast,
+// guarded against staleness — see `rescheduleUnit`.
+//
+// ── WHAT IS STILL NOT BUILT ──────────────────────────────────────────────
+// Lesson-dot drag (a lesson's date is per-lesson forkable content), paint-a-new
+// unit / subject on an empty track, the Units|Lessons + Timeline|List toggle
+// pairs, the "N missed" chip, and the Unit/Lesson Library + Needs Attention
+// drawer.
 //
 // ── WHY THIS OPENS DOCS RATHER THAN THE GLOBAL WORKSPACE ─────────────────
 // It routes through the hub's own `onOpenDoc`, exactly as the browse pickers
@@ -41,9 +64,18 @@
 // may, because the hub's explorer is invisible to workspace-state's
 // single-renderer election.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
+import { useUndoToastOptional } from "@/lib/undo-toast";
 import { useAcademicYear } from "@/lib/use-academic-year";
 import { useSchoolWeek, type Weekday } from "@/lib/use-school-week";
 import { useHolidays } from "@/lib/use-holidays";
@@ -52,16 +84,33 @@ import { allYearWeeksFor, buildSchoolDays } from "@/lib/year-calendar";
 import {
   buildTimelineAxis,
   buildTimelineLanes,
+  lessonsOutsideRange,
   monthBands,
   todayLineSlot,
+  weekRangeEquals,
   weekSlotRange,
+  weeksLabel,
 } from "@/lib/plan-timeline";
-import type { NowRef } from "@/lib/plan-timeline";
+import type { NowRef, WeekRange } from "@/lib/plan-timeline";
 import { PlannerEmpty } from "@/components/ui";
-import type { Lesson } from "@/lib/types";
+import { stripHtml } from "@/lib/html-text";
+import type { Lesson, SubjectId } from "@/lib/types";
+import {
+  buildLessonLibrary,
+  buildNeedsAttention,
+  buildUnitLibrary,
+  type LibraryGroup,
+  type LibrarySort,
+  type LibraryStatusFilter,
+} from "@/lib/plan-timeline/library";
+import { ToggleGroup } from "@/components/ui";
 import { queryMatches, type HubBrowseProps } from "../browse/browse-data";
 import { TimelineCanvas } from "./TimelineCanvas";
+import { TimelineDrawer } from "./TimelineDrawer";
 import { TimelineLegend } from "./TimelineLegend";
+import { TimelineList } from "./TimelineList";
+import { TimelineZoom } from "./TimelineZoom";
+import type { BandDragKind } from "./use-band-drag";
 import styles from "./timeline.module.css";
 
 /** `useSchoolWeek` speaks lowercase tokens; `buildSchoolDays` wants the
@@ -78,8 +127,15 @@ const WEEKDAY_TO_SHORT: Readonly<Record<Weekday, string>> = {
 };
 
 export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
-  const { lessons, units, subjects, getSections } = usePlanner();
-  const { currentWeek, currentWeekBasis } = useAppState();
+  const { lessons, units, subjects, getSections, editUnitFields } =
+    usePlanner();
+  const { currentWeek, currentWeekBasis, editMode } = useAppState();
+  // Optional: the hub renders inside <UndoToastProvider> today
+  // (app/(planner)/layout.tsx:152), but a surface that silently throws when it
+  // does not is a surface that cannot be reused. Without a provider the
+  // reschedule still commits — it just loses its undo affordance, and
+  // `rescheduleUnit` says so rather than pretending.
+  const toast = useUndoToastOptional();
   const { start: yearStart, end: yearEnd } = useAcademicYear();
   const { days: schoolWeekDays } = useSchoolWeek();
   const { holidays } = useHolidays();
@@ -91,6 +147,26 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
   // known position" rather than as a default.
   const [todayColumn, setTodayColumn] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
+  // Zoom: null means "whatever the stylesheet's default is for this pointer and
+  // viewport", which is NOT a fixed number — the coarse-pointer query widens it
+  // (see timeline.module.css). Kept as session state rather than persisted: a
+  // stored value would have to be applied post-mount to stay SSR-safe, and a
+  // canvas this dense visibly re-lays-out when it jumps a frame after paint.
+  const [colWidth, setColWidth] = useState<number | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // The handoff's two switches (`ph-units.jsx:479-490`). They are ORTHOGONAL,
+  // and treating them as one four-way control was the temptation worth
+  // resisting: the LENS says which objects the surface is about (units or
+  // lessons) and the MODE says how they are drawn (on the axis or as a list).
+  // All four combinations are meaningful, and a teacher who has chosen "show me
+  // lessons" should keep that choice when they flip to the list.
+  const [lens, setLens] = useState<"units" | "lessons">("units");
+  const [mode, setMode] = useState<"timeline" | "list">("timeline");
+  const [group, setGroup] = useState<LibraryGroup>("subject");
+  const [status, setStatus] = useState<LibraryStatusFilter>("all");
+  const [sort, setSort] = useState<LibrarySort>("schedule");
+  const [compact, setCompact] = useState(false);
   useEffect(() => {
     setTodayColumn(todayColumnIndex(new Date(), schoolWeekDays));
     setMounted(true);
@@ -208,6 +284,223 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
     [query],
   );
 
+  // ── The list + drawer bodies ──────────────────────────────────────────────
+  // Same inputs as the lanes, same predicates. The list and the drawer are
+  // other VIEWS of the timeline, not other opinions about it.
+  const libraryInput = useMemo(
+    () => ({
+      subjects,
+      units,
+      lessons,
+      schoolWeekLen,
+      axisLength: axis.length,
+      now,
+      hasResources: hasAnyResource,
+      isHolidaySlot,
+    }),
+    [
+      subjects,
+      units,
+      lessons,
+      schoolWeekLen,
+      axis.length,
+      now,
+      hasAnyResource,
+      isHolidaySlot,
+    ],
+  );
+
+  // The hub's live search FILTERS the list and the drawer, where it DIMS the
+  // canvas. Different surfaces, different right answer: a year with non-matches
+  // removed loses the shape that makes it a year, but a list is a list.
+  const libraryLessons = useMemo(
+    () =>
+      buildLessonLibrary(libraryInput).filter((l) =>
+        queryMatches(query, l.title, l.unitName, l.subjectName),
+      ),
+    [libraryInput, query],
+  );
+  const libraryUnits = useMemo(
+    () =>
+      buildUnitLibrary(libraryInput).filter((u) =>
+        queryMatches(query, u.name, u.subjectName),
+      ),
+    [libraryInput, query],
+  );
+  // NEEDS ATTENTION IS NOT FILTERED BY THE SEARCH. A count that shrank as a
+  // teacher typed would report "2 need attention" for a plan with fourteen
+  // problems in it, and the count is on the collapsed bar where nothing
+  // explains the discrepancy.
+  const attention = useMemo(() => {
+    const all = buildLessonLibrary(libraryInput);
+    return buildNeedsAttention(all, buildUnitLibrary(libraryInput));
+  }, [libraryInput]);
+
+  const subjectClass = useCallback(
+    (id: SubjectId) => subjects.find((s) => s.id === id)?.cls ?? "",
+    [subjects],
+  );
+  const subjectDisplayName = useCallback(
+    (id: SubjectId) => subjects.find((s) => s.id === id)?.name ?? id,
+    [subjects],
+  );
+
+  const openLessonById = useCallback(
+    (lessonId: string, title?: string) => {
+      const lesson = lessons.find((l) => l.id === lessonId);
+      if (!lesson) return;
+      onOpenDoc({
+        kind: "lesson",
+        id: lessonId,
+        title: title ?? stripHtml(lesson.title) ?? "Lesson",
+        sid: lesson.subject,
+      });
+    },
+    [lessons, onOpenDoc],
+  );
+  const openUnitById = useCallback(
+    (unitId: string, subject: SubjectId, name?: string) => {
+      // Matched on BOTH: a unit slug is unique only WITHIN a subject, so
+      // `find(u => u.id === unitId)` would open Math's "u1" from a Reading row.
+      const unit = units.find((u) => u.id === unitId && u.subject === subject);
+      if (!unit) return;
+      onOpenDoc({
+        kind: "unit",
+        id: unitId,
+        title: name ?? unit.name,
+        sid: subject,
+      });
+    },
+    [units, onOpenDoc],
+  );
+
+  // ── Authoring ─────────────────────────────────────────────────────────────
+  // Units are TEAM content with one shared row and no personal fork, so the
+  // store refuses the write outright when the teacher is not in Team Curriculum
+  // mode (planner-store.tsx:3752). Offering the gesture anyway and letting it
+  // fail silently is the worst of the three options; disabling it and SAYING SO
+  // on the band is the honest one.
+  const dragEnabled = editMode === "master";
+  const dragBlockedReason = dragEnabled
+    ? null
+    : "A unit's weeks are shared with the whole team, so re-planning one needs the Team Curriculum mode — switch with the toggle in the top bar.";
+
+  const unitsRef = useRef(units);
+  unitsRef.current = units;
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+
+  /**
+   * Write a unit's new week range, then offer a guarded inverse-patch undo.
+   *
+   * This does NOT go through the store's 50-step history, and cannot: units
+   * live in the catalog, which is an explicit SIBLING of the undo stacks
+   * (planner-store.tsx:1371-1375), and `editUnitFields` is documented
+   * non-undoable (:2352). Putting them on the shared stack would mean a
+   * teacher's Ctrl+Z after a lesson edit could rewind a team-wide schedule
+   * change instead — the reason the split exists. The inverse patch is
+   * therefore offered on the toast and STALE-GUARDED at the moment it fires:
+   * if the unit's range has moved since (a re-hydrate pulling in a teammate's
+   * change is the way that happens), the undo is refused and says why rather
+   * than reverting shared content to a schedule nobody is looking at.
+   */
+  const rescheduleUnit = useCallback(
+    (
+      subject: SubjectId,
+      unitId: string,
+      next: WeekRange,
+      kind: BandDragKind,
+    ): void => {
+      const all = unitsRef.current;
+      const unit = all.find((u) => u.id === unitId && u.subject === subject);
+      if (!unit) return;
+      // THE STORE'S SEAM IS KEYED BY unitId ALONE — its reducer resolves the
+      // target with `units.findIndex(u => u.id === action.unitId)`
+      // (planner-store.tsx:1520), and a unit slug is unique only WITHIN a
+      // subject. Under Supabase these ids are uuids and cannot collide; under
+      // the mock they are slugs and can. Refusing a colliding write is the only
+      // safe option available from here — re-scheduling a different subject's
+      // unit is a silent, team-wide, wrong edit.
+      if (all.find((u) => u.id === unitId) !== unit) {
+        toastRef.current?.showUndoToast({
+          message: `Could not re-plan ${unit.name} — another subject has a unit with the same id.`,
+        });
+        return;
+      }
+
+      const before: WeekRange | null =
+        typeof unit.startWeek === "number" && typeof unit.endWeek === "number"
+          ? { start: unit.startWeek, end: unit.endWeek }
+          : null;
+      if (before && weekRangeEquals(before, next)) return;
+
+      const label = weeksLabel(next.start, next.end);
+      const verb = kind === "resize" ? "now runs" : "moved to";
+      const unitLessons = lessons.filter(
+        (l) => l.subject === subject && l.unit === unitId,
+      );
+      const outside = lessonsOutsideRange(unitLessons, next);
+      // The consequence, in the toast, with the number in it (audit B10). A
+      // teacher cannot judge whether to undo from "Moved" alone.
+      const consequence =
+        outside > 0
+          ? ` · ${outside} lesson${outside === 1 ? "" : "s"} still dated outside`
+          : "";
+
+      editUnitFields(
+        unitId,
+        {
+          startWeek: next.start,
+          endWeek: next.end,
+          // The DISPLAY collapse, so the unit card and the rail do not keep
+          // showing the old schedule. Derived, not stored — the Supabase source
+          // drops it and re-derives from the numbers (see UnitPatch's doc).
+          weeks: label,
+        },
+        (ok) => {
+          if (!ok) {
+            toastRef.current?.showUndoToast({
+              message: `Could not re-plan ${unit.name}. Your change was not saved.`,
+            });
+            return;
+          }
+          toastRef.current?.showUndoToast({
+            message: `${unit.name} ${verb} ${label}${consequence}`,
+            // No undo when the unit had NO stored week range before: the
+            // columns are NOT NULL, so "back to having no weeks" is not a state
+            // this patch can express. Offering an Undo that silently did
+            // something else would be worse than offering none.
+            onUndo: before
+              ? () => {
+                  const live = unitsRef.current.find(
+                    (u) => u.id === unitId && u.subject === subject,
+                  );
+                  const now =
+                    live &&
+                    typeof live.startWeek === "number" &&
+                    typeof live.endWeek === "number"
+                      ? { start: live.startWeek, end: live.endWeek }
+                      : null;
+                  if (!weekRangeEquals(now, next)) {
+                    toastRef.current?.showUndoToast({
+                      message: `${unit.name} has changed since — not undone.`,
+                    });
+                    return;
+                  }
+                  editUnitFields(unitId, {
+                    startWeek: before.start,
+                    endWeek: before.end,
+                    weeks: weeksLabel(before.start, before.end),
+                  });
+                }
+              : undefined,
+          });
+        },
+      );
+    },
+    [editUnitFields, lessons],
+  );
+
   if (axis.length === 0) {
     // Reachable only with an empty school week (every weekday deselected) or a
     // zero-length academic year. Named rather than shown as a blank canvas —
@@ -252,43 +545,135 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
           that, and reported "todayLine: 0" three runs running about a timeline
           that renders it correctly. An absence-assertion with no hydration gate
           FAILS OPEN. This attribute is that gate. */}
-      <div className={styles.card} data-mounted={mounted || undefined}>
+      <div
+        className={styles.card}
+        ref={cardRef}
+        data-mounted={mounted || undefined}
+        // The LENS as a data attribute rather than a prop threaded to every
+        // mark: it changes only emphasis (which of bands / dots reads as
+        // foreground), so it is presentation, and one attribute keeps the
+        // whole cascade in one place instead of a `dim` flag on two components.
+        data-lens={lens}
+        // The zoom slider's value, resolved against the touch floor by the
+        // stylesheet — never `--tl-col` directly, which would beat the
+        // coarse-pointer override and let a teacher shrink their own targets
+        // below the ≥44px contract. See timeline.module.css.
+        style={
+          colWidth === null
+            ? undefined
+            : ({ "--tl-col-user": `${colWidth}px` } as CSSProperties)
+        }
+      >
         <div className={styles.toolbar}>
-          <p className={styles.hint}>
-            Click a unit bar to open its planner · click a lesson dot to plan it.
-          </p>
-          <TimelineLegend />
+          <ToggleGroup
+            ariaLabel="What the plan shows"
+            value={lens}
+            onChange={(v) => setLens(v as "units" | "lessons")}
+            options={[
+              {
+                value: "units",
+                label: "Units",
+                title: "Put the unit bars in front — the shape of the year.",
+              },
+              {
+                value: "lessons",
+                label: "Lessons",
+                title:
+                  "Put the individual lessons in front — what is planned, taught, or still thin.",
+              },
+            ]}
+          />
+          <ToggleGroup
+            ariaLabel="How the plan is drawn"
+            variant="prominent"
+            value={mode}
+            onChange={(v) => setMode(v as "timeline" | "list")}
+            options={[
+              {
+                value: "timeline",
+                label: "Timeline",
+                title: "Draw the plan across the calendar year.",
+              },
+              {
+                value: "list",
+                label: "List",
+                title:
+                  "Read the same plan as a list you can group, filter and sort.",
+              },
+            ]}
+          />
+          {mode === "timeline" && (
+            <>
+              <p className={styles.hint}>
+                {dragEnabled
+                  ? "Click a unit bar to open its planner, or drag it to change the weeks it is planned for · click a lesson dot to plan it."
+                  : "Click a unit bar to open its planner · click a lesson dot to plan it."}
+              </p>
+              <TimelineZoom
+                value={colWidth}
+                onChange={setColWidth}
+                canvasRef={cardRef}
+              />
+            </>
+          )}
+          {lens === "lessons" && <TimelineLegend />}
         </div>
+
+        {mode === "list" ? (
+          <TimelineList
+            lens={lens}
+            lessons={libraryLessons}
+            units={libraryUnits}
+            group={group}
+            onGroupChange={setGroup}
+            status={status}
+            onStatusChange={setStatus}
+            sort={sort}
+            onSortChange={setSort}
+            compact={compact}
+            onCompactChange={setCompact}
+            subjectClass={subjectClass}
+            onOpenLesson={openLessonById}
+            onOpenUnit={(unitId, name, subject) =>
+              openUnitById(unitId, subject, name)
+            }
+          />
+        ) : (
         <TimelineCanvas
           axis={axis}
           months={months}
           lanes={lanes}
+          schoolWeekLen={schoolWeekLen}
+          dragEnabled={dragEnabled}
+          dragBlockedReason={dragBlockedReason}
+          onRescheduleUnit={rescheduleUnit}
           todaySlot={todaySlot}
           currentWeekRange={currentWeekRange}
           matchesUnit={matchesUnit}
           matchesLesson={matchesLesson}
-          onOpenUnit={(unitId, name, subject) => {
-            // MATCH ON BOTH. A unit slug is unique only WITHIN a subject, so
-            // `units.find(u => u.id === unitId)` returns whichever subject's
-            // unit happens to come first — clicking Reading's "u1" band would
-            // open Math's "u1". Same collision PlannerHub.tsx:59-62 documents
-            // for doc-tab keys, and the reason the lane hands its subject down.
-            const unit = units.find(
-              (u) => u.id === unitId && u.subject === subject,
-            );
-            if (!unit) return;
-            onOpenDoc({ kind: "unit", id: unitId, title: name, sid: subject });
-          }}
-          onOpenLesson={(lessonId, title) => {
-            const lesson = lessons.find((l) => l.id === lessonId);
-            if (!lesson) return;
-            onOpenDoc({
-              kind: "lesson",
-              id: lessonId,
-              title,
-              sid: lesson.subject,
-            });
-          }}
+          // MATCH ON BOTH, inside `openUnitById`. A unit slug is unique only
+          // WITHIN a subject, so `units.find(u => u.id === unitId)` returns
+          // whichever subject's unit comes first — clicking Reading's "u1"
+          // band would open Math's "u1". Same collision PlannerHub.tsx:59-62
+          // documents for doc-tab keys, and why the lane hands its subject
+          // down.
+          onOpenUnit={(unitId, name, subject) =>
+            openUnitById(unitId, subject, name)
+          }
+          onOpenLesson={openLessonById}
+        />
+        )}
+
+        {/* The library + triage panel (`ph-drawer.jsx`). Below the body in
+            BOTH modes: it is the same catalogue whichever way the plan above
+            it is drawn. */}
+        <TimelineDrawer
+          units={libraryUnits}
+          attention={attention}
+          subjectClass={subjectClass}
+          subjectName={subjectDisplayName}
+          onOpenLesson={(id) => openLessonById(id)}
+          onOpenUnit={(id, subject) => openUnitById(id, subject)}
         />
       </div>
     </>

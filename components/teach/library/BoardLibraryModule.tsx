@@ -9,8 +9,15 @@
 //   • Sidebar — My Library (All Boards / Favorites / Recent / Shared with Team /
 //     My Boards / Archived) + Filter by Use (Lesson / Part of Lesson / Free
 //     Board / Day / Week / Subject / Schedule Time / Whiteboard — colour-keyed).
-//   • Main — colored filter pills + a reflowing board-card grid + a "Boards are
-//     separate from resources" explainer + a Team Library strip + a Tips bar.
+//   • Main — colored filter pills + a "Sort by" control + a reflowing
+//     board-card grid + a "Boards are separate from resources" explainer + a
+//     Team Library strip + a Tips bar.
+//
+// DATA HONESTY: the list has a three-value readiness (`BoardsDataState`), NOT a
+// boolean loading flag — pending renders a <Skeleton>, a failed read renders the
+// "Couldn't load your boards" state, and only a SETTLED read is allowed to say
+// "No boards yet". See `loadBoardLibrary` for why the old try/finally turned a
+// backend outage into "you have no boards".
 //
 // FORKING / SEGMENTS: the Personal segment lists the teacher's own boards
 // (counts toward the 50-board cap) via `listMyBoards`; the Team segment lists
@@ -33,8 +40,8 @@
 // Responsive: full-screen on desktop AND usable inside a ~300–340px side panel —
 // the sidebar collapses to a scrolling row and the grid reflows to one column.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type {
   Board,
   BoardTag,
@@ -54,8 +61,13 @@ import {
 } from "@/lib/teach/board-tags";
 import { SearchIcon } from "../right/icons";
 import { TeachIcon, type TeachIconName } from "@/components/teach/widgets";
-import { Button } from "@/components/ui";
-import { BoardLibraryCard } from "./BoardLibraryCard";
+import { Button, EmptyState, Skeleton } from "@/components/ui";
+import {
+  BoardLibraryCard,
+  TagChips,
+  boardFamily,
+  boardIcon,
+} from "./BoardLibraryCard";
 import { RepeatScheduleEditor } from "./RepeatScheduleEditor";
 import styles from "./BoardLibrary.module.css";
 
@@ -188,6 +200,162 @@ function applyScope(list: Board[], scope: LibraryScope): Board[] {
     .slice(0, RECENT_LIMIT);
 }
 
+// ── Sort ─────────────────────────────────────────────────────────────────────
+// Only keys the `Board` shape actually carries. There is no favorite flag, no
+// archive flag, and no open/usage counter on a board, so the handoff's static
+// mock control is honoured with the three orderings we can truthfully compute
+// (the mock only ever showed "Recently updated").
+
+type SortKey = "updated" | "created" | "title";
+
+const SORT_OPTIONS: ReadonlyArray<{ id: SortKey; label: string }> = [
+  { id: "updated", label: "Recently updated" },
+  { id: "created", label: "Recently created" },
+  { id: "title", label: "Title A–Z" },
+];
+
+function sortBoards(list: Board[], sort: SortKey): Board[] {
+  const out = list.slice();
+  switch (sort) {
+    case "created":
+      return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    case "title":
+      return out.sort((a, b) =>
+        a.title.localeCompare(b.title, undefined, { sensitivity: "base" }),
+      );
+    case "updated":
+    default:
+      return out.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }
+}
+
+// ── Relative time ────────────────────────────────────────────────────────────
+// The Team Library row's "{by} · {ago}" byline (handoff SharedRow :154). The
+// repo has no shared relative-time helper — the only one that exists is private
+// to components/shell/NotificationBell.tsx — so this is a deliberately trivial,
+// dependency-free local copy. It renders only inside data loaded by an effect,
+// so it never runs during SSR and cannot cause a hydration mismatch.
+
+function relativeAgo(iso: string, now: number = Date.now()): string | null {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const min = Math.round((now - t) / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.round(hr / 24);
+  if (day <= 1) return "1 day ago";
+  if (day < 30) return `${day} days ago`;
+  // Older than a month: no honest short form, so the byline just drops the age.
+  return null;
+}
+
+// ── Data state ───────────────────────────────────────────────────────────────
+// A local three-value readiness, NOT the planner's. This surface's data comes
+// from `teachClient`, so <PlannerEmpty> would be wrong twice over: it reports
+// PLANNER hydration (unrelated to a board fetch) and it throws outright without
+// a <PlannerProvider>, which the standalone Boards page does not mount. We
+// mirror its SHAPE (Skeleton on pending, its error copy on error) so the app
+// speaks with one voice.
+
+export type BoardsDataState = "pending" | "error" | "settled";
+
+/** One Board Library load. `state` is exactly what the surface renders. */
+export type BoardLibraryLoad =
+  | { state: "settled"; boards: Board[]; myCount: number }
+  | { state: "error" };
+
+/**
+ * Read the segment's board list + the teacher's cap count.
+ *
+ * WHY THIS SWALLOWS: under the live flag `teachClient` REJECTS on any backend
+ * failure (lib/teach/client.ts rethrows the server action's error envelope).
+ * The caller is a fire-and-forget `void refresh()` inside an effect, so a
+ * rejection escaping here becomes an unhandled promise rejection AND — because
+ * the old `try/finally` had no `catch` — left the list at `[]` with loading
+ * cleared, i.e. a backend outage rendered to the teacher as "you have no
+ * boards". Returning an explicit `error` state makes the failure renderable.
+ */
+export async function loadBoardLibrary(opts: {
+  tab: Tab;
+  ownerId: string;
+  gradeLevelId?: string;
+}): Promise<BoardLibraryLoad> {
+  try {
+    // The Team Library query needs a resolved grade. Under the live flag the
+    // grade resolves a tick after ownerId, so gradeLevelId can briefly be
+    // undefined; passing the old "g5" mock slug to resolveGradeId would throw
+    // (audit L4). Skip the team list until the grade arrives — the caller's
+    // effect re-runs (gradeLevelId is in its deps). "mine" never needs a grade.
+    const listPromise =
+      opts.tab === "mine"
+        ? teach.listMyBoards(opts.ownerId)
+        : opts.gradeLevelId
+          ? teach.listTeamLibraryBoards(opts.gradeLevelId)
+          : Promise.resolve([] as Board[]);
+    const [boards, myCount] = await Promise.all([
+      listPromise,
+      teach.countMyBoards(opts.ownerId),
+    ]);
+    return { state: "settled", boards, myCount };
+  } catch {
+    return { state: "error" };
+  }
+}
+
+/**
+ * The list region: loading / failed / empty / the grid. Split out of the module
+ * so the honesty contract is directly testable — the module renders exactly
+ * this, and a test can pin every data state without a DOM.
+ */
+export function BoardListRegion({
+  dataState,
+  loadedCount,
+  visibleCount,
+  tab,
+  canCreate,
+  children,
+}: {
+  dataState: BoardsDataState;
+  /** Boards returned by the load, BEFORE search/scope/tag filtering. */
+  loadedCount: number;
+  /** Boards left after filtering — what the grid would show. */
+  visibleCount: number;
+  tab: Tab;
+  /** True when a "New board" action exists to point the teacher at. */
+  canCreate: boolean;
+  /** The card grid; rendered only once there is something to show. */
+  children?: ReactNode;
+}): ReactNode {
+  if (dataState === "pending") {
+    return <Skeleton lines={3} label="Loading your boards…" />;
+  }
+  if (dataState === "error") {
+    // Same wording as PlannerEmpty's error branch, with "boards" for "plan".
+    return (
+      <EmptyState
+        heading="Couldn’t load your boards"
+        body="Check your connection and reload. Your saved work is safe."
+      />
+    );
+  }
+  if (visibleCount === 0) {
+    return (
+      <p className={styles.empty}>
+        {loadedCount === 0
+          ? tab === "mine"
+            ? canCreate
+              ? "No boards yet — click “New board” to create your first one, or start from a template below."
+              : "No boards yet. Build one on a lesson, then it shows up here."
+            : "Your team hasn't shared any boards yet."
+          : "No boards match your search and filters."}
+      </p>
+    );
+  }
+  return <>{children}</>;
+}
+
 // ── BoardLibraryModule ───────────────────────────────────────────────────────
 
 export function BoardLibraryModule({
@@ -202,6 +370,7 @@ export function BoardLibraryModule({
 
   const [tab, setTab] = useState<Tab>("mine");
   const [scope, setScope] = useState<LibraryScope>("all");
+  const [sort, setSort] = useState<SortKey>("updated");
   const [query, setQuery] = useState("");
   // Active tag-value filter pills, keyed by `tagKey` — AND semantics.
   const [activeFilters, setActiveFilters] = useState<Set<string>>(
@@ -212,7 +381,7 @@ export function BoardLibraryModule({
 
   const [boards, setBoards] = useState<Board[]>([]);
   const [myCount, setMyCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [dataState, setDataState] = useState<BoardsDataState>("pending");
   const [capNotice, setCapNotice] = useState(false);
   // Templates: load once + surface below the board grid on the Personal segment.
   const [templates, setTemplates] = useState<BoardTemplate[]>([]);
@@ -226,37 +395,31 @@ export function BoardLibraryModule({
   const [showTips, setShowTips] = useState(true);
 
   // ── Load ────────────────────────────────────────────────────────────────
+  // Monotonic load id: a superseded response (segment switched, or a mutation
+  // refresh that overtook the segment load) must not paint over a newer one.
+  const loadSeq = useRef(0);
   const refresh = useCallback(async (): Promise<void> => {
-    // Guard: skip the load until the owner is resolved (auth not yet available
-    // or mock path misconfigured). Show an empty, non-loading state so the UI
-    // stays consistent; the effect below re-runs when ownerId becomes non-null.
+    const seq = ++loadSeq.current;
+    // Guard: the owner is not resolved yet (the auth session is still
+    // resolving). That is "we don't know", NOT "you have no boards" — so the
+    // surface stays PENDING rather than asserting an empty library. The effect
+    // below re-runs when ownerId becomes non-null.
     if (!ownerId) {
-      setLoading(false);
       setBoards([]);
+      setDataState("pending");
       return;
     }
-    setLoading(true);
-    try {
-      // The Team Library query needs a resolved grade. Under the live flag the
-      // grade resolves a tick after ownerId, so gradeLevelId can briefly be
-      // undefined; passing the old "g5" mock slug to resolveGradeId would throw
-      // (audit L4). Skip the team list until the grade arrives — the effect
-      // re-runs (gradeLevelId is in the deps). "mine" never needs a grade.
-      const listPromise =
-        tab === "mine"
-          ? teach.listMyBoards(ownerId)
-          : gradeLevelId
-            ? teach.listTeamLibraryBoards(gradeLevelId)
-            : Promise.resolve([] as Board[]);
-      const [list, count] = await Promise.all([
-        listPromise,
-        teach.countMyBoards(ownerId),
-      ]);
-      setBoards(list);
-      setMyCount(count);
-    } finally {
-      setLoading(false);
+    setDataState("pending");
+    const res = await loadBoardLibrary({ tab, ownerId, gradeLevelId });
+    if (seq !== loadSeq.current) return; // superseded by a newer load
+    if (res.state === "settled") {
+      setBoards(res.boards);
+      setMyCount(res.myCount);
     }
+    // On error the previously-loaded boards are left in state but not rendered
+    // (BoardListRegion branches on the state first) — a failed refresh reports
+    // the failure instead of silently showing stale content as current.
+    setDataState(res.state);
   }, [tab, ownerId, gradeLevelId]);
 
   useEffect(() => {
@@ -332,23 +495,42 @@ export function BoardLibraryModule({
       }
       return true;
     });
-    return applyScope(filtered, scope);
-  }, [boards, scope, query, filterPills, activeFilters, activeUse]);
+    // `recent` caps to the most-recently-updated N first; the chosen sort then
+    // orders whatever survived, so the two controls compose instead of fighting.
+    return sortBoards(applyScope(filtered, scope), sort);
+  }, [boards, scope, sort, query, filterPills, activeFilters, activeUse]);
 
   // ── Derived: the Team Library strip (always the team set, capped to 4) ────
   const [teamStrip, setTeamStrip] = useState<Board[]>([]);
+  const [teamStripError, setTeamStripError] = useState(false);
   useEffect(() => {
     // Wait for a resolved grade before querying the Team Library (audit L4): under
     // the live flag gradeLevelId is briefly undefined, and a mock slug would throw
     // in resolveGradeId. The effect re-runs when the grade arrives.
     if (!gradeLevelId) {
       setTeamStrip([]);
+      setTeamStripError(false);
       return;
     }
     let alive = true;
-    void teach.listTeamLibraryBoards(gradeLevelId).then((list) => {
-      if (alive) setTeamStrip(list.slice(0, 4));
-    });
+    void teach
+      .listTeamLibraryBoards(gradeLevelId)
+      .then((list) => {
+        if (alive) {
+          setTeamStrip(list.slice(0, 4));
+          setTeamStripError(false);
+        }
+      })
+      // Without this the live client's rethrow escapes as an unhandled
+      // rejection — and the strip would fall back to "No team-shared boards
+      // yet.", telling the teacher their team shares nothing when the read
+      // simply failed. Flag the failure and say so instead.
+      .catch(() => {
+        if (alive) {
+          setTeamStrip([]);
+          setTeamStripError(true);
+        }
+      });
     return () => {
       alive = false;
     };
@@ -446,12 +628,23 @@ export function BoardLibraryModule({
   const handleDelete = useCallback(
     async (board: Board): Promise<void> => {
       setConfirmingDeleteId(null);
-      await teach.deleteBoard(board.id);
+      try {
+        await teach.deleteBoard(board.id);
+      } catch {
+        // A rejected delete used to escape this fire-and-forget callback as an
+        // unhandled rejection, leaving the teacher to believe the board was
+        // gone until the next refresh brought it back. Report it and stop —
+        // no cap check here: deleting can never hit the board cap.
+        showConsequence({
+          message: "Couldn't do that just now — please try again.",
+        });
+        return;
+      }
       // Deleting frees a slot, so a stale "at the limit" notice no longer holds.
       setCapNotice(false);
       await refresh();
     },
-    [refresh],
+    [refresh, showConsequence],
   );
 
   // Repeat: open the editor inline; on save write through the repo + refresh.
@@ -459,11 +652,21 @@ export function BoardLibraryModule({
     async (repeat: RepeatSchedule): Promise<void> => {
       const board = repeatingBoard;
       if (!board) return;
-      await teach.setBoardRepeat(board.id, repeat);
+      try {
+        await teach.setBoardRepeat(board.id, repeat);
+      } catch {
+        // Same hole as delete. Keep the editor OPEN on failure so the teacher's
+        // unsaved schedule isn't thrown away by a transient backend error.
+        // (setBoardRepeat writes to an existing board — no cap involved.)
+        showConsequence({
+          message: "Couldn't save that repeat — please try again.",
+        });
+        return;
+      }
       setRepeatingBoard(null);
       await refresh();
     },
-    [repeatingBoard, refresh],
+    [repeatingBoard, refresh, showConsequence],
   );
 
   // Use a template → create ONE board and select it.
@@ -521,6 +724,9 @@ export function BoardLibraryModule({
     100,
     Math.round((myCount / MAX_BOARDS_PER_TEACHER) * 100),
   );
+  // Unique id so the sort <label> binds correctly even if the module ever
+  // renders twice on one page (e.g. the overlay above the Boards home).
+  const sortId = `${useId()}-board-sort`;
 
   return (
     <div className={styles.root}>
@@ -668,34 +874,57 @@ export function BoardLibraryModule({
 
         {/* Main */}
         <div className={styles.main}>
-          {/* Colored tag-value filter pills */}
-          {filterPills.length > 0 ? (
-            <div
-              className={styles.filters}
-              role="group"
-              aria-label="Filter boards by tag"
-            >
-              {filterPills.map((tag) => {
-                const id = filterIdFor(tag);
-                const active = activeFilters.has(id);
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`${styles.filterPill} ${active ? styles.filterPillActive : ""}`}
-                    aria-pressed={active}
-                    onClick={() => toggleFilter(id)}
-                    title={`Show only boards tagged ${TAG_KIND_LABEL[tag.kind]}: ${tagDisplayLabel(tag)}`}
-                  >
-                    <span className={styles.filterKind}>
-                      {TAG_KIND_LABEL[tag.kind]}
-                    </span>
-                    {tagDisplayLabel(tag)}
-                  </button>
-                );
-              })}
+          {/* Colored tag-value filter pills + the sort control (handoff :167).
+              The pills are conditional; the sort control is not, so the row
+              wrapper always renders. */}
+          <div className={styles.filterRow}>
+            {filterPills.length > 0 ? (
+              <div
+                className={styles.filters}
+                role="group"
+                aria-label="Filter boards by tag"
+              >
+                {filterPills.map((tag) => {
+                  const id = filterIdFor(tag);
+                  const active = activeFilters.has(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`${styles.filterPill} ${active ? styles.filterPillActive : ""}`}
+                      aria-pressed={active}
+                      onClick={() => toggleFilter(id)}
+                      title={`Show only boards tagged ${TAG_KIND_LABEL[tag.kind]}: ${tagDisplayLabel(tag)}`}
+                    >
+                      <span className={styles.filterKind}>
+                        {TAG_KIND_LABEL[tag.kind]}
+                      </span>
+                      {tagDisplayLabel(tag)}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            <div className={styles.sortWrap}>
+              <label className={styles.sortLabel} htmlFor={sortId}>
+                Sort by
+              </label>
+              <select
+                id={sortId}
+                className={styles.sortSelect}
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                title="Choose the order your boards are listed in"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          ) : null}
+          </div>
 
           {/* Cap notice (inline) */}
           {capNotice ? (
@@ -705,20 +934,14 @@ export function BoardLibraryModule({
             </p>
           ) : null}
 
-          {/* Card grid / empty / loading */}
-          {loading ? (
-            <p className={styles.empty}>Loading boards…</p>
-          ) : visible.length === 0 ? (
-            <p className={styles.empty}>
-              {boards.length === 0
-                ? tab === "mine"
-                  ? onCreateBlank
-                    ? "No boards yet — click “New board” to create your first one, or start from a template below."
-                    : "No boards yet. Build one on a lesson, then it shows up here."
-                  : "Your team hasn't shared any boards yet."
-                : "No boards match your search and filters."}
-            </p>
-          ) : (
+          {/* Card grid / empty / failed / loading — see BoardListRegion. */}
+          <BoardListRegion
+            dataState={dataState}
+            loadedCount={boards.length}
+            visibleCount={visible.length}
+            tab={tab}
+            canCreate={onCreateBlank != null}
+          >
             <div className={styles.grid}>
               {visible.map((board) => (
                 <BoardLibraryCard
@@ -742,7 +965,7 @@ export function BoardLibraryModule({
                 />
               ))}
             </div>
-          )}
+          </BoardListRegion>
 
           {/* Repeat editor (Personal) — inline below the grid for the open board */}
           {repeatingBoard ? (
@@ -819,10 +1042,21 @@ export function BoardLibraryModule({
               </p>
               {teamStrip.length > 0 ? (
                 <div className={styles.teamStrip}>
+                  {/* Three bands, per the handoff's SharedRow (:145-156):
+                      family chip + title · tag chips · "{by} · {ago}" byline.
+                      No kebab: the handoff's ⋮ has nothing wired behind it here,
+                      and a dead affordance is worse than none. */}
                   {teamStrip.map((board) => {
                     const by = board.publishedBy
                       ? TEACHER_BY_ID[board.publishedBy]?.name
                       : undefined;
+                    const ago = relativeAgo(board.updatedAt);
+                    const byline = [by, ago].filter(Boolean).join(" · ");
+                    const fam = boardFamily(board);
+                    const chipVars = {
+                      "--chip-bg": `var(--wf-${fam}-chip)`,
+                      "--chip-fg": `var(--wf-${fam}-accent)`,
+                    } as CSSProperties;
                     return (
                       <button
                         key={board.id}
@@ -831,18 +1065,33 @@ export function BoardLibraryModule({
                         onClick={() => handleOpen(board)}
                         title={`Open ${board.title}`}
                       >
-                        <span className={styles.teamCardTitle}>
-                          {board.title}
+                        <span className={styles.teamCardHead}>
+                          <span
+                            className={styles.teamCardChip}
+                            style={chipVars}
+                            aria-hidden="true"
+                          >
+                            <TeachIcon name={boardIcon(board)} size={16} />
+                          </span>
+                          <span className={styles.teamCardTitle}>
+                            {board.title}
+                          </span>
                         </span>
-                        {by ? (
+                        <TagChips board={board} max={2} />
+                        {byline ? (
                           <span className={styles.teamCardBy}>
-                            <TeachIcon name="users" size={12} /> {by}
+                            <TeachIcon name="users" size={12} /> {byline}
                           </span>
                         ) : null}
                       </button>
                     );
                   })}
                 </div>
+              ) : teamStripError ? (
+                <p className={styles.teamEmpty}>
+                  Couldn&rsquo;t load your team&rsquo;s boards. Check your
+                  connection and reload.
+                </p>
               ) : (
                 <p className={styles.teamEmpty}>No team-shared boards yet.</p>
               )}

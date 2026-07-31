@@ -286,6 +286,26 @@ export function CopyLinkIcon({ size = 14 }: GlyphProps): ReactNode {
   );
 }
 
+/** Trash glyph — destructive actions (delete/remove). */
+export function TrashIcon({ size = 14 }: GlyphProps): ReactNode {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16M10 4h4M9 7v11M15 7v11" />
+      <path d="M6 7l1 13h10l1-13" />
+    </svg>
+  );
+}
+
 /** Per-resource-kind glyph for the card thumbnail / list chip. */
 export function ResourceKindIcon({
   kind,

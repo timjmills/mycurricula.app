@@ -7,7 +7,8 @@
 import type { Lesson, Subject, Unit } from "@/lib/types";
 import { stripHtml } from "@/lib/html-text";
 import { slotOf } from "./axis";
-import { packLevels, unitSpan } from "./bands";
+import { packLevels, unitSpan, unitWeekRange } from "./bands";
+import { lessonsOutsideRange, weekOfSlot } from "./drag";
 import { dotStateFor, forkTierFor, planningGapCount, stackBySlot } from "./dots";
 import type { NowRef } from "./dots";
 import type { TimelineBand, TimelineDot, TimelineLane } from "./types";
@@ -144,6 +145,14 @@ export function buildTimelineLanes(input: BuildLanesInput): TimelineLane[] {
         if (planningGapCount(l, hasResources) === 0) ready += 1;
         if (l.status === "done") taught += 1;
       }
+      // The STORED range where there is one, not the drawn one. `p.startSlot` /
+      // `p.endSlot` are clamped to the axis, so recovering the weeks from them
+      // would hand a drag on a unit stored for weeks 38–45 in a 40-week year an
+      // origin of 38–40 — and the first nudge would silently truncate it.
+      const weekRange = unitWeekRange(p.unit) ?? {
+        start: weekOfSlot(p.startSlot, schoolWeekLen),
+        end: weekOfSlot(p.endSlot, schoolWeekLen),
+      };
       return {
         unitId: p.unit.id,
         name: p.unit.name,
@@ -154,6 +163,8 @@ export function buildTimelineLanes(input: BuildLanesInput): TimelineLane[] {
         taught,
         total: unitLessons.length,
         spanSource: p.source,
+        weekRange,
+        lessonsOutside: lessonsOutsideRange(unitLessons, weekRange),
       };
     });
 

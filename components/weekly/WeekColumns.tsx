@@ -52,8 +52,12 @@ import {
 import { CSS as DndCSS } from "@dnd-kit/utilities";
 import { useReducedMotion } from "framer-motion";
 import { Tooltip } from "@/components/ui";
+import { AddLessonMenu } from "@/components/planner-v2";
+// Non-instructional-event popover — a self-contained position:fixed dialog,
+// reused verbatim from the Daily canvas (as WeekA and WeekC do).
+import { AddEventForm } from "@/components/daily/AddEventForm";
 import { useLabels } from "@/lib/labels";
-import type { Lesson, LessonStatus } from "@/lib/types";
+import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useOrderedWeekdays } from "@/lib/week-order";
@@ -124,6 +128,7 @@ export function WeekColumns(): ReactNode {
     duplicateLesson,
     setSaveTarget,
     unarchiveLesson,
+    addLesson,
     lastChange,
     subjects,
     subjectById,
@@ -252,6 +257,76 @@ export function WeekColumns(): ReactNode {
     }
     return buckets;
   }, [lessons, week, DAY_COUNT, lessonMatchesQuery, subjectRank]);
+
+  // ── Quick-add (one-click blank lesson, PER DAY) ───────────────────────────
+  // Paper was the only Week frame with no add affordance at all: an empty
+  // column rendered the `emptyLabel` and nothing else, so a teacher on their
+  // own frame had to leave the surface to create a lesson. Ported verbatim from
+  // WeekA (the glass per-DAY add), including its two hard-won details: the
+  // subject is INFERRED (this day's first lesson's subject — the likeliest
+  // continuation — else the catalog's first), and a synchronous ref guards the
+  // double-click double-create that `addingDay` state alone cannot (two clicks
+  // in one tick both pass a state check before the first setState commits).
+  const [addingDay, setAddingDay] = useState<number | null>(null);
+  const [errorDay, setErrorDay] = useState<number | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quickAddInFlightRef = useRef(false);
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current !== null) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
+
+  const handleQuickAdd = useCallback(
+    async (day: number): Promise<void> => {
+      if (quickAddInFlightRef.current) return; // sync guard — never double-create
+      const subject: SubjectId | undefined =
+        byDay[day]?.[0]?.subject ?? subjects[0]?.id;
+      if (!subject) return; // catalog not settled yet (backend hydrate)
+      quickAddInFlightRef.current = true;
+      setAddingDay(day);
+      if (errorTimerRef.current !== null) {
+        clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = null;
+      }
+      setErrorDay(null);
+      setErrorMsg(null);
+      try {
+        const created = await addLesson({
+          subject,
+          week,
+          day,
+          title: `New ${labels.lesson.toLowerCase()}`,
+        });
+        if (created) {
+          setSelectedLessonId(created.id);
+        } else {
+          setErrorDay(day);
+          setErrorMsg(
+            `Couldn’t add the ${labels.lesson.toLowerCase()} — check your connection and try again.`,
+          );
+          errorTimerRef.current = setTimeout(() => {
+            errorTimerRef.current = null;
+            setErrorDay(null);
+            setErrorMsg(null);
+          }, 6000);
+        }
+      } finally {
+        quickAddInFlightRef.current = false;
+        setAddingDay(null);
+      }
+    },
+    [byDay, subjects, addLesson, week, labels.lesson, setSelectedLessonId],
+  );
+
+  // ── Add non-instructional event (per day) ─────────────────────────────────
+  // The anchor is captured on onClickCapture from the add row's LIVE rect so it
+  // works for mouse AND keyboard (Enter fires a synthesized click with no
+  // pointer event, and capture runs before the menu row's onClick). Without it
+  // AddEventForm falls back to Daily's left:64px, which lands over the rail.
+  const [addEventDay, setAddEventDay] = useState<number | null>(null);
+  const addEventAnchorRef = useRef<{ x: number; y: number } | null>(null);
 
   // ── Drop-target resolution (§4a W3.6-c3 finding #1) ───────────────────────
   // Every card is itself a droppable (useSortable wraps useDroppable), so with
@@ -571,7 +646,7 @@ export function WeekColumns(): ReactNode {
             // One column per configured school day (never a fixed 5).
             style={{ "--day-count": DAY_COUNT } as React.CSSProperties}
           >
-            {weekdays.map(({ token, index: dayIdx, label, longLabel }) => (
+            {weekdays.map(({ token, index: dayIdx, label, longLabel }, pos) => (
               <DayColumn
                 key={token}
                 dayIndex={dayIdx}
@@ -586,6 +661,29 @@ export function WeekColumns(): ReactNode {
                 selectedId={selectedLessonId ?? selectedId}
                 dragActiveId={dragActiveId}
                 emptyLabel={`No ${labels.lesson.toLowerCase()}s`}
+                addTooltip={`Add a ${labels.lesson.toLowerCase()} or a non-instructional event to this day`}
+                // The menu is 300px and a column ~170px, so a centered menu on
+                // an EDGE column overhangs the horizontal scroll container and
+                // is clipped (live: 39px lost off the left on Sunday, 38px off
+                // the right on Thursday, 5-day week at 1440px). Only the two
+                // extremes need pinning; the columns between them have room.
+                // Keyed on the RENDER POSITION, not `dayIdx`: the two happen to
+                // agree today, but which column sits at the edge of the track
+                // is a question about the layout, not about the day's value.
+                addAlign={
+                  pos === 0
+                    ? "start"
+                    : pos === weekdays.length - 1
+                      ? "end"
+                      : "center"
+                }
+                onQuickAdd={() => void handleQuickAdd(dayIdx)}
+                onAddEvent={() => setAddEventDay(dayIdx)}
+                onAddAnchor={(rect) => {
+                  addEventAnchorRef.current = { x: rect.left, y: rect.bottom };
+                }}
+                quickAdding={addingDay === dayIdx}
+                quickAddError={errorDay === dayIdx ? errorMsg : null}
                 onSelect={handleSelect}
                 onActivateDetail={handleActivateDetail}
                 onToggleComplete={handleToggleComplete}
@@ -637,6 +735,21 @@ export function WeekColumns(): ReactNode {
           }
         />
       )}
+
+      {/* Non-instructional-event popover — fixed-position, at this surface's
+          root so it escapes the horizontal `.scroll` container's overflow
+          (same placement as WeekA/WeekC). */}
+      <AddEventForm
+        open={addEventDay !== null}
+        onClose={() => setAddEventDay(null)}
+        day={addEventDay ?? 0}
+        // The CONFIGURED weekday label, not the form's positional Sun–Thu
+        // fallback, and an anchor beside the clicked column.
+        dayLabel={
+          weekdays.find((w) => w.index === (addEventDay ?? 0))?.longLabel
+        }
+        anchor={addEventAnchorRef.current}
+      />
     </div>
   );
 }
@@ -662,6 +775,22 @@ interface DayColumnProps {
   selectedId: string | null;
   dragActiveId: string | null;
   emptyLabel: string;
+  /** Teaching tooltip for this column's add trigger. */
+  addTooltip: string;
+  /** Which edge the add menu hangs from — the edge columns pin to their own
+   *  side so the 300px menu is not clipped by the week's scroll container. */
+  addAlign: "center" | "start" | "end";
+  /** Create a blank lesson in this day. */
+  onQuickAdd: () => void;
+  /** Open the non-instructional-event popover for this day. */
+  onAddEvent: () => void;
+  /** Report the add row's live rect so the event popover anchors beside THIS
+   *  column (fires on click capture, so keyboard Enter is covered too). */
+  onAddAnchor: (rect: DOMRect) => void;
+  /** True while this column's quick-add round-trip is in flight. */
+  quickAdding: boolean;
+  /** Transient quick-add failure for THIS column, or null. */
+  quickAddError: string | null;
   onSelect: (id: string) => void;
   onActivateDetail: (id: string) => void;
   onToggleComplete: (id: string, next: LessonStatus) => void;
@@ -687,6 +816,13 @@ function DayColumn({
   selectedId,
   dragActiveId,
   emptyLabel,
+  addTooltip,
+  addAlign,
+  onQuickAdd,
+  onAddEvent,
+  onAddAnchor,
+  quickAdding,
+  quickAddError,
   onSelect,
   onActivateDetail,
   onToggleComplete,
@@ -795,6 +931,35 @@ function DayColumn({
           )}
         </div>
       </SortableContext>
+
+      {/* Add row — one dashed add affordance per day, OUTSIDE the sortable
+          stack so it is never a drop target and never reorders. A holiday
+          column keeps it: a school can still schedule a make-up session on a
+          day the calendar calls off, and hiding the control would make the
+          only path to that a different surface. */}
+      <div
+        className={styles.addRow}
+        onClickCapture={(e) => onAddAnchor(e.currentTarget.getBoundingClientRect())}
+      >
+        <AddLessonMenu
+          triggerClassName={styles.addTrigger}
+          tooltipId="week-columns-add"
+          tooltipContent={addTooltip}
+          align={addAlign}
+          onQuickAdd={onQuickAdd}
+          onAddEvent={onAddEvent}
+          quickAdding={quickAdding}
+          quickAddError={quickAddError}
+          triggerContent={
+            <>
+              <span className={styles.addPlus} aria-hidden="true">
+                +
+              </span>
+              <span>Add</span>
+            </>
+          }
+        />
+      </div>
     </div>
   );
 }

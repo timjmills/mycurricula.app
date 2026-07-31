@@ -1,0 +1,443 @@
+/* RefineTab.module.css — Unit workspace › Refine (the planning spreadsheet).
+ *
+ * TONE, NOT THEME. Every colour is a token that already re-declares itself on
+ * the `[data-tone="dark"]` path in app/tokens.css (--surface, --surface-warm,
+ * --ink-*, --border, --hairline, --accent, --done). Branching on a theme would
+ * break the other six; branching on tone is done FOR us by the tokens. The
+ * handoff's `--phx-*` tier is deliberately NOT carried across — it branches on
+ * `data-bg`, which inverts under Photo-Bright. Zero hex literals, zero px font
+ * sizes.
+ *
+ * CP-ROOT RESET. This tab renders inside `.cp-root`, whose `.cp-root button`
+ * rule is (0,1,1) and silently strips padding / border / background from a
+ * single-class rule. Both hand-rolled buttons here (`.fd`, `.cellBtn`) are
+ * therefore DOUBLED (`.fd.fd`, 0-2-0) in the markup and in these rules —
+ * including inside @media, where a single-class override would lose to its own
+ * doubled base.
+ *
+ * NO SHARP CORNERS (CLAUDE.md §4 RULE #1). Every input, select, button and the
+ * table card itself is rounded. The table's own cells are not — they are rules,
+ * not surfaces — but the card that clips them is.
+ *
+ * RESPONSIVE. A spreadsheet is the one shape that genuinely needs width, so the
+ * table scrolls INSIDE its own card (`overflow-x: auto`) rather than pushing the
+ * document sideways — the §4 contract explicitly allows internal scroll and
+ * forbids page-level scroll. Below 900px the meta line under each title hides
+ * (it repeats what the Lessons tab shows) and the columns tighten. Touch targets
+ * stay ≥44px on coarse pointers via the @media (pointer: coarse) block.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ── Pass controls ─────────────────────────────────────────────────────────── */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pickLabel {
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  white-space: nowrap;
+}
+
+.passProgress {
+  margin: 0;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border-radius: var(--r-pill);
+  padding: 6px 12px;
+}
+
+/* ── Table card ────────────────────────────────────────────────────────────── */
+
+.tableWrap {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  /* The internal scroll that keeps the DOCUMENT from scrolling sideways. */
+  overflow-x: auto;
+  overflow-y: visible;
+  min-width: 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--t-13);
+  /* Wide enough that every column stays readable; the card scrolls to reach it
+     rather than crushing Objective to nothing. */
+  min-width: 720px;
+}
+
+/* Visible to screen readers only — the table still needs a name, but the
+   heading above it already says what this surface is. */
+.caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  text-align: left;
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.thText {
+  vertical-align: middle;
+}
+
+.table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
+  color: var(--ink-900);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+  background: var(--surface-warm);
+}
+
+/* ── The active pass's column ──────────────────────────────────────────────── */
+/* Tint only — the header label and the progress counter carry the meaning in
+   words, so the highlight is never the sole channel. */
+
+.table th[data-focus],
+.table td[data-focus] {
+  background: var(--accent-soft);
+}
+
+.table tbody tr:hover td[data-focus] {
+  background: color-mix(in oklab, var(--accent-soft) 80%, var(--ink-900) 4%);
+}
+
+/* ── Cells ─────────────────────────────────────────────────────────────────── */
+
+.input,
+.select {
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  padding: 7px;
+  outline: none;
+}
+
+.input:hover,
+.select:hover {
+  border-color: var(--border);
+}
+
+.input:focus-visible,
+.select:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-warm);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* A cell holding rich text (bold, links) that a plain input cannot round-trip
+   without flattening it. It renders the STRIPPED text, read-only, so a teacher
+   can still read the row and run a Pass past it — but an unexplained dead input
+   reads as a bug, so it has to LOOK inert rather than merely behave that way.
+   Muted ink + a dotted rule says "shown, not editable" without spending a
+   status colour on it (§4 — colour is information, never decoration). */
+.input[data-rich-readonly] {
+  color: var(--ink-500);
+  border-bottom: 1px dotted var(--border);
+  border-radius: 0;
+  cursor: default;
+}
+
+.input[data-rich-readonly]:hover {
+  border-color: transparent;
+  border-bottom-color: var(--ink-400);
+}
+
+.inputNum {
+  text-align: center;
+}
+
+.placeholder {
+  color: var(--ink-400);
+}
+
+.rowMeta {
+  display: block;
+  padding: 0 7px 2px;
+  font-size: var(--t-10);
+  font-weight: 700;
+  color: var(--ink-400);
+  white-space: nowrap;
+}
+
+/* ── Column widths ─────────────────────────────────────────────────────────── */
+
+.cNum {
+  width: 40px;
+  text-align: center;
+}
+.cTitle {
+  min-width: 180px;
+}
+.cTitle .input {
+  font-weight: 700;
+}
+.cObj {
+  min-width: 200px;
+}
+.cStd {
+  width: 116px;
+}
+.cDur {
+  width: 68px;
+}
+.cAss {
+  width: 124px;
+}
+.cRes {
+  width: 52px;
+  text-align: center;
+}
+.cDone {
+  width: 84px;
+  text-align: center;
+}
+
+/* ── Row marker ────────────────────────────────────────────────────────────── */
+
+.num {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-xs);
+  font-size: var(--t-11);
+  font-weight: 800;
+  background: var(--hairline);
+  color: var(--ink-500);
+}
+
+.num[data-taught] {
+  background: var(--done-tint);
+  color: var(--done);
+}
+
+.num svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ── Hand-rolled buttons — DOUBLED against the .cp-root reset ──────────────── */
+
+.fd.fd {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 3px;
+  vertical-align: middle;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.fd.fd:hover:not(:disabled),
+.fd.fd:focus-visible {
+  opacity: 1;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.fd.fd:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.fd.fd svg {
+  width: 12px;
+  height: 12px;
+}
+
+.cellBtn.cellBtn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  min-height: 28px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--accent-deep);
+  cursor: pointer;
+}
+
+.cellBtn.cellBtn:hover,
+.cellBtn.cellBtn:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.stdCodes {
+  font-size: var(--t-11);
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ── Completeness dots ─────────────────────────────────────────────────────── */
+
+.dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--r-xs);
+  padding: 2px 4px;
+}
+
+.dots:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dotRow {
+  display: inline-flex;
+  gap: 3px;
+}
+
+/* Shape AND colour: an unfilled field is a hollow ring, a filled one is solid.
+   Colour alone would fail for a teacher who cannot distinguish these hues, and
+   is the one thing in the handoff's legend worth not copying. */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--ink-300);
+  background: transparent;
+}
+
+.dot[data-on] {
+  border-color: var(--done);
+  background: var(--done);
+}
+
+.dotCount {
+  font-size: var(--t-10);
+  font-weight: 800;
+  color: var(--ink-400);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .table {
+    min-width: 640px;
+  }
+  /* The week/day line repeats what the Lessons tab already shows, and it is the
+     first thing worth losing when width is scarce. */
+  .rowMeta {
+    display: none;
+  }
+  .cObj {
+    min-width: 160px;
+  }
+  .cTitle {
+    min-width: 150px;
+  }
+}
+
+/* Touch: the §4 contract's ≥44px targets. Applied on coarse pointers only, so
+   the dense desktop grid a spreadsheet needs is not paid for by everyone. */
+@media (pointer: coarse) {
+  .table td {
+    padding: 8px;
+  }
+  .input,
+  .select {
+    min-height: 44px;
+  }
+  .cellBtn.cellBtn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .fd.fd {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd.fd,
+  .cellBtn.cellBtn,
+  .input,
+  .select {
+    transition: none;
+  }
+}

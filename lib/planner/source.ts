@@ -95,9 +95,45 @@ export type LessonPatch = Partial<
 
 /**
  * The editable Track-B workspace fields on a unit (migration 20260728120000 —
- * the B1.7 Unit Plan editor). A subset of `Unit`: the identity + scheduling
- * fields (id / subject / name / weeks / shade / start_week / end_week) are NOT
- * patchable through this seam.
+ * the B1.7 Unit Plan editor), plus the unit's WEEK RANGE. A subset of `Unit`:
+ * the identity fields (id / subject / name / shade) are NOT patchable through
+ * this seam.
+ *
+ * ── THE SCHEDULING FIELDS ARE NOW PATCHABLE, AND THAT IS A REVERSAL ────────
+ * This comment previously read "the identity + scheduling fields (… weeks /
+ * start_week / end_week) are NOT patchable through this seam", and that was
+ * accurate for every consumer up to the Plan timeline: the Unit Plan editor
+ * writes content, and a unit's schedule was moved only by whatever created it.
+ * The timeline's band drag is the first surface whose entire purpose is to
+ * change WHEN a unit is taught, so the allowlist had to open — a `Pick`
+ * allowlist that a caller cannot widen is exactly the seam that would
+ * otherwise have been worked around with a second, unaudited write path.
+ *
+ * Three keys, and the reason they travel together:
+ *   • `startWeek` / `endWeek` — the numbers. These are the fields that are
+ *     actually stored (`units.start_week` / `end_week`, NOT NULL since
+ *     20260518102823_initial_schema.sql:351-352).
+ *   • `weeks` — the DISPLAY collapse ("Wk 9–14"). Derived, not stored. It is
+ *     in the patch only so the OPTIMISTIC local update stays self-consistent:
+ *     the reducer spreads the patch over the catalog unit, and a unit whose
+ *     numbers said weeks 3–8 while its label still said "Wk 9–14" would show
+ *     two different schedules on two different surfaces until the next
+ *     hydrate. `supabase-source.updateUnitFields` deliberately does NOT write
+ *     it — the server row has no such column and `mapUnitRow` re-derives the
+ *     label on the echo, which is what corrects a caller that computed it
+ *     differently.
+ *
+ * What this does NOT open: DAY-granularity scheduling. `units.anchor_slot` /
+ * `position` and `lessons.pad` / `stack` stay deferred
+ * (20260728120000_track_b_workspace_fields.sql:36-42), whose note warns they
+ * would "run two scheduling vocabularies in parallel". Moving a unit's week
+ * range also does not move its LESSONS — see lib/plan-timeline/drag.ts.
+ *
+ * The authorization story is unchanged, and it is why this widening is safe to
+ * make here rather than needing a new seam: a unit is TEAM content with one
+ * shared row, so a schedule change is gated by exactly the same `units_write`
+ * RLS predicate as a notes change, and an unauthorized caller gets the same
+ * server-side zero-row denial.
  *
  * UNLIKE `LessonPatch`, a unit edit takes NO `SaveTarget`: units are TEAM /
  * MASTER content with no personal-fork table — there is one shared units row per
@@ -123,6 +159,10 @@ export type UnitPatch = Partial<
     | "defaultFlow"
     | "defaultDuration"
     | "archived"
+    // ── Week range (the Plan timeline's band drag) — see the note above ──
+    | "startWeek"
+    | "endWeek"
+    | "weeks"
   >
 >;
 

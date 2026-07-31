@@ -277,6 +277,64 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* ── Triage meta row (second line under .rowSub) ─────────────────────────────
+ * .rowSub is the single-line IDENTITY (unit · standard · status) and is
+ * ellipsised, so the triage facts — due day, lateness, materials, the
+ * teacher's reason — live here instead, where they are allowed to wrap. Chips
+ * stay compact and nowrap; the reason takes a full row of its own
+ * (flex-basis:100%) because it is prose and must be readable, not clipped. */
+.rowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.metaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: var(--r-pill, 999px);
+  background: color-mix(in srgb, var(--ink-500) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-500) 14%, transparent);
+  font-size: var(--t-11, 11px);
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--ink-700, #3a3950);
+  white-space: nowrap;
+}
+.metaChip svg {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+}
+/* Lateness is the urgency signal — the flame-red Catch-Up status token, mixed
+   toward --ink for the text so it clears AA on the faint tint in both tones.
+   NEVER a subject hue (color is information: this is status, not subject). */
+.metaLate {
+  background: color-mix(in srgb, var(--catchup) 14%, transparent);
+  border-color: color-mix(in srgb, var(--catchup) 34%, transparent);
+  color: color-mix(in oklab, var(--catchup) 62%, var(--ink));
+  font-variant-numeric: tabular-nums;
+}
+.rowReason {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 1px 0 0;
+  font-size: var(--t-12, 12px);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ink-500, #57566b);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.reasonLabel {
+  font-weight: 800;
+  color: var(--ink-700, #3a3950);
+}
+
 .rowActions {
   display: flex;
   align-items: center;

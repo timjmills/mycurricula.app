@@ -2520,6 +2520,15 @@ function unitToPatch(u: Unit): UnitPatch {
     defaultFlow: u.defaultFlow,
     defaultDuration: u.defaultDuration,
     archived: u.archived,
+    // Week range (the Plan timeline's band drag). Carried here for the same
+    // reason as every other editable key: the reconcile rebuilds the catalog
+    // unit from the CANONICAL server row, and a projection that omitted the
+    // schedule would leave a failed drag's optimistic week range on screen
+    // permanently — the one field where a stale local value silently
+    // contradicts what every other teacher on the team sees.
+    startWeek: u.startWeek,
+    endWeek: u.endWeek,
+    weeks: u.weeks,
   };
 }
 

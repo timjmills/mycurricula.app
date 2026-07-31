@@ -17,6 +17,7 @@
 // day-granularity slot storage out of this wave.
 
 import type { SubjectId } from "@/lib/types";
+import type { WeekRange } from "./bands";
 
 // ── Axis ───────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,28 @@ export interface TimelineBand {
   taught: number;
   total: number;
   spanSource: SpanSource;
+  /**
+   * The band's 1-based inclusive ACADEMIC-WEEK range — the only granularity a
+   * drag can author (see ./drag.ts), and the value a drag starts from.
+   *
+   * Carried separately from `startSlot`/`endSlot` rather than recovered from
+   * them at the callsite. The slots are CLAMPED to the axis, so a unit stored
+   * for weeks 38–45 in a 40-week year draws as 38–40 — and a drag that read
+   * its origin off the drawn geometry would silently truncate the unit to the
+   * visible part the moment it was nudged one week. This is the stored range,
+   * unclamped.
+   */
+  weekRange: WeekRange;
+  /**
+   * How many of the unit's lessons fall OUTSIDE `weekRange`.
+   *
+   * Not an error: a unit's declared weeks and its lessons' dates are separately
+   * editable facts, and a week-granularity drag moves the former without
+   * touching the latter (deliberately — see ./drag.ts). This is the count that
+   * keeps that divergence visible on the band instead of leaving a teacher to
+   * notice that the bar and its own dots have come apart.
+   */
+  lessonsOutside: number;
 }
 
 /** One subject row of the timeline. */

@@ -2,7 +2,8 @@
 
 // DayA.tsx — Frame "glass" (Calm Recede). A vertical timeline of glass cards
 // over the recede background: one row per lesson, time on the left, subject
-// glyph, title/unit, and a right cluster of a Finish pill + a Plan|Teach split.
+// glyph, title/unit, and a right cluster of a Finish pill + a Plan|Post|Teach
+// split.
 // A dashed "Add to <day>" row opens a small create menu. Bundle: views-a.jsx
 // DayA + DayAddA (B:5926-5989), CSS B:796-903.
 
@@ -193,6 +194,23 @@ export function DayA(props: DayViewV2Props): ReactNode {
                         Plan
                       </button>
                     </Tooltip>
+                    {/* Handoff order is Plan · Post · Teach — 7.21
+                        source-home/views-a.jsx:42-44. */}
+                    <Tooltip
+                      content="Open this lesson's resources on the wall"
+                      side="top"
+                    >
+                      <button
+                        type="button"
+                        className={styles.vaPillBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/post?lesson=${lesson.id}`);
+                        }}
+                      >
+                        Post
+                      </button>
+                    </Tooltip>
                     <Tooltip content="Open this lesson on the teaching board" side="top">
                       <button
                         type="button"
@@ -205,8 +223,6 @@ export function DayA(props: DayViewV2Props): ReactNode {
                         Teach
                       </button>
                     </Tooltip>
-                    {/* Wave 9: a "Post" (resource wall) button lands here once
-                        the /post route ships. */}
                   </div>
                 </div>
               </div>

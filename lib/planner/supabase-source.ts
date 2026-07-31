@@ -980,6 +980,20 @@ function finiteWeek(value: number | null | undefined): number | undefined {
     : undefined;
 }
 
+/** The WRITE-side mirror of `finiteWeek`. Throws rather than coercing: a
+ *  fractional or non-positive week violates the NOT NULL integer column, and
+ *  PostgREST would reject the whole statement — silently taking the content
+ *  keys travelling in the same patch down with it. Failing here fails the
+ *  mutator, which is what surfaces `onResult(false)` to the caller instead of a
+ *  write that reports success and is not there on reload. */
+function assertWeek(value: number, field: string): void {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(
+      `updateUnitFields: ${field} must be a positive integer week, got ${value}`,
+    );
+  }
+}
+
 function mapUnitRow(
   row: UnitRow,
   subject: SubjectId,
@@ -2224,6 +2238,27 @@ export const plannerSupabaseSource: PlannerDataSource = {
     // to a stamp (archive) or null (restore).
     if (patch.archived !== undefined)
       next.archived_at = patch.archived ? new Date().toISOString() : null;
+    // ── Week range (the Plan timeline's band drag) ──────────────────────────
+    // INTEGER-GUARDED on the way out, mirroring `finiteWeek` on the way in. The
+    // columns are NOT NULL integers, so a fractional or non-positive value is a
+    // constraint violation that would fail the whole patch — including the
+    // content keys alongside it. Dropping the bad key instead would be worse
+    // (a silently partial write), so the write is refused outright and the
+    // mutator throws, which is what surfaces `onResult(false)` to the caller.
+    if (patch.startWeek !== undefined) {
+      assertWeek(patch.startWeek, "startWeek");
+      next.start_week = patch.startWeek;
+    }
+    if (patch.endWeek !== undefined) {
+      assertWeek(patch.endWeek, "endWeek");
+      next.end_week = patch.endWeek;
+    }
+    // `patch.weeks` is intentionally NOT written: there is no such column. It
+    // is the display collapse `mapUnitRow` derives from the two numbers above,
+    // and it rides in the patch only so the caller's OPTIMISTIC catalog update
+    // stays self-consistent (see the UnitPatch doc in ./source.ts). The
+    // `reloadUnit` echo below re-derives it, which is what corrects a caller
+    // that formatted the label differently.
 
     if (Object.keys(next).length > 0) {
       await patchUnit(client, unitDbId, next);

@@ -7,23 +7,47 @@
 // keeps subject identity through the horizontal scroll) beside an absolutely
 // positioned track carrying unit bands and lesson dots.
 //
-// NOT built in this wave, and deliberately: every authoring gesture. The
-// handoff's bands and dots are pointer-drag surfaces (`ph-units.jsx:357-463`)
-// with no keyboard equivalent at all (audit B6). Rather than ship a gesture a
-// keyboard user cannot reach, bands and dots here are plain <button>s that OPEN
-// the thing they represent — natively focusable, natively activatable, and the
-// same affordance on touch as on desktop.
+// AUTHORING, and its limits. A band can now be dragged to re-pace the unit's
+// WEEK RANGE and its right edge dragged to lengthen or shorten it. A LESSON dot
+// still only opens its lesson: the handoff drags dots too
+// (`ph-units.jsx:357-374`), but a lesson's date is per-lesson forkable content
+// and day-granularity storage is deferred by migration — see the ruling in
+// lib/plan-timeline/drag.ts.
+//
+// EVERY POINTER GESTURE HAS A KEYBOARD EQUIVALENT. The handoff has none at all
+// (`onPointerDown` throughout, `touch-action:none` on the marks — audit B6),
+// which under CLAUDE.md §4's full-keyboard-navigation requirement makes the
+// whole authoring surface unreachable for some teachers. Here Shift+←/→ moves a
+// focused band by a week and Alt+Shift+←/→ moves its end, which is the same
+// two gestures the pointer has, at the same granularity.
 
 import type { CSSProperties, ReactNode } from "react";
-import { DOT_STATE_LABEL, FORK_TIER_LABEL } from "@/lib/plan-timeline";
-import type { TimelineLane } from "@/lib/plan-timeline";
+import {
+  DOT_STATE_LABEL,
+  FORK_TIER_LABEL,
+  weekRangeSlots,
+  weeksLabel,
+} from "@/lib/plan-timeline";
+import type { TimelineBand, TimelineLane } from "@/lib/plan-timeline";
 import type { SubjectId } from "@/lib/types";
+import type { BandDragKind, UseBandDrag } from "./use-band-drag";
 import styles from "./timeline.module.css";
 
 export interface TimelineLaneRowProps {
   lane: TimelineLane;
   /** Number of axis columns — the track's width in column units. */
   columns: number;
+  /** School days per week — turns a band's week range back into slot geometry
+   *  for the drag preview. */
+  schoolWeekLen: number;
+  /** The shared drag session (one at a time across every lane). */
+  drag: UseBandDrag;
+  /** Is band authoring available? False in Personal mode — see `dragBlocked`. */
+  dragEnabled: boolean;
+  /** Why authoring is unavailable, appended to every band's tooltip so the
+   *  absence of a gesture is explained where the gesture would have been
+   *  rather than only in a toolbar hint the teacher may never read. */
+  dragBlockedReason: string | null;
   /** Predicate: is this band/dot a match for the live hub search? A non-match
    *  dims rather than disappears (`ph-units.jsx:594,607`) so the year keeps its
    *  shape while a teacher searches. Always true when the query is empty. */
@@ -38,11 +62,43 @@ export interface TimelineLaneRowProps {
 export function TimelineLaneRow({
   lane,
   columns,
+  schoolWeekLen,
+  drag,
+  dragEnabled,
+  dragBlockedReason,
   matchesUnit,
   matchesLesson,
   onOpenUnit,
   onOpenLesson,
 }: TimelineLaneRowProps): ReactNode {
+  // The live session, but only if it belongs to THIS lane — one drag runs at a
+  // time across the whole canvas and every lane sees the same object.
+  const session =
+    drag.session && drag.session.subject === lane.subject ? drag.session : null;
+  const ghost =
+    session && session.moved
+      ? weekRangeSlots(session.next, schoolWeekLen, columns)
+      : null;
+  const ghostLevel = session
+    ? (lane.bands.find((b) => b.unitId === session.unitId)?.level ?? 0)
+    : 0;
+
+  function bandKeyDown(
+    e: React.KeyboardEvent<HTMLElement>,
+    band: TimelineBand,
+  ): void {
+    if (!dragEnabled) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    // Shift is the modifier that turns arrow keys from "move focus" into "move
+    // the unit" — unmodified arrows must keep doing what they do everywhere
+    // else. Alt+Shift resizes; Alt alone is left to the browser (it is
+    // history back/forward in several).
+    if (!e.shiftKey) return;
+    const kind: BandDragKind = e.altKey ? "resize" : "move";
+    e.preventDefault();
+    drag.nudge(lane.subject, band, kind, e.key === "ArrowLeft" ? -1 : 1);
+  }
+
   return (
     <div
       className={`cp-subj ${lane.cls} ${styles.lane}`}
@@ -96,20 +152,59 @@ export function TimelineLaneRow({
 
       <div
         className={styles.laneTrack}
+        // The column count travels on the ELEMENT because useBandDrag measures
+        // this box to recover the used pixel width of one column — see the
+        // note at the top of use-band-drag.ts on why the CSS variable cannot
+        // be read instead.
+        data-tl-track={columns}
         style={{ width: `calc(var(--tl-col) * ${columns})` }}
       >
+        {/* Where the drag will land. Rendered inside the lane so it inherits
+            the subject colour, and before the bands so it paints beneath
+            them. */}
+        {ghost && (
+          <div
+            className={styles.dragGhost}
+            aria-hidden="true"
+            style={{
+              left: `calc(var(--tl-col) * ${ghost.startSlot})`,
+              width: `calc(var(--tl-col) * ${ghost.endSlot - ghost.startSlot + 1})`,
+              transform: ghostLevel
+                ? `translateY(calc(${ghostLevel} * var(--tl-level-step)))`
+                : undefined,
+            }}
+          />
+        )}
+
         {lane.bands.map((band) => {
           const span = band.endSlot - band.startSlot + 1;
           const dim = !matchesUnit(band.unitId, band.name);
+          const dragging = session?.unitId === band.unitId && session.moved;
           const where =
             band.spanSource === "weeks"
-              ? "Placed from its week range"
+              ? `Planned for ${weeksLabel(band.weekRange.start, band.weekRange.end)}`
               : "Placed from the days its lessons fall on — it has no week range set";
+          // The mismatch the drag itself can create, stated in words rather
+          // than left as a pill the teacher has to interpret.
+          const outside =
+            band.lessonsOutside > 0
+              ? ` ${band.lessonsOutside} of its lessons ${band.lessonsOutside === 1 ? "is" : "are"} dated outside those weeks.`
+              : "";
+          const how = dragEnabled
+            ? " Drag to change the weeks it is planned for, or drag its right edge to lengthen it (Shift+← / Shift+→ to move, Alt+Shift+← / Alt+Shift+→ to resize). Click to open its planner."
+            : dragBlockedReason
+              ? ` Opens its unit planner. ${dragBlockedReason}`
+              : " Opens its unit planner.";
           return (
-            <button
+            // The band and its resize grip are SIBLINGS inside a positioned
+            // wrapper, not a grip nested in the band. A focusable control
+            // inside a <button> is invalid content and gives the inner control
+            // unreliable focus and activation behaviour across browsers — so
+            // the wrapper carries the geometry and both controls are plain
+            // native <button>s.
+            <div
               key={band.unitId}
-              type="button"
-              className={styles.band}
+              className={styles.bandWrap}
               data-dim={dim || undefined}
               style={{
                 left: `calc(var(--tl-col) * ${band.startSlot})`,
@@ -118,17 +213,67 @@ export function TimelineLaneRow({
                   ? `translateY(calc(${band.level} * var(--tl-level-step)))`
                   : undefined,
               }}
-              title={`${band.name} — ${band.total} lesson${band.total === 1 ? "" : "s"}, ${band.taught} taught, ${band.ready} fully planned. ${where}. Opens its unit planner.`}
-              onClick={() => onOpenUnit(band.unitId, band.name, lane.subject)}
             >
-              <span className={styles.bandName}>{band.name}</span>
-              {/* ready/total (`ph-units.jsx:595`). The handoff renders this bare
-                  at opacity .75, which reads as a fraction of nothing in
-                  particular; the accessible name above spells it out. */}
-              <span className={styles.bandCount} aria-hidden="true">
-                {band.ready}/{band.total}
-              </span>
-            </button>
+              <button
+                type="button"
+                className={styles.band}
+                data-draggable={dragEnabled || undefined}
+                data-dragging={dragging || undefined}
+                title={`${band.name} — ${band.total} lesson${band.total === 1 ? "" : "s"}, ${band.taught} taught, ${band.ready} fully planned. ${where}.${outside}${how}`}
+                onPointerDown={(e) => drag.begin(e, lane.subject, band, "move")}
+                onKeyDown={(e) => bandKeyDown(e, band)}
+                onClick={() => {
+                  // A finished drag consumes the click it produced. Without
+                  // this every re-pace would also open the unit planner over
+                  // the timeline the teacher was working on.
+                  if (drag.consumeClickSuppression()) return;
+                  onOpenUnit(band.unitId, band.name, lane.subject);
+                }}
+              >
+                <span className={styles.bandName}>{band.name}</span>
+                {band.lessonsOutside > 0 && (
+                  // aria-hidden: the same fact is already in the button's
+                  // `title`, in a full sentence. A screen reader announcing
+                  // "3 out" would be less informative, not more.
+                  <span className={styles.bandOutside} aria-hidden="true">
+                    {band.lessonsOutside} out
+                  </span>
+                )}
+                {/* ready/total (`ph-units.jsx:595`). The handoff renders this
+                    bare at opacity .75, which reads as a fraction of nothing
+                    in particular; the accessible name above spells it out. */}
+                <span className={styles.bandCount} aria-hidden="true">
+                  {band.ready}/{band.total}
+                </span>
+              </button>
+              {dragEnabled && (
+                <button
+                  type="button"
+                  className={styles.bandGrip}
+                  aria-label={`Change how many weeks ${band.name} runs for`}
+                  title={`${band.name} currently runs ${weeksLabel(band.weekRange.start, band.weekRange.end)}. Drag this edge, or press Alt+Shift+← / Alt+Shift+→, to change its length.`}
+                  onPointerDown={(e) =>
+                    drag.begin(e, lane.subject, band, "resize")
+                  }
+                  onClick={() => {
+                    // Clear the suppression flag a completed resize set, so it
+                    // cannot leak into the NEXT click on the band beside it.
+                    drag.consumeClickSuppression();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                    if (!e.shiftKey) return;
+                    e.preventDefault();
+                    drag.nudge(
+                      lane.subject,
+                      band,
+                      "resize",
+                      e.key === "ArrowLeft" ? -1 : 1,
+                    );
+                  }}
+                />
+              )}
+            </div>
           );
         })}
 

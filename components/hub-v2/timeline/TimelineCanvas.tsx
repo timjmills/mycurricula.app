@@ -12,7 +12,7 @@
 // document-level horizontal scroll but explicitly permits "a wide grid inside a
 // scrollable container", which is what a year-long axis has to be.
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import type {
   TimelineDay,
   TimelineLane,
@@ -20,12 +20,27 @@ import type {
 } from "@/lib/plan-timeline";
 import type { SubjectId } from "@/lib/types";
 import { TimelineLaneRow } from "./TimelineLaneRow";
+import { useBandDrag, type BandDragKind } from "./use-band-drag";
+import type { WeekRange } from "@/lib/plan-timeline";
 import styles from "./timeline.module.css";
 
 export interface TimelineCanvasProps {
   axis: readonly TimelineDay[];
   months: readonly TimelineMonthBand[];
   lanes: readonly TimelineLane[];
+  /** School days per week — the drag's quantiser and the preview's geometry. */
+  schoolWeekLen: number;
+  /** Is band authoring available? False in Personal mode. */
+  dragEnabled: boolean;
+  /** Why it is not, when it is not — surfaced on each band. */
+  dragBlockedReason: string | null;
+  /** Commit a finished band drag or keyboard nudge. */
+  onRescheduleUnit: (
+    subject: SubjectId,
+    unitId: string,
+    next: WeekRange,
+    kind: BandDragKind,
+  ) => void;
   /** Slot the today line sits on, or null when today has no place on this axis. */
   todaySlot: number | null;
   /** Inclusive slot range of the week being planned, or null. */
@@ -42,6 +57,10 @@ export function TimelineCanvas({
   axis,
   months,
   lanes,
+  schoolWeekLen,
+  dragEnabled,
+  dragBlockedReason,
+  onRescheduleUnit,
   todaySlot,
   currentWeekRange,
   matchesUnit,
@@ -52,6 +71,32 @@ export function TimelineCanvas({
   const scrollRef = useRef<HTMLDivElement>(null);
   const columns = axis.length;
 
+  const drag = useBandDrag({
+    schoolWeekLen,
+    axisLength: columns,
+    onCommit: onRescheduleUnit,
+    enabled: dragEnabled,
+  });
+
+  /**
+   * The USED width of one day column, in px.
+   *
+   * MEASURED, not read. `--tl-col` is declared as
+   * `max(var(--tl-col-floor), var(--tl-col-user, var(--tl-col-base)))` so a
+   * zoom can never breach the touch floor (timeline.module.css), and
+   * `getComputedStyle().getPropertyValue()` returns that whole expression as a
+   * STRING for a custom property — `parseFloat` on it is NaN. This function
+   * previously read the property with a `|| 34` fallback, which meant every
+   * consumer silently used 34 regardless of the real column width; the effect
+   * below would then open a coarse-pointer canvas (46px columns) about a third
+   * of a screen short of today. A rendered day cell cannot lie about its width.
+   */
+  const columnWidth = useCallback((): number | null => {
+    const day = scrollRef.current?.querySelector<HTMLElement>("[data-tl-day]");
+    const w = day?.getBoundingClientRect().width ?? 0;
+    return w > 0 ? w : null;
+  }, []);
+
   // Open near today rather than at week 1 (`ph-units.jsx:314`). Runs once per
   // today-change: re-running on every render would fight a teacher who has
   // scrolled. `behavior` is left default (instant) — an animated jump on mount
@@ -59,16 +104,51 @@ export function TimelineCanvas({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || todaySlot === null) return;
-    const col = el.clientWidth > 0 ? el.clientWidth : 0;
-    const colWidth =
-      parseFloat(
-        getComputedStyle(el).getPropertyValue("--tl-col").trim() || "34",
-      ) || 34;
-    el.scrollLeft = Math.max(0, todaySlot * colWidth - col * 0.45);
+    const day = el.querySelector<HTMLElement>("[data-tl-day]");
+    const colWidth = day?.getBoundingClientRect().width ?? 0;
+    if (colWidth <= 0) return;
+    el.scrollLeft = Math.max(0, todaySlot * colWidth - el.clientWidth * 0.45);
   }, [todaySlot]);
 
+  /** Scroll by whole weeks (the handoff's arrows, `ph-units.jsx:534`). A
+   *  year-long axis inside a scroll box is otherwise reachable only by a
+   *  horizontal wheel gesture, which a trackpad-less mouse does not have. */
+  const scrollWeeks = useCallback(
+    (weeks: number) => {
+      const el = scrollRef.current;
+      const colWidth = columnWidth();
+      if (!el || colWidth === null) return;
+      el.scrollBy({
+        left: weeks * colWidth * Math.max(1, schoolWeekLen),
+        behavior: "smooth",
+      });
+    },
+    [columnWidth, schoolWeekLen],
+  );
+
   return (
-    <div className={styles.scroller} ref={scrollRef}>
+    <>
+      <div className={styles.scrollGroup}>
+        <button
+          type="button"
+          className={styles.scrollBtn}
+          title="Scroll the timeline back two weeks."
+          aria-label="Scroll back two weeks"
+          onClick={() => scrollWeeks(-2)}
+        >
+          ‹
+        </button>
+        <button
+          type="button"
+          className={styles.scrollBtn}
+          title="Scroll the timeline forward two weeks."
+          aria-label="Scroll forward two weeks"
+          onClick={() => scrollWeeks(2)}
+        >
+          ›
+        </button>
+      </div>
+      <div className={styles.scroller} ref={scrollRef}>
       <div
         className={styles.inner}
         style={{ width: `calc(var(--tl-lbl) + var(--tl-col) * ${columns})` }}
@@ -92,6 +172,9 @@ export function TimelineCanvas({
               <div
                 key={d.slot}
                 className={styles.day}
+                // The measurement seam for one column's USED width — see
+                // `columnWidth` above on why the CSS variable cannot be read.
+                data-tl-day=""
                 data-week-start={d.weekStart || undefined}
                 data-holiday={d.holiday ? true : undefined}
                 data-today={d.slot === todaySlot || undefined}
@@ -160,6 +243,10 @@ export function TimelineCanvas({
               key={lane.subject}
               lane={lane}
               columns={columns}
+              schoolWeekLen={schoolWeekLen}
+              drag={drag}
+              dragEnabled={dragEnabled}
+              dragBlockedReason={dragBlockedReason}
               matchesUnit={matchesUnit}
               matchesLesson={matchesLesson}
               onOpenUnit={onOpenUnit}
@@ -167,7 +254,8 @@ export function TimelineCanvas({
             />
           ))}
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

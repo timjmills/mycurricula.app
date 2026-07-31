@@ -49,6 +49,7 @@ import {
 import type { TeachZonesProps } from "@/components/teach/zones-contract";
 import { TeachOverlays } from "@/components/teach/TeachOverlays";
 import { LessonRail } from "./LessonRail";
+import { BoardHeadIdentity } from "./BoardHeadIdentity";
 import { BoardSwitcher } from "./BoardSwitcher";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { WritingBar } from "./WritingBar";
@@ -275,12 +276,14 @@ export function TeachV2Shell(props: TeachZonesProps): ReactNode {
             </Button>
           </Tooltip>
         ) : null}
-        <span className={styles.boardGlyph} aria-hidden="true">
-          {subjectMeta?.icon ?? "•"}
-        </span>
-        <span className={styles.boardName} title={subjectLabel}>
-          {subjectLabel}
-        </span>
+        {/* The lesson's identity, not just the subject's: the rail that used to
+            carry the title/objective/standards is GONE while `lessonHidden`,
+            and this header renders in both states. */}
+        <BoardHeadIdentity
+          activeLessonId={state.activeLessonId ?? null}
+          subjectLabel={subjectLabel}
+          subjectGlyph={subjectMeta?.icon ?? "•"}
+        />
       </div>
 
       {activeBoard ? (

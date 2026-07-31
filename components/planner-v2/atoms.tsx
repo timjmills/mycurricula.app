@@ -247,7 +247,11 @@ export function AddLessonMenu({
   triggerContent: ReactNode;
   tooltipId: string;
   tooltipContent: string;
-  align?: "center" | "start";
+  /** Which edge of the trigger the menu hangs from. `center` is the default and
+   *  is right whenever the trigger is at least as wide as the 300px menu; a
+   *  narrow trigger near the edge of a clipping scroll container needs `start`
+   *  or `end` or the menu is cut off (see `.menuEnd` in atoms.module.css). */
+  align?: "center" | "start" | "end";
   wrapperClassName?: string;
   onQuickAdd: () => void;
   onAddEvent?: (() => void) | null;
@@ -272,7 +276,11 @@ export function AddLessonMenu({
       {open && (
         <div
           className={`${styles.vaDayAddMenu} ${
-            align === "start" ? styles.menuStart : ""
+            align === "start"
+              ? styles.menuStart
+              : align === "end"
+                ? styles.menuEnd
+                : ""
           }`}
           onMouseLeave={() => setOpen(false)}
         >

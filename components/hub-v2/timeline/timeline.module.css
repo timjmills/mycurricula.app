@@ -13,7 +13,23 @@
    column for touch is one declaration rather than a re-render. */
 
 .card {
-  --tl-col: 34px; /* the handoff's "cozy" default (ph-units.jsx:304) */
+  /* ── Column width: base · floor · user, resolved in that order ──────────
+     `--tl-col-base` is the default (the handoff's "cozy" 34, ph-units.jsx:304).
+     `--tl-col-user` is what TimelineZoom writes, and is UNSET until a teacher
+     touches the slider. `--tl-col-floor` is the touch-target contract, and it
+     wins over both.
+
+     The floor is the reason zoom is three variables rather than one inline
+     `--tl-col`. An inline declaration beats every rule in this file INCLUDING
+     the `any-pointer: coarse` override below, so a teacher on a tablet could
+     zoom their own 44px lesson dots down to 16px (the handoff's slider `min`,
+     ph-units.jsx:496) and then be unable to hit them — CLAUDE.md §4, audit B8.
+     Resolving through `max()` here means the floor holds no matter what the
+     control writes, and TimelineZoom reads this same property back so its
+     slider never advertises travel the canvas will refuse. */
+  --tl-col-base: 34px;
+  --tl-col-floor: 24px;
+  --tl-col: max(var(--tl-col-floor), var(--tl-col-user, var(--tl-col-base)));
   --tl-lbl: 190px; /* ph-units.css:41 */
   --tl-lane-h: 64px;
   --tl-band-h: 42px;
@@ -92,6 +108,70 @@
   color: var(--muted);
 }
 /* (The `.legendDot` overrides live AFTER `.dot` — see the note there.) */
+
+/* ── Zoom + scroll controls ────────────────────────────────────────────── */
+.zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.zoomLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.zoomRange {
+  width: 118px;
+  accent-color: var(--chrome-accent);
+  /* A native range input's own thumb is well under 44px on touch. Growing the
+     control's box is what gives the thumb a reachable target without
+     re-implementing the slider (which would cost the keyboard behaviour the
+     native element already has for free). */
+  min-height: 24px;
+}
+.zoomReset,
+.scrollBtn {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.zoomReset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.zoomReset:not(:disabled):hover,
+.scrollBtn:hover {
+  border-color: var(--chrome-accent);
+  color: var(--ink-900);
+}
+/* Sits directly above the scroll region, right-aligned — the handoff's edge
+   arrows (`ph-units.jsx:534`) as a pair of real buttons. A year-long axis is
+   otherwise reachable only by a horizontal-scroll gesture, which a plain mouse
+   does not have. */
+.scrollGroup {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 6px 16px;
+}
+@media (any-pointer: coarse) {
+  .zoomReset,
+  .scrollBtn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .zoomRange {
+    min-height: 44px;
+  }
+}
 
 /* ── Scroll region ─────────────────────────────────────────────────────── */
 /* The document must never scroll sideways (CLAUDE.md §4); a year-long axis
@@ -321,10 +401,19 @@
    anchor: the lane's midpoint shifts down as the lane grows, so the lowest
    stacked band painted over the NEXT subject's track. Top-anchored with a
    fixed height is stable under both. */
-.band.band {
+/* The positioned wrapper. It — not the band button — carries the band's slot
+   geometry, so the band and its resize grip can be SIBLINGS: a focusable
+   control nested inside a <button> is invalid content with unreliable focus
+   and activation behaviour. */
+.bandWrap {
   position: absolute;
   top: var(--tl-band-top);
   height: var(--tl-band-h);
+}
+.band.band {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   border-radius: 9px;
   border: 1.5px solid var(--c);
   background: var(--c-surface, var(--cl));
@@ -347,7 +436,10 @@
 }
 .band.band:hover {
   box-shadow: 0 8px 22px -10px rgb(12 11 20 / 45%);
-  z-index: 2;
+}
+.bandWrap:hover,
+.bandWrap:focus-within {
+  z-index: 5;
 }
 .band.band:focus-visible {
   outline: 2px solid var(--chrome-accent);
@@ -366,6 +458,101 @@
   font-size: 10px;
   font-weight: 800;
   opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* ── Band drag (week granularity) ──────────────────────────────────────── */
+/* `grab`, not `move`: the gesture moves the unit's WEEK RANGE only, and the
+   cursor is the first place that promise is either kept or broken. */
+.band.band[data-draggable] {
+  cursor: grab;
+  /* The dragged axis is horizontal; leaving `touch-action: auto` would let the
+     browser claim the gesture for a page scroll before the pointermove
+     handler ever sees it. `pan-y` keeps the VERTICAL scroll native, so a
+     teacher can still flick the page while a band is under their thumb — the
+     handoff sets a blanket `touch-action: none` on its marks
+     (ph-units.css:57), which traps the page. */
+  touch-action: pan-y;
+}
+.band.band[data-dragging] {
+  cursor: grabbing;
+  z-index: 6;
+  box-shadow: 0 12px 30px -12px rgb(12 11 20 / 55%);
+}
+/* The right-edge resize grip. A separate element rather than an edge-zone
+   hit-test on the band, so it is a real, focusable, individually-labelled
+   control instead of an invisible 8px strip a teacher has to discover. */
+.bandGrip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: ew-resize;
+  touch-action: pan-y;
+  border-radius: 0 8px 8px 0;
+  z-index: 4;
+}
+.bandGrip::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 2px;
+  height: 14px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--c);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.bandWrap:hover .bandGrip::before,
+.bandGrip:focus-visible::before {
+  opacity: 0.9;
+}
+.bandGrip:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: -2px;
+}
+@media (any-pointer: coarse) {
+  .bandGrip {
+    width: 28px;
+  }
+  .bandGrip::before {
+    opacity: 0.9;
+  }
+}
+
+/* The live preview of where a drag will land. Painted UNDER the band and
+   pointer-transparent — a drag must never be able to hit its own ghost. */
+.dragGhost {
+  position: absolute;
+  top: var(--tl-band-top);
+  height: var(--tl-band-h);
+  border-radius: 9px;
+  border: 2px dashed var(--c);
+  background: color-mix(in oklab, var(--c) 12%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* A unit whose lessons no longer sit inside its own week range. NOT an error
+   state — the two facts are independently editable and a teacher may well
+   want them apart for a week. It is a fact the band would otherwise hide,
+   which is exactly what a drag creates (see lib/plan-timeline/drag.ts). */
+.bandOutside {
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: var(--r-pill);
+  background: var(--c-deep, var(--cd));
+  color: var(--surface);
+  opacity: 0.85;
   white-space: nowrap;
 }
 
@@ -463,7 +650,7 @@
 
 /* Search dimming — non-matches fade, they do not vanish (ph-units.jsx:594,607).
    Kept above 0.28 so a dimmed mark still clears a legibility floor. */
-.band.band[data-dim],
+.bandWrap[data-dim],
 .dot.dot[data-dim] {
   opacity: 0.32;
 }
@@ -476,7 +663,13 @@
    neighbouring dots still cannot overlap. */
 @media (any-pointer: coarse), (max-width: 900px) {
   .card {
-    --tl-col: 46px;
+    /* BASE and FLOOR, never `--tl-col` itself: the resolved column is a
+       `max()` over the floor and the teacher's zoom (see .card above), so
+       overriding the resolved value here would discard both. The floor is what
+       makes the 44px hit area below actually reachable — two 44px targets in
+       40px columns overlap, and the lower one becomes untappable. */
+    --tl-col-base: 46px;
+    --tl-col-floor: 44px;
     --tl-lbl: 130px;
     --tl-lane-h: 78px;
     --tl-band-h: 52px;
@@ -504,5 +697,248 @@
   }
   .dot.dot:hover::before {
     transform: none;
+  }
+}
+
+/* ── Lens emphasis (Units | Lessons) ───────────────────────────────────── */
+/* The lens changes which marks read as FOREGROUND, never what is drawn.
+   Hiding the other half would make the switch a filter, and a teacher who
+   flipped to Lessons would lose the unit context that tells them what a dot
+   is part of. Both stay clickable at both settings — this is emphasis, and
+   emphasis must not become an interaction trap. */
+.card[data-lens="lessons"] .band.band {
+  opacity: 0.55;
+}
+.card[data-lens="lessons"] .band.band:hover,
+.card[data-lens="lessons"] .band.band:focus-visible {
+  opacity: 1;
+}
+.card[data-lens="lessons"] .dot.dot::before {
+  border-width: 3px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.card[data-lens="units"] .dot.dot::before {
+  opacity: 0.82;
+}
+.card[data-lens="units"] .dot.dot:hover::before,
+.card[data-lens="units"] .dot.dot:focus-visible::before {
+  opacity: 1;
+}
+
+/* ── List mode ─────────────────────────────────────────────────────────── */
+.list {
+  padding: 14px 16px 18px;
+}
+.listControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.listGroup {
+  margin-top: 16px;
+}
+.listGroup:first-of-type {
+  margin-top: 0;
+}
+.listGroupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-family: var(--font-display-sm, var(--font-display));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.listGroupCount {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--muted);
+  background: var(--ink-100, var(--hairline));
+  border-radius: var(--r-pill);
+  padding: 1px 7px;
+}
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Doubled class for the `.cp-root button` reset, same as `.band`. */
+.row.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  /* ≥44px at comfort so a row is a real touch target (CLAUDE.md §4). Compact
+     trades that away on purpose — it is an explicit, reversible choice a
+     teacher makes for density, not a default the surface imposes. */
+  min-height: 44px;
+  padding: 8px 12px 8px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg, 12px);
+  background: var(--surface);
+  color: var(--ink-700);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.list[data-compact] .row.row {
+  min-height: 34px;
+  padding: 4px 12px 4px 14px;
+}
+.row.row:hover {
+  border-color: var(--c, var(--border));
+}
+.row.row:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 2px;
+}
+/* The three-tier stripe (CLAUDE.md §2) in its list form. */
+.rowStripe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--c);
+}
+.rowDot {
+  position: static;
+  transform: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+.rowTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rowMeta {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.rowDetail {
+  flex: 2 1 220px;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--ink-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rowFlag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--c-deep, var(--cd));
+  color: var(--surface);
+  white-space: nowrap;
+}
+
+/* ── Drawer ────────────────────────────────────────────────────────────── */
+.drawer {
+  border-top: 1px solid var(--hairline);
+}
+.drawerBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+}
+.drawerToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.drawerCount {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  /* Warn tone, not a subject colour — this is a plan-wide signal, and colour
+     here is information (CLAUDE.md §4), not decoration. */
+  color: var(--warn-ink, var(--ink-900));
+  border-color: var(--warn-line, var(--border));
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.drawerToggle:hover,
+.drawerCount:hover {
+  border-color: var(--chrome-accent);
+}
+.drawerToggle:focus-visible,
+.drawerCount:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 2px;
+}
+.drawerBody {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Capped and scrolled: the library is every unit in the year, and an
+     uncapped panel would push the page to several screens the moment it
+     opened. Internal scroll is what CLAUDE.md §4 permits. */
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.drawerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drawerEmpty {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-500);
+}
+
+@media (any-pointer: coarse) {
+  .drawerToggle,
+  .drawerCount {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 560px) {
+  /* The metadata columns are the first thing to go on a phone — a row whose
+     title is ellipsed to four characters so a week number can fit names
+     nothing. The same facts stay in the row's `title`. */
+  .rowMeta,
+  .rowDetail {
+    display: none;
   }
 }

@@ -289,11 +289,64 @@
   overflow-y: auto;
 }
 
-/* ── Tag-value filter pills ────────────────────────────────────────────────── */
+/* ── Filter row: tag-value pills + the sort control ────────────────────────── */
+/* The pill group takes the remaining width and wraps INSIDE itself, so the sort
+   control stays pinned to the row's right edge instead of being pushed onto a
+   line of its own by a long pill run (the `margin-left:auto` failure mode). */
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+/* The 200px floor is the wrap guard: without it the pill group would shrink to
+   nothing in a ~300px side panel and its pills would spill out sideways to keep
+   the sort control on line 1. With it, the pill group keeps a usable width and
+   the sort control wraps onto its own line (still right-aligned) instead. */
 .filters {
   display: flex;
   flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 200px;
   gap: 8px;
+}
+
+.sortWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.sortLabel {
+  color: var(--ink-400);
+  font-size: var(--t-13);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sortSelect {
+  min-height: 44px;
+  padding: 8px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-700);
+  font-family: inherit;
+  font-size: var(--t-13);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sortSelect:hover {
+  border-color: var(--brand-300);
+}
+
+.sortSelect:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
 }
 
 .filterPill.filterPill {
@@ -372,13 +425,18 @@
   box-shadow: var(--wf-shadow-card);
 }
 
-/* Kind-keyed structural preview */
+/* Kind-keyed structural preview.
+   --preview-grad / --preview-accent are set per-card by BoardPreview from the
+   board's colour family (whiteboard=purple · subject=blue · day=orange ·
+   phase=green · generic=slate). They resolve to the `--wf-*` widget-palette
+   tokens; the blue fallbacks here keep the rules valid on their own. Geometry
+   (128px tall, 12px pad) matches the handoff's BoardCard preview well.  */
 .preview {
-  height: 110px;
+  height: 128px;
   margin-bottom: 13px;
-  padding: 10px;
+  padding: 12px;
   border-radius: 13px;
-  background: var(--wf-blue-grad);
+  background: var(--preview-grad, var(--wf-blue-grad));
 }
 
 .previewBox {
@@ -387,13 +445,13 @@
   flex-direction: column;
   height: 100%;
   padding: 10px 12px;
-  border: 2px solid var(--wf-blue-accent);
+  border: 2px solid var(--preview-accent, var(--wf-blue-accent));
   border-radius: 12px;
   background: var(--paper);
 }
 
 .previewTitle {
-  color: var(--wf-blue-accent);
+  color: var(--preview-accent, var(--wf-blue-accent));
   font-size: var(--t-13);
   font-weight: 800;
   text-align: center;
@@ -406,7 +464,7 @@
   flex: 1;
   display: grid;
   place-items: center;
-  color: var(--wf-blue-accent);
+  color: var(--preview-accent, var(--wf-blue-accent));
 }
 
 .cardTitle {
@@ -639,13 +697,41 @@
   outline-offset: 1px;
 }
 
+/* Band 1 of the handoff's SharedRow: family chip + ellipsized title. */
+.teamCardHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.teamCardChip {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  /* Set per row from the board's colour family (see boardFamily). */
+  background: var(--chip-bg, var(--wf-blue-chip));
+  color: var(--chip-fg, var(--wf-blue-accent));
+}
+
 .teamCardTitle {
+  flex: 1;
+  min-width: 0;
   color: var(--ink-900);
   font-size: var(--t-13);
   font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Band 2 — the tag chips reuse the card's .tagRow/.tagChip; inside a team row
+   the row's own 8px flex gap supplies the spacing. */
+.teamCard .tagRow {
+  margin-bottom: 0;
 }
 
 .teamCardBy {
@@ -770,6 +856,22 @@
 @media (max-width: 600px) {
   .meter {
     flex: 1 1 100%;
+  }
+
+  /* Phone: the sort control gets its own full-width line rather than a
+     right-stranded pill, and the select fills it for an easy tap target. */
+  .filters {
+    min-width: 0;
+  }
+
+  .sortWrap {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .sortSelect {
+    flex: 1;
+    min-width: 0;
   }
 
   .grid {

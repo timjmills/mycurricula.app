@@ -85,6 +85,7 @@ import {
   ProgressRing,
   OverviewTab,
   LessonsTab,
+  RefineTab,
   StandardsTab,
   ResourcesTab,
   NotesTab,
@@ -144,19 +145,35 @@ function splitUnitName(name: string): { prefix: string; rest: string } {
   };
 }
 
-/** The five tabs — and B3 deliberately kept them at five. Assessments and
- *  Insights did NOT graduate into this strip; they went to the right-hand
- *  context drawer instead, because the strip lists the unit's PARTS (its plan,
- *  its lessons, its standards, its resources, its notes) while the drawer holds
- *  commentary ABOUT the unit. Let commentary in and the strip becomes a junk
- *  drawer that buries the parts a teacher opened the unit to reach. Refine is
- *  out of B3 scope entirely — not built, and no dead tab stands in for it.
+/** The tab strip. B3 deliberately kept Assessments and Insights OUT of it: they
+ *  went to the right-hand context drawer instead, because the strip lists the
+ *  unit's PARTS (its plan, its lessons, its standards, its resources, its notes)
+ *  while the drawer holds commentary ABOUT the unit. Let commentary in and the
+ *  strip becomes a junk drawer that buries the parts a teacher opened the unit
+ *  to reach. That ruling stands.
+ *
+ *  WAVE 5 adds **Refine**, which does NOT reopen it. Refine is not commentary —
+ *  it is the unit's lessons themselves, laid out as an editable table so one
+ *  planning field can be filled down the whole unit in a single keyboard run.
+ *  The drawer REPORTS the gaps; Refine is where they get fixed, and there is no
+ *  other surface that does it (the Lessons tab is read-only, and its row actions
+ *  all leave). It sits after Lessons because that is the handoff's order
+ *  (`ph-workspace.jsx:272`) and because it reads as a deeper pass over the same
+ *  thing the tab before it lists.
+ *
  *  B1.5 relabels the first "Unit Plan"; the key stays `overview` (the body
  *  switch + tab CSS key off it — a label-only change keeps the churn minimal). */
-type TabKey = "overview" | "lessons" | "standards" | "resources" | "notes";
+type TabKey =
+  | "overview"
+  | "lessons"
+  | "refine"
+  | "standards"
+  | "resources"
+  | "notes";
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: "overview", label: "Unit Plan" },
   { key: "lessons", label: "Lessons" },
+  { key: "refine", label: "Refine" },
   { key: "standards", label: "Standards" },
   { key: "resources", label: "Resources" },
   { key: "notes", label: "Notes" },
@@ -678,6 +695,17 @@ export function UnitExplorer({
               setLessonStatus={setLessonStatus}
               onPlan={openPlan}
               onTeach={openTeach}
+            />
+          )}
+          {tab === "refine" && (
+            <RefineTab
+              lessons={lessons}
+              // Section-aware, for the same reason the drawer needs it: a lesson
+              // whose resources all hang off its sections has an EMPTY
+              // `Lesson.resources`, so without this its Refine dot would read
+              // "no resources" one tab away from a Resources tab listing them.
+              hasResources={hasAnyResource}
+              onPlan={openPlan}
             />
           )}
           {tab === "standards" && <StandardsTab standards={standards} />}

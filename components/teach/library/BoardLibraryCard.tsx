@@ -10,7 +10,7 @@
 //   • the title,
 //   • colored tag chips (subject / day / time / type — see tag-tone bridge),
 //   • a "Repeats: X" line (when the board repeats) + the owner (Team / Personal),
-//   • an action row — Open · Duplicate · Repeat · Share · More.
+//   • an action row — Open · Duplicate · Repeat · Share · Delete.
 //
 // PRIVACY (CLAUDE.md): boards carry STRUCTURE only. The only person-name shown
 // is the PUBLISHER of a Team-Library board (a teacher), never a student. The
@@ -21,7 +21,7 @@
 // action opens the RepeatScheduleEditor (owned by the module); the destructive
 // delete path keeps the required-tooltip + two-step inline confirm.
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Board, BoardTag } from "@/lib/types";
 import {
   tagDisplayLabel,
@@ -29,8 +29,8 @@ import {
   TAG_KIND_LABEL,
 } from "@/lib/teach/board-tags";
 import { Button, Tooltip } from "@/components/ui";
-import { TeachIcon } from "@/components/teach/widgets";
-import { ExternalIcon, CopyLinkIcon, MoreIcon } from "../right/icons";
+import { TeachIcon, type TeachIconName } from "@/components/teach/widgets";
+import { ExternalIcon, CopyLinkIcon, TrashIcon } from "../right/icons";
 import styles from "./BoardLibrary.module.css";
 
 // ── Tag-tone bridge ──────────────────────────────────────────────────────────
@@ -94,8 +94,18 @@ function toneForTag(tag: BoardTag): ChipTone {
 // Self-contained (no import from a sibling chip component) so this file builds
 // on its own. Each chip uses the shared label helper so wording never drifts.
 
-function TagChips({ board }: { board: Board }): ReactNode {
-  const tags = board.tags ?? [];
+/** `max` caps how many chips render — the Team Library row is a 3-band strip
+ *  inside a ~300px panel, where an unbounded chip run would push the byline off.
+ *  Omitted (the card) → every tag renders. */
+export function TagChips({
+  board,
+  max,
+}: {
+  board: Board;
+  max?: number;
+}): ReactNode {
+  const all = board.tags ?? [];
+  const tags = max != null ? all.slice(0, max) : all;
   if (tags.length === 0) return null;
   return (
     <div className={styles.tagRow}>
@@ -121,7 +131,53 @@ function TagChips({ board }: { board: Board }): ReactNode {
 // board's primary tag kind (or whiteboard flag); the preview is always
 // structural lines/icons — never student content.
 
-function boardPreviewKind(board: Board): string {
+export type BoardPreviewKind =
+  | "whiteboard"
+  | "subject"
+  | "day"
+  | "phase"
+  | "generic";
+
+/** The `--wf-*` widget-palette families a preview can wear. Every one of these
+ *  ships VERBATIM in app/tokens.css (the handoff's widgets530.css values), so
+ *  the per-kind tint adds no new colour — it only stops every card wearing the
+ *  same blue. */
+export type BoardFamily =
+  | "blue"
+  | "green"
+  | "purple"
+  | "orange"
+  | "slate";
+
+/** Kind → colour family. Derived from the handoff's `b.fam` map (boardlib.jsx
+ *  :64-81), collapsed onto the five kinds this app actually derives:
+ *    • whiteboard → purple  (handoff: "Free Whiteboard" is fam purple)
+ *    • subject    → blue    (handoff: the subject-anchored warm-up + grammar
+ *                            boards are fam blue)
+ *    • day        → orange  (matches the sidebar's colour key for "Day", which
+ *                            already paints --wf-orange-accent)
+ *    • phase      → green   (handoff: the "Part of Lesson" boards — centers,
+ *                            guided reading, science — are fam green; the
+ *                            sidebar's "Part of Lesson" key is green too)
+ *    • generic    → slate   (an untagged board is genuinely unclassified;
+ *                            colour is information, so it gets the neutral) */
+const KIND_FAMILY: Record<BoardPreviewKind, BoardFamily> = {
+  whiteboard: "purple",
+  subject: "blue",
+  day: "orange",
+  phase: "green",
+  generic: "slate",
+};
+
+const KIND_ICON: Record<BoardPreviewKind, TeachIconName> = {
+  whiteboard: "model",
+  subject: "notes",
+  day: "calendar",
+  phase: "check",
+  generic: "grid",
+};
+
+export function boardPreviewKind(board: Board): BoardPreviewKind {
   if (board.whiteboard) return "whiteboard";
   const tags = board.tags ?? [];
   if (tags.some((t) => t.kind === "subject")) return "subject";
@@ -130,24 +186,34 @@ function boardPreviewKind(board: Board): string {
   return "generic";
 }
 
+/** The board's colour family — shared with the Team Library row's chip icon so
+ *  one board reads the same colour wherever it appears. */
+export function boardFamily(board: Board): BoardFamily {
+  return KIND_FAMILY[boardPreviewKind(board)];
+}
+
+/** The board's preview/chip glyph. */
+export function boardIcon(board: Board): TeachIconName {
+  return KIND_ICON[boardPreviewKind(board)];
+}
+
 function BoardPreview({ board }: { board: Board }): ReactNode {
   const kind = boardPreviewKind(board);
-  const icon =
-    kind === "whiteboard"
-      ? "model"
-      : kind === "subject"
-        ? "notes"
-        : kind === "day"
-          ? "calendar"
-          : kind === "phase"
-            ? "check"
-            : "grid";
+  const fam = KIND_FAMILY[kind];
+  // Local custom properties, so ALL FOUR preview rules (.preview / .previewBox /
+  // .previewTitle / .previewIcon) repaint from one place instead of hard-coding
+  // the blue family four times in the stylesheet. Values are token references —
+  // no literal colour crosses this boundary.
+  const vars = {
+    "--preview-grad": `var(--wf-${fam}-grad)`,
+    "--preview-accent": `var(--wf-${fam}-accent)`,
+  } as CSSProperties;
   return (
-    <div className={styles.preview} aria-hidden="true">
+    <div className={styles.preview} style={vars} aria-hidden="true">
       <span className={styles.previewBox}>
         <span className={styles.previewTitle}>{board.title}</span>
         <span className={styles.previewIcon}>
-          <TeachIcon name={icon} size={22} />
+          <TeachIcon name={KIND_ICON[kind]} size={22} />
         </span>
       </span>
     </div>
@@ -313,9 +379,16 @@ export function BoardLibraryCard({
               </span>
               Share
             </button>
+            {/* The visible label was "More" over a ⋯ glyph while the click
+                deleted the board — the label misdescribed the action, and the
+                `Delete <title>` accessible name did not contain the visible
+                text (WCAG 2.5.3 Label in Name: a voice-control user saying
+                "click More" hit nothing, and a sighted user expecting a menu
+                got a destructive action). The visible label now names what the
+                button does, and the accessible name starts with it. */}
             <Tooltip
               required
-              content={`Delete "${board.title}" from My Boards`}
+              content={`Delete "${board.title}" from My Boards — you'll be asked to confirm first`}
             >
               <button
                 type="button"
@@ -324,9 +397,9 @@ export function BoardLibraryCard({
                 onClick={() => onRequestDelete?.(board)}
               >
                 <span className={styles.actionIcon}>
-                  <MoreIcon />
+                  <TrashIcon />
                 </span>
-                More
+                Delete
               </button>
             </Tooltip>
           </div>
