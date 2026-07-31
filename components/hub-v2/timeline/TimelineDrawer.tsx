@@ -25,6 +25,11 @@
 
 import { useState, type ReactNode } from "react";
 import { ToggleGroup } from "@/components/ui";
+// THE shared week-range formatter (lib/planner/source.ts:unitWeeksLabel, which
+// both data sources derive `Unit.weeks` through). Spelling the label inline
+// here is how this row came to render "Wk 12–12" for a one-week unit whose own
+// card said "Wk 12" — an inline literal has no `start === end` branch.
+import { weeksLabel } from "@/lib/plan-timeline";
 import type {
   AttentionItem,
   LibraryUnit,
@@ -168,8 +173,8 @@ export function TimelineDrawer({
                         {!u.weekRange
                           ? "No weeks set"
                           : u.offAxis
-                            ? `Wk ${u.weekRange.start}–${u.weekRange.end} · outside this year`
-                            : `Wk ${u.weekRange.start}–${u.weekRange.end}`}
+                            ? `${weeksLabel(u.weekRange.start, u.weekRange.end)} · outside this year`
+                            : weeksLabel(u.weekRange.start, u.weekRange.end)}
                       </span>
                       <span className={styles.rowMeta}>
                         {u.ready}/{u.total} planned

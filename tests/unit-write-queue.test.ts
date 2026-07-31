@@ -35,16 +35,11 @@ const U = (over: Partial<Unit> = {}): Unit => ({
   ...over,
 });
 
-const unitToPatch = (u: Unit): UnitPatch => ({
-  notes: u.notes,
-  bigIdea: u.bigIdea,
-});
-
 /** A controllable fake client: each updateUnitFields call parks a deferred so
  *  the test decides when (and whether) it resolves/rejects. */
 function makeRig(opts?: { canWrite?: () => boolean }) {
   const sends: { unitId: string; patch: UnitPatch; d: ReturnType<typeof deferred<Unit>> }[] = [];
-  const reconciled: { unitId: string; patch: UnitPatch }[] = [];
+  const reconciled: { unitId: string; unit: Unit }[] = [];
   const retained = new Map<string, UnitPatch>(); // §4a R5 H2 failed-write holder
   const queue = createUnitWriteQueue({
     updateUnitFields: (unitId, patch) => {
@@ -52,10 +47,12 @@ function makeRig(opts?: { canWrite?: () => boolean }) {
       sends.push({ unitId, patch, d });
       return d.promise;
     },
-    // CONFIRM-ONLY: reconcile fires ONLY on a confirmed write's canonical row.
-    reconcile: (unitId, patch) => reconciled.push({ unitId, patch }),
+    // CONFIRM-ONLY: reconcile fires ONLY on a confirmed write's canonical row —
+    // and it receives that ROW WHOLE, never a `UnitPatch` projection of it (the
+    // projection cannot carry the source-derived `Unit.weeks`; see
+    // tests/unit-week-label-reconcile.test.ts).
+    reconcile: (unitId, unit) => reconciled.push({ unitId, unit }),
     canWrite: opts?.canWrite ?? (() => true),
-    unitToPatch,
     onError: () => {}, // swallow the expected console.error in tests
     retainFailed: (unitId, patch) =>
       retained.set(unitId, { ...(retained.get(unitId) ?? {}), ...patch }),
@@ -120,9 +117,7 @@ describe("unit-write-queue — confirm-only: catalog written ONLY on confirmed w
     expect(reconciled).toHaveLength(0); // nothing optimistic before confirmation
     sends[0].d.resolve(U({ bigIdea: "B" }));
     await tick();
-    expect(reconciled).toEqual([
-      { unitId: "u1", patch: { notes: undefined, bigIdea: "B" } },
-    ]);
+    expect(reconciled).toEqual([{ unitId: "u1", unit: U({ bigIdea: "B" }) }]);
   });
 
   it("a FAILED write leaves the catalog untouched — no reconcile, no revert (dissolves the stale-optimistic class)", async () => {
@@ -141,7 +136,7 @@ describe("unit-write-queue — confirm-only: catalog written ONLY on confirmed w
     sends[0].d.resolve(U({ notes: "A" })); // A confirmed → reconcile A
     await tick();
     expect(reconciled).toEqual([
-      { unitId: "u1", patch: { notes: "A", bigIdea: undefined } },
+      { unitId: "u1", unit: U({ notes: "A" }) },
     ]);
 
     const rB = vi.fn();
@@ -150,7 +145,7 @@ describe("unit-write-queue — confirm-only: catalog written ONLY on confirmed w
     await tick();
     // Still only A's reconcile — B never dispatched (A is intact by construction).
     expect(reconciled).toEqual([
-      { unitId: "u1", patch: { notes: "A", bigIdea: undefined } },
+      { unitId: "u1", unit: U({ notes: "A" }) },
     ]);
     expect(rB).toHaveBeenLastCalledWith(false);
   });
@@ -167,7 +162,7 @@ describe("unit-write-queue — confirm-only: catalog written ONLY on confirmed w
     sends[1].d.resolve(U({ bigIdea: "B" })); // #2 confirmed → reconcile only now
     await tick();
     expect(reconciled).toEqual([
-      { unitId: "u1", patch: { notes: undefined, bigIdea: "B" } },
+      { unitId: "u1", unit: U({ bigIdea: "B" }) },
     ]);
   });
 });
@@ -190,7 +185,7 @@ describe("unit-write-queue — mode gate re-checked at send time (R2 H2)", () =>
     expect(sends).toHaveLength(1);
     expect(rB).toHaveBeenLastCalledWith(false);
     expect(reconciled).toEqual([
-      { unitId: "u1", patch: { notes: "A", bigIdea: undefined } },
+      { unitId: "u1", unit: U({ notes: "A" }) },
     ]);
   });
 

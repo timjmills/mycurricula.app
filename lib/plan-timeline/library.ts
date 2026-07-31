@@ -27,7 +27,7 @@ import type { Lesson, Subject, SubjectId, Unit } from "@/lib/types";
 import { stripHtml } from "@/lib/html-text";
 import { slotOf } from "./axis";
 import { unitWeekRange, type WeekRange } from "./bands";
-import { axisWeekCount, lessonsOutsideRange } from "./drag";
+import { axisWeekCount, lessonsOutsideRange, weeksLabel } from "./drag";
 import {
   dotStateFor,
   forkTierFor,
@@ -340,7 +340,10 @@ export function buildNeedsAttention(
         kind: "off_axis_unit",
         subject: u.subject,
         title: u.name,
-        detail: `Set for Wk ${u.weekRange.start}–${u.weekRange.end}, which is outside this academic year — it has no place on the timeline.`,
+        // THE shared formatter, never an inline literal: an inline
+        // `Wk ${start}–${end}` has no `start === end` branch, so a one-week
+        // unit read "Wk 12–12" here while its own unit card read "Wk 12".
+        detail: `Set for ${weeksLabel(u.weekRange.start, u.weekRange.end)}, which is outside this academic year — it has no place on the timeline.`,
         target: { kind: "unit", id: u.unitId },
       });
     } else if (!u.weekRange) {
@@ -359,7 +362,7 @@ export function buildNeedsAttention(
         kind: "outside_range",
         subject: u.subject,
         title: u.name,
-        detail: `${u.lessonsOutside} lesson${u.lessonsOutside === 1 ? "" : "s"} dated outside Wk ${u.weekRange.start}–${u.weekRange.end}.`,
+        detail: `${u.lessonsOutside} lesson${u.lessonsOutside === 1 ? "" : "s"} dated outside ${weeksLabel(u.weekRange.start, u.weekRange.end)}.`,
         target: { kind: "unit", id: u.unitId },
       });
     }

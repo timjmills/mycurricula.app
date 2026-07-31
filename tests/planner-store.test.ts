@@ -442,9 +442,14 @@ describe("moveLesson", () => {
   });
 });
 
-// ── editUnitFields (B1.7 — catalog side-channel, NOT undoable) ──────────────
+// ── reconcileUnitRow (B1.7 — catalog side-channel, NOT undoable) ────────────
+// Formerly `editUnitFields`, which merged a `UnitPatch` over the catalog unit.
+// It now swaps in the CANONICAL row the data source returned, because the patch
+// type cannot carry the source-derived `Unit.weeks` and the merge was silently
+// dropping it on every timeline band drag (see tests/unit-week-label-reconcile
+// .test.ts, and `ReconcileUnitRowAction` in lib/planner-store.tsx).
 
-describe("editUnitFields", () => {
+describe("reconcileUnitRow", () => {
   const unit = (id: string, over: Partial<Unit> = {}): Unit => ({
     id,
     subject: "math" as SubjectId,
@@ -474,15 +479,15 @@ describe("editUnitFields", () => {
     };
   }
 
-  it("merges the patch into the matching catalog unit, leaving siblings intact", () => {
+  it("swaps the canonical row into the matching catalog slot, leaving siblings intact", () => {
     const next = historyReducer(withUnits(), {
-      type: "editUnitFields",
+      type: "reconcileUnitRow",
       unitId: "u-a",
-      patch: {
+      unit: unit("u-a", {
         bigIdea: "Fractions describe equal parts of a whole.",
         essentialQuestions: ["How do we compare unlike fractions?"],
         kud: { know: ["fraction vocabulary"] },
-      },
+      }),
     });
     const edited = next.catalog.units.find((u) => u.id === "u-a");
     expect(edited?.bigIdea).toBe("Fractions describe equal parts of a whole.");
@@ -498,9 +503,9 @@ describe("editUnitFields", () => {
   it("is a NON-history side-channel — never touches undo/redo or the document", () => {
     const before = withUnits();
     const next = historyReducer(before, {
-      type: "editUnitFields",
+      type: "reconcileUnitRow",
       unitId: "u-a",
-      patch: { notes: "front-load vocab" },
+      unit: unit("u-a", { notes: "front-load vocab" }),
     });
     // The document + both history stacks are the SAME references (untouched).
     expect(next.history.present).toBe(before.history.present);
@@ -513,9 +518,9 @@ describe("editUnitFields", () => {
   it("no-ops (same state ref) when the unit id is not in the catalog", () => {
     const before = withUnits();
     const next = historyReducer(before, {
-      type: "editUnitFields",
+      type: "reconcileUnitRow",
       unitId: "does-not-exist",
-      patch: { notes: "orphan" },
+      unit: unit("does-not-exist", { notes: "orphan" }),
     });
     expect(next).toBe(before);
   });

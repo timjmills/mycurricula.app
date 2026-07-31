@@ -145,19 +145,17 @@ export function resizeWeekRange(
 }
 
 /**
- * The `Unit.weeks` display label for a range.
+ * The `Unit.weeks` display label for a range — RE-EXPORTED, not reimplemented.
  *
- * MUST match `supabase-source.ts:987-991` character for character, EN DASH
- * included. That label is what every non-timeline surface reads (unit cards,
- * the workspace rail), and the drag writes it optimistically while the server
- * echo re-derives it — so a one-character difference makes the unit card
- * flicker between two spellings on every successful write. It also has to stay
- * readable by `bands.ts:unitWeekRange`'s `\bWk\.?\s*(\d+)…` fallback, which is
- * the only path for any unit whose numeric fields are absent.
+ * This file used to carry its own byte-identical copy, sitting under a comment
+ * that told the next editor it "MUST match supabase-source.ts character for
+ * character". Two copies that must never diverge are one copy with extra steps:
+ * the real formatter is `unitWeeksLabel` in the data-source seam, which both
+ * sources already derive `Unit.weeks` through, so the timeline now reads the
+ * same function rather than promising to match it. The name is kept so the
+ * `@/lib/plan-timeline` barrel and its callers are unchanged.
  */
-export function weeksLabel(start: number, end: number): string {
-  return start === end ? `Wk ${start}` : `Wk ${start}–${end}`;
-}
+export { unitWeeksLabel as weeksLabel } from "@/lib/planner/source";
 
 /** Inclusive slot footprint of a week range, clamped to the axis — the drag
  *  preview's geometry, and the same arithmetic `bands.ts:unitSpan` uses for the

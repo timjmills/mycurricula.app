@@ -167,16 +167,35 @@ export type UnitPatch = Partial<
 >;
 
 /**
- * The `Unit.weeks` display label for a week range.
+ * The `Unit.weeks` display label for a week range. THE formatter — the only
+ * implementation in the repo, exported from the seam both sources import.
  *
- * ONE formatter, exported from the seam both sources import, because three
- * places have to agree on it character for character: the Supabase read mapper
- * (`mapUnitRow`), the mock source (which has no read mapper and must derive it
- * itself), and the timeline's band tooltip. A one-character difference — a
- * hyphen where the EN DASH belongs — makes a unit card visibly flicker between
- * two spellings on every successful write, and breaks
- * `lib/plan-timeline/bands.ts:unitWeekRange`'s fallback parser, which is the
- * only path for any unit whose numeric fields are absent.
+ * ── IT HAS NOT ALWAYS BEEN ONE, AND THE COMMENT SAID IT WAS ───────────────
+ * This note previously claimed "ONE formatter … three places have to agree",
+ * and named "the timeline's band tooltip" as one of them. The tooltip did not
+ * import this function; `lib/plan-timeline/drag.ts` carried a byte-identical
+ * COPY, and three further callsites spelled the label inline with no
+ * `start === end` branch at all — so a one-week unit read "Wk 12" in the unit
+ * card and "Wk 12–12" in the timeline drawer, the timeline list and the Needs
+ * Attention triage. That was not hypothetical: `lib/mock/units.ts` ships
+ * spelling's List 12 as `weeks: "Wk 12"`.
+ *
+ * A comment asserting an invariant nothing enforces is worse than no comment —
+ * it retires the question. The duplicate is now deleted (drag.ts re-exports
+ * THIS function under its old name) and every inline literal calls it, so the
+ * claim is finally true. The callers that must agree character for character:
+ *
+ *   • the Supabase read mapper (`supabase-source.ts:mapUnitRow`);
+ *   • the mock source (no read mapper — it must derive the label itself);
+ *   • `lib/plan-timeline/drag.ts:weeksLabel` (a re-export) and everything the
+ *     `@/lib/plan-timeline` barrel serves it to;
+ *   • the drawer / list / triage rows in `components/hub-v2/timeline/` and
+ *     `lib/plan-timeline/library.ts`.
+ *
+ * A one-character difference — a hyphen where the EN DASH belongs — makes a
+ * unit card visibly flicker between two spellings on every successful write,
+ * and breaks `lib/plan-timeline/bands.ts:unitWeekRange`'s fallback parser,
+ * which is the only path for any unit whose numeric fields are absent.
  */
 export function unitWeeksLabel(start: number, end: number): string {
   return start === end ? `Wk ${start}` : `Wk ${start}–${end}`;

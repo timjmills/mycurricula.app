@@ -469,17 +469,36 @@ type SetCatalogAction = { type: "setCatalog"; catalog: PlannerCatalog };
  *  only ever ADDS keys (existing descriptions win, so a hydrate never loses to
  *  a stale merge). */
 type MergeStandardsAction = { type: "mergeStandards"; map: StandardsMap };
-/** Patch a unit's editable Track-B workspace fields (B1.7). A CATALOG-level
- *  side-channel like setCatalog/mergeStandards: units live in the reference
- *  catalog (a SIBLING of the document), so a unit edit NEVER enters undo/redo —
- *  editing a big idea must not put the unit list on the lesson undo stack. The
- *  provider tees the same patch to the source's updateUnitFields (flag ON), so
- *  the edit persists to the shared team `units` row; flag OFF it stays
- *  reducer-local, exactly like every other mock-path edit. */
-type EditUnitFieldsAction = {
-  type: "editUnitFields";
+/** Swap the CONFIRMED CANONICAL unit row returned by the data source into the
+ *  catalog (B1.7). A CATALOG-level side-channel like setCatalog/mergeStandards:
+ *  units live in the reference catalog (a SIBLING of the document), so a unit
+ *  edit NEVER enters undo/redo — editing a big idea must not put the unit list
+ *  on the lesson undo stack.
+ *
+ *  ── WHY A ROW AND NOT A PATCH ────────────────────────────────────────────
+ *  This action used to carry a `UnitPatch` that the reducer shallow-merged, and
+ *  it was dispatched with `unitToPatch(canonicalRow)` — the source's row
+ *  projected down to the write seam's editable keys. `Unit.weeks` (the display
+ *  collapse, "Wk 20–25") is deliberately NOT one of those keys — a caller must
+ *  not be able to supply a label that disagrees with the numbers (see
+ *  lib/planner/source.ts) — so both sources RE-DERIVE it on the row they return
+ *  and the projection then threw it away. Result: a successful timeline band
+ *  drag moved `startWeek`/`endWeek` and left `unit.weeks` stale for the rest of
+ *  the session, on every surface that renders the label (Units browse, /year,
+ *  the left filter panel, the Resource Wall scope meta — and hub browse SORTS
+ *  by it). Nothing re-hydrates units mid-session; there is no realtime
+ *  subscription. That is exactly the flag-ON/flag-OFF divergence the seam's
+ *  `Pick` exists to prevent, reintroduced one layer above the seam.
+ *
+ *  Swapping the whole row fixes the class, not the instance: every field the
+ *  source derives (today `weeks`; tomorrow whatever else) arrives intact
+ *  instead of being silently dropped for not being writable. The catalog is
+ *  CONFIRM-ONLY — it holds server-confirmed values and nothing else — so the
+ *  source's row IS the correct content of that slot. */
+type ReconcileUnitRowAction = {
+  type: "reconcileUnitRow";
   unitId: string;
-  patch: UnitPatch;
+  unit: Unit;
 };
 /** Insert a freshly-created lesson into the document (W3.7). The payload is
  *  the FULL Lesson RETURNED by the data source's createLesson — carrying the
@@ -524,7 +543,7 @@ export type PlannerAction =
   | SetHydrationAction
   | SetCatalogAction
   | MergeStandardsAction
-  | EditUnitFieldsAction
+  | ReconcileUnitRowAction
   | AddLessonAction;
 
 // ── Human labels for undo/redo tooltips ──────────────────────────────────
@@ -1512,19 +1531,50 @@ export function historyReducer(
     return { ...state, catalog: { ...state.catalog, standards: merged } };
   }
 
-  // ── Edit unit fields (B1.7 — CATALOG side-channel, NOT undoable) ──────────
-  // Merge a Track-B patch into the matching catalog unit. Like setCatalog /
-  // mergeStandards this touches only the catalog slice (never the document or
-  // undo/redo history) — units are reference data, so a unit edit must not land
-  // on the lesson undo stack. No-op when the unit isn't in the catalog (a stale
-  // id, or a unit outside the hydrated grade) so a mistargeted edit can't insert
-  // a phantom unit. The persist tee (updateUnitFields) fires separately in the
-  // provider; flag OFF this reducer update is the only effect.
-  if (action.type === "editUnitFields") {
+  // ── Reconcile a canonical unit row (B1.7 — CATALOG side-channel, NOT undoable)
+  // Swap the data source's CONFIRMED row into the matching catalog slot. Like
+  // setCatalog / mergeStandards this touches only the catalog slice (never the
+  // document or undo/redo history) — units are reference data, so a unit edit
+  // must not land on the lesson undo stack. No-op when the unit isn't in the
+  // catalog (a stale id, or a unit outside the hydrated grade) so a mistargeted
+  // write can't insert a phantom unit.
+  //
+  // A SWAP, NOT A MERGE — see ReconcileUnitRowAction for why the old
+  // patch-merge silently dropped `Unit.weeks` on every band drag. The catalog is
+  // CONFIRM-ONLY, so the source's row is the whole truth for this slot; merging
+  // it over the previous one would only preserve fields the source has already
+  // superseded.
+  //
+  // ONE FIELD IS PINNED: `id`. The catalog is keyed by the CALLER-VISIBLE id,
+  // and the Supabase source resolves a fixture SLUG to its DB uuid before
+  // writing, then maps the reloaded row back AS that uuid — so a slug-keyed
+  // catalog unit would come back under a different id and silently orphan every
+  // reference to it (`lesson.unit`, `activeUnitBySubject`, the timeline lanes).
+  // The row is canonical for CONTENT; the catalog is canonical for IDENTITY.
+  // IDENTITY IS CHECKED, NOT ASSUMED (§4a gate, Medium #2). Pinning `id` above
+  // means an id mismatch between the returned row and the slot is EXPECTED —
+  // which is exactly what makes an accidental cross-unit response
+  // indistinguishable from the intended slug→uuid mapping. `subject` is the one
+  // immutable identity a unit carries through the write path (`UnitPatch` has no
+  // `subject` key, so no write can legitimately move a unit between subjects),
+  // so it can separate the two. A mismatch is a source/adapter bug, and
+  // swapping on it would write another unit's content — name, weeks, big idea —
+  // into this teacher's unit. No-op instead, and say so where a developer will
+  // see it rather than failing silently in the way this file keeps finding.
+  if (action.type === "reconcileUnitRow") {
     const idx = state.catalog.units.findIndex((u) => u.id === action.unitId);
     if (idx === -1) return state;
+    const slot = state.catalog.units[idx];
+    if (action.unit.subject !== slot.subject) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error(
+          `reconcileUnitRow: refusing to swap — unit ${action.unitId} is subject "${slot.subject}" but the confirmed row is "${action.unit.subject}". The data source returned a row for a different unit.`,
+        );
+      }
+      return state;
+    }
     const nextUnits = state.catalog.units.slice();
-    nextUnits[idx] = { ...nextUnits[idx], ...action.patch };
+    nextUnits[idx] = { ...action.unit, id: slot.id };
     return { ...state, catalog: { ...state.catalog, units: nextUnits } };
   }
 
@@ -2504,11 +2554,20 @@ export function useCatalogOptional(): CatalogValue {
 }
 
 // ── Unit-patch helper (B1.7) ────────────────────────────────────────────────
-/** Project a Unit's editable Track-B fields into a `UnitPatch`. Used to merge a
- *  canonical server row back into the catalog — on a successful write's echo and
- *  on the post-failure reconcile (unit-write-queue). Every editable key is
- *  carried (undefined where unset) so the reconcile clears fields the failed
- *  burst had optimistically added, not just changed. */
+/** Project a Unit's editable Track-B fields into a `UnitPatch`.
+ *
+ *  ONE CALLER, and it is a COMPARISON, not a merge: `confirmedUnitPatch` uses
+ *  this to answer "what does the server currently hold for each writable field?"
+ *  so the failed-write retry guard (`staleUnitPatchKeys`) can tell "still the
+ *  value I diverged from" apart from "a teammate has changed this since". Every
+ *  editable key is carried (undefined where unset) so a key the unit does not
+ *  have compares equal to a patch that does not set it.
+ *
+ *  It is deliberately NOT how a confirmed row reaches the catalog. That path
+ *  dispatches the row WHOLE (`reconcileUnitRow`), because this projection is
+ *  lossy by construction — `UnitPatch` excludes the source-derived `Unit.weeks`,
+ *  so routing the canonical row through here dropped the label on every band
+ *  drag. See `ReconcileUnitRowAction`. */
 function unitToPatch(u: Unit): UnitPatch {
   return {
     notes: u.notes,
@@ -3670,10 +3729,12 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     unitWriteQueueRef.current = createUnitWriteQueue({
       updateUnitFields: (unitId, patch) =>
         plannerClient.updateUnitFields(unitId, patch, ownerIdRef.current ?? ""),
-      reconcile: (unitId, patch) =>
-        dispatchRef.current({ type: "editUnitFields", unitId, patch }),
+      // The CANONICAL row, whole — never `unitToPatch(row)`. `UnitPatch` cannot
+      // carry `Unit.weeks` (the source-derived display label), so projecting
+      // through it dropped the freshly-derived range on every band drag.
+      reconcile: (unitId, unit) =>
+        dispatchRef.current({ type: "reconcileUnitRow", unitId, unit }),
       canWrite: () => editModeRef.current === "master",
-      unitToPatch,
       onError: (message, err) => {
         console.error(message, err);
         // Units are TEAM content with no personal fork, so a failed unit write
@@ -3831,13 +3892,15 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         return;
       }
       // ATOMIC SCHEDULE. `staleUnitPatchKeys` works key by key, which is right
-      // for every content field and wrong for the week range: `startWeek` /
-      // `endWeek` / `weeks` are one logical field, and the write seam refuses a
-      // patch carrying one end without the other (`assertUnitWeekPatch`). A
-      // per-key drop could therefore leave a retry that can never succeed.
-      // `expandStaleUnitKeys` drops the three together, which is also the
-      // honest outcome: if the team's weeks have moved, the teacher's stale
-      // range is precisely what must not be re-sent.
+      // for every content field and wrong for the week range: `startWeek` and
+      // `endWeek` are one logical field, and the write seam refuses a patch
+      // carrying one end without the other (`assertUnitWeekPatch`). A per-key
+      // drop could therefore leave a retry that can never succeed.
+      // `expandStaleUnitKeys` drops BOTH ENDS together (`UNIT_WEEK_KEYS` — the
+      // two numbers, and only those two: the derived `weeks` label is not a
+      // `UnitPatch` key, so it can never appear in a retained patch), which is
+      // also the honest outcome: if the team's weeks have moved, the teacher's
+      // stale range is precisely what must not be re-sent.
       const stale = expandStaleUnitKeys(
         staleUnitPatchKeys(
           retained.patch,

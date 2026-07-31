@@ -28,7 +28,11 @@ import {
   type LibraryStatusFilter,
   type LibraryUnit,
 } from "@/lib/plan-timeline/library";
-import { DOT_STATE_LABEL, FORK_TIER_LABEL } from "@/lib/plan-timeline";
+// `weeksLabel` is THE shared week-range formatter (lib/planner/source.ts:
+// unitWeeksLabel, which both data sources derive `Unit.weeks` through) — never
+// an inline `Wk ${start}–${end}`, which has no `start === end` branch and so
+// renders a one-week unit as "Wk 12–12" while its own card reads "Wk 12".
+import { DOT_STATE_LABEL, FORK_TIER_LABEL, weeksLabel } from "@/lib/plan-timeline";
 import type { SubjectId } from "@/lib/types";
 import styles from "./timeline.module.css";
 
@@ -143,7 +147,7 @@ export function TimelineList({
                 <span className={styles.rowTitle}>{u.name}</span>
                 <span className={styles.rowMeta}>
                   {u.weekRange
-                    ? `Wk ${u.weekRange.start}–${u.weekRange.end}`
+                    ? weeksLabel(u.weekRange.start, u.weekRange.end)
                     : // Named, not blank. A unit with no schedule is the one a
                       // teacher most needs to notice.
                       "No weeks set"}

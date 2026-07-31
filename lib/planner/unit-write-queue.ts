@@ -32,13 +32,33 @@ export interface UnitWriteQueueDeps {
    *  denial / transport error. (Flag OFF this is the in-memory mock, which is the
    *  confirming source of truth for the session.) */
   updateUnitFields: (unitId: string, patch: UnitPatch) => Promise<Unit>;
-  /** Apply a CONFIRMED patch to the in-memory catalog (a reducer dispatch in the
-   *  store). Called ONLY on a successful write — never optimistically. */
-  reconcile: (unitId: string, patch: UnitPatch) => void;
+  /**
+   * Apply the CONFIRMED CANONICAL ROW to the in-memory catalog (a reducer
+   * dispatch in the store). Called ONLY on a successful write — never
+   * optimistically.
+   *
+   * ── THE ROW TRAVELS WHOLE, NOT A PROJECTION OF IT ────────────────────────
+   * This used to hand the store `unitToPatch(updated)` — the row projected down
+   * to `UnitPatch`'s editable keys — which the reducer then shallow-merged. That
+   * projection is LOSSY BY CONSTRUCTION: `Unit.weeks` (the display collapse,
+   * "Wk 20–25") is deliberately absent from `UnitPatch` because a caller must
+   * not be able to supply a label that disagrees with the numbers (see
+   * ./source.ts). Both sources re-derive it on the row they RETURN — and the
+   * projection threw that freshly-derived label away, so a successful band drag
+   * left every `unit.weeks` reader (Units browse, /year, the left filter panel,
+   * the Resource Wall scope meta, hub browse's SORT) showing the OLD range for
+   * the rest of the session. Nothing re-hydrates units mid-session.
+   *
+   * Passing the row itself is not a widening of the write seam — it is the
+   * opposite. The seam's job is to stop a CALLER inventing a derived value; the
+   * SOURCE is the only thing entitled to compute one, and this is the source's
+   * own output on its way to the catalog. Every derived field the sources add
+   * later (a duration, a pacing flag) rides along for free instead of quietly
+   * going stale the way `weeks` did.
+   */
+  reconcile: (unitId: string, unit: Unit) => void;
   /** True when writes are allowed (Team Curriculum mode). Re-checked at send. */
   canWrite: () => boolean;
-  /** Project a Unit → its editable `UnitPatch` (for the canonical merge). */
-  unitToPatch: (u: Unit) => UnitPatch;
   /** Error sink (console.error in the store; captured in tests). */
   onError?: (message: string, err: unknown) => void;
   /** Retain a FAILED write's patch OUTSIDE the component, keyed by unit (§4a R5
@@ -169,7 +189,9 @@ export function createUnitWriteQueue(deps: UnitWriteQueueDeps): UnitWriteQueue {
           // confirmed write whose follow-up is later dropped by the mode gate,
           // leaving the catalog stale until the next hydrate). Both are
           // server-confirmed states in sequence; the latest confirmed one wins.
-          deps.reconcile(unitId, deps.unitToPatch(updated));
+          // The row goes in WHOLE — never projected through `UnitPatch`, which
+          // cannot carry the source-derived `weeks` label (see `reconcile`).
+          deps.reconcile(unitId, updated);
           // FIELD-WISE (§4a R6 H2-B): a confirmed write supersedes only the
           // fields it actually covered — `next` is the patch that just
           // committed. An earlier failed retry of a DIFFERENT field stays
