@@ -109,7 +109,18 @@
   --ink-700: #3a3950; /* secondary — ink-soft */
   --ink-600: #494862; /* (intermediate — some surfaces reference it) */
   --ink-500: #57566b; /* tertiary / meta — body */
-  --ink-400: #908fa3; /* muted */
+  /* muted — MEASURED 5.25:1 on --surface (#fff) and 5.07:1 on the warm panel
+     (#fcfaf6), by canvas-resolve + photographed backdrop, not by arithmetic.
+     Was #908fa3, which measured 2.82–3.16:1 and failed AA for small text on
+     EVERY light-tone surface (docs/audits/2026-07-31-qa-tone-matrix.md B3).
+     The dark-tone value (#8d8ba4, :1666) measures 5.0–5.1:1 and is unchanged —
+     this tier was mis-tuned on the light branch only.
+
+     Margin note: on a theme-tinted panel the same token lands lower — 4.41:1
+     on blossom's accent wash at /boards. That still clears the old value by
+     ~1.7, but it is why this sits at 5.25 on white rather than a bare 4.5.
+     Keep in sync with --muted below; they are one tier and must not drift. */
+  --ink-400: #6b6a80; /* muted */
   --ink-300: #bfbed0; /* faint */
   --ink-200: #d9d6cc; /* warm light border */
   --ink-150: #eceae3; /* card / input border (warm) */
@@ -132,7 +143,7 @@
   --ink: #1c1b2e; /* headings */
   --ink-soft: #3a3950; /* strong UI text */
   --body: #57566b; /* body copy */
-  --muted: #908fa3; /* secondary text, metadata */
+  --muted: #6b6a80; /* secondary text, metadata — alias of ink-400, keep in sync */
   --faint: #bfbed0; /* placeholders, disabled */
   --border: #eceae3; /* card + input borders */
   --border-cool: #e8eaf2; /* borders next to brand color */

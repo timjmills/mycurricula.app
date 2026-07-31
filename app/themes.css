@@ -298,6 +298,41 @@
         rgba(12, 16, 26, 0.32) 100%
       );
   }
+  /* LIGHT TONE over photo — the mirror of the dark scrim above, and the ONLY
+     thing that makes Photo-Bright legible.
+     ────────────────────────────────────────────────────────────────────────
+     `dim="bright"` (and `dim="normal"` over a light photo) derives
+     data-tone="light", so every surface flips to DARK ink. Without this rule
+     the glass+photo stage keeps painting the dark scrim above, and dark ink
+     lands on a darkened photograph — measured at 1.13:1 on /boards and 1.18:1
+     on the /post section title (docs/audits/2026-07-31-qa-tone-matrix.md B1/B2).
+     Every sibling frame already had its tone branch (paper/color get theirs in
+     §3); glass+photo was the one combination that never got one, which is why
+     Night is flawless and Photo-Bright is not.
+
+     Branches on data-tone, never on data-dim — the §4 legibility contract. The
+     auto path (dim="normal" over a bright photo) reaches light tone too and
+     needs exactly the same veil.
+
+     The recipe is the handoff's own BRIGHT treatment (`.scrim.frost` +
+     `.veil`, ported below at :1449-1470) reduced to one stage layer: composite
+     white sits at ~0.82 in the centre and ~0.87 at the vignette edge, the same
+     register as the paper frame's rgba(252,250,246,0.82) on photo. That floor
+     is what --body/--ink-500 (#57566b) needs to clear 4.5:1 over the darkest
+     pixel a photo can supply. */
+  [data-tone="light"][data-frame="glass"][data-bg="photo"] .stage::after {
+    background:
+      radial-gradient(
+        120% 90% at 50% 8%,
+        rgba(255, 255, 255, 0.48) 30%,
+        rgba(255, 255, 255, 0.58) 100%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(252, 250, 246, 0.66) 0%,
+        rgba(252, 250, 246, 0.7) 100%
+      );
+  }
   [data-frame="glass"][data-bg="wash"] .stage::after {
     background: rgba(255, 255, 255, 0.1);
   }
