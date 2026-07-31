@@ -25,7 +25,16 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import styles from "./timeline.module.css";
 
 /** Widest column the slider offers, matching the handoff's `max="130"`
- *  (`ph-units.jsx:496`) — the width at which a dot can carry its lesson title. */
+ *  (`ph-units.jsx:496`).
+ *
+ *  This constant used to be commented "the width at which a dot can carry its
+ *  lesson title", and the slider's tooltip PROMISED that title to teachers. It
+ *  does not exist: `TimelineLaneRow.tsx:296-315` renders every dot as a
+ *  childless <button>, deliberately, and a live sweep found 0 of 310 dots
+ *  carrying text at every stop from 16 to 130px — against a positive control of
+ *  52 unit labels that did have text, so the check was real
+ *  (docs/audits/2026-07-31-qa-plan-timeline.md #3). 130 is simply the widest
+ *  the year is worth spreading; it marks no feature threshold. */
 const MAX_COL = 130;
 /** Fallback floor for the first paint, before the computed value is read. The
  *  stylesheet is the authority; this only has to be non-absurd for one frame. */
@@ -103,7 +112,20 @@ export function TimelineZoom({
         // hearing "Zoom, slider, 34" learns nothing about the surface.
         aria-label="Timeline zoom — how wide each school day is"
         aria-valuetext={`${Math.round(clamped)} pixels per day`}
-        title="Widen or narrow each day column. Lesson titles appear on the bars once the columns are wide enough."
+        // Says what the control ACCOMPLISHES, and only what it actually does.
+        // The previous copy ended "Lesson titles appear on the bars once the
+        // columns are wide enough" — a feature that was deliberately not built
+        // (see MAX_COL above). A tooltip is the one place a first-time teacher
+        // is told what a control is for, so advertising unbuilt behaviour there
+        // sends them hunting at maximum zoom for something that never arrives.
+        //
+        // AND NOTHING ELSE. A first replacement ended "...easier to tell apart
+        // AND TO TAP", which is the same kind of false promise one revision
+        // later: a dot's target is `--tl-hit` (22px fine / 44px coarse) and is
+        // INDEPENDENT of `--tl-col`, so widening a column moves the dots apart
+        // without making any of them one pixel bigger. Only the spacing claim
+        // survives, so only the spacing claim is made.
+        title="Sets how much of the year fits on screen. Narrow to take in more months at once; widen to spread the days out so individual lessons are easier to tell apart."
         onChange={(e) => onChange(Number(e.currentTarget.value))}
       />
       <button

@@ -44,6 +44,10 @@
   --tl-row-axis: calc(var(--tl-band-top) + var(--tl-band-h) / 2);
   --tl-dot: 14px;
   --tl-hit: 22px;
+  /* The band's right-edge resize grip — the width it WANTS. What it actually
+     gets is `min()`ed against half a column; see `.bandGrip.bandGrip` for the
+     arithmetic and for why this control cannot reach 44px. */
+  --tl-grip: 20px;
 
   border: 1px solid var(--border);
   background: var(--surface);
@@ -131,8 +135,20 @@
      native element already has for free). */
   min-height: 24px;
 }
-.zoomReset,
-.scrollBtn {
+/* DOUBLED CLASSES, for the same reason `.band.band` and `.dot.dot` are doubled
+   below: `.cp-root button` (app/tokens.css:1128) is (0,1,1) and a single-class
+   module rule is (0,1,0), so the reset silently strips padding / border /
+   background / font-size off these buttons. Measured before the doubling: the
+   two scroll arrows computed to 5.1 × 28px bare glyphs, and Reset to 36.2 × 28
+   with no border or fill (docs/audits/2026-07-31-qa-plan-timeline.md #1). The
+   arrows are the ONLY mouse route across a year-long axis (TimelineCanvas.tsx
+   :113-115), so this was not a cosmetic loss.
+
+   ⚠ ANY OVERRIDE OF A DOUBLED BASE MUST ALSO BE DOUBLED. A single-class rule in
+   a media query does NOT beat (0,2,0) — media queries add no specificity — so
+   the coarse-pointer bump below is doubled too. */
+.zoomReset.zoomReset,
+.scrollBtn.scrollBtn {
   min-height: 28px;
   padding: 0 9px;
   border: 1px solid var(--border);
@@ -143,12 +159,12 @@
   font-weight: 700;
   cursor: pointer;
 }
-.zoomReset:disabled {
+.zoomReset.zoomReset:disabled {
   opacity: 0.4;
   cursor: default;
 }
-.zoomReset:not(:disabled):hover,
-.scrollBtn:hover {
+.zoomReset.zoomReset:not(:disabled):hover,
+.scrollBtn.scrollBtn:hover {
   border-color: var(--chrome-accent);
   color: var(--ink-900);
 }
@@ -163,8 +179,10 @@
   padding: 6px 16px;
 }
 @media (any-pointer: coarse) {
-  .zoomReset,
-  .scrollBtn {
+  /* Doubled to match the base above — a single-class rule here would be DEAD
+     against a (0,2,0) base no matter which media query it sits in. */
+  .zoomReset.zoomReset,
+  .scrollBtn.scrollBtn {
     min-height: 44px;
     min-width: 44px;
   }
@@ -482,12 +500,56 @@
 /* The right-edge resize grip. A separate element rather than an edge-zone
    hit-test on the band, so it is a real, focusable, individually-labelled
    control instead of an invisible 8px strip a teacher has to discover. */
-.bandGrip {
+/* DOUBLED, like `.band.band`. `.cp-root button` (app/tokens.css:1128) also sets
+   `cursor: pointer`, and at (0,1,1) it beat this rule's (0,1,0) — so the one
+   control whose whole job is to say "drag my edge" computed to `pointer`,
+   advertising the wrong gesture. Combined with the resting `opacity: 0` below,
+   the resize had no affordance at all on a fine pointer. */
+/* ── WHY THIS GRIP CANNOT BE 44px, PROVEN RATHER THAN ASSERTED ────────────
+   The audit (docs/audits/2026-07-31-qa-plan-timeline.md #2) asked for ≥44px
+   here. It was tried, and it took a lesson away: at 44px, 15 of 310 lesson dots
+   were ≥90% covered and the worst was 98% — `elementFromPoint` returned the
+   GRIP at all five sample points across a dot, so that lesson could not be
+   opened by touch at all.
+
+   That is not a tuning miss, it is arithmetic. TimelineLaneRow.tsx places a dot
+   at `--tl-col * slot + --tl-col / 2` and a band at
+   `left: --tl-col * startSlot; width: --tl-col * span`, so:
+
+       (a band's right edge) − (its last dot's centre) = --tl-col / 2   EXACTLY
+
+   A grip anchored to `right: 0` with width W therefore swallows that dot's
+   centre whenever W > --tl-col / 2. On a coarse pointer the column FLOOR is
+   44px (see `.card`), so the largest grip that can never hijack a lesson is
+   just under 22px — and 44 is twice that.
+
+   Straddling the edge (`right: calc(var(--tl-grip) / -2)`, the cheapest
+   suggested fix) does not escape it either: a 44px grip centred on the edge has
+   its boundary at exactly ±22px, which is exactly where the dot centres on
+   BOTH sides sit once a teacher zooms to the 44px floor. It clears by 1px at
+   the default 46px column and by ZERO at minimum zoom — a knife edge, not a
+   fix. Bands are laid out edge-to-edge (consecutive units share a boundary), so
+   the "inter-band gap" it spends its other half in usually does not exist.
+
+   Lowering the grip beneath the dots (`z-index` under `.dot.dot`) inverts the
+   casualty rather than removing it: the dots tile the track edge-to-edge at the
+   floor (`--tl-hit` 44 in 44px columns), so a grip that loses every overlap
+   keeps ~2px and the resize gesture becomes the unreachable one.
+
+   So the width is CAPPED BY THE COLUMN instead — expressed in the stylesheet,
+   not in a comment, so it holds at every zoom stop rather than at the one a
+   probe happened to measure. The 4px is the margin between the grip's inner
+   edge and the dot's centre. Opening a lesson is the primary action; resizing a
+   unit is secondary and keeps its full-size keyboard path (Alt+Shift+←/→) and
+   the band's own drag. Raising this to 44 requires insetting the last dot in
+   TimelineLaneRow.tsx — a different file and a product decision, not a CSS
+   tweak. */
+.bandGrip.bandGrip {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
-  width: 12px;
+  width: min(var(--tl-grip), calc(var(--tl-col) / 2 - 4px));
   padding: 0;
   border: 0;
   background: none;
@@ -513,18 +575,12 @@
 .bandGrip:focus-visible::before {
   opacity: 0.9;
 }
-.bandGrip:focus-visible {
+.bandGrip.bandGrip:focus-visible {
   outline: 2px solid var(--chrome-accent);
   outline-offset: -2px;
 }
-@media (any-pointer: coarse) {
-  .bandGrip {
-    width: 28px;
-  }
-  .bandGrip::before {
-    opacity: 0.9;
-  }
-}
+/* (The grip's touch size and its resting mark now live in the single
+   coarse/small-viewport block further down, with the rest of the geometry.) */
 
 /* The live preview of where a drag will land. Painted UNDER the band and
    pointer-transparent — a drag must never be able to hit its own ghost. */
@@ -675,6 +731,15 @@
     --tl-band-h: 52px;
     --tl-dot: 18px;
     --tl-hit: 44px;
+  }
+  /* The grip's WIDTH is deliberately NOT set here. It is capped against
+     `--tl-col` at every zoom instead (see `.bandGrip.bandGrip`) — a stronger
+     guarantee than any breakpoint can give, and the reason this file still has
+     no third one. Only the resting MARK is touch-conditional: there is no hover
+     on a touch tier, so without it the resize gesture would be discoverable
+     only by reading the band's `title`. */
+  .bandGrip::before {
+    opacity: 0.9;
   }
 }
 
@@ -864,7 +929,10 @@
   gap: 10px;
   padding: 8px 16px;
 }
-.drawerToggle {
+/* Doubled for the `.cp-root button` reset, same as `.scrollBtn` above — these
+   measured 62.7 × 32 and 121.1 × 32 with no border or fill, so "▸ Library" and
+   "203 need attention" read as plain text rather than as buttons. */
+.drawerToggle.drawerToggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -878,7 +946,7 @@
   font-weight: 800;
   cursor: pointer;
 }
-.drawerCount {
+.drawerCount.drawerCount {
   min-height: 32px;
   padding: 0 11px;
   border: 1px solid var(--border);
@@ -892,12 +960,12 @@
   font-weight: 800;
   cursor: pointer;
 }
-.drawerToggle:hover,
-.drawerCount:hover {
+.drawerToggle.drawerToggle:hover,
+.drawerCount.drawerCount:hover {
   border-color: var(--chrome-accent);
 }
-.drawerToggle:focus-visible,
-.drawerCount:focus-visible {
+.drawerToggle.drawerToggle:focus-visible,
+.drawerCount.drawerCount:focus-visible {
   outline: 2px solid var(--chrome-accent);
   outline-offset: 2px;
 }
@@ -927,8 +995,9 @@
 }
 
 @media (any-pointer: coarse) {
-  .drawerToggle,
-  .drawerCount {
+  /* Doubled to match the base — see the note on `.scrollBtn.scrollBtn`. */
+  .drawerToggle.drawerToggle,
+  .drawerCount.drawerCount {
     min-height: 44px;
   }
 }

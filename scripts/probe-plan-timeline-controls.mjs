@@ -149,9 +149,18 @@ const MEASURE = `(() => {
 /**
  * THE REACHABILITY PASS.
  *
- * For every lesson dot on the canvas: scroll it into view, then hit-test NINE
- * points spanning its full width at its own centre line. A dot is reachable
- * only if `document.elementFromPoint` resolves to the dot itself.
+ * For every lesson dot on the canvas: scroll it into view, then hit-test a 3×3
+ * grid over its own box — its CENTRE, its four CORNERS and its four edge
+ * midpoints. A dot is reachable only where `document.elementFromPoint` resolves
+ * to the dot itself. Nine points, not one: a centre-only check would miss a
+ * blocker eating three quarters of a target, and a width-only check (this
+ * probe's first version) never tests a corner at all.
+ *
+ * POSITIVE CONTROL, IN THE SAME EVALUATION. `dots` and `grips` are both counted
+ * here and returned. "0 dots blocked" is a vacuous pass if there were no dots,
+ * and equally vacuous if there were no grips to block them — which is exactly
+ * what Personal mode looks like. The caller refuses to score a result whose
+ * control is zero.
  *
  * Blockers are classified rather than merely counted, because they are not
  * equivalent. The pinned subject-label column is `position: sticky` and WILL
@@ -162,8 +171,9 @@ const MEASURE = `(() => {
 const REACH = `(() => {
   const dots = [...document.querySelectorAll("[data-lane-subject] button[class*='timeline_dot__']")]
     .filter((d) => !/legendDot|rowDot/.test(d.className));
-  const SAMPLES = 9;
+  const grips = document.querySelectorAll('button[aria-label^="Change how many weeks"]').length;
   let centreOk = 0, centreByGrip = 0, centreByOther = 0, unmeasurable = 0;
+  let cornersBlockedByGrip = 0;
   let worstGripFraction = 0, worstGripDot = null;
   const gripVictims = [];
   for (const d of dots) {
@@ -173,33 +183,44 @@ const REACH = `(() => {
     d.scrollIntoView({ block: "center", inline: "center" });
     const r = d.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) { unmeasurable++; continue; }
-    const y = r.top + r.height / 2;
-    let blockedByGrip = 0;
-    let centreHit = null;
-    for (let i = 0; i < SAMPLES; i++) {
-      const x = r.left + 1 + ((r.width - 2) * i) / (SAMPLES - 1);
-      const el = document.elementFromPoint(x, y);
-      const ours = el && (el === d || d.contains(el));
-      const isGrip = el && el.closest && el.closest('button[aria-label^="Change how many weeks"]');
-      if (!ours && isGrip) blockedByGrip++;
-      if (i === (SAMPLES - 1) / 2) centreHit = { ours, isGrip: !!isGrip, what: el ? (el.getAttribute("aria-label") || el.className || el.tagName) : null };
+    const xs = [r.left + 1, r.left + r.width / 2, r.right - 1];
+    const ys = [r.top + 1, r.top + r.height / 2, r.bottom - 1];
+    let blockedByGrip = 0, cornerGrip = 0, centreHit = null;
+    for (let iy = 0; iy < 3; iy++) {
+      for (let ix = 0; ix < 3; ix++) {
+        const el = document.elementFromPoint(xs[ix], ys[iy]);
+        const ours = el && (el === d || d.contains(el));
+        const isGrip = !!(el && el.closest && el.closest('button[aria-label^="Change how many weeks"]'));
+        if (!ours && isGrip) {
+          blockedByGrip++;
+          // A CORNER is a point where both axes are at an extreme.
+          if (ix !== 1 && iy !== 1) cornerGrip++;
+        }
+        if (ix === 1 && iy === 1) {
+          centreHit = { ours, isGrip, what: el ? (el.getAttribute("aria-label") || el.className || el.tagName) : null };
+        }
+      }
     }
-    const frac = blockedByGrip / SAMPLES;
+    const frac = blockedByGrip / 9;
     if (frac > worstGripFraction) {
       worstGripFraction = frac;
-      worstGripDot = { dot: d.getAttribute("aria-label"), gripSamples: blockedByGrip };
+      worstGripDot = { dot: d.getAttribute("aria-label"), gripSamples: blockedByGrip, cornerSamples: cornerGrip };
     }
-    if (blockedByGrip > 0) gripVictims.push({ dot: d.getAttribute("aria-label"), gripSamples: blockedByGrip });
+    if (cornerGrip > 0) cornersBlockedByGrip++;
+    if (blockedByGrip > 0) gripVictims.push({ dot: d.getAttribute("aria-label"), gripSamples: blockedByGrip, cornerSamples: cornerGrip });
     if (centreHit && centreHit.ours) centreOk++;
     else if (centreHit && centreHit.isGrip) { centreByGrip++; if (!worstGripDot) worstGripDot = centreHit; }
     else centreByOther++;
   }
   return {
+    control: { dots: dots.length, grips },
     dots: dots.length,
     unmeasurable,
+    samplesPerDot: 9,
     centreOk,
     centreBlockedByGrip: centreByGrip,
     centreBlockedByOther: centreByOther,
+    dotsWithAnyCornerBlockedByGrip: cornersBlockedByGrip,
     dotsTouchedByGripAtAll: gripVictims.length,
     worstGripCoverage: Math.round(worstGripFraction * 100) + "%",
     worstCase: worstGripDot,
@@ -495,21 +516,41 @@ async function runTier(tier) {
     const r = await page.evaluate(REACH);
     note(`${tier.name} reachability @${stop} (col ${col}px)`, r);
 
-    if (r.dots === 0) {
-      fail(`${tier.name} reachability @${stop}`, {
-        why: "no lesson dots found — this pass would otherwise report a vacuous 0 blocked",
+    // THE CONTROL, checked before the verdict. "0 dots blocked by the grip" is
+    // vacuously true of a page with no dots, and equally vacuous on a page with
+    // no grips — which is what Personal mode looks like, and what a half-flipped
+    // toggle produced during the audit.
+    if (!(r.control.dots > 0 && r.control.grips > 0)) {
+      fail(`${tier.name} reachability @${stop} CONTROL`, {
+        control: r.control,
+        why: "dots and grips must BOTH be present for a reachability verdict — with either at zero the result is vacuous, not clean",
       });
-    } else if (r.centreBlockedByGrip > 0) {
+    } else if (
+      r.centreBlockedByGrip > 0 ||
+      (r.worstCase?.gripSamples ?? 0) >= 5
+    ) {
+      // TWO failure conditions, and deliberately NOT "any corner is blocked".
+      // The grip lives ON the band's trailing edge and the last dot's box ends
+      // at that same edge, so the dot's two trailing corners overlap the grip
+      // by design at every width — including the 12px original. Failing on that
+      // would condemn every version this control has ever had.
+      // What must never happen is the target losing its CENTRE (then it is not
+      // a target) or losing the MAJORITY of its area (≥5 of 9 samples). For
+      // scale, the reviewer measured worst-case grip coverage of 25% at the old
+      // 12px, 61% at the old 28px, and 98% at the 44px regression.
       fail(`${tier.name} reachability @${stop}`, {
         centreBlockedByGrip: r.centreBlockedByGrip,
+        dotsWithAnyCornerBlockedByGrip: r.dotsWithAnyCornerBlockedByGrip,
         of: r.dots,
         worstCase: r.worstCase,
-        why: "a lesson dot's own centre resolves to the resize grip — that lesson cannot be opened by pointer",
+        why: "a lesson dot lost its centre or the majority of its area to the resize grip",
       });
     } else {
       pass(`${tier.name} reachability @${stop}`, {
         centreOk: r.centreOk,
         of: r.dots,
+        control: r.control,
+        cornersBlocked: r.dotsWithAnyCornerBlockedByGrip,
         dotsTouchedByGripAtAll: r.dotsTouchedByGripAtAll,
         worstGripCoverage: r.worstGripCoverage,
         colWidth: col,
