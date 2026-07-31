@@ -11,6 +11,18 @@
 // subject-scoped navigation). Arrow keys move through results; Enter
 // activates the focused result; Esc closes.
 //
+// Data readiness — why the "No results" line is guarded:
+//   Five of the six result sources are module constants (VIEW_RESULTS, the
+//   subject list, and the three appearance axes), so they answer the instant a
+//   teacher types. Only the LESSON bucket comes out of usePlanner(), which is
+//   empty for the whole 11–16s Supabase hydrate. The denial is reached only when
+//   EVERY source came back empty — i.e. exactly when the one unknown source is
+//   the one that decides the answer — so a teacher who opens ⌘K on arrival and
+//   types a lesson title was told, definitively, that it does not exist. Since
+//   the palette has no source filter, there is no reachable state in which the
+//   denial rests on static data alone; the guard therefore covers the denial
+//   whole. See the render branch for where it sits and why not one level up.
+//
 // A11y contract — mirrors save-target-dialog.tsx:
 //   • role="dialog" + aria-modal="true" + aria-labelledby the heading.
 //   • Focus trap: Tab / Shift-Tab cycle inside the panel.
@@ -32,7 +44,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
+import { Skeleton } from "@/components/ui";
 import { useTheme } from "@/lib/theme";
 import type { ThemeSetting, ThemeStyle, ThemePalette } from "@/lib/theme";
 import { SUBJECTS } from "@/lib/mock";
@@ -241,22 +254,99 @@ export interface CommandPaletteProps {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
+/**
+ * The mount gate and the query state. Everything a teacher actually reads
+ * lives in <CommandPaletteBody>; this half owns only what has to survive the
+ * palette closing and reopening — the query to reset, and the element to hand
+ * focus back to.
+ *
+ * The split is not cosmetic. The empty/loading decision below is a function of
+ * the query, and the query is component state that no test can reach: the
+ * palette seeds it in an effect, and react-dom/server runs no effects, so an
+ * outside-in render can only ever exercise the empty query — under which every
+ * static source matches and the branch under test is unreachable. Making the
+ * body a controlled component is the smallest change that lets a test type
+ * "Fractions" (see tests/command-palette-empty.test.ts). Same reason
+ * SearchResults split into <SearchResultsBody> (commit 75d99df).
+ */
 export function CommandPalette({
   open,
   onClose,
 }: CommandPaletteProps): ReactNode {
-  const headingId = useId();
-  const listboxId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const [query, setQuery] = useState("");
+
+  // ── Open / close effects ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+      setQuery("");
+      // activeIndex is no longer reset here: it lives in the body, which
+      // unmounts on close, so reopening remounts it at 0 on its own.
+      const frame = requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+      return () => cancelAnimationFrame(frame);
+    } else {
+      const prev = previousFocusRef.current;
+      if (prev && typeof prev.focus === "function") {
+        const timer = setTimeout(() => prev.focus(), 0);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <CommandPaletteBody
+      query={query}
+      onQueryChange={setQuery}
+      onClose={onClose}
+      inputRef={inputRef}
+    />
+  );
+}
+
+// ── Body ───────────────────────────────────────────────────────────────────────
+
+export interface CommandPaletteBodyProps {
+  /** The live search text. Controlled — the mount gate owns the state so it
+   *  can reset the query when the palette reopens. */
+  query: string;
+  onQueryChange: (next: string) => void;
+  onClose: () => void;
+  /** Owned by the gate, which focuses the input on open. */
+  inputRef: React.RefObject<HTMLInputElement | null>;
+}
+
+/**
+ * The panel itself: build the results from the query, render them, and decide
+ * what to say when nothing comes back. Split out of <CommandPalette> so this —
+ * the half with a correctness contract — can be rendered directly in a test.
+ */
+export function CommandPaletteBody({
+  query,
+  onQueryChange,
+  onClose,
+  inputRef,
+}: CommandPaletteBodyProps): ReactNode {
+  const headingId = useId();
+  const listboxId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+
   const [activeIndex, setActiveIndex] = useState(0);
 
   const router = useRouter();
   const { setSubjectView, setSearch } = useAppState();
   const { lessons } = usePlanner();
+  // Read alongside `lessons`, not instead of it: the list above still renders
+  // whatever the store has produced so far, and this only decides what to say
+  // when it has produced nothing.
+  const dataState = usePlannerDataState();
   const { theme, style, palette, setTheme, setStyle, setPalette } = useTheme();
 
   // ── Build the full results list from the current query ───────────────────
@@ -389,26 +479,6 @@ export function CommandPalette({
     setActiveIndex(0);
   }, [results.length]);
 
-  // ── Open / close effects ─────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement as HTMLElement | null;
-      setQuery("");
-      setActiveIndex(0);
-      const frame = requestAnimationFrame(() => {
-        inputRef.current?.focus();
-      });
-      return () => cancelAnimationFrame(frame);
-    } else {
-      const prev = previousFocusRef.current;
-      if (prev && typeof prev.focus === "function") {
-        const timer = setTimeout(() => prev.focus(), 0);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [open]);
-
   // ── Keyboard handling ─────────────────────────────────────────────────────
 
   const handleKeyDown = useCallback(
@@ -467,8 +537,6 @@ export function CommandPalette({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (!open) return null;
-
   return (
     <div
       className={styles.backdrop}
@@ -498,7 +566,7 @@ export function CommandPalette({
             className={styles.input}
             placeholder="Search views, subjects, lessons…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => onQueryChange(e.target.value)}
             role="combobox"
             aria-expanded={results.length > 0}
             aria-controls={listboxId}
@@ -555,7 +623,37 @@ export function CommandPalette({
               </li>
             ))}
           </ul>
+        ) : dataState === "pending" ? (
+          // The fork above is deliberately NOT gated on readiness — hoisting
+          // this branch over it would strand "weekly", "night", "math" and
+          // every other statically-answerable query behind 11–16s of skeleton,
+          // replacing a correct instant answer with a wait. The guard belongs
+          // here, in the one branch whose claim the store cannot yet back.
+          //
+          // Bare <Skeleton> rather than <PlannerEmpty>: this slot is a single
+          // centered line inside a fixed-width modal, which is the bespoke
+          // shape PlannerEmpty's own header points at the primitive for. Two
+          // short bars read as "a result or two is coming", not as a rewritten
+          // panel. The label is what a screen-reader user hears in place of
+          // the denial — without it the lie would simply move into the a11y
+          // layer.
+          <div className={styles.empty}>
+            <Skeleton lines={2} size="sm" label="Loading your plan…" />
+          </div>
+        ) : dataState === "error" ? (
+          // A failed hydrate leaves the same empty document as a pending one,
+          // so denying here would blame the teacher's search for a backend
+          // outage. Copy mirrors <PlannerEmpty>'s error state verbatim so the
+          // two surfaces cannot drift into describing one outage two ways.
+          <div className={styles.empty}>
+            Couldn’t load your plan. Check your connection and reload. Your
+            saved work is safe.
+          </div>
         ) : (
+          // Settled — every source has spoken, so the negative is now a fact.
+          // Keeping this reachable is half the contract: a palette that only
+          // ever skeletons would pass every "the lie is gone" check while
+          // never answering a genuine miss.
           <div className={styles.empty}>
             No results for &ldquo;{query}&rdquo;
           </div>
