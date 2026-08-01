@@ -27,20 +27,32 @@
 // handoff built the table around, and the reason a table beats five visits to a
 // lesson editor.
 //
+// THE FLOW COLUMN is the one cell here that edits a DOCUMENT rather than a
+// value. A lesson's flow is its section list, so picking a flow replaces every
+// phase — which is why it is the only column that can refuse. `refineFlowOf`
+// (lib/unit-refine.ts) reads the flow off the sections, and locks the cell on
+// any lesson whose phases hold prose, carry a delivery status, or were built by
+// hand: none of those survive a phase-for-phase swap. Resources DO survive —
+// `refineFlowApply` carries them onto the new phases — so attaching a resource
+// never costs a teacher the ability to restructure the lesson.
+//
 // WHAT IS DELIBERATELY NOT HERE (see lib/unit-refine.ts for the full reasoning):
-//   • The handoff's **Flow** column and pass. It writes a `flowName` string this
-//     app has no field for; the real equivalent is the lesson's SECTION list, a
-//     document rather than a pickable value. A select here would write nothing
-//     or silently overwrite twelve lessons' content.
+//   • A Flow PASS and a Flow completeness dot. Every lesson is seeded with the
+//     default flow at creation, so both would be permanently "done" — the
+//     vacuous-counter defect tests/unit-refine-tab.test.ts pins as BUG 1. The
+//     handoff has both because its `flowName` starts null.
 //   • Fill-down on title / objective. Twelve identical objectives is never the
 //     intent, and the button would sit one mis-click from the content that took
-//     longest to write. Only Standards / Durations / Assessments are fillable.
+//     longest to write. Only Standards / Flow / Durations / Assessments are
+//     fillable.
 //   • A `done` jsonb column. Completeness is derived (the 7.28 migration ruled
 //     that column content-derived and dropped it).
 //
 // EVERY COLUMN PERSISTS. Each editable cell writes through `editLesson`, whose
-// patch keys are all in `LESSON_CONTENT_KEYS` (lib/planner/lesson-track-b.ts) —
-// so nothing here is an input that looks live and saves nothing.
+// patch keys are all in `LESSON_CONTENT_KEYS` (lib/planner/lesson-track-b.ts),
+// or — for Flow — through `setSections`, which tees to the same serialized
+// per-lesson write queue. So nothing here is an input that looks live and saves
+// nothing.
 
 import {
   useCallback,
@@ -53,17 +65,28 @@ import {
 } from "react";
 import type { Lesson, LessonAssessment } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
+import { useConsequenceToast } from "@/lib/consequence-toast";
 import { useComposerOptional } from "@/components/composer";
 import { StandardsTaggingPicker } from "@/components/standards/StandardsTaggingPicker";
 import { PlannerEmpty, Tooltip } from "@/components/ui";
 import { stripHtml } from "@/lib/html-text";
+import type { LessonSectionContent } from "@/lib/lesson-flow";
 import {
   REFINE_FIELDS,
   REFINE_FILLABLE,
+  REFINE_FLOW_FILL_DISABLED,
+  REFINE_FLOW_FILL_LABEL,
+  REFINE_FLOW_GROUPS,
   REFINE_PASSES,
   refineCompleteness,
   refineFillDescriptors,
   refineFillPatch,
+  refineFlowFill,
+  refineFlowFillMessage,
+  refineFlowLockReason,
+  refineFlowOf,
+  refineFlowSetWrite,
+  refineFlowUndoable,
   refinePassBanner,
   refinePassProgress,
   type RefineFieldKey,
@@ -273,10 +296,16 @@ function PlannedDots({
 function FillDown({
   label,
   disabled,
+  disabledReason = "Nothing to copy — the first lesson in this unit has no value in this column yet.",
   onClick,
 }: {
   label: string;
   disabled: boolean;
+  /** Why the button is off, in the teacher's terms. Overridden by Flow, whose
+   *  reason is a source that matches no built-in flow rather than an empty
+   *  cell — a disabled control has to explain ITS OWN reason (CLAUDE.md §4),
+   *  not the generic one. */
+  disabledReason?: string;
   onClick: () => void;
 }): ReactNode {
   // NO `title=` HERE, DELIBERATELY. Tooltip mirrors its own content to the
@@ -291,11 +320,7 @@ function FillDown({
   // reaches assistive tech as the description.
   return (
     <Tooltip
-      content={
-        disabled
-          ? "Nothing to copy — the first lesson in this unit has no value in this column yet."
-          : label
-      }
+      content={disabled ? disabledReason : label}
       side="bottom"
       tooltipId="ue-refine-filldown"
     >
@@ -321,6 +346,99 @@ function FillDown({
   );
 }
 
+/**
+ * The Flow cell — the lesson's phase structure, as one control.
+ *
+ * TWO SHAPES, ONE COLUMN, deliberately mirroring `RichSafeCell`: a lesson whose
+ * phases can be swapped losslessly gets a live `<select>`; one whose phases hold
+ * something a swap would destroy gets a READ-ONLY input naming the flow it is on
+ * and explaining why it is locked.
+ *
+ * WHY READ-ONLY AND NOT `<select disabled>`. A disabled select is not focusable,
+ * so it registers no cell — and `advance()` returns without preventing default
+ * when the next row has no entry, which would stall an Enter run dead on the row
+ * above a locked lesson. The read-only input keeps the column walkable, exactly
+ * as the rich-text branch does. It also keeps the explanation reachable on
+ * touch: Chromium drops pointer events on a disabled control, so its tooltip
+ * never fires — the one place a locked cell most needs to say why.
+ */
+function FlowCell({
+  cellRef,
+  index,
+  sections,
+  onKeyDown,
+  onPick,
+}: {
+  cellRef: (el: HTMLInputElement | HTMLSelectElement | null) => void;
+  /** Row index — the cell's accessible name, nothing else. The flow itself is
+   *  read entirely off `sections`; the `Lesson` is not consulted, because a
+   *  lesson row carries no flow field to disagree with them. */
+  index: number;
+  sections: readonly LessonSectionContent[];
+  onKeyDown: (e: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  onPick: (templateId: string) => void;
+}): ReactNode {
+  const flow = refineFlowOf(sections);
+  const ariaLabel = `Flow, lesson ${index + 1}`;
+
+  if (flow.lock !== null) {
+    const reason = refineFlowLockReason(flow.lock);
+    return (
+      <input
+        ref={cellRef}
+        className={styles.input}
+        data-rich-readonly=""
+        value={flow.label}
+        readOnly
+        aria-readonly="true"
+        aria-label={`${ariaLabel} — ${flow.label}, read-only here`}
+        title={reason}
+        onKeyDown={onKeyDown}
+      />
+    );
+  }
+
+  return (
+    <Tooltip
+      content={
+        // Names the CONSEQUENCE, not the control (CLAUDE.md §4 voice): this is
+        // the one cell in the table that replaces a document rather than
+        // setting a value, and a teacher has to know that before they open it.
+        "Choose how this lesson is structured — its phases are replaced by the ones this flow defines. Anything attached to a phase moves across; there is nothing written in these phases to lose."
+      }
+      side="top"
+      tooltipId="ue-refine-flow"
+    >
+      <select
+        ref={cellRef}
+        className={styles.select}
+        value={flow.templateId ?? ""}
+        aria-label={ariaLabel}
+        onKeyDown={onKeyDown}
+        onChange={(e) => onPick(e.target.value)}
+      >
+        {/* Present only until a flow is chosen, and never selectable: a lesson
+            cannot be put BACK to "no phases", so offering it as a value would
+            be a control that cannot do what it says. */}
+        {flow.templateId === null ? (
+          <option value="" disabled>
+            {flow.label}
+          </option>
+        ) : null}
+        {REFINE_FLOW_GROUPS.map((g) => (
+          <optgroup key={g.label} label={g.label}>
+            {g.options.map((o) => (
+              <option key={o.id} value={o.id} title={o.description}>
+                {o.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </Tooltip>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function RefineTab({
@@ -328,8 +446,19 @@ export function RefineTab({
   hasResources,
   onPlan,
 }: RefineTabProps): ReactNode {
-  const { editLesson, describeStandard, mergeStandards } = usePlanner();
+  const {
+    editLesson,
+    describeStandard,
+    mergeStandards,
+    getSections,
+    setSections,
+  } = usePlanner();
   const composer = useComposerOptional();
+  // Outside a provider this is a logged no-op, so the Flow fill-down still
+  // WRITES in an isolated render — it just loses its undo affordance. That is
+  // the right failure direction, but it is why the fill-down's safety lives in
+  // `refineFlowFill`'s skip rule rather than in the toast.
+  const { showConsequence } = useConsequenceToast();
 
   /** The active pass, or null for "No pass" (the resting state). */
   const [pass, setPass] = useState<RefineFieldKey | null>(null);
@@ -403,6 +532,87 @@ export function RefineTab({
     [lessons, editLesson],
   );
 
+  // ── Flow ──────────────────────────────────────────────────────────────────
+  // The only writes in this table that replace a DOCUMENT rather than set a
+  // value. Both go through `setSections`, which tees to the same serialized
+  // per-lesson write queue the lesson editor uses.
+
+  /** Put ONE lesson on a flow.
+   *
+   *  THE GUARD IS IN THE WRITE PATH, NOT ONLY IN THE RENDER BRANCH.
+   *  `refineFlowSetWrite` re-checks the lock and returns null rather than a
+   *  section list, so the refusal is a property of the write instead of a
+   *  property of which JSX branch happened to paint. Be precise about what that
+   *  does and does not buy: `getSections` is a render-scoped closure over
+   *  `present.sections`, so it returns what THIS render saw — the same data
+   *  `FlowCell` decided from. It is therefore NOT a live read, and it cannot
+   *  close a window in which the store changes during the click's own tick.
+   *  What it does close is the two paths disagreeing — a future change to
+   *  FlowCell's rendering (memoisation, a different cell shape, a keyboard
+   *  affordance) cannot reintroduce a destructive write, because the write
+   *  refuses on its own. For user-driven staleness there is no window worth
+   *  chasing anyway: a store change schedules a render, and the click that
+   *  follows is dispatched against the tree that render produced.
+   *
+   *  `refineFlowApply` carries the attached resources across, and one
+   *  `setSections` is one history entry, so ⌘Z reverts it — the same as any
+   *  other single cell here. */
+  const setFlow = useCallback(
+    (lessonId: string, templateId: string): void => {
+      const next = refineFlowSetWrite(getSections(lessonId), templateId);
+      if (next === null) return;
+      setSections(lessonId, next);
+    },
+    [getSections, setSections],
+  );
+
+  /**
+   * Put the WHOLE unit on the first lesson's flow.
+   *
+   * THE UNDO STORY, stated plainly because it differs from the other three
+   * fill-downs. Those coalesce their N writes into one history entry, so one
+   * ⌘Z reverts the lot. `SetSectionsAction` carries no coalesce fields
+   * (planner-store.tsx:319), so these N writes are N entries and ⌘Z would
+   * revert them one lesson at a time. The toast's Undo is therefore the
+   * one-gesture path, and it restores the EXACT prior section lists captured
+   * before the write — not a re-read, which by then would return the new ones.
+   *
+   * The toast also fires when nothing was written, because "nothing happened"
+   * is the outcome a teacher is least able to explain on their own: it means
+   * every remaining lesson was skipped, and the message says how many and why.
+   *
+   * UNDO IS FILTERED, NOT REPLAYED. The toast outlives the click, so a teacher
+   * can open a rewritten lesson, write into a phase, and only then reach for
+   * Undo — and restoring the captured `previous` would then destroy that newer
+   * writing in order to repair the older change. `refineFlowUndoable` keeps only
+   * the lessons still holding exactly what the fill put there. Filtering at
+   * click time, not at fill time, is the point: the edit it guards against
+   * happens in between.
+   */
+  const fillFlow = useCallback((): void => {
+    // No second lock check between planning and dispatching, unlike `setFlow`,
+    // and the asymmetry is deliberate rather than an oversight. `setFlow`'s
+    // guard exists because its decision was made in a DIFFERENT function (the
+    // cell's render) from its write. Here the plan and the writes are one
+    // synchronous block over one snapshot: nothing runs between
+    // `refineFlowFill` reading a lesson's sections and the loop writing them,
+    // so there is no window to re-check. A re-check would read the same
+    // render-scoped `getSections` closure and could only ever agree with
+    // itself — protection that looks real in a diff and is not.
+    const fill = refineFlowFill(lessons, getSections);
+    for (const w of fill.writes) setSections(w.id, w.next);
+    showConsequence({
+      message: refineFlowFillMessage(fill),
+      onUndo:
+        fill.writes.length > 0
+          ? () => {
+              for (const w of refineFlowUndoable(fill.writes, getSections))
+                setSections(w.id, w.previous);
+            }
+          : undefined,
+    });
+  }, [lessons, getSections, setSections, showConsequence]);
+
   // ── Readiness ─────────────────────────────────────────────────────────────
   // The empty branch goes through <PlannerEmpty>, which consults the store's
   // hydration state before it will claim anything is empty. Without it, the
@@ -427,6 +637,12 @@ export function RefineTab({
   }
 
   const progress = pass ? refinePassProgress(lessons, pass, resOpts) : null;
+  // Only the SOURCE's flow, not the whole fill plan: `refineFlowFill` builds a
+  // fresh section list per target, which mints ids through `uid()` — a side
+  // effect that has no business running once per render just to decide whether
+  // a button is grey. Whether any lesson actually needs the flow is reported by
+  // the toast after the click, the same way the skip count is.
+  const flowSource = refineFlowOf(getSections(lessons[0].id));
   const pickerLesson =
     stdFor === null ? null : (lessons.find((l) => l.id === stdFor) ?? null);
 
@@ -476,12 +692,17 @@ export function RefineTab({
               Standards and Resources are buttons that open a picker, and a
               title or objective carrying markup renders read-only (see
               `RichSafeCell`). The caption names what each kind of cell does
-              instead of promising one behaviour for all of them. */}
+              instead of promising one behaviour for all of them — which is why
+              Flow, a cell that replaces the lesson's phases and refuses on a
+              lesson that has written in them, is named separately here rather
+              than folded into "type in a cell". */}
           <caption className={styles.caption}>
             Every lesson in this unit, one row each. Type in a cell to change
-            it — Standards and Resources open a picker, and a cell holding
-            formatted text opens in the Lesson Planner. Changes save as you
-            type.
+            it — Standards and Resources open a picker, and Flow replaces the
+            lesson’s phases with a different structure. A cell holding
+            formatted text, and Flow on a lesson whose phases already have
+            writing in them, are read-only here and open in the Lesson Planner
+            instead. Changes save as you type.
           </caption>
           <thead>
             <tr>
@@ -508,6 +729,18 @@ export function RefineTab({
                   label={REFINE_FILLABLE[0].label}
                   disabled={refineFillPatch(lessons, "standards") === null}
                   onClick={() => fillDown("standards")}
+                />
+              </th>
+              {/* Flow sits between Standards and Min, as in the handoff
+                  (ph-units.jsx:945). It carries no `data-focus` because it is
+                  not a pass — see this file's header. */}
+              <th scope="col" className={styles.cFlow}>
+                <span className={styles.thText}>Flow</span>
+                <FillDown
+                  label={REFINE_FLOW_FILL_LABEL}
+                  disabled={flowSource.templateId === null}
+                  disabledReason={REFINE_FLOW_FILL_DISABLED}
+                  onClick={fillFlow}
                 />
               </th>
               <th
@@ -623,6 +856,18 @@ export function RefineTab({
                         )}
                       </button>
                     </Tooltip>
+                  </td>
+
+                  {/* Flow — the lesson's phase structure. The only cell here
+                      that can refuse; see FlowCell. */}
+                  <td className={styles.cFlow}>
+                    <FlowCell
+                      cellRef={registerCell("flow", i)}
+                      index={i}
+                      sections={getSections(l.id)}
+                      onKeyDown={advance("flow", i)}
+                      onPick={(templateId) => setFlow(l.id, templateId)}
+                    />
                   </td>
 
                   {/* Duration */}

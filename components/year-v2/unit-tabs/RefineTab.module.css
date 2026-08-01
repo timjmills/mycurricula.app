@@ -95,12 +95,29 @@
      ~770px of table container once the body padding is taken out. The first cut
      of the column widths below summed to 864px, so at a 1440px desktop the
      right-most column — "Planned", the completeness roll-up a teacher scans the
-     table FOR — sat half off the edge behind a horizontal scrollbar. The widths
-     now total ~736px so the whole table fits without scrolling in the compact
-     dialog; the internal scroll stays for genuinely narrow viewports, where it
-     is the right answer. `box-sizing: border-box` is global (tokens.css:1118),
-     so those numbers include cell padding. */
-  min-width: 720px;
+     table FOR — sat half off the edge behind a horizontal scrollbar.
+
+     THE NINTH COLUMN IS WHERE FITTING STOPS PAYING. Eight columns fitted the
+     compact dialog exactly, and Flow was first built to keep that promise:
+     every other column gave up a few pixels (Objective 180→133, Lesson
+     150→130, header padding 6→5px) until the nine summed to 770px inside the
+     772px container. MEASURED, and the measurement is why it was undone —
+     at that budget the Flow select renders 65px wide, showing "Gradua" and
+     nothing else, and Objective loses a quarter of its width on every row of
+     every unit. Cramming cost more than it saved, and it charged the cost to
+     the two columns carrying the most text.
+
+     So the compact dialog SCROLLS instead, which §4 explicitly allows for a
+     wide grid inside a scrollable container, and every column keeps a readable
+     width. What that trades away is the earlier lane's reason for fitting:
+     "Planned" — the roll-up a teacher scans the table for — is now ~100px past
+     the right edge in the compact dialog and has to be scrolled to. In the
+     WORKSPACE presentation (a ~1110px container, the width task #32 measured)
+     nothing scrolls and every column is visible, as before. Flip `min-width`
+     back to 760 with the pre-Flow widths to reverse this trade.
+     `box-sizing: border-box` is global (tokens.css:1118), so these numbers
+     include cell padding. */
+  min-width: 870px;
 }
 
 /* Visible to screen readers only — the table still needs a name, but the
@@ -142,9 +159,9 @@
   color: var(--ink-400);
   /* 6px, not 8: the uppercase nowrap header labels ("ASSESSMENT" is the
      widest) drive the table's natural width, and at 8px they pushed it to
-     788px against a 778px container — stranding the last column behind a
-     scrollbar at desktop. Two pixels per side across eight columns buys back
-     32px, which is the whole deficit and then some. */
+     788px against a 778px container. The Flow wave briefly took this to 5px
+     to buy 18px back — see `.table` for why that whole line of attack was
+     abandoned. */
   padding: 9px 6px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
@@ -247,7 +264,7 @@
 
 /* ── Column widths ─────────────────────────────────────────────────────────── */
 
-/* Fixed widths total ~406px; the two `min-width` columns (Lesson, Objective)
+/* Fixed widths total ~510px; the two `min-width` columns (Lesson, Objective)
    absorb whatever the container has spare. See `.table` for the budget. */
 .cNum {
   width: 36px;
@@ -264,6 +281,12 @@
 }
 .cStd {
   width: 90px;
+}
+/* 104px, which leaves the `<select>` ~92px — enough for "Gradual Release" and
+   "Direct Instruction", the two a teacher meets first. Longer names clip; the
+   full name is on the option list and on the cell's tooltip. */
+.cFlow {
+  width: 104px;
 }
 .cDur {
   width: 56px;
@@ -416,7 +439,7 @@
 
 @media (max-width: 900px) {
   .table {
-    min-width: 620px;
+    min-width: 760px;
   }
   /* The week/day line repeats what the Lessons tab already shows, and it is the
      first thing worth losing when width is scarce. */
@@ -428,6 +451,15 @@
   }
   .cTitle {
     min-width: 150px;
+  }
+  /* Narrower, never hidden. A hidden Flow cell would silently exclude the phone
+     and tablet tiers from a column the §4 responsive contract says must stay
+     reachable — and, worse, would make a locked lesson's explanation for why it
+     cannot be changed unreachable exactly where a teacher is most likely to be
+     confused by it. The select clips its label; the tooltip still carries the
+     whole flow name. */
+  .cFlow {
+    width: 96px;
   }
 }
 

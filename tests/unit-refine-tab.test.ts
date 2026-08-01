@@ -469,9 +469,19 @@ describe("RefineTab — the caption describes the cells that exist", () => {
   it("names what the non-typing cells do instead", () => {
     const html = render(LESSONS);
     expect(html).toContain("Standards and Resources open a picker");
-    expect(html).toContain("formatted text opens in the Lesson Planner");
+    expect(html).toContain("read-only here and open in the Lesson Planner");
     // The part that was always true must survive the rewrite.
     expect(html).toContain("Changes save as you type");
+  });
+
+  it("names the Flow cell separately, because it does a third thing", () => {
+    // Flow neither takes typing nor opens a picker: it REPLACES the lesson's
+    // phases, and refuses on a lesson that has written in them. Folding it into
+    // "type in a cell" would leave the caption describing a table with one fewer
+    // behaviour than it has — the same defect the caption rewrite above fixed.
+    const html = render(LESSONS);
+    expect(html).toContain("Flow replaces the lesson’s phases");
+    expect(html).toContain("already have writing in them");
   });
 });
 
@@ -479,7 +489,14 @@ describe("RefineTab — a disabled fill-down explains itself, not its action", (
   // BARE first means every fillable column has an empty source, so all three
   // buttons are disabled — the state whose explanation was being overridden.
   const EMPTY_SOURCE = [BARE, PLANNED];
-  const REASON = "Nothing to copy";
+  // The FULL generic reason, not the "Nothing to copy" prefix. Flow's fill-down
+  // shares that prefix but ends differently ("isn't on one of the built-in
+  // flows"), and it is disabled in BOTH fixtures here because this file's store
+  // mock serves no sections — so a prefix match would make the "still announces
+  // the action once the button works" case fail on a column it never meant to
+  // assert about.
+  const REASON =
+    "Nothing to copy — the first lesson in this unit has no value in this column yet.";
 
   it("puts the reason on the native title, which is the disabled path", () => {
     const html = render(EMPTY_SOURCE);
