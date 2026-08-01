@@ -302,10 +302,36 @@ interface Usage {
   classes: string[];
 }
 
+/**
+ * Blank out comments PRESERVING LENGTH, as the CSS reader above already does
+ * for the stylesheet — and for the same reason, one file later.
+ *
+ * The tag scan below takes the nearest `<tag` before a `className=`, and a
+ * COMMENT that mentions one is not an element. This surface's comments discuss
+ * `<button>` inside `<button>` at length (it is the constraint the whole
+ * band/grip and issue-row shape is built around), so without this the reader
+ * attributes `.issue` — which is on an `<li>` — to a <button> and reports a
+ * reset violation that does not exist. That failure is LOUD rather than silent,
+ * which is the right way round, but a guard that cries wolf gets ignored.
+ *
+ * LIMITATION, stated rather than hidden: `//` is masked to end-of-line unless
+ * it directly follows a `:` (which is how `https://` survives). A `//`
+ * appearing inside a plain string on the same line as a `className=` would
+ * blank that usage out — there is no such case today, and the failure mode is
+ * a MISSED check rather than a wrong one, so it is bounded by the positive
+ * control on `USAGES.length` above.
+ */
+function maskComments(src: string): string {
+  const blank = (c: string): string => c.replace(/[^\n]/g, " ");
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/(^|[^:])\/\/[^\n]*/g, (_all, lead: string) => lead + blank(_all.slice(lead.length)));
+}
+
 function readUsages(): Usage[] {
   const out: Usage[] = [];
   for (const file of readdirSync(DIR).filter((f) => f.endsWith(".tsx"))) {
-    const src = readFileSync(`${DIR}${file}`, "utf8");
+    const src = maskComments(readFileSync(`${DIR}${file}`, "utf8"));
     for (const m of src.matchAll(/className=/g)) {
       const at = m.index;
       // The enclosing element is the nearest `<tag` before the attribute.

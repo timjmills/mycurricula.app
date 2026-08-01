@@ -13,6 +13,20 @@
 // so a lesson can never be "missed" in the drawer and "planned" on the
 // timeline eighty pixels above it.
 //
+// ── THE HANDOFF'S FOUR TRIAGE PREDICATES, AND WHERE EACH LANDED ───────────
+// `issuesOf` (`ph-drawer.jsx:28-49`) raises four things. Three are here:
+//
+//   • missed          → `missed`        (:31-33)
+//   • running late    → `running_late`  (:34-38)
+//   • barely planned  → `thin`          (:39-42), but PER LESSON rather than
+//     as one "N upcoming lessons are barely planned" row per unit. A teacher
+//     acting on that row has to go and find which N; the per-lesson rows open
+//     the lesson that is thin. NOTE the handoff's own copy here is off by one
+//     — its predicate is `PW.comp(l)<=1` and its sentence says "(2 sections or
+//     fewer)". Ours has no such split: the predicate is `planningGapCount >= 2`
+//     and the sentence names the same number it tested.
+//   • dateless drafts → NOT BUILT, see below.
+//
 // ── ONE THING THE HANDOFF HAS THAT THIS DOES NOT ──────────────────────────
 // The handoff's Needs Attention also lists DATELESS DRAFTS — lessons on the
 // bench, with no date at all. That shape is not storable: the schema makes
@@ -97,15 +111,25 @@ export interface LibraryUnit {
 /** Why an item needs attention. Each maps to exactly one predicate. */
 export type AttentionKind =
   | "missed"
+  | "running_late"
   | "thin"
   | "off_calendar"
   | "unscheduled_unit"
   | "off_axis_unit"
   | "outside_range";
 
+/**
+ * How soon a teacher has to care. The handoff's three buckets
+ * (`ph-drawer.jsx:47`, `rank={urgent:0,soon:1,quality:2}`), kept at three
+ * rather than grown a fourth — the sort rank and the section headings are the
+ * same axis and splitting them would put the same list in two orders.
+ */
+export type AttentionSeverity = "urgent" | "soon" | "quality";
+
 /** One row of the Needs Attention list. */
 export interface AttentionItem {
   kind: AttentionKind;
+  severity: AttentionSeverity;
   subject: SubjectId;
   /** What it is. */
   title: string;
@@ -114,6 +138,75 @@ export interface AttentionItem {
   /** What opening this row should open. */
   target: { kind: "lesson" | "unit"; id: string };
 }
+
+/**
+ * Which bucket each predicate falls in.
+ *
+ * `missed` is the only URGENT kind: a date has gone by. `running_late` is the
+ * only SOON kind: nothing is wrong yet and something will be. Everything else
+ * is a plan a teacher would want to improve but that no date is forcing.
+ */
+const SEVERITY_OF: Readonly<Record<AttentionKind, AttentionSeverity>> = {
+  missed: "urgent",
+  running_late: "soon",
+  thin: "quality",
+  off_calendar: "quality",
+  off_axis_unit: "quality",
+  outside_range: "quality",
+  unscheduled_unit: "quality",
+};
+
+/**
+ * The heading each bucket renders under.
+ *
+ * The third is NOT the handoff's "Planning quality" (`ph-drawer.jsx:81`). That
+ * label is true of `thin` and false of the four calendar kinds underneath it —
+ * a unit whose weeks fall outside the academic year is not a quality problem,
+ * and a heading that misdescribes half its own rows is the exact failure this
+ * surface keeps being audited for. "Worth a look" is true of all five.
+ */
+export const ATTENTION_SEVERITY_LABEL: Readonly<
+  Record<AttentionSeverity, string>
+> = {
+  urgent: "Urgent",
+  soon: "Coming up",
+  quality: "Worth a look",
+};
+
+/**
+ * The verb on each row's action button.
+ *
+ * The handoff puts `title={is.act}` on this button (`ph-drawer.jsx:228`) — a
+ * tooltip that restates its own label, which CLAUDE.md §4 forbids outright
+ * ("a tooltip that restates the label adds noise without teaching"). The label
+ * is here; the explanation is `ATTENTION_ACTION_HINT` below, and says what
+ * pressing it accomplishes.
+ */
+export const ATTENTION_ACTION_LABEL: Readonly<Record<AttentionKind, string>> = {
+  missed: "Review",
+  running_late: "Open unit",
+  thin: "Plan it",
+  off_calendar: "Open lesson",
+  off_axis_unit: "Open unit",
+  outside_range: "Open unit",
+  unscheduled_unit: "Open unit",
+};
+
+export const ATTENTION_ACTION_HINT: Readonly<Record<AttentionKind, string>> = {
+  missed:
+    "Opens this lesson, where you can mark it taught, or leave it for Catch-Up to pick up.",
+  running_late:
+    "Opens this unit's planner, where you can give it more weeks or move lessons out of it.",
+  thin: "Opens this lesson so you can add what it is still missing.",
+  off_calendar:
+    "Opens this lesson. Its week and weekday are the fields to change — Settings → Calendar is what decides which ones exist.",
+  off_axis_unit:
+    "Opens this unit's planner, where its week range can be moved back inside the academic year.",
+  outside_range:
+    "Opens this unit's planner, where its week range can be widened to cover the lessons already dated outside it.",
+  unscheduled_unit:
+    "Opens this unit's planner, where a week range will give it a place on the timeline.",
+};
 
 // ── Controls ───────────────────────────────────────────────────────────────
 
@@ -163,6 +256,23 @@ export interface BuildLibraryInput {
   hasResources?: (lesson: Lesson) => boolean;
   /** Is this slot a configured holiday? A lesson parked on a "no school"
    *  column could not have been taught, so it is never called missed. */
+  isHolidaySlot?: (slot: number) => boolean;
+}
+
+/**
+ * What the running-late predicate needs and nothing else.
+ *
+ * Deliberately NOT `BuildLibraryInput`: this is asked at a different moment
+ * (after the rows exist) and about a different thing (where today is), and
+ * threading the whole input through would let a caller pass a `now` that
+ * disagrees with the one the rows were already built with.
+ */
+export interface PaceContext {
+  /** Today's flat axis slot. Only ever non-null when `NowRef` was. */
+  todaySlot: number;
+  schoolWeekLen: number;
+  /** Same predicate the axis and `dotStateFor` use — a holiday is not a
+   *  teaching day, so it must not be counted as one. */
   isHolidaySlot?: (slot: number) => boolean;
 }
 
@@ -295,6 +405,7 @@ export function buildUnitLibrary(input: BuildLibraryInput): LibraryUnit[] {
 export function buildNeedsAttention(
   lessonRows: readonly LibraryLesson[],
   unitRows: readonly LibraryUnit[],
+  pace: PaceContext | null = null,
 ): AttentionItem[] {
   const items: AttentionItem[] = [];
 
@@ -302,6 +413,7 @@ export function buildNeedsAttention(
     if (l.state === "missed") {
       items.push({
         kind: "missed",
+        severity: SEVERITY_OF.missed,
         subject: l.subject,
         title: l.title || "Untitled lesson",
         detail: `Week ${l.week} has passed and this lesson is not marked taught.`,
@@ -313,6 +425,7 @@ export function buildNeedsAttention(
       // would inflate the count a teacher is trying to work through.
       items.push({
         kind: "thin",
+        severity: SEVERITY_OF.thin,
         subject: l.subject,
         title: l.title || "Untitled lesson",
         detail: `Missing ${l.gaps} of an objective, a resource and a standard.`,
@@ -322,6 +435,7 @@ export function buildNeedsAttention(
     if (!l.placeable) {
       items.push({
         kind: "off_calendar",
+        severity: SEVERITY_OF.off_calendar,
         subject: l.subject,
         title: l.title || "Untitled lesson",
         detail: `Dated week ${l.week}, day ${l.day + 1} — which this school week and academic year no longer have, so it has no place on the timeline.`,
@@ -330,7 +444,62 @@ export function buildNeedsAttention(
     }
   }
 
+  // Pre-group the lessons by unit ONCE. The running-late predicate needs each
+  // unit's own lessons, and re-filtering `lessonRows` inside the unit loop is
+  // the quadratic shape this surface can least afford — a grade carries ~1250
+  // lessons against ~90 units.
+  const lessonsByUnit = new Map<string, LibraryLesson[]>();
+  if (pace) {
+    for (const l of lessonRows) {
+      const key = unitKey(l.subject, l.unitId);
+      const list = lessonsByUnit.get(key);
+      if (list) list.push(l);
+      else lessonsByUnit.set(key, [l]);
+    }
+  }
+
   for (const u of unitRows) {
+    // ── Running late (`ph-drawer.jsx:34-38`) ───────────────────────────────
+    // The one predicate in the handoff's `issuesOf` that has no counterpart
+    // here: a unit currently being taught with more untaught lessons left than
+    // it has teaching days left to teach them in.
+    //
+    // It fires ONLY with a known today (`pace !== null`). Without one there is
+    // no "late" — `NowRef` is null whenever `currentWeekBasis` is not
+    // "in-range", i.e. before the year starts, after it ends, or unconfigured,
+    // and a verdict drawn against a clamped week would call units late that
+    // are not (the same trap dots.ts:NowRef exists to avoid).
+    if (pace && u.weekRange && !u.offAxis) {
+      const startSlot = (u.weekRange.start - 1) * pace.schoolWeekLen;
+      const endSlot = u.weekRange.end * pace.schoolWeekLen - 1;
+      if (startSlot <= pace.todaySlot && endSlot >= pace.todaySlot) {
+        const mine = lessonsByUnit.get(unitKey(u.subject, u.unitId)) ?? [];
+        const remaining = mine.filter(
+          (l) =>
+            l.state !== "taught" && l.slot !== null && l.slot >= pace.todaySlot,
+        ).length;
+        // INSTRUCTIONAL days, not calendar slots: the handoff counts
+        // `endSlot - TODAY + 1` flat (`:35`), which counts a two-week holiday
+        // as ten teaching days and so tells a teacher they have time they do
+        // not have. Every slot on this axis is already a school day; the
+        // holidays among them are the only ones to drop.
+        let daysLeft = 0;
+        for (let s = pace.todaySlot; s <= endSlot; s++) {
+          if (!pace.isHolidaySlot?.(s)) daysLeft += 1;
+        }
+        if (remaining > daysLeft) {
+          items.push({
+            kind: "running_late",
+            severity: SEVERITY_OF.running_late,
+            subject: u.subject,
+            title: u.name,
+            detail: `${remaining} lesson${remaining === 1 ? "" : "s"} still to teach, but only ${daysLeft} teaching day${daysLeft === 1 ? "" : "s"} left before this unit's weeks run out.`,
+            target: { kind: "unit", id: u.unitId },
+          });
+        }
+      }
+    }
+
     if (u.offAxis && u.weekRange) {
       // Checked BEFORE the no-range case and instead of `outside_range`: a unit
       // parked past the end of the year would otherwise report "N lessons
@@ -338,6 +507,7 @@ export function buildNeedsAttention(
       // actual problem.
       items.push({
         kind: "off_axis_unit",
+        severity: SEVERITY_OF.off_axis_unit,
         subject: u.subject,
         title: u.name,
         // THE shared formatter, never an inline literal: an inline
@@ -349,6 +519,7 @@ export function buildNeedsAttention(
     } else if (!u.weekRange) {
       items.push({
         kind: "unscheduled_unit",
+        severity: SEVERITY_OF.unscheduled_unit,
         subject: u.subject,
         title: u.name,
         detail:
@@ -360,6 +531,7 @@ export function buildNeedsAttention(
     } else if (u.lessonsOutside > 0) {
       items.push({
         kind: "outside_range",
+        severity: SEVERITY_OF.outside_range,
         subject: u.subject,
         title: u.name,
         detail: `${u.lessonsOutside} lesson${u.lessonsOutside === 1 ? "" : "s"} dated outside ${weeksLabel(u.weekRange.start, u.weekRange.end)}.`,
@@ -368,17 +540,56 @@ export function buildNeedsAttention(
     }
   }
 
+  // SEVERITY FIRST, then the kind's own rank inside it. The handoff sorts on
+  // severity alone (`ph-drawer.jsx:47-48`), which leaves the order of two
+  // quality rows down to whatever order the units happened to be built in;
+  // keeping the kind rank as the tiebreak means the list is stable and the
+  // section headings below still group cleanly, because every kind belongs to
+  // exactly one severity.
+  const severityRank: Record<AttentionSeverity, number> = {
+    urgent: 0,
+    soon: 1,
+    quality: 2,
+  };
   const rank: Record<AttentionKind, number> = {
     missed: 0,
-    thin: 1,
-    off_calendar: 2,
-    off_axis_unit: 3,
-    outside_range: 4,
-    unscheduled_unit: 5,
+    running_late: 1,
+    thin: 2,
+    off_calendar: 3,
+    off_axis_unit: 4,
+    outside_range: 5,
+    unscheduled_unit: 6,
   };
   return items.sort(
-    (a, b) => rank[a.kind] - rank[b.kind] || a.title.localeCompare(b.title),
+    (a, b) =>
+      severityRank[a.severity] - severityRank[b.severity] ||
+      rank[a.kind] - rank[b.kind] ||
+      a.title.localeCompare(b.title),
   );
+}
+
+/** Group an already-sorted list by severity, dropping empty buckets. The
+ *  order is the list's own order, so the sections cannot disagree with the
+ *  sort above them. */
+export function groupAttention(
+  items: readonly AttentionItem[],
+): { severity: AttentionSeverity; label: string; items: AttentionItem[] }[] {
+  const out: {
+    severity: AttentionSeverity;
+    label: string;
+    items: AttentionItem[];
+  }[] = [];
+  for (const item of items) {
+    const last = out[out.length - 1];
+    if (last && last.severity === item.severity) last.items.push(item);
+    else
+      out.push({
+        severity: item.severity,
+        label: ATTENTION_SEVERITY_LABEL[item.severity],
+        items: [item],
+      });
+  }
+  return out;
 }
 
 // ── Filter / sort / group ──────────────────────────────────────────────────

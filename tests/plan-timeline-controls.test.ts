@@ -41,6 +41,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Lesson, Subject, Unit } from "@/lib/types";
+import {
+  ROOMY_MIN_COL,
+  zoomNameFor,
+} from "@/components/hub-v2/timeline/use-column-metrics";
 
 const store = vi.hoisted(() => ({
   editMode: "master" as "personal" | "master",
@@ -268,16 +272,19 @@ describe("Plan timeline — the zoom tooltip describes the control it actually i
    *  how the FIRST correction shipped with a second false promise in its unread
    *  half: "…easier to tell apart AND TO TAP". A dot's target is `--tl-hit`
    *  (22px fine / 44px coarse) and is independent of `--tl-col`, so widening a
-   *  column never enlarges one. */
+   *  column never enlarges one.
+   *
+   *  ── THE TITLE CLAUSE IS BACK, AND THIS FILE IS WHY IT IS ALLOWED TO BE ──
+   *  It was removed because the feature did not exist. It is restated now
+   *  because the feature was BUILT (`ph-units.jsx:616`), and the two assertions
+   *  below are what keep that from being taken on trust: the tooltip may only
+   *  name the threshold that the code actually uses, and the markup must really
+   *  carry a title on every dot. If the pill is ever removed again, the second
+   *  of those turns red and this copy has to come out with it. */
   const TOOLTIP =
-    "Sets how much of the year fits on screen. Narrow to take in more months at once; widen to spread the days out so individual lessons are easier to tell apart.";
+    "Sets how much of the year fits on screen. Narrow to take in more months at once; widen to spread the days out so individual lessons are easier to tell apart — past 80 pixels a day, each lesson shows its title.";
 
-  it("no longer promises lesson titles on the bars", () => {
-    expect(html).not.toContain("Lesson titles appear");
-    expect(html).not.toContain("wide enough");
-  });
-
-  it("does not promise that widening enlarges a lesson's target either", () => {
+  it("does not promise that widening enlarges a lesson's target", () => {
     expect(html).not.toContain("to tap");
   });
 
@@ -288,5 +295,29 @@ describe("Plan timeline — the zoom tooltip describes the control it actually i
     expect(html).toContain(`title="${TOOLTIP}"`);
     // Not a restatement of its own label (CLAUDE.md §4).
     expect(html).toContain('aria-label="Timeline zoom');
+  });
+
+  it("names the threshold the code actually branches on", () => {
+    // The tooltip says "80". `zoomNameFor` is what decides. A tooltip naming a
+    // number the canvas does not use is the same class of lie as naming a
+    // feature that does not exist — one revision subtler.
+    expect(TOOLTIP).toContain(`past ${ROOMY_MIN_COL} pixels a day`);
+    expect(zoomNameFor(ROOMY_MIN_COL)).toBe("roomy");
+    expect(zoomNameFor(ROOMY_MIN_COL - 1)).not.toBe("roomy");
+  });
+
+  it("the titles it promises are really in the markup", () => {
+    // THE PROMISE, CHECKED AGAINST THE RENDER. This is the assertion whose
+    // absence let the original false tooltip ship: nothing tied the sentence to
+    // the canvas, so the sentence outlived the feature it described by a whole
+    // wave. Every dot carries its title as a `.dotTitle` span, always in the
+    // DOM and revealed by `[data-zoom="roomy"]` — so the count here is the
+    // number of dots, not zero.
+    const titles = html.match(/_dotTitle_[a-z0-9]+/g) ?? [];
+    expect(titles.length).toBeGreaterThan(0);
+    // And the stylesheet really does gate them on the attribute the tooltip's
+    // threshold produces — a span that is `display:none` at every zoom would
+    // satisfy the count above and still show a teacher nothing.
+    expect(CSS).toMatch(/\.card\[data-zoom="roomy"\]\s+\.dotTitle\s*\{[^}]*display:\s*block/);
   });
 });

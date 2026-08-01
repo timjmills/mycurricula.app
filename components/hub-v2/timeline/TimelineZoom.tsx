@@ -21,23 +21,15 @@
 // has. A slider whose bottom third silently does nothing is worse than a
 // shorter slider.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { ROOMY_MIN_COL, useColumnMetrics } from "./use-column-metrics";
 import styles from "./timeline.module.css";
 
 /** Widest column the slider offers, matching the handoff's `max="130"`
- *  (`ph-units.jsx:496`).
- *
- *  This constant used to be commented "the width at which a dot can carry its
- *  lesson title", and the slider's tooltip PROMISED that title to teachers. It
- *  does not exist: `TimelineLaneRow.tsx:296-315` renders every dot as a
- *  childless <button>, deliberately, and a live sweep found 0 of 310 dots
- *  carrying text at every stop from 16 to 130px — against a positive control of
- *  52 unit labels that did have text, so the check was real
- *  (docs/audits/2026-07-31-qa-plan-timeline.md #3). 130 is simply the widest
- *  the year is worth spreading; it marks no feature threshold. */
+ *  (`ph-units.jsx:496`). It marks no feature threshold — `ROOMY_MIN_COL` (80)
+ *  is the one that does. */
 const MAX_COL = 130;
-/** Fallback floor for the first paint, before the computed value is read. The
- *  stylesheet is the authority; this only has to be non-absurd for one frame. */
+/** Fallback shown for one frame if the canvas ref is not resolved yet. */
 const FALLBACK_FLOOR = 24;
 
 export interface TimelineZoomProps {
@@ -53,37 +45,15 @@ export function TimelineZoom({
   onChange,
   canvasRef,
 }: TimelineZoomProps): ReactNode {
-  const [floor, setFloor] = useState(FALLBACK_FLOOR);
-  const [base, setBase] = useState<number | null>(null);
   // The floor is media-query dependent (`any-pointer: coarse` raises it), and a
   // laptop can gain a coarse pointer mid-session by having a stylus or a touch
-  // display woken up. Re-read on the same media queries the stylesheet uses so
-  // the control never advertises travel the canvas will not honour.
+  // display woken up. `useColumnMetrics` re-reads on the same media queries the
+  // stylesheet uses, so the control never advertises travel the canvas will not
+  // honour — and it is the SAME read PlanTimeline resolves `data-zoom` from, so
+  // the slider and the canvas cannot disagree about where `roomy` begins.
+  const { floor, base } = useColumnMetrics(canvasRef);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    const read = (): void => {
-      const cs = getComputedStyle(el);
-      const f = parseFloat(cs.getPropertyValue("--tl-col-floor"));
-      const b = parseFloat(cs.getPropertyValue("--tl-col-base"));
-      const nextFloor = Number.isFinite(f) && f > 0 ? f : FALLBACK_FLOOR;
-      setFloor(nextFloor);
-      setBase(Number.isFinite(b) && b > 0 ? b : null);
-    };
-    read();
-    const mqs = [
-      window.matchMedia("(any-pointer: coarse)"),
-      window.matchMedia("(max-width: 900px)"),
-      window.matchMedia("(max-width: 560px)"),
-    ];
-    for (const mq of mqs) mq.addEventListener("change", read);
-    return () => {
-      for (const mq of mqs) mq.removeEventListener("change", read);
-    };
-  }, [canvasRef]);
 
   // A zoom already set BELOW a newly-raised floor is corrected upward rather
   // than left stranded: the canvas would clamp it anyway, so leaving the slider
@@ -113,19 +83,22 @@ export function TimelineZoom({
         aria-label="Timeline zoom — how wide each school day is"
         aria-valuetext={`${Math.round(clamped)} pixels per day`}
         // Says what the control ACCOMPLISHES, and only what it actually does.
-        // The previous copy ended "Lesson titles appear on the bars once the
-        // columns are wide enough" — a feature that was deliberately not built
-        // (see MAX_COL above). A tooltip is the one place a first-time teacher
-        // is told what a control is for, so advertising unbuilt behaviour there
-        // sends them hunting at maximum zoom for something that never arrives.
         //
-        // AND NOTHING ELSE. A first replacement ended "...easier to tell apart
-        // AND TO TAP", which is the same kind of false promise one revision
-        // later: a dot's target is `--tl-hit` (22px fine / 44px coarse) and is
+        // THE TITLE CLAUSE IS BACK, AND IT IS NOW TRUE. This tooltip once ended
+        // "Lesson titles appear on the bars once the columns are wide enough"
+        // against a canvas where no dot had ever carried text — 0 of 310 at
+        // every stop from 16 to 130px, against a positive control of 52 unit
+        // labels that did (docs/audits/2026-07-31-qa-plan-timeline.md #3) — so
+        // the sentence was removed. The pill it described now exists
+        // (`ph-units.jsx:616`, TimelineLaneRow), and the threshold is NAMED
+        // rather than left as "wide enough", because a teacher who cannot tell
+        // when the promise applies is being sent hunting either way.
+        //
+        // WHAT IS STILL NOT CLAIMED: that widening makes dots easier to TAP. A
+        // dot's target is `--tl-hit` (22px fine / 44px coarse) and is
         // INDEPENDENT of `--tl-col`, so widening a column moves the dots apart
-        // without making any of them one pixel bigger. Only the spacing claim
-        // survives, so only the spacing claim is made.
-        title="Sets how much of the year fits on screen. Narrow to take in more months at once; widen to spread the days out so individual lessons are easier to tell apart."
+        // without making any of them one pixel bigger.
+        title={`Sets how much of the year fits on screen. Narrow to take in more months at once; widen to spread the days out so individual lessons are easier to tell apart — past ${ROOMY_MIN_COL} pixels a day, each lesson shows its title.`}
         onChange={(e) => onChange(Number(e.currentTarget.value))}
       />
       <button

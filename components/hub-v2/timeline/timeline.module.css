@@ -293,7 +293,12 @@
   opacity: 0.35;
 }
 .day[data-today] .dayNum {
-  color: var(--on-accent, #fff);
+  /* `--on-solid` (app/tokens.css:983), NOT `var(--on-accent, #fff)`. There is
+     no `--on-accent` anywhere in the repo, so that declaration only ever
+     resolved through its own fallback — a hard-coded hex, which §4 forbids, and
+     one that could not follow the token if the accent's contrast pair ever
+     changed. Redesign audit CODE-01. */
+  color: var(--on-solid);
   background: var(--chrome-accent);
   border-radius: var(--r-pill);
   min-width: 17px;
@@ -711,6 +716,72 @@
   border-radius: 4px;
 }
 
+/* ── Lesson title on the mark, at the ROOMY zoom only ────────────────────
+   `ph-units.jsx:616` renders the title at `colw>=80`; `ph-v2.css:1644-1653`
+   turns the mark into a pill to hold it. Values taken from there: max-width
+   102px, radius 12px (a full pill at this height), padding 0 8px 0 6px, gap
+   4px, `justify-content: flex-start`.
+
+   TWO DELIBERATE DEPARTURES, both to keep contracts the handoff does not have:
+
+   1. HEIGHT is `--tl-hit`, not the handoff's flat 22px. On a fine pointer
+      `--tl-hit` IS 22px, so the handoff's value is reproduced exactly; on a
+      coarse one it is 44px, and hard-coding 22 would have halved every lesson
+      target the moment a teacher zoomed in — reintroducing at the top of the
+      zoom range the exact defect the `--tl-col-floor` machinery exists to stop
+      at the bottom of it. It also keeps the stack fan (`--tl-hit` per level)
+      exactly one pill tall, so stacked pills abut instead of overlapping.
+   2. The MARK stays in `::before`. The handoff's chip IS the mark, which works
+      because its states are colour-only; ours carries the fork tier and the
+      state as shape channels (ring, dashed, squared) and would lose all of
+      them. So the pill is chrome around the existing disc, and every state and
+      fork rule above keeps applying untouched. */
+.card[data-zoom="roomy"] .dot.dot {
+  width: auto;
+  max-width: 102px;
+  height: var(--tl-hit);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 0 8px 0 6px;
+  /* RULE #1 — no sharp corners. `--r-pill` renders identically to the
+     handoff's 12px at this height and stays correct at 44px. */
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  /* Above its neighbours: a 102px pill in an 80px column overlaps by design
+     (the handoff accepts the same), and the one being pointed at has to win. */
+  z-index: 3;
+}
+.card[data-zoom="roomy"] .dot.dot:hover,
+.card[data-zoom="roomy"] .dot.dot:focus-visible {
+  z-index: 6;
+}
+/* The disc must not be squeezed by the label beside it. */
+.card[data-zoom="roomy"] .dot.dot::before {
+  flex: 0 0 auto;
+}
+.dotTitle {
+  /* Hidden at every other zoom, and present in the DOM at all of them —
+     `ph-v2.css:1652-1653` does exactly this, and it is what keeps the slider
+     from remounting ~1250 buttons per input event. */
+  display: none;
+  font-size: 10px;
+  font-weight: 700;
+  /* Tone-aware, never the handoff's `#fff` / `--phx-ink` (`ph-v2.css:1650`):
+     this pill sits on `--surface`, so its text is the ink that pairs with it
+     under BOTH tones. */
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.card[data-zoom="roomy"] .dotTitle {
+  display: block;
+}
+
 /* The legend reuses the REAL mark so the shape channels (filled vs hollow,
    dashed for needs-work, ring for a personal copy) are discoverable — the
    handoff's legend is five identical squares differing only in background
@@ -966,6 +1037,44 @@
 /* ── Drawer ────────────────────────────────────────────────────────────── */
 .drawer {
   border-top: 1px solid var(--hairline);
+  /* The grip is absolutely positioned against this (`ph-v2.css:961` is
+     `position:relative` for the same reason). */
+  position: relative;
+}
+/* The resize grip (`ph-v2.css:963-965`): a full-width strip straddling the
+   drawer's top edge at `top:-7px`, 14px tall, `row-resize`. Doubled for the
+   `.cp-root button` reset — it is a <button>, and single-class would lose its
+   padding, border, background and cursor exactly as the scroll arrows did. */
+.drawerGrip.drawerGrip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -7px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: row-resize;
+  /* Without this a touch-drag is claimed by the page's own scroll before the
+     pointermove handler ever sees it (`ph-v2.css:963`). */
+  touch-action: none;
+  z-index: 2;
+}
+.drawerGripBar {
+  width: 52px;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+}
+.drawerGrip.drawerGrip:hover .drawerGripBar {
+  background: var(--border);
+}
+.drawerGrip.drawerGrip:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: -2px;
+  border-radius: var(--r-pill);
 }
 .drawerBar {
   display: flex;
@@ -998,8 +1107,14 @@
   background: var(--surface);
   /* Warn tone, not a subject colour — this is a plan-wide signal, and colour
      here is information (CLAUDE.md §4), not decoration. */
-  color: var(--warn-ink, var(--ink-900));
-  border-color: var(--warn-line, var(--border));
+  color: var(--warn-ink);
+  /* `--warn-line` does not exist (redesign audit CODE-01), so this chip's
+     border silently resolved to the plain `--border` fallback and the "N need
+     attention" pill had no warn-hued edge at all. Mixed from `--warn` against
+     the surface so it stays a hue rather than a hard-coded line, and so it
+     follows the tone — `--warn-ink` is remapped under dark
+     (app/tokens.css:1810). */
+  border-color: color-mix(in oklab, var(--warn) 45%, var(--border));
   font-size: 11.5px;
   font-weight: 800;
   cursor: pointer;
@@ -1018,10 +1133,10 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Capped and scrolled: the library is every unit in the year, and an
-     uncapped panel would push the page to several screens the moment it
-     opened. Internal scroll is what CLAUDE.md §4 permits. */
-  max-height: 46vh;
+  /* Scrolled internally: the library is every unit AND every lesson in the
+     year, and an uncapped panel would push the page to several screens the
+     moment it opened. Internal scroll is what CLAUDE.md §4 permits.
+     The HEIGHT itself is inline, set by the resize grip — see TimelineDrawer. */
   overflow-y: auto;
 }
 .drawerList {
@@ -1037,12 +1152,119 @@
   font-size: 12.5px;
   color: var(--ink-500);
 }
+.drawerControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Drawer groups (Lesson Library by unit · Needs Attention by severity) ── */
+.drawerGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drawerGroupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+/* Severity as a TINT on the heading, never as the only signal — the words
+   "Urgent" / "Coming up" / "Worth a look" are the encoding, and each row also
+   spells out its own reason. Colour is the accelerant (§4). */
+.drawerGroupHead[data-severity="urgent"] {
+  color: var(--danger);
+}
+.drawerGroupHead[data-severity="soon"] {
+  color: var(--warn-ink);
+}
+.drawerGroupCount {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  color: var(--ink-700);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+/* ── A Needs Attention row ───────────────────────────────────────────────
+   NOT a button: it holds one (`ph-drawer.jsx:225-231`), and a <button> inside
+   a <button> is invalid content with unreliable focus and activation across
+   browsers — the same constraint the band/grip pair upstairs is built around. */
+.issue {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px 7px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.issueText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  /* The floor that lets the title and detail ellipse instead of shoving the
+     action button off the row. */
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.issueSubject {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-500);
+}
+/* Doubled for the `.cp-root button` reset. */
+.issueAction.issueAction {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-900);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.issueAction.issueAction:hover {
+  border-color: var(--chrome-accent);
+}
+.issueAction.issueAction:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 2px;
+}
 
 @media (any-pointer: coarse) {
   /* Doubled to match the base — see the note on `.scrollBtn.scrollBtn`. */
   .drawerToggle.drawerToggle,
-  .drawerCount.drawerCount {
+  .drawerCount.drawerCount,
+  .issueAction.issueAction {
     min-height: 44px;
+  }
+  /* `ph-v2.css:1022`. This stops SHORT of the ≥44px contract, deliberately and
+     as the only place in this file that does — see the header of
+     TimelineDrawer.tsx. A 44px strip here would have to eat 22px of the canvas
+     above (the bottom lane's own 44px lesson dots) and 22px of the bar below
+     (the three 44px tab buttons), taking two rows of compliant targets out of
+     reach to make one non-essential one compliant. The gesture's non-pointer
+     path is a real focusable button with ↑/↓ resize and Enter to collapse, so
+     nothing here is reachable only by a precise drag. */
+  .drawerGrip.drawerGrip {
+    height: 22px;
+    top: -11px;
   }
 }
 

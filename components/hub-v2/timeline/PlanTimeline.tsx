@@ -52,10 +52,15 @@
 // guarded against staleness — see `rescheduleUnit`.
 //
 // ── WHAT IS STILL NOT BUILT ──────────────────────────────────────────────
-// Lesson-dot drag (a lesson's date is per-lesson forkable content), paint-a-new
-// unit / subject on an empty track, the Units|Lessons + Timeline|List toggle
-// pairs, the "N missed" chip, and the Unit/Lesson Library + Needs Attention
-// drawer.
+// Lesson-dot drag (a lesson's date is per-lesson forkable content),
+// paint-a-new-unit / paint-a-new-subject on an empty track, and the "N missed"
+// chip (`ph-units.jsx:522-523`), whose job the drawer's attention count now
+// does from the bar below.
+//
+// The toggle pairs and the three-tab drawer ARE built (task #27): the
+// Units|Lessons lens, the Timeline|List pair gated to the Units lens
+// (`ph-units.jsx:483`), the Unit and Lesson Libraries, and Needs Attention with
+// the handoff's severity grouping and per-row actions.
 //
 // ── WHY THIS OPENS DOCS RATHER THAN THE GLOBAL WORKSPACE ─────────────────
 // It routes through the hub's own `onOpenDoc`, exactly as the browse pickers
@@ -110,6 +115,11 @@ import { TimelineDrawer } from "./TimelineDrawer";
 import { TimelineLegend } from "./TimelineLegend";
 import { TimelineList } from "./TimelineList";
 import { TimelineZoom } from "./TimelineZoom";
+import {
+  resolvedColumnWidth,
+  useColumnMetrics,
+  zoomNameFor,
+} from "./use-column-metrics";
 import type { BandDragKind } from "./use-band-drag";
 import styles from "./timeline.module.css";
 
@@ -155,18 +165,43 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
   const [colWidth, setColWidth] = useState<number | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // The handoff's two switches (`ph-units.jsx:479-490`). They are ORTHOGONAL,
-  // and treating them as one four-way control was the temptation worth
-  // resisting: the LENS says which objects the surface is about (units or
-  // lessons) and the MODE says how they are drawn (on the axis or as a list).
-  // All four combinations are meaningful, and a teacher who has chosen "show me
-  // lessons" should keep that choice when they flip to the list.
+  // The handoff's two switches (`ph-units.jsx:479-485`), and they are NOT
+  // orthogonal — this surface used to treat them as if they were, and the live
+  // sweep recorded the divergence (audit #10: the mode pair rendered in both
+  // lenses at 375, 768 and 1440). The handoff's model, read off the source:
+  //
+  //   `lens` ∈ bars | list       — Units or Lessons          (:479-482)
+  //   the Timeline|List pair renders ONLY at `lens==='bars'`  (:483)
+  //   at `lens==='list'` the body is ALWAYS the lessons list  (:527-529)
+  //   the zoom renders at `lens==='bars' && vmode==='timeline'` (:494)
+  //
+  // So the Lessons lens IS a list; "Lessons, drawn on the axis" is not a state
+  // the handoff has. Gating the pair rather than deleting it keeps a teacher's
+  // Timeline/List choice across a trip through the Lessons lens, which is what
+  // the prototype's own retained `vmode` does.
   const [lens, setLens] = useState<"units" | "lessons">("units");
   const [mode, setMode] = useState<"timeline" | "list">("timeline");
+  // What is actually drawn. Derived rather than forced into `mode` on the lens
+  // change, so flipping back to Units restores the mode the teacher chose
+  // instead of leaving them in a list they never asked for.
+  const drawnMode = lens === "lessons" ? "list" : mode;
   const [group, setGroup] = useState<LibraryGroup>("subject");
   const [status, setStatus] = useState<LibraryStatusFilter>("all");
   const [sort, setSort] = useState<LibrarySort>("schedule");
   const [compact, setCompact] = useState(false);
+  // The RESOLVED column width, which is not derivable from `colWidth` alone —
+  // the base and the floor both move under the coarse-pointer query, so the
+  // same `null` zoom is 34px on a laptop and 46px on a tablet. See the header
+  // of use-column-metrics.ts for why this is a DOM read and why it reads the
+  // two inputs rather than `--tl-col` itself.
+  const colMetrics = useColumnMetrics(cardRef);
+  // Withheld until the read lands. Emitting a server-side guess here would put
+  // `data-zoom="cozy"` in the SSR HTML for a tablet whose first client paint
+  // says `roomy`, and React does not patch an attribute mismatch — the same
+  // hydration trap `todaySlot` and `currentWeekRange` are already gated for.
+  const zoomName = colMetrics.ready
+    ? zoomNameFor(resolvedColumnWidth(colWidth, colMetrics))
+    : undefined;
   useEffect(() => {
     setTodayColumn(todayColumnIndex(new Date(), schoolWeekDays));
     setMounted(true);
@@ -333,8 +368,20 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
   // explains the discrepancy.
   const attention = useMemo(() => {
     const all = buildLessonLibrary(libraryInput);
-    return buildNeedsAttention(all, buildUnitLibrary(libraryInput));
-  }, [libraryInput]);
+    return buildNeedsAttention(
+      all,
+      buildUnitLibrary(libraryInput),
+      // NULL WHEN TODAY HAS NO POSITION, which switches the running-late
+      // predicate off rather than letting it guess. `todaySlot` is already
+      // gated on `mounted && currentWeekBasis === "in-range"`, so before the
+      // year starts, after it ends, or with the year unconfigured, no unit is
+      // called late — a verdict drawn against a clamped week would flag units
+      // that have not started.
+      todaySlot === null
+        ? null
+        : { todaySlot, schoolWeekLen, isHolidaySlot },
+    );
+  }, [libraryInput, todaySlot, schoolWeekLen, isHolidaySlot]);
 
   const subjectClass = useCallback(
     (id: SubjectId) => subjects.find((s) => s.id === id)?.cls ?? "",
@@ -573,6 +620,12 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
         // foreground), so it is presentation, and one attribute keeps the
         // whole cascade in one place instead of a `dim` flag on two components.
         data-lens={lens}
+        // The handoff's three named zoom stops (`ph-units.jsx:314`,
+        // `data-zoom={zoomName}` at `:533`). `roomy` is what reveals the lesson
+        // title on each dot (`ph-v2.css:1644-1653`); the other two name nothing
+        // the stylesheet keys off, and are emitted anyway so the attribute is a
+        // whole scale rather than one flag with a misleading name.
+        data-zoom={zoomName}
         // The zoom slider's value, resolved against the touch floor by the
         // stylesheet — never `--tl-col` directly, which would beat the
         // coarse-pointer override and let a teacher shrink their own targets
@@ -602,26 +655,32 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
               },
             ]}
           />
-          <ToggleGroup
-            ariaLabel="How the plan is drawn"
-            variant="prominent"
-            value={mode}
-            onChange={(v) => setMode(v as "timeline" | "list")}
-            options={[
-              {
-                value: "timeline",
-                label: "Timeline",
-                title: "Draw the plan across the calendar year.",
-              },
-              {
-                value: "list",
-                label: "List",
-                title:
-                  "Read the same plan as a list you can group, filter and sort.",
-              },
-            ]}
-          />
-          {mode === "timeline" && (
+          {/* UNITS LENS ONLY (`ph-units.jsx:483`). The Lessons lens is a list
+              by definition, so a Timeline/List pair beside it would offer a
+              "Lessons on the axis" state that does not exist — and, worse,
+              would sit there apparently doing nothing. */}
+          {lens === "units" && (
+            <ToggleGroup
+              ariaLabel="How the plan is drawn"
+              variant="prominent"
+              value={mode}
+              onChange={(v) => setMode(v as "timeline" | "list")}
+              options={[
+                {
+                  value: "timeline",
+                  label: "Timeline",
+                  title: "Draw the units across the calendar year.",
+                },
+                {
+                  value: "list",
+                  label: "List",
+                  title:
+                    "Read the same units as a list you can group, filter and sort.",
+                },
+              ]}
+            />
+          )}
+          {drawnMode === "timeline" && (
             <>
               <p className={styles.hint}>
                 {dragEnabled
@@ -638,7 +697,7 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
           {lens === "lessons" && <TimelineLegend />}
         </div>
 
-        {mode === "list" ? (
+        {drawnMode === "list" ? (
           <TimelineList
             lens={lens}
             lessons={libraryLessons}
@@ -688,6 +747,7 @@ export function PlanTimeline({ query, onOpenDoc }: HubBrowseProps): ReactNode {
             it is drawn. */}
         <TimelineDrawer
           units={libraryUnits}
+          lessons={libraryLessons}
           attention={attention}
           subjectClass={subjectClass}
           subjectName={subjectDisplayName}

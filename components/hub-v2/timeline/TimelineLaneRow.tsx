@@ -318,15 +318,33 @@ export function TimelineLaneRow({
                 left: `calc(var(--tl-col) * ${dot.slot} + var(--tl-col) / 2)`,
                 top,
               }}
-              // The handoff's dot shows its title only at colw>=80 and carries
-              // NO aria-label or title (`ph-units.jsx:616`), so at the default
-              // zoom every dot is an unnamed button (audit B7). Both attributes
-              // are set here: `title` for the touch long-press path, aria-label
-              // because the button has no text content at all.
+              // The handoff's dot carries NO aria-label and no title
+              // (`ph-units.jsx:611-617`), so below the roomy threshold every
+              // dot is an unnamed button (audit B7). Both attributes are set
+              // here: `title` for the touch long-press path, `aria-label`
+              // because the visible title below is present only at one zoom —
+              // an accessible name that appeared and vanished with the column
+              // width would be the same defect wearing a different hat.
+              //
+              // The aria-label WINS over the visible text for the accessible
+              // name, which is what is wanted: the label is a superset of the
+              // pill's text (it adds the state and the fork tier), so nothing
+              // is lost and the state is never announced twice.
               title={`${dot.title || "Untitled lesson"} — ${DOT_STATE_LABEL[dot.state]}${fork ? ` · ${fork}` : ""}. Opens the lesson.`}
               aria-label={`${dot.title || "Untitled lesson"}. ${DOT_STATE_LABEL[dot.state]}.${fork ? ` ${fork}.` : ""}`}
               onClick={() => onOpenLesson(dot.lessonId, dot.title)}
-            />
+            >
+              {/* ALWAYS IN THE DOM, shown by CSS only at `data-zoom="roomy"`
+                  (`ph-v2.css:1652-1653` does exactly this). Rendering it
+                  conditionally on the zoom would remount every dot on the
+                  canvas as the slider moved — a re-render of ~1250 buttons per
+                  input event on a full grade. `aria-hidden` because the
+                  button's own `aria-label` already carries this text and more.
+                */}
+              <span className={styles.dotTitle} aria-hidden="true">
+                {dot.title || "Untitled"}
+              </span>
+            </button>
           );
         })}
       </div>

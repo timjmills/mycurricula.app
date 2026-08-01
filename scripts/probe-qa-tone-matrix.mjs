@@ -413,9 +413,32 @@ async function makeContext(browser, axisKey, viewport) {
 }
 
 /**
- * THE TONE GATE. Without this the whole report is worthless: a probe that
- * seeded the wrong half renders one tone twice and labels it two.
- * Returns the RESOLVED tone; the caller must abandon the case on mismatch.
+ * THE AXIS GATE. Without this the whole report is worthless: a probe that
+ * seeded the wrong half renders one axis twice and labels it two.
+ *
+ * ── WHY IT CHECKS EVERY AXIS AND NOT JUST `data-tone` ────────────────────
+ * It used to assert only the DERIVED tone, and that could not tell the four
+ * cases apart, because tone is two-valued and the axes are four:
+ *
+ *     wash          tone=light   theme=clear  bg=wash   dim=normal
+ *     photo-bright  tone=light   theme=clear  bg=photo  dim=bright
+ *     photo-dim     tone=dark    theme=clear  bg=photo  dim=dim
+ *     night         tone=dark    theme=night  bg=photo  dim=normal
+ *
+ * So a `night` case whose cookie never took and fell back to Clear-on-photo
+ * resolved `tone=dark`, PASSED the gate, and was recorded as Night — the exact
+ * "would pass Clear as Night" failure, and it fails toward reporting a green
+ * axis that was never rendered. `wash` and `photo-bright` collide the same way
+ * on `light`.
+ *
+ * Every axis in the AXES table is SEEDED deterministically (`cookieValue`), so
+ * every one of them can be asserted; none relies on the photo-luminance
+ * fallback. `tone` is still checked, as the derived half — if the four seeded
+ * attributes are right and the tone is wrong, that is a real bug in the
+ * appearance engine rather than a seeding failure, and the two are worth
+ * telling apart in the report.
+ *
+ * Returns the resolved attributes; the caller must abandon the case on null.
  */
 async function toneGate(page, axisKey, where) {
   const got = await page.evaluate(() => ({
@@ -424,15 +447,39 @@ async function toneGate(page, axisKey, where) {
     theme: document.documentElement.getAttribute("data-theme"),
     dim: document.documentElement.getAttribute("data-dim"),
     frame: document.documentElement.getAttribute("data-frame"),
+    glass: document.documentElement.getAttribute("data-glass"),
   }));
-  const want = AXES[axisKey].tone;
-  const okTone = got.tone === want;
+  const want = AXES[axisKey];
+  // The SEEDED axes first — a mismatch here means the cookie did not take, and
+  // nothing measured under it describes the axis it is filed as.
+  const seeded = ["frame", "glass", "bg", "theme", "dim"];
+  const wrong = seeded.filter((k) => got[k] !== want[k]);
+  const measured = `measured tone=${got.tone} theme=${got.theme} bg=${got.bg} dim=${got.dim} frame=${got.frame} glass=${got.glass}`;
+  if (wrong.length) {
+    record(
+      "FAIL",
+      `[gate] ${axisKey} @ ${where} did not seed: ${wrong.join(", ")}`,
+      `${measured} · wanted ${seeded.map((k) => `${k}=${want[k]}`).join(" ")}`,
+    );
+    return null;
+  }
+  // Then the DERIVED tone. Reaching here with the wrong tone means the seeding
+  // worked and `lib/theme.tsx` derived something else — a product bug, not an
+  // instrument one, and it is labelled as such.
+  if (got.tone !== want.tone) {
+    record(
+      "FAIL",
+      `[gate] ${axisKey} @ ${where} seeded correctly but DERIVED tone=${got.tone}, wanted ${want.tone}`,
+      `${measured} — this is an appearance-engine bug, not a seeding failure`,
+    );
+    return null;
+  }
   record(
-    okTone ? "PASS" : "FAIL",
-    `[gate] ${axisKey} @ ${where} resolved data-tone=${want}`,
-    `measured tone=${got.tone} bg=${got.bg} theme=${got.theme} dim=${got.dim} frame=${got.frame}`,
+    "PASS",
+    `[gate] ${axisKey} @ ${where} resolved all five axes + tone=${want.tone}`,
+    measured,
   );
-  return okTone ? got : null;
+  return got;
 }
 
 // ── the seven surfaces that shipped 2026-07-31 ─────────────────────────────
@@ -555,43 +602,63 @@ const SURFACES = [
     ],
   },
   {
-    id: "day-post",
-    name: "Day frames' Post button (/daily)",
+    // ── RETARGETED 2026-08-01 ────────────────────────────────────────────
+    // This block used to name `day-v2_vaPillBtn` / `vaTitle` / `vaUnitSubject`
+    // / `vaTime` — every one of them a class of DayA, the GLASS Day frame,
+    // which is what the default frame happened to render. /daily no longer
+    // branches its layout on the frame: DayA and DayB are deleted and the
+    // former DayC (`components/day-v2/DayFocus`) is the only Day view there
+    // is. Left alone, every selector here would simply stop matching, this
+    // surface would silently drop out of the matrix, and the run would still
+    // print a clean sheet — the exact failure mode the ABSENT verdict exists
+    // to catch, arriving one level higher up where nothing is watching.
+    //
+    // The new selectors are the surviving surface's OWN classes, and they
+    // deliberately cover BOTH floating surfaces rather than just the buttons:
+    // the focus card is an opaque subject gradient and was never the risk, but
+    // the rail is now a 92%-of-`--surface` panel floating on the photograph,
+    // and its 11.5px time column is the smallest text on /daily.
+    id: "day-focus",
+    name: "Day focus card + agenda rail (/daily)",
     goto: "/daily?lesson=m-11-1",
-    root: '[data-planner-item^="lesson:"] [class*="day-v2_vaPillBtn"]',
+    root: '[class*="day-v2_vcDetail__"]',
     text: [
+      // The focus card — the one place the day can be acted on.
       [
-        "Post pill label",
-        {
-          sel: '[data-planner-item^="lesson:"] [class*="day-v2_vaPillBtn"]',
-          text: "^Post$",
-        },
+        "Plan button label",
+        { sel: '[class*="day-v2_vbBtn__"]', text: "^Plan$" },
       ],
       [
-        "Plan pill label",
-        {
-          sel: '[data-planner-item^="lesson:"] [class*="day-v2_vaPillBtn"]',
-          text: "^Plan$",
-        },
+        "Post button label",
+        { sel: '[class*="day-v2_vbBtn__"]', text: "^Post$" },
       ],
       [
-        "Teach pill label",
-        {
-          sel: '[data-planner-item^="lesson:"] [class*="day-v2_vaPillBtn"]',
-          text: "^Teach$",
-        },
+        "Open in Teach label",
+        { sel: '[class*="day-v2_vbBtn__"]', text: "^Open in Teach$" },
       ],
-      ["row lesson title", { sel: '[class*="day-v2_vaTitle__"]' }],
-      ["row subject line", { sel: '[class*="day-v2_vaUnitSubject__"]' }],
-      ["row time column", { sel: '[class*="day-v2_vaTime__"]' }],
+      ["focus eyebrow", { sel: '[class*="day-v2_dlab__"]' }],
+      ["focus lesson title", { sel: '[class*="day-v2_detailTitle__"]' }],
+      ["learning-target label", { sel: '[class*="day-v2_dcTl__"]' }],
+      ["learning-target text", { sel: '[class*="day-v2_dobj__"]' }],
+      ["flow step chip", { sel: '[class*="day-v2_dcStep__"]' }],
+      ["meta chip", { sel: '[class*="day-v2_dchip__"]' }],
+      // The agenda rail — small type on a translucent panel over the photo.
+      ["rail time column", { sel: '[class*="day-v2_at__"]' }],
+      ["rail lesson title", { sel: '[class*="day-v2_an__"]' }],
+      ["rail subject name", { sel: '[class*="day-v2_au__"]' }],
+      // The day-nav bar, which also floats now.
+      ["day-nav day name", { sel: '[class*="day-v2_vheadTitle__"]' }],
+      ["day-nav date", { sel: '[class*="day-v2_vsub__"]' }],
     ],
-    // The one control on this surface that is a TARGET, not just text.
+    // The controls on this surface that are TARGETS, not just text: the focus
+    // card's action row, and a rail row (the only way to change focus).
     touch: [
-      [
-        "Post pill",
-        '[data-planner-item^="lesson:"] [class*="day-v2_vaPillBtn"]',
-        "^Post$",
-      ],
+      ["Post button", '[class*="day-v2_vbBtn__"]', "^Post$"],
+      ["Open in Teach button", '[class*="day-v2_vbBtn__"]', "^Open in Teach$"],
+      // `.` rather than a label: a rail row has no fixed caption, and the
+      // matcher below is `new RegExp(text)` — a null would become /null/ and
+      // match nothing, reporting ABSENT for a row that is right there.
+      ["rail row", '[data-planner-item^="lesson:"]', "."],
     ],
   },
   {
