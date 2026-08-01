@@ -7,9 +7,16 @@
 //
 // Public surface:
 //   • CatchUpModalHost           — the ONE renderer; drop it into ChromeShell
-//                                  and/or the route. The controlled modal itself
-//                                  is intentionally NOT exported (single-modal
-//                                  invariant — callers open via the singleton).
+//                                  and/or the route, tagged with where it is
+//                                  mounted (`mount="chrome" | "route"`), which
+//                                  is what decides the election. The controlled
+//                                  modal itself is intentionally NOT exported
+//                                  (single-modal invariant — callers open via
+//                                  the singleton).
+//   • onCatchupRendererMissing   — fires when the modal is open and no Host is
+//                                  rendering it. That state is invisible on
+//                                  screen, so it is announced rather than left
+//                                  to be discovered as "the modal did nothing".
 //   • CATCHUP_MODAL_TOGGLE_EVENT — the window event the Tools-dock dispatches.
 //   • open/close/toggle + useCatchupModalOpen — the singleton the route drives.
 
@@ -20,4 +27,6 @@ export {
   toggleCatchupModal,
   useCatchupModalOpen,
   onCatchupModalClosed,
+  onCatchupRendererMissing,
+  type CatchupHostMount,
 } from "./modal-state";

@@ -13,8 +13,14 @@
 // modal-state singleton so exactly ONE modal ever renders, whether it was
 // opened here or from the chrome Tools-dock (Codex W10 gate — dual-modal
 // hazard). The v2 route:
-//   • renders <CatchUpModalHost/> (the single renderer — a chrome-mounted Host,
-//     once the sibling wires it, is elected first and this one no-ops),
+//   • renders <CatchUpModalHost mount="route"/> — a fallback renderer. The
+//     chrome-mounted Host outranks it and does the actual rendering, so on a
+//     healthy load THIS Host draws nothing and `#main-content` is EMPTY BY
+//     DESIGN: the modal portals to `.cp-root`, which is an ancestor of
+//     `<main>`, not a descendant. An empty `#main-content` on this route is
+//     therefore never by itself evidence of a fault (task #49 — a report that
+//     the route "renders an empty page" turned out to be this, plus a page
+//     read before it had hydrated),
 //   • opens the modal on mount via the singleton, and
 //   • watches the shared open state; when the modal closes (✕ / Esc / backdrop /
 //     dock toggle) it navigates back to /weekly.
@@ -61,7 +67,15 @@ function CatchUpRouteV2() {
     };
   }, [router]);
 
-  return <CatchUpModalHost />;
+  // `mount="route"` LOSES the election to ChromeShell's `mount="chrome"` Host
+  // whenever that one is mounted — which, inside this route group, is always.
+  // It is kept anyway so this route still works if it is ever rendered under a
+  // shell that mounts no Host of its own; the election, not mount order, is
+  // what decides. If BOTH were somehow absent, the modal would be opened with
+  // nothing drawing it — a state with no symptom on screen, which is exactly
+  // why modal-state announces it (onCatchupRendererMissing) instead of leaving
+  // it to be found as "the route renders an empty page".
+  return <CatchUpModalHost mount="route" />;
 }
 
 export default function CatchUpPage() {

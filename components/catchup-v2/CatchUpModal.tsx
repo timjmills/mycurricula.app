@@ -85,6 +85,7 @@ import {
   useCatchupModalOpen,
   useIsCatchupHostRenderer,
   type CatchupCloseReason,
+  type CatchupHostMount,
 } from "./modal-state";
 import styles from "./CatchUpModal.module.css";
 
@@ -842,8 +843,19 @@ function CatchUpModalBody({
  * /catch-up route already does. When the sibling wires the Tools-dock Host into
  * ChromeShell, that mount point must also be inside those providers (their Low #4).
  */
-export function CatchUpModalHost(): ReactNode {
-  const isRenderer = useIsCatchupHostRenderer();
+export function CatchUpModalHost({
+  mount = "route",
+}: {
+  /** Where this Host is mounted. `chrome` outranks `route` in the election, so
+   *  the app-wide Host keeps the slot across navigations. Defaults to `route`:
+   *  a Host added without thinking about it must not displace the chrome's. */
+  mount?: CatchupHostMount;
+  // NO `= {}` default on this parameter. It would make the props argument
+  // optional, which lets createElement resolve to its zero-props overload —
+  // where `mount` is not a known property and is silently rejected. JSX always
+  // passes an object, so `<CatchUpModalHost />` is unaffected.
+}): ReactNode {
+  const isRenderer = useIsCatchupHostRenderer(mount);
   const open = useCatchupModalOpen();
 
   useEffect(() => {

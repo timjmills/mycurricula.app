@@ -110,8 +110,10 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
     return (
       <div className="overlay immersive">
         {/* R1a: the Catch-Up modal host is elected app-wide, so the Tools
-            popover's Catch-up item works from the immersive routes too. */}
-        <CatchUpModalHost />
+            popover's Catch-up item works from the immersive routes too.
+            `mount="chrome"` WINS the election over any route-mounted Host —
+            deliberately, because this one outlives every navigation. */}
+        <CatchUpModalHost mount="chrome" />
         <ImmersiveBar
           title={viewTitle}
           showModeSwitch={showModeSwitch}
@@ -150,8 +152,10 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
   return (
     <div className="overlay">
       {/* R1a: the single elected Catch-Up modal host — the Tools popover's
-          Catch-up item dispatches CATCHUP_MODAL_TOGGLE_EVENT to it. */}
-      <CatchUpModalHost />
+          Catch-up item dispatches CATCHUP_MODAL_TOGGLE_EVENT to it.
+          `mount="chrome"` WINS the election over any route-mounted Host —
+          deliberately, because this one outlives every navigation. */}
+      <CatchUpModalHost mount="chrome" />
       <ChromeTopBar
         title={viewTitle}
         tools={

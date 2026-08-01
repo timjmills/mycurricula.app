@@ -17,7 +17,7 @@
 // SSR-safe subscriber hooks (server → default, hydrate post-mount). This is
 // transient session state (no localStorage) — closing the tab forgets it.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 // ── Open state ───────────────────────────────────────────────────────────────
 
@@ -51,6 +51,7 @@ export function openCatchupModal(): void {
   if (open) return;
   open = true;
   emitOpen();
+  scheduleRendererCheck();
 }
 
 /** Close the Catch-Up modal (idempotent). Fires close listeners on a real
@@ -69,6 +70,7 @@ export function toggleCatchupModal(): void {
   open = !open;
   emitOpen();
   if (wasOpen && !open) fireClosed("dismiss");
+  else if (!wasOpen && open) scheduleRendererCheck();
 }
 
 /** Register a callback fired when the modal closes (open → closed), by any
@@ -105,44 +107,142 @@ export function useCatchupModalOpen(): boolean {
 //
 // Multiple <CatchUpModalHost> instances can mount at once (the /catch-up route
 // AND the chrome). Exactly one must render the modal (and own the window toggle
-// listener) or the open state would paint twice. Each Host claims the single
-// renderer slot on mount; the FIRST to claim wins, later Hosts no-op. When the
-// renderer unmounts it frees the slot and notifies survivors so one re-elects.
+// listener) or the open state would paint twice.
+//
+// The election is decided by MOUNT POINT, not by arrival order. It used to be
+// first-come — whichever Host ran its mount effect first claimed the slot — and
+// that is not a property anyone controls: the route body hydrates inside its
+// own Suspense boundary, so the winner moved with React's scheduling. Ranking
+// the mount points makes the answer the same on every load, and puts the slot
+// on the Host that can hold it: the chrome's outlives every route, so a
+// navigation never tears the renderer down underneath an open modal.
+//
+// A Host that loses renders nothing, and on screen that is indistinguishable
+// from a Host that is broken, from a bundle that failed to load, and from no
+// Host at all. Those really were confused for each other (task #49), so the
+// case that actually hurts — the modal is OPEN and nothing is rendering it — is
+// REPORTED rather than swallowed. See reportMissingRenderer below.
 
-let rendererId: number | null = null;
+/** Where a Host is mounted. `chrome` outranks `route`. */
+export type CatchupHostMount = "chrome" | "route";
+
+const MOUNT_RANK: Record<CatchupHostMount, number> = { chrome: 0, route: 1 };
+
+interface RegisteredHost {
+  id: number;
+  mount: CatchupHostMount;
+  reconcile: () => void;
+}
+
 let idSeq = 0;
-const rendererListeners = new Set<() => void>();
+const hosts: RegisteredHost[] = [];
 
+/** The elected Host — best mount rank, ties broken by earliest mount. Null when
+ *  no Host is mounted at all. */
+function electedHost(): RegisteredHost | null {
+  let best: RegisteredHost | null = null;
+  for (const h of hosts) {
+    if (
+      best === null ||
+      MOUNT_RANK[h.mount] < MOUNT_RANK[best.mount] ||
+      (MOUNT_RANK[h.mount] === MOUNT_RANK[best.mount] && h.id < best.id)
+    ) {
+      best = h;
+    }
+  }
+  return best;
+}
+
+/** Re-run every Host's election check. Iterates a COPY: a reconcile is a
+ *  setState, and React may commit an unmount off the back of one. */
 function notifyRenderers(): void {
-  for (const fn of rendererListeners) fn();
+  for (const h of [...hosts]) h.reconcile();
+}
+
+// ── "Open, but nothing is drawing it" ───────────────────────────────────────
+//
+// The one failure this singleton can produce with no visible symptom: `open` is
+// true, every subscriber agrees, and no Host is mounted to render the modal.
+// The teacher sees an unchanged page, the console says nothing, and the state
+// is perfectly consistent and perfectly invisible — the same silence a dead
+// bundle produces, which is exactly how one was mistaken for the other.
+//
+// So it announces itself. A subscriber takes over the reporting when there is
+// one (the test asserts on it; a dev overlay could surface it); with none it
+// goes to console.error, where an unattended session still shows it.
+
+const missingListeners = new Set<(message: string) => void>();
+
+/** Subscribe to "the modal is open and no Host is rendering it". Returns an
+ *  unsubscribe. While at least one subscriber is registered, the default
+ *  console.error is suppressed — the subscriber owns the reporting. */
+export function onCatchupRendererMissing(
+  fn: (message: string) => void,
+): () => void {
+  missingListeners.add(fn);
+  return () => {
+    missingListeners.delete(fn);
+  };
+}
+
+let missingCheck: ReturnType<typeof setTimeout> | null = null;
+
+const MISSING_RENDERER_MESSAGE =
+  "[catchup] The Catch-Up modal is open but no CatchUpModalHost is rendering it — " +
+  "the state says open and nothing is on screen. Mount a <CatchUpModalHost/>: " +
+  "ChromeShell mounts one app-wide, and the /catch-up route mounts its own.";
+
+/**
+ * Verify — on the next macrotask, so Hosts mounting in the same commit have
+ * registered first — that something is actually drawing the open modal.
+ *
+ * Deferred rather than immediate because the legitimate order really is
+ * "open, then mount": the /catch-up route opens from an effect that can run
+ * before a Host below it has registered. Checking synchronously would cry wolf
+ * on the healthy path, and an alarm that cries wolf gets muted.
+ */
+function scheduleRendererCheck(): void {
+  // The server never mounts a Host, and never renders the modal — the open
+  // state there is always about to be replaced by the client's.
+  if (typeof window === "undefined") return;
+  if (missingCheck !== null) return;
+  missingCheck = setTimeout(() => {
+    missingCheck = null;
+    if (!open || electedHost() !== null) return;
+    if (missingListeners.size === 0) {
+      console.error(MISSING_RENDERER_MESSAGE);
+      return;
+    }
+    for (const fn of missingListeners) fn(MISSING_RENDERER_MESSAGE);
+  }, 0);
 }
 
 /**
  * Returns whether THIS Host instance is the elected renderer. Exactly one
  * mounted Host resolves true at a time; the rest resolve false and render
- * nothing. Re-elects when the current renderer unmounts.
+ * nothing. Re-elects whenever a Host mounts or unmounts.
  */
-export function useIsCatchupHostRenderer(): boolean {
+export function useIsCatchupHostRenderer(mount: CatchupHostMount): boolean {
   const [isRenderer, setIsRenderer] = useState(false);
-  const idRef = useRef(0);
   useEffect(() => {
     const id = ++idSeq;
-    idRef.current = id;
-    const reconcile = (): void => {
-      // Claim the slot if it's free — the first reconcile to run wins, so the
-      // earliest-mounted (or earliest-surviving) Host becomes the renderer.
-      if (rendererId === null) rendererId = id;
-      setIsRenderer(rendererId === id);
+    const host: RegisteredHost = {
+      id,
+      mount,
+      reconcile: () => setIsRenderer(electedHost()?.id === id),
     };
-    rendererListeners.add(reconcile);
-    reconcile(); // claim-or-defer on mount
+    hosts.push(host);
+    // EVERY Host re-reads the election, not just this one. A chrome Host
+    // arriving after a route Host has to take the slot AND the route Host has
+    // to stand down in the same pass, or both would paint.
+    notifyRenderers();
     return () => {
-      rendererListeners.delete(reconcile);
-      if (rendererId === id) {
-        rendererId = null; // I was the renderer — free the slot…
-        notifyRenderers(); // …and let a surviving Host re-elect.
-      }
+      const i = hosts.indexOf(host);
+      if (i !== -1) hosts.splice(i, 1);
+      notifyRenderers();
+      // Losing the last Host while the modal is open is the silent case above.
+      scheduleRendererCheck();
     };
-  }, []);
+  }, [mount]);
   return isRenderer;
 }
