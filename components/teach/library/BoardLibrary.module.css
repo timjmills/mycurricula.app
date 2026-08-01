@@ -110,12 +110,53 @@
   outline-offset: 1px;
 }
 
+/* The cap meter carries a surface of its own — it was the one thing in this row
+   that did not.
+   ────────────────────────────────────────────────────────────────────────────
+   `.meterLabel` is 13px/600 --ink-500 and, unlike its row-mates, it had nothing
+   behind it: `.segments` sits on the opaque `--hairline` track, `.searchInput`
+   on `--surface`, "New Board" is a solid Button — the meter alone was text laid
+   straight on the stage photograph. Under a DARK tone that failed AA on all
+   eight dark theme×dim cases, worst 2.74:1 (sky-dim) through 3.42:1 (night)
+   against a 4.5 floor (task #43, the dark half of audit finding B2; measured at
+   1440 by scripts/probe-photo-bright-veil.mjs).
+
+   This is NOT the defect the four elements in d92a50d had. Those each carried a
+   translucent fill mixed into `transparent`, so they darkened their own
+   backdrop and the remedy was to mix the same percentage into --surface
+   instead. The meter has no fill to make opaque, so the surface itself is the
+   fix — same conclusion, and the same recipe, as `.sidebar` below.
+
+   The handoff (5.31 boardlib.jsx:100) gives this block no panel, but it renders
+   the whole library on an opaque page; it has no appearance axes and therefore
+   says nothing about a photograph. CLAUDE.md §4's forward rule ("survive Wash /
+   Photo-Dim / Photo-Bright / Night before shipping") governs there, and AA is
+   non-negotiable.
+
+   The blur stays here, unlike the wall section's panel: nothing is anchored
+   inside the meter, so the stacking context `backdrop-filter` creates has no
+   popover to trap. */
 .meter {
   flex: 0 0 auto;
   min-width: 180px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  /* Glass carries the lit top edge (CLAUDE.md §4), branching on the DERIVED
+     tone: the white frosted register lights at .95, the dark one at .14
+     (app/themes.css:775 and :707). */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+:global([data-tone="dark"]) .meter,
+:global([data-tone="dark"]) .sidebar {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .meterLabel {
@@ -188,6 +229,10 @@
   background: color-mix(in srgb, var(--surface) 86%, transparent);
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
   backdrop-filter: blur(14px) saturate(1.2);
+  /* Lit top edge, added with `.meter` above so the page's two glass panels read
+     as one material rather than two. Purely optical — it cannot move a contrast
+     ratio, and the fill above is what carries the legibility. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
   /* The `border-right: 1px solid var(--border)` that used to live here is gone:
      it was the only thing separating this column from .main, and the panel now
      does that job. A hairline running down the open side of a rounded panel
@@ -203,10 +248,24 @@
   margin-bottom: 14px;
 }
 
+/* --ink-500, not --ink-400 — the same move, for the same reason, that
+   `.segment` above records.
+   ────────────────────────────────────────────────────────────────────────────
+   The 86% panel makes this text's backdrop MOSTLY the panel, but not entirely:
+   14% of the stage photograph still comes through, so the backdrop tracks
+   whatever the heading happens to sit over. At 1440 that measured (31,28,41)
+   and --ink-400 cleared AA at 5.02:1; at 375 the stacked sidebar lands on a
+   brighter patch, (53,54,70), and the same token falls to 3.55:1 against a 4.5
+   floor (photo-dim, scripts/probe-qa-tone-matrix.mjs). A token whose verdict
+   depends on which part of a photograph a teacher's window happens to show is
+   not a token that passes. --ink-500 holds 5.74:1 on that same backdrop and
+   5.2:1 even if the patch behind it goes fully blown-out, so the heading stops
+   being photo-dependent. The heading is still visibly quieter than the
+   --ink-700 nav items it labels. */
 .navHeading {
   margin: 0 0 6px;
   padding: 0 12px;
-  color: var(--ink-400);
+  color: var(--ink-500);
   font-size: var(--t-11);
   font-weight: 700;
   letter-spacing: 0.12em;

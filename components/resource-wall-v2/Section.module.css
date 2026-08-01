@@ -1,9 +1,9 @@
 /* Section.module.css — one kanban column of the Resource Wall (Wave 9a).
  *
- * Tokens only. The section deliberately paints NO background of its own until
- * one is pinned: "follow page style" means the wall's frame material shows
- * through, which is what keeps the wall legible on Night and on every wash. The
- * bundle's opaque white section is the anti-pattern this replaces.
+ * Tokens only. The section is a frosted panel (see `.sec` below); a pinned
+ * background replaces that panel rather than sitting on top of it. This file
+ * used to paint NO background at all until one was pinned — see the `.sec`
+ * comment for why that could not survive a photograph.
  *
  * Every <button> rule here is DOUBLED (`.act.act`) so it outguns the
  * `.cp-root button` reset (0,1,1), which would otherwise strip padding, border
@@ -19,6 +19,75 @@
   border-radius: var(--r-xl, 20px);
   padding: 6px 8px 10px;
   transition: background 0.2s ease;
+}
+
+/* The section carries a surface of its own, and that is what makes its own
+   heading legible.
+   ────────────────────────────────────────────────────────────────────────────
+   THE PROBLEM. `.title` is 15px/700 --ink-800 with nothing behind it: on a wall
+   with no pinned background it is ink sitting directly on the stage
+   photograph. Under a DARK tone that failed AA on all eight dark theme×dim
+   cases — worst 2.73:1 (honey-dim) through 3.29:1 (off-dim) against a 4.5
+   floor, measured at 1440 by scripts/probe-photo-bright-veil.mjs (task #43,
+   audit finding B4). It is NOT the same defect the count badge and the tag chip
+   had: those carried a translucent fill that DARKENED their own backdrop, and
+   the remedy was to mix the same percentage into --surface so the fill went
+   opaque. The title has no fill to make opaque. Only a real surface fixes it.
+
+   THE RECIPE IS THE HANDOFF'S. Both the bundled mockup (6.24 `New v2 Site
+   Design.bundled.html`) and the 7.21 update (resource-wall.css:180) give
+   `.rw-sec` a frosted panel — `border-radius: var(--r-xl)`, a translucent fill,
+   a light border, a blur, and a lifted shadow — and :181/:193 re-tint it for
+   the dark tone and the Calm-Glass dark register. So the panel is the design of
+   record, not an invention; this file's earlier "no background" note was
+   arguing against the OPAQUE WHITE section of a still older draft, and the
+   answer to that objection is --surface (which inverts by tone), not the
+   absence of a surface.
+
+   TWO VALUES DIVERGE FROM THE HANDOFF, BOTH DELIBERATELY:
+
+   1. THE OPACITY. The handoff's dark-register fill is
+      `linear-gradient(rgba(42,42,60,.5), rgba(28,28,44,.44))`. At 50% a bright
+      patch of photograph still contributes half the backdrop, and white text
+      over that computes 3.61:1 — the handoff's own value does not clear AA over
+      a photo. CLAUDE.md §4 makes AA non-negotiable and outranks the handoff on
+      exactly this kind of value; the tag chip below already carries the same
+      precedent (48% vs the handoff's 62%). 86% of --surface is the same
+      material at an opacity that holds, and it is the number the /boards
+      sidebar panel uses for the identical problem, so the two read as one
+      system.
+
+   2. NO `backdrop-filter`. The handoff blurs at 20px. `backdrop-filter` makes
+      the element a STACKING CONTEXT, and `.sec` is the ancestor of the header's
+      background popover (`.pop`, z-index 40, up to 560px tall). Trapped inside
+      `.sec`'s layer, that popover would be painted over by the NEXT section —
+      later in DOM, and stacking contexts at z-index auto paint in tree order —
+      so opening it on any section but the last would hide its lower half. That
+      is the same bug the `.hasPhoto > .head` note below records, one level up.
+      At 86% the blur is sampling 14% of the scene and doing almost no visible
+      work, so the material survives the omission and the popover keeps working.
+      (`.meter` on /boards keeps its blur: nothing is anchored inside it.)
+
+   Scoped `:not(.hasBg)` because a pinned background IS the section's surface —
+   `backgroundStyle(bg)` writes it as an inline style, `.hasPhoto::before` lays
+   the scrim under it, and `.inverse` flips the ink to --ink-50 for a known-dark
+   one. Painting --surface underneath all of that would put near-white ink on a
+   near-white panel on exactly the `.inverse` path. */
+.sec:not(.hasBg) {
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  /* Glass always carries the lit top edge (CLAUDE.md §4). The two registers'
+     values, branching on the DERIVED tone rather than the theme: the white
+     frosted register lights at .95, the dark frosted one at .14
+     (app/themes.css:775 and :707). */
+  box-shadow:
+    0 16px 44px -28px rgba(28, 27, 46, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+:global([data-tone="dark"]) .sec:not(.hasBg) {
+  box-shadow:
+    0 16px 44px -28px rgba(8, 12, 22, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 /* A pinned background gets the frame treatment: an edge so the fill reads as a
