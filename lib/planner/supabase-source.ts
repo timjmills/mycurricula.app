@@ -116,6 +116,7 @@ import {
 // not land exactly on the ceiling. See the header of paged-read.ts.
 import {
   assertNotTruncated,
+  chunkedIn,
   pagedSelect,
   type PageRequest,
   type PageResult,
@@ -132,46 +133,11 @@ const unwrap = makeUnwrap("Planner repository");
 const unwrapMaybe = makeUnwrapMaybe("Planner repository");
 
 // ── Chunked `.in(...)` lookups ────────────────────────────────────────────────
-// A PostgREST `.in("col", ids)` serializes every id into the request URL, so a
-// large id set (a grade with thousands of master events) can blow the URL /
-// proxy length limit. `chunkedIn` slices the id set into fixed-size batches,
-// runs `query(idsChunk)` per batch, and concatenates the rows. An empty id set
-// short-circuits to `[]` (PostgREST `.in("col", [])` is valid but wasteful).
-//
-// CHUNKING IS NOT PAGINATION (task #48). Bounding the id set bounds the URL, not
-// the RESPONSE: one chunk of 150 lesson ids can match far more than 150 rows
-// (`lesson_sections` holds several sections per lesson, in both a team and a
-// personal flavour), and the response is still capped at the PostgREST row
-// ceiling — silently. So each chunk runs through `pagedSelect`, which means the
-// caller's builder must accept a cursor page: `.gt(cursorCol, after)` +
-// `.order(cursorCol)` + `.limit(page.limit)`, on a column that is unique under
-// that query's filters. See paged-read.ts for why the cursor is not an offset.
-
-/** Max ids per `.in(...)` batch. ~150 keeps each request URL well under the
- *  typical 2–8KB proxy/URL ceiling even with uuid (36-char) ids. */
-const IN_CHUNK_SIZE = 150;
-
-async function chunkedIn<T>(
-  ids: string[],
-  cursorOf: (row: T) => string,
-  query: (
-    idsChunk: string[],
-    page: PageRequest,
-  ) => PromiseLike<PageResult<T>>,
-  context: string,
-): Promise<T[]> {
-  if (ids.length === 0) return [];
-  const out: T[] = [];
-  for (let i = 0; i < ids.length; i += IN_CHUNK_SIZE) {
-    const chunk = ids.slice(i, i + IN_CHUNK_SIZE);
-    out.push(
-      ...(await pagedSelect<T>(context, cursorOf, (page) =>
-        query(chunk, page),
-      )),
-    );
-  }
-  return out;
-}
+// `chunkedIn` moved to paged-read.ts, next to `pagedSelect` — it is the same
+// concern (reading more rows than one request can carry), and that module has
+// no imports, so the chunking behaviour is testable without a Supabase client.
+// See tests/planner-chunked-in.test.ts. It is imported below and used
+// unchanged at all three call sites.
 
 /** `.select()` options for one `pagedSelect` page. The exact row total is asked
  *  for on the FIRST page only — it rides along on that request's
@@ -1575,18 +1541,17 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
     // 3. This teacher's personal copies for those masters (the lazy fork), their
     //    completion rows, and the teacher's own AUTHORED lessons for the grade.
-    //    Copies/completion are keyed by the MASTER event id. The `.in(masterIds)`
-    //    lookups are CHUNKED (a large grade can have thousands of master ids,
-    //    which would otherwise blow the PostgREST/proxy URL length limit).
-    //    All three are PAGINATED (task #48). The authored read is year-wide on
-    //    exactly the same terms as the master read above — it is only under the
-    //    ceiling today because the beta grade has no authored lessons yet, and
-    //    "not yet large enough to lose data" is not a property worth relying on.
-    //    The two chunked reads page per chunk: chunking bounds the URL, not the
-    //    response. Every cursor below is unique UNDER THAT QUERY'S FILTERS —
-    //    `id` for the two row-per-id tables, and `core_lesson_event_id` for
-    //    completion, which is unique per teacher (UNIQUE (teacher_id,
-    //    core_lesson_event_id)) and this read is already scoped to one teacher.
+    //    Copies/completion are keyed by the MASTER event id, but are no longer
+    //    SELECTED by it — see the predicate note below; the master-id list they
+    //    used to chunk over is gone. All three are PAGINATED (task #48). The
+    //    authored read is year-wide on exactly the same terms as the master read
+    //    above — it is only under the ceiling today because the beta grade has no
+    //    authored lessons yet, and "not yet large enough to lose data" is not a
+    //    property worth relying on. Every cursor below is unique UNDER THAT
+    //    QUERY'S FILTERS — `id` for the two row-per-id tables, and
+    //    `core_lesson_event_id` for completion, which is unique per teacher
+    //    (UNIQUE (teacher_id, core_lesson_event_id)) and this read is still
+    //    scoped to one teacher.
     const buildAuthoredQuery = (page: PageRequest) => {
       let q = client
         .from("personal_authored_lessons")
@@ -1611,7 +1576,65 @@ export const plannerSupabaseSource: PlannerDataSource = {
       return q.order("id", { ascending: true }).limit(page.limit);
     };
 
+    // ── ONE OF THESE TWO DROPPED ITS ID LIST; THE OTHER MUST KEEP IT ─────────
+    // Both reads used to pass the grade's ENTIRE master-id set into a `.in(...)`,
+    // chunked at 150 ids to stay under the URL limit — 8 requests each on the
+    // beta grade, 16 in total, to fetch 3 rows and 4 rows. Chunking exists for
+    // URL LENGTH, not for correctness, so an id list that a predicate can replace
+    // takes the chunking with it. But "a predicate can replace it" has to be
+    // proved per query against the live schema, not assumed from the shape:
+    //
+    //   COMPLETION  → predicate. Safe, and argued below.
+    //   COPIES      → id list KEPT. The denormalized column it would need is
+    //                 nullable and trigger-derived from the copy's own unit; see
+    //                 the block at that read. Dropping it could silently lose a
+    //                 teacher's fork.
+    //
+    // Measured (scripts/probe-f3-predicate.mjs, n=3, chunked arm ALREADY
+    // parallelised so the comparison is not flattered):
+    //   personal copies    8 trips 611ms → 1 trip 528ms   ← NOT taken, ~80ms
+    //   completion status  8 trips 563ms → 1 trip 267ms   ← taken
     const [copyRows, complRows, authoredUnsorted] = await Promise.all([
+      // ⚠ THIS ONE KEEPS THE ID LIST, DELIBERATELY, AND IT IS THE ONE THAT
+      // CARRIES A TEACHER'S OWN EDITS.
+      //
+      // A `grade_level_id` predicate here would be one round trip instead of
+      // eight, and it was written that way before the live catalog was checked.
+      // It is not safe. Verified read-only against production on 2026-08-01:
+      //
+      //   • `personal_core_lesson_event_copies.grade_level_id` IS NULLABLE, with
+      //     no default (information_schema.columns).
+      //   • NO constraint ties it to the referenced master's grade. The FKs are
+      //     to `grade_levels(id)` and `master_core_lesson_events(id)` — nothing
+      //     relates the two (pg_constraint).
+      //   • It is maintained by a BEFORE INSERT OR UPDATE trigger,
+      //     `set_personal_copy_grade_level()`, whose entire body is
+      //     `new.grade_level_id := (select grade_level_id from units where id =
+      //     new.unit_id)`. So it tracks the COPY'S OWN UNIT, not the master's
+      //     grade, and it is rewritten on EVERY update.
+      //
+      // That is a silent-drop shape, not a theoretical one: a copy whose unit
+      // resolves to a different grade — or to a unit row with a null
+      // `grade_level_id` — falls out of the predicate WHILE ITS MASTER IS STILL
+      // IN THE LOADED SET. The teacher's own fork vanishes from their planner
+      // with no error. Moving a lesson between units is a shipped concept here
+      // (`deriveMoved(master, copy)` below), so the divergence the trigger keys
+      // on is reachable by ordinary use.
+      //
+      // Production shows 0 nulls and 0 mismatches today — across THREE rows, on
+      // ONE account, in ONE grade. That dataset cannot distinguish "safe" from
+      // "not yet broken", so it is not evidence. The SCHEMA is the evidence, and
+      // the schema says the column is nullable and derived.
+      //
+      // Cost of keeping the id list: 8 round trips instead of 1 — but they now
+      // overlap (`chunkedIn`, width 6), which recovered most of the wall clock
+      // anyway: 611ms chunked-parallel vs 528ms predicate. ~80ms to not risk a
+      // teacher's edits is not a close call.
+      //
+      // TO MAKE THE PREDICATE SAFE: make the column NOT NULL and add a
+      // constraint (or a trigger keyed on the MASTER) guaranteeing it equals the
+      // master's grade. That is a migration, and migrations are not this code's
+      // to make.
       chunkedIn<PersonalCopyRow>(
         masterIds,
         (row) => row.id,
@@ -1630,23 +1653,57 @@ export const plannerSupabaseSource: PlannerDataSource = {
         },
         "list personal copies",
       ),
-      chunkedIn<CompletionRow>(
-        masterIds,
+      pagedSelect<CompletionRow>(
+        "list completion",
         (row) => row.core_lesson_event_id,
-        (ids, page) => {
+        (page) => {
           // ⚠ THE `.eq("teacher_id")` BELOW IS LOAD-BEARING FOR PAGINATION, not
           // just for scoping. `core_lesson_event_id` is the cursor, and it is
           // unique only via UNIQUE (teacher_id, core_lesson_event_id) — so it is
           // unique HERE only because the query is already pinned to one teacher.
-          // Widening or dropping that filter silently makes the cursor
-          // non-unique, and `.gt()` would then skip every row sharing a boundary
-          // value. Widen it and you must change the cursor to `id` in the same
-          // edit (and add `id` to COMPLETION_COLS).
+          // Dropping that filter silently makes the cursor non-unique, and
+          // `.gt()` would then skip every row sharing a boundary value. Drop it
+          // and you must change the cursor to `id` in the same edit (and add
+          // `id` to COMPLETION_COLS). Removing the `.in(...)` did NOT weaken
+          // this — the teacher filter is exactly what was kept.
+          //
+          // ⚠ THIS READ IS A DELIBERATE SUPERSET, AND ITS ROWS ARE
+          // LOOKUP-ONLY. Read this before consuming `complRows`.
+          //
+          // NO GRADE FILTER IS AVAILABLE: `completion_status` carries only
+          // (id, teacher_id, core_lesson_event_id, status, reason_not_done,
+          // is_public, updated_at) — verified against the live schema. So this
+          // returns EVERY completion this teacher has, ACROSS EVERY GRADE AND
+          // SCHOOL YEAR, not just the loaded masters'.
+          //
+          // The contract that makes that safe, which is a constraint on
+          // CONSUMERS rather than a property of the query:
+          //
+          //   `complRows` may ONLY be used to build a map keyed by
+          //   `core_lesson_event_id` and read via `.get(<a loaded master id>)`.
+          //   It must NEVER be counted, iterated, summed, or rendered.
+          //
+          // Count it and you report another grade's completions as this grade's
+          // — a cross-grade leak in an app whose §6 rule is "never assume a
+          // single grade". `tests/planner-completion-superset.test.ts` fails if
+          // this read's rows reach any consumer that does more than look up.
+          //
+          // Unlike the copies read below, the SUPERSET direction is the only
+          // risk here: the filter is `teacher_id`, which is NOT NULL and is the
+          // same column the old chunked query already required for its cursor
+          // uniqueness, so no row that the id-list version returned can be
+          // missing from this one. It cannot drop; it can only over-return.
+          //
+          // Scaling: this grows with the teacher's HISTORY rather than the
+          // grade — 1 request today (4 rows) against the 8 it replaces, and
+          // cheaper until ~9000 accumulated completion rows (about nine years at
+          // a thousand lessons a year). Denormalizing `grade_level_id` onto this
+          // table would remove both the caveat and the consumer contract; that
+          // is a migration, and migrations are not this code's to make.
           let q = client
             .from("completion_status")
             .select(COMPLETION_COLS, countOpt(page))
-            .eq("teacher_id", ownerId)
-            .in("core_lesson_event_id", ids);
+            .eq("teacher_id", ownerId);
           if (page.after != null)
             q = q.gt("core_lesson_event_id", page.after);
           return q
@@ -1655,7 +1712,6 @@ export const plannerSupabaseSource: PlannerDataSource = {
             PageResult<CompletionRow>
           >;
         },
-        "list completion",
       ),
       pagedSelect<AuthoredLessonRow>(
         "list authored lessons",

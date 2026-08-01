@@ -347,3 +347,138 @@ export function assertNotTruncated<T>(
   }
   return rows;
 }
+
+// ── Chunked `.in(...)` lookups ────────────────────────────────────────────────
+// A PostgREST `.in("col", ids)` serializes every id into the request URL, so a
+// large id set (a grade with thousands of master events) can blow the URL /
+// proxy length limit. `chunkedIn` slices the id set into fixed-size batches,
+// runs `query(idsChunk)` per batch, and concatenates the rows. An empty id set
+// short-circuits to `[]` (PostgREST `.in("col", [])` is valid but wasteful).
+//
+// CHUNKING IS NOT PAGINATION. Bounding the id set bounds the URL, not the
+// RESPONSE: one chunk of 150 lesson ids can match far more than 150 rows
+// (`lesson_sections` holds several sections per lesson, in both a team and a
+// personal flavour), and the response is still capped at the row ceiling above —
+// silently. So each chunk runs through `pagedSelect`, which means the caller's
+// builder must accept a cursor page: `.gt(cursorCol, after)` + `.order(cursorCol)`
+// + `.limit(page.limit)`, on a column that is unique under that query's filters.
+//
+// Lives HERE, next to `pagedSelect`, rather than in the repository: it is the
+// same concern (reading more rows than one request can carry) and this module
+// has no imports, so the behaviour is testable without standing up a Supabase
+// client. See tests/planner-chunked-in.test.ts.
+
+/** Max ids per `.in(...)` batch. ~150 keeps each request URL well under the
+ *  typical 2–8KB proxy/URL ceiling even with uuid (36-char) ids. */
+export const IN_CHUNK_SIZE = 150;
+
+/** How many chunks may be in flight at once.
+ *
+ *  CHUNKS ARE INDEPENDENT AND THE PAGES INSIDE ONE ARE NOT. A chunk is a
+ *  disjoint slice of the id set, so two chunks can never observe each other;
+ *  but page N+1 of a chunk needs page N's last cursor, so `pagedSelect` stays
+ *  strictly sequential WITHIN a chunk. Only the outer loop overlaps.
+ *
+ *  BOUNDED, NOT UNBOUNDED. Without a cap, a school three times the beta's size
+ *  would put 80+ requests in flight from a single hydrate — trading this repo's
+ *  serial-read problem for a pooler-saturation one. 6 captures nearly all of the
+ *  available win (measured below) at a fraction of that.
+ *
+ *  ⚠ THE CAP IS PER INVOCATION, NOT PER REQUEST, and the honest ceiling is
+ *  therefore higher than 6. `listLessons` runs two chunked reads inside a
+ *  `Promise.all` (12), the sections batch adds a third (18), and the hydrate's
+ *  other reads — subjects, units, the paged standards and master-lesson scans —
+ *  are concurrent with those, so one hydrate can have low-twenties requests open.
+ *  A single request-scoped semaphore shared by every planner read would bound
+ *  the real number; `withSharedServerClient`'s `AsyncLocalStorage` scope is
+ *  already the right place to hang one. Deliberately NOT built here: it is a
+ *  wider change than this fix, and low-twenties is far from a pooler's limit.
+ *  Raised as Medium by the §4a review gate and left open on purpose — if the
+ *  chunk width is ever raised, build the shared limiter in the same edit. */
+export const IN_CHUNK_CONCURRENCY = 6;
+
+/**
+ * Run every `.in(...)` chunk, up to `IN_CHUNK_CONCURRENCY` at a time.
+ *
+ * ── WHY THIS IS NOT A `for` LOOP ANY MORE ────────────────────────────────────
+ * It used to be `for (…) { out.push(...(await pagedSelect(…))) }` — every chunk
+ * waiting on the one before it, for no reason: the chunks are disjoint id slices
+ * with no data dependency between them. Three hydrate reads go through here
+ * (`personal_core_lesson_event_copies`, `completion_status`, and the
+ * `lesson_sections` batch), each keyed by the grade's full lesson-id set, so on
+ * the beta grade (1254 master lessons → 9 chunks each) ONE hydrate spent 27
+ * sequential round trips inside what the bundle presents as a single call.
+ *
+ * Measured against production, replaying those exact three reads
+ * (`scripts/probe-f3-chunk-cost.mjs`, n=3): serial 7925 / 8009 / 8226 ms versus
+ * 1771 / 1803 / 3217 ms at width 6 — ~6.2 s of a hydrate whose responses were
+ * nearly EMPTY (3, 4 and 0 rows respectively). It was almost pure latency.
+ *
+ * ── THE OUTPUT IS BYTE-IDENTICAL, NOT MERELY EQUIVALENT ──────────────────────
+ * Results are written into a pre-sized array AT THEIR CHUNK'S INDEX and
+ * flattened in order, so the returned row sequence is exactly what the serial
+ * loop produced. That matters beyond tidiness: `completion_status` pages on
+ * `core_lesson_event_id`, whose uniqueness holds only under the caller's
+ * `.eq("teacher_id")` filter, and the lesson reads re-sort through
+ * `sortLessonRows` afterwards. Preserving order means neither has to be
+ * re-argued — the only thing that changed is when the requests leave.
+ *
+ * ── FAILURE SEMANTICS ARE UNCHANGED ──────────────────────────────────────────
+ * `Promise.all` over the workers rejects with the first error, exactly as the
+ * `await` in the old loop did, so a failing chunk still propagates to the
+ * caller's catch and a partial result is never returned as a whole one. Chunks
+ * already in flight are not cancelled — they resolve into an array nobody
+ * reads, which is what the old loop did with the work it had already finished.
+ */
+export async function chunkedIn<T>(
+  ids: string[],
+  cursorOf: (row: T) => string,
+  query: (idsChunk: string[], page: PageRequest) => PromiseLike<PageResult<T>>,
+  context: string,
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK_SIZE) {
+    chunks.push(ids.slice(i, i + IN_CHUNK_SIZE));
+  }
+
+  const perChunk: T[][] = new Array(chunks.length);
+  let next = 0;
+  // STOP CLAIMING WORK ONCE ANYTHING HAS FAILED. The serial loop this replaced
+  // got this for free: a throw ended the loop, so a failed read issued no
+  // further requests. Without the flag, `Promise.all` rejects to the caller
+  // immediately while the OTHER workers carry on draining every remaining chunk
+  // — so a transient PostgREST failure on a large grade would fan out across the
+  // whole id set and then overlap the store's retry, which is the opposite of
+  // what the concurrency bound is for. (Raised as Medium by the §4a gate.)
+  //
+  // Chunks already in flight are not cancelled: supabase-js's builder is not
+  // wired to an AbortSignal here, so the honest guarantee is "no NEW request
+  // after a failure", which bounds the overshoot at one in-flight request per
+  // worker rather than the entire remainder.
+  let failed = false;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      if (failed) return;
+      const index = next++;
+      if (index >= chunks.length) return;
+      try {
+        perChunk[index] = await pagedSelect<T>(context, cursorOf, (page) =>
+          query(chunks[index], page),
+        );
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
+    }
+  };
+  await Promise.all(
+    Array.from(
+      { length: Math.min(IN_CHUNK_CONCURRENCY, chunks.length) },
+      worker,
+    ),
+  );
+
+  return perChunk.flat();
+}
