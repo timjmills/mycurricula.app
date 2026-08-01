@@ -22,10 +22,18 @@
 // "Day") still swaps in the two-pane <DayEditSplit>, which keeps its own
 // data-day-edit-split probe hook and its shared selectedId.
 //
-// PRESERVED VERBATIM (PR #27 deep-link trio + invariants): the `?lesson=`
-// resolver effect, the URL-strip effect, the `?date=` resolver, and the
-// `seededFor` latch. These are copied unchanged — do not reorder, merge, or
-// touch their deps.
+// PR #27 deep-link trio + invariants — the `?lesson=` resolver effect, the
+// URL-strip effect, the `?date=` resolver, and the `seededFor` latch. Do not
+// reorder, merge, or touch their deps. Two changes have been made since they
+// were copied here, both deliberate and both recorded at the code below:
+//   • task #31 added a RENDER-TIME seed (`pendingSeedLesson`/`viewWeek`/
+//     `viewDay`) beside the effect, because an effect cannot run before
+//     hydration and the wrong week was what the teacher actually saw. The
+//     effect is untouched and remains the authority for the SHARED week/day;
+//     the day slice + row-order effect moved BELOW the trio because they read
+//     the resolved view week/day.
+//   • the resolver now bails when `seedCancelledRef` names its id — the teacher
+//     navigated first, and a late-arriving document must not undo that.
 //
 // Per-teacher row order: the day slice is still sorted by the persisted
 // per-teacher order (readRowOrder / sortByRowOrder) before it reaches the
@@ -232,23 +240,9 @@ export function DailyView({
   // would make the client's first render diverge from the server HTML and
   // trip a React hydration mismatch. The mount effect below loads the saved
   // order immediately after hydration instead.
+  // (The load effect + the day slice live BELOW the deep-link trio, because
+  // they read the resolved view week/day it derives.)
   const [rowOrder, setRowOrder] = useState<string[]>([]);
-
-  // Load the saved order after mount, and reload it whenever the week or day
-  // changes. Running post-mount keeps the localStorage read off the hydration
-  // path; access is SSR-guarded inside readRowOrder regardless.
-  useEffect(() => {
-    setRowOrder(readRowOrder(week, selectedDay));
-  }, [week, selectedDay]);
-
-  // The day's lessons, filtered to week + day and then sorted by the saved
-  // per-teacher order. Lessons not yet in the saved order append at the end.
-  const dayLessons = useMemo(() => {
-    const filtered = lessons.filter(
-      (l) => l.week === week && l.day === selectedDay,
-    );
-    return sortByRowOrder(filtered, rowOrder);
-  }, [lessons, week, selectedDay, rowOrder]);
 
   // Daily view manages its own selected-lesson state (shared with EDIT mode
   // and the breadcrumb). Default: first not-yet-done lesson for the active
@@ -294,14 +288,28 @@ export function DailyView({
   // palette, another "Go to lesson", a resource row) is still honored; reset
   // when the query is absent so even a repeat link to the SAME lesson re-seeds.
   const [seededFor, setSeededFor] = useState<string | null>(null);
+  // The one documented ADDITION to the PR #27 trio: the id whose seed the
+  // teacher pre-empted by navigating (handleShiftDay writes it). A REF, not
+  // state — an effect already queued from an earlier render holds a stale
+  // `seededFor` in its closure, so only something read at run time can stop it
+  // applying a navigation the teacher has since overridden.
+  const seedCancelledRef = useRef<string | null>(null);
   useEffect(() => {
     if (!initialLessonId) {
       // No (or stripped) ?lesson= — re-arm so a later deep link, even to the
-      // same lesson, resolves again.
+      // same lesson, resolves again. The cancellation clears with it, or a
+      // repeat link to the same id would arrive pre-cancelled.
+      seedCancelledRef.current = null;
       if (seededFor !== null) setSeededFor(null);
       return;
     }
     if (seededFor === initialLessonId) return; // already settled this id
+    if (seedCancelledRef.current === initialLessonId) {
+      // The teacher navigated first. Settle the id WITHOUT moving the view, so
+      // the URL-strip effect below still clears the consumed query.
+      setSeededFor(initialLessonId);
+      return;
+    }
     const target = lessons.find((l) => l.id === initialLessonId);
     if (target) {
       // Set week/day unconditionally — React bails out of a same-value useState
@@ -348,6 +356,73 @@ export function DailyView({
     router.replace("/daily", { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialLessonId, seededFor]);
+
+  // ── The deep link's week + day, from the FIRST render (task #31) ────────
+  //
+  // The resolver above is an EFFECT: it cannot run until the client has
+  // hydrated. Everything rendered before that — the server HTML, and every
+  // client frame until hydration finishes — therefore shows the DEFAULT week
+  // (whatever `useAppState` derived from the academic year), not the linked
+  // lesson's. That is the whole of the reported bug: `/daily?lesson=<id>`
+  // "lands on an empty out-of-year week". It is not a flash. On a cold load
+  // of this app, hydration is measured in seconds, so a teacher who clicks
+  // Catch-Up's "Plan" or a Week card's "Go to lesson" watches an empty day —
+  // usually a day with no lessons at all — for that entire window, and the
+  // click reads as broken even though it worked.
+  //
+  // So the seed is ALSO derived during render, from the same lookup: while a
+  // `?lesson=` is still pending (not yet settled by the effect) and the lesson
+  // is present in the document, the day surface renders THAT lesson's week and
+  // day. Nothing here writes state — it only changes what this render shows,
+  // so the server HTML and the first client render agree (both run the same
+  // lookup over the same document) and there is no hydration mismatch.
+  //
+  // The effect stays exactly as it is and remains the authority: it moves the
+  // SHARED app-state week/day so every other surface (the top bar, /weekly,
+  // the schedule) agrees, and it is what makes the seed survive the `?lesson=`
+  // being stripped. Once it has settled the id, `seededFor === initialLessonId`
+  // and this override switches off — from then on the teacher's own navigation
+  // owns the view.
+  //
+  // While the document has not arrived yet (the Supabase shape: the first
+  // render sees zero lessons) there is nothing to look up, so this falls back
+  // to the shared week. What the teacher then sees is the canvas's own empty
+  // state, and it is honest for MOST of that window but not all of it:
+  // <DayEmptyState> maps hydration "idle"/"loading" → the "Loading your plan…"
+  // skeleton, which is right — but hydration "empty" maps to `settled`, and the
+  // store passes THROUGH "empty" on a cold load (planner-store.tsx :2718 marks
+  // the null-owner EMPTY_DOC "empty" before the real owner's lessons arrive).
+  // For that sub-window the day says "No lessons planned for this day."
+  //
+  // That is a PRE-EXISTING false-empty in the store's 3-state mapping, not
+  // something this seed introduces — it is what a plain `/daily` cold load
+  // shows too — and fixing it means changing what "empty" means for every
+  // surface, which is not this change's to make. Recorded here so the sentence
+  // above is not read as a guarantee it does not carry.
+  const pendingSeedLesson =
+    initialLessonId != null && seededFor !== initialLessonId
+      ? (lessons.find((l) => l.id === initialLessonId) ?? null)
+      : null;
+  const viewWeek = pendingSeedLesson?.week ?? week;
+  const viewDay = pendingSeedLesson?.day ?? selectedDay;
+
+  // Load the saved per-teacher row order after mount, and reload it whenever
+  // the rendered week or day changes. Running post-mount keeps the localStorage
+  // read off the hydration path; access is SSR-guarded inside readRowOrder
+  // regardless.
+  useEffect(() => {
+    setRowOrder(readRowOrder(viewWeek, viewDay));
+  }, [viewWeek, viewDay]);
+
+  // The day's lessons, filtered to the rendered week + day and then sorted by
+  // the saved per-teacher order. Lessons not yet in the saved order append at
+  // the end.
+  const dayLessons = useMemo(() => {
+    const filtered = lessons.filter(
+      (l) => l.week === viewWeek && l.day === viewDay,
+    );
+    return sortByRowOrder(filtered, rowOrder);
+  }, [lessons, viewWeek, viewDay, rowOrder]);
 
   // `/daily?date=<YYYY-MM-DD>` deep link (UX roadmap item 07) — the sibling of
   // the lesson seed above, skipped whenever that seed resolves (a lesson pins
@@ -458,8 +533,8 @@ export function DailyView({
     try {
       const created = await addLesson({
         subject,
-        week,
-        day: selectedDay,
+        week: viewWeek,
+        day: viewDay,
         title: "New lesson",
       });
       // null → the source rejected/failed; the store already console.debug'd.
@@ -485,8 +560,8 @@ export function DailyView({
     dayLessons,
     subjects,
     addLesson,
-    week,
-    selectedDay,
+    viewWeek,
+    viewDay,
     openLessonPlanner,
   ]);
 
@@ -510,7 +585,7 @@ export function DailyView({
     : null;
 
   // ── Day / date labels for the canvas header ────────────────────────────
-  const dayLabel = weekdays[selectedDay]?.longLabel ?? "Day";
+  const dayLabel = weekdays[viewDay]?.longLabel ?? "Day";
 
   // "Jun 14 · 2026" — derived from the same week/day → Date resolver the week
   // strip and the deep link use (lib/week-dates.ts, via useWeekDates).
@@ -519,11 +594,11 @@ export function DailyView({
   // plausible wrong one. Empty rather than null keeps the `dateLabel: string`
   // prop contract that the three day-v2 variants share.
   const dateLabel = useMemo(() => {
-    const d = dateFor(week, selectedDay);
+    const d = dateFor(viewWeek, viewDay);
     if (d === null) return "";
     const month = d.toLocaleDateString("en-US", { month: "short" });
     return `${month} ${d.getDate()} · ${d.getFullYear()}`;
-  }, [dateFor, week, selectedDay]);
+  }, [dateFor, viewWeek, viewDay]);
 
   // Whether the visible day IS today — the canvas gates its live "now"/
   // "upcoming" split on this (false → no false "now" ring; B/C focus falls
@@ -534,9 +609,9 @@ export function DailyView({
   // today's school-week column. A CLAMPED current week draws no "now" split at
   // all; see isTodayEmphasisWeek in lib/now-anchor.
   const isToday =
-    isTodayEmphasisWeek(week, currentWeek, currentWeekBasis) &&
+    isTodayEmphasisWeek(viewWeek, currentWeek, currentWeekBasis) &&
     todayColIdx !== null &&
-    todayColIdx === selectedDay;
+    todayColIdx === viewDay;
 
   // ── Day prev/next with week rollover ───────────────────────────────────
   // The canvas's day-nav arrows call onShiftDay(±1). Shifting past the first
@@ -548,19 +623,24 @@ export function DailyView({
   const handleShiftDay = useCallback(
     (delta: 1 | -1): void => {
       const dayCount = Math.max(weekdays.length, 1);
-      const raw = selectedDay + delta;
+      // Shift from the day the teacher is LOOKING at. During the one-render
+      // window where a `?lesson=` deep link has resolved for the render but its
+      // effect has not yet moved the shared week/day, those two differ — and an
+      // arrow that stepped from the shared value would jump somewhere the
+      // teacher never was.
+      const raw = viewDay + delta;
       // Resolve the target week + day with rollover (clamp at week 1).
-      let targetWeek = week;
+      let targetWeek = viewWeek;
       let targetDay: number;
       if (raw < 0) {
-        if (week > 1) {
-          targetWeek = week - 1;
+        if (viewWeek > 1) {
+          targetWeek = viewWeek - 1;
           targetDay = dayCount - 1;
         } else {
           targetDay = 0; // already at week 1 day 0 — clamp
         }
       } else if (raw > dayCount - 1) {
-        targetWeek = week + 1;
+        targetWeek = viewWeek + 1;
         targetDay = 0;
       } else {
         targetDay = raw;
@@ -583,10 +663,25 @@ export function DailyView({
       );
       setSelectedId(firstOpen?.id ?? null);
       setSelectedLessonId(null);
+      // The teacher has taken over — settle any still-pending `?lesson=` seed
+      // so it cannot yank them back. Two windows this closes, both of which end
+      // with a navigation the teacher made being silently undone:
+      //   • the doc arrives LATE (the Supabase path) and the resolver fires
+      //     minutes after the teacher navigated somewhere else;
+      //   • the narrow gap between hydration attaching this handler and the
+      //     resolver's passive effect flushing.
+      // Settling is exactly what the resolver does for an id it has handled, so
+      // the URL-strip effect below still runs and the query still clears.
+      if (initialLessonId != null && seededFor !== initialLessonId) {
+        seedCancelledRef.current = initialLessonId; // synchronous — see the ref
+        setSeededFor(initialLessonId);
+      }
     },
     [
-      selectedDay,
-      week,
+      viewDay,
+      viewWeek,
+      initialLessonId,
+      seededFor,
       weekdays.length,
       lessons,
       setWeek,
@@ -604,7 +699,7 @@ export function DailyView({
   // so the resolved node passes to <DayViewV2> as `holidayNode`. `null` on a
   // non-holiday day: the v2 frames key their holiday wrapper AND empty-state
   // branch on this being truthy, so it must not be an always-present element.
-  const holiday = useDayHoliday(week, selectedDay);
+  const holiday = useDayHoliday(viewWeek, viewDay);
 
   // ── Breadcrumb (BIG-7) ─────────────────────────────────────────────────
   // Week N / <Day> / <Subject> — each segment is a clickable link. Subject is
@@ -621,7 +716,12 @@ export function DailyView({
   const { scheduleMode: showScheduleRail } = useDailyScheduleMode();
 
   return (
-    <div className={styles.page}>
+    // VIEW mode drops the page's opaque `--canvas` panel so the Day's rail,
+    // focus card and clock float directly on the stage photograph (the user's
+    // 2026-08-01 decision). EDIT mode keeps the panel: <DayEditSplit>'s panes
+    // are separated by gutters, and un-panelling would put those gutters on the
+    // photo with none of the contrast work behind them.
+    <div className={`${styles.page} ${isEdit ? "" : styles.pageFloating}`}>
       {/* ── Page header (page identity + cross-view nav + orphan controls) ──
           The day's own identity (day name + date + prev/next nav) now lives
           inside <DayViewV2>'s header, so this bar keeps only what has no home
@@ -632,7 +732,11 @@ export function DailyView({
           is gone — the v2 Day surface has no list/grid modes, so the control
           did nothing here (and setting the shared viewMode leaked into
           Weekly/Year). */}
-      <div className={styles.dailyPageHeader}>
+      <div
+        className={`${styles.dailyPageHeader} ${
+          isEdit ? "" : styles.dailyPageHeaderFloating
+        }`}
+      >
         <div className={styles.pageHeadText}>
           <h1 className={styles.pageTitle}>Daily View</h1>
           {/* Breadcrumb directly under the title — Week N › Day › Subject.
@@ -641,7 +745,7 @@ export function DailyView({
               from the configured school week (useOrderedWeekdays). */}
           <nav className={styles.headerCrumb} aria-label="Breadcrumb">
             <Link href="/weekly" className={styles.breadcrumbLink}>
-              {labels.week} {week}
+              {labels.week} {viewWeek}
             </Link>
             <span className={styles.breadcrumbSep} aria-hidden="true">
               ›
@@ -702,8 +806,8 @@ export function DailyView({
               back to View. */
           <DayEditSplit
             dayLessons={dayLessons}
-            week={week}
-            day={selectedDay}
+            week={viewWeek}
+            day={viewDay}
             dayLabel={dayLabel}
             selectedId={selectedId}
             onSelect={handleSelectLesson}
@@ -726,8 +830,8 @@ export function DailyView({
               and the nav / plan / quick-add / add-event seams. */
           <DayViewV2
             dayLessons={dayLessons}
-            week={week}
-            day={selectedDay}
+            week={viewWeek}
+            day={viewDay}
             dayLabel={dayLabel}
             dateLabel={dateLabel}
             isToday={isToday}
@@ -748,7 +852,10 @@ export function DailyView({
             tablet / phone. */}
         {showScheduleRail && (
           <aside className={styles.scheduleRail} aria-label="Schedule rail">
-            <ScheduleDayPane day={selectedDay} variant="rail" />
+            {/* `week` is passed explicitly: while a `?lesson=` seed is still
+                settling the rail must describe the SAME week the canvas beside
+                it renders, not the shared one it would otherwise read. */}
+            <ScheduleDayPane day={viewDay} week={viewWeek} variant="rail" />
           </aside>
         )}
       </div>
@@ -761,7 +868,7 @@ export function DailyView({
       <AddEventForm
         open={addEventOpen}
         onClose={() => setAddEventOpen(false)}
-        day={selectedDay}
+        day={viewDay}
         dayLabel={dayLabel}
       />
     </div>

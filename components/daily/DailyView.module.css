@@ -22,6 +22,52 @@
   background: var(--canvas);
 }
 
+/* ── VIEW mode: no containing panel ──────────────────────────────────────
+   User decision, 2026-08-01: the Day view's rail, focus card and clock each
+   float directly on the stage photograph. `--canvas` is OPAQUE (a warm cream
+   in light tone, near-black in dark), so it IS the panel — the one the user
+   pointed at and asked to remove. Dropping it is the whole of "float on the
+   photo"; everything that then meets the photograph carries its own fill (see
+   day-v2.module.css's `.vhead` / `.vcAgenda` / `.heroEmpty` notes).
+
+   SCOPED TO VIEW MODE ON PURPOSE. `.page` also hosts <DayEditSplit>, whose
+   panes are `--surface` cards separated by GAPS — un-panelling that would put
+   the editor's gutters and divider corridor on the photograph, which nobody
+   asked for and which has none of the contrast work behind it. Edit mode keeps
+   the canvas. */
+.pageFloating {
+  background: transparent;
+}
+
+/* The page header floats with everything else rather than banding across the
+   surface. It keeps its contents — the page <h1> (the single-h1 a11y anchor),
+   the cross-view breadcrumb, the Schedule pill and Present — because none of
+   those has another home; it just stops being an opaque full-bleed bar with a
+   border-bottom, and becomes its own rounded frosted panel.
+
+   Same 92%-of-`--surface` recipe as the day-nav bar below it: `--surface`
+   inverts by tone so one value serves both glass registers, and the breadcrumb
+   (12px, `--body`) is the piece with the least headroom. It may blur — every
+   popover anchored in this bar (Tooltips, the Present menu) portals to <body>,
+   so the stacking context a `backdrop-filter` creates traps nothing. */
+.dailyPageHeaderFloating {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-bottom: none;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--r-xl);
+  margin: 8px 8px 0;
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 16px 44px -28px rgba(28, 27, 46, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+:global([data-tone="dark"]) .dailyPageHeaderFloating {
+  box-shadow:
+    0 16px 44px -28px rgba(8, 12, 22, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
 /* ── Page header — single tightened bar (6.11.26 redesign) ───────────────
    One header band: the page title with the breadcrumb DIRECTLY underneath
    (the previous separate breadcrumb strip and the generic subtitle were
