@@ -323,6 +323,37 @@ export interface PlannerDataSource {
    *  first, else the first row in `teacher_grade_assignments`. Lets a caller
    *  hydrate without already knowing the grade. Mock returns the single grade. */
   getActiveGradeLevelId(ownerId: string): Promise<string | null>;
+  /**
+   * The school (workspace) that OWNS `gradeLevelId`.
+   *
+   * WHY THIS IS A READ ABOUT THE DATA AND NOT ABOUT THE TEACHER, which is the
+   * entire point of it. Every read in a hydrate is scoped by a grade, so the
+   * workspace a hydrated document belongs to is definitionally the school that
+   * owns that grade. Asking the teacher's ACTIVE-workspace pointer instead
+   * answers a different question — "where is this teacher now" — which can move
+   * while the document is being read, and a label derived from it is an
+   * inference about a window rather than a fact about the rows.
+   *
+   * Keyed on a grade id, so the answer does not depend on WHEN it is asked: a
+   * grade does not change schools. That is what lets `buildServerSeed` label a
+   * server-rendered seed with an identity the client can check (see
+   * lib/planner/hydrate-seed.ts).
+   *
+   * Returns null when the grade does not exist OR when the caller may not read
+   * it — RLS gates this like every other read.
+   *
+   * ⚠ AND FOR WHOM, PRECISELY. `grade_levels_read` is
+   * `school_id = auth_teacher_school_id() OR is_school_admin(school_id)`
+   * (verified against the LIVE catalog, not the committed migration). So for an
+   * ORDINARY member a grade outside their active workspace resolves null and the
+   * caller fails closed — but a SCHOOL ADMIN can read grades in any school they
+   * administer, so that suppression is not universal and must not be described
+   * as if it were. The guarantee that does hold for everyone is the one this
+   * method exists for: the answer is the grade's REAL school, so the label is
+   * correct for an admin too, and a client expecting a different workspace still
+   * refuses it.
+   */
+  getGradeSchoolId(gradeLevelId: string): Promise<string | null>;
   /** All lessons a teacher sees for a grade: personal forks resolved over
    *  master, soft-deletes excluded (plan §4.3).
    *

@@ -344,11 +344,44 @@ export function useAppState(): AppStateValue {
 
 interface AppStateProviderProps {
   children: ReactNode;
+  /**
+   * The auth user id the SERVER already resolved for this request, or null when
+   * there is no session.
+   *
+   * ── WHY THIS PROP EXISTS ──────────────────────────────────────────────────
+   * `currentUser.id` is what the planner store keys its hydrate on, and it used
+   * to arrive only from the `supabase.auth.getUser()` effect below — a real
+   * cross-origin round trip to the Supabase auth server, made AFTER the bundle
+   * downloaded and React mounted. Nothing in the planner could ask for a lesson
+   * until it came back, so the whole document load queued behind an auth call
+   * whose answer the server had already computed and thrown away (middleware
+   * calls `getUser()` on every request for the auth gate).
+   *
+   * Worse than slow: while `id` is null the store's hydrate effect dispatches
+   * `hydration: "empty"` and returns, and `plannerDataStateFromHydration` maps
+   * "empty" to SETTLED — so for the length of that round trip every surface is
+   * told the document is finished and contains nothing. That is the false-empty
+   * class this repo keeps shipping, on every single page load.
+   *
+   * ── IT IS A HINT, NOT A CREDENTIAL ────────────────────────────────────────
+   * Same status as the `ownerId` the client already passes to
+   * `plannerHydrateBundleAction` (see lib/planner/actions.ts): every query runs
+   * under the caller's own session through RLS, so this cannot widen what
+   * anyone may read. If it disagrees with the session the effect below resolves,
+   * that effect overwrites it and the store re-hydrates for the real owner
+   * through its existing owner-change guard.
+   *
+   * ID ONLY. Name, email and avatar still come from the client's own auth
+   * subscription — they are cosmetic, and keeping them out of the server HTML
+   * keeps the identity in the document down to one opaque uuid.
+   */
+  initialUserId?: string | null;
 }
 
 /** Hosts the planner-wide UI state for everything under the shell layout. */
 export function AppStateProvider({
   children,
+  initialUserId = null,
 }: AppStateProviderProps): ReactNode {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [editMode, setEditMode] = useState<EditMode>("personal");
@@ -413,7 +446,18 @@ export function AppStateProvider({
 
   // Current user — hydrated from the Supabase Auth session on mount and kept
   // in sync via onAuthStateChange (sign-in, sign-out, token refresh).
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(FALLBACK_USER);
+  // Seeded with the server-resolved id where there is one, so the planner store
+  // can start hydrating on the first client render instead of after a round trip
+  // to the auth server (see `initialUserId`). Everything else stays FALLBACK_USER
+  // until the auth subscription below fills it in — the display name and avatar
+  // are cosmetic and already arrive late today.
+  //
+  // NO HYDRATION MISMATCH: `initialUserId` is a prop, so the server render and
+  // the first client render compute the identical value. The localStorage
+  // overlays below still run post-mount, exactly as before.
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(() =>
+    initialUserId ? { ...FALLBACK_USER, id: initialUserId } : FALLBACK_USER,
+  );
 
   // Auth-default identity — the PRE-overlay name/initials from the Supabase
   // session, or null while unresolved / signed out. This is what a cleared

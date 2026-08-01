@@ -16,6 +16,17 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+// FORCE-ENABLED. The grade→school label is only read to name a server seed, so
+// with the shipped switch OFF (lib/planner/server-seed-enabled.ts) the lookup is
+// not issued at all — that is the whole point, and
+// tests/planner-seed-disabled.test.ts asserts it against the real constant. The
+// labelling logic stays fully covered here so turning the feature on is a
+// reviewed flip rather than a rewrite.
+vi.mock("@/lib/planner/server-seed-enabled", () => ({
+  PLANNER_SERVER_SEED_ENABLED: true,
+  SSR_USER_ID_FORWARDING_ENABLED: true,
+}));
+
 import {
   buildPlannerHydrateBundle,
   type PlannerHydrateBundle,
@@ -28,6 +39,7 @@ import type { Lesson } from "@/lib/types";
 
 const OWNER = "owner-uuid";
 const GRADE = "grade-uuid";
+const SCHOOL = "school-uuid";
 
 function lesson(id: string): Lesson {
   return {
@@ -67,6 +79,7 @@ describe("buildPlannerHydrateBundle — concurrency", () => {
     const units = deferred<unknown[]>();
     const standards = deferred<Record<string, string>>();
     const sections = deferred<Record<string, unknown[]>>();
+    const school = deferred<string | null>();
 
     const source = {
       getActiveGradeLevelId: () => {
@@ -93,6 +106,10 @@ describe("buildPlannerHydrateBundle — concurrency", () => {
         started.push("sections");
         return sections.promise;
       },
+      getGradeSchoolId: () => {
+        started.push("school");
+        return school.promise;
+      },
     } as unknown as PlannerDataSource;
 
     const bundle = buildPlannerHydrateBundle(source, OWNER);
@@ -108,12 +125,16 @@ describe("buildPlannerHydrateBundle — concurrency", () => {
     // THE ASSERTION THE OLD PATH FAILED. Nothing has resolved yet, and all four
     // catalog reads have nevertheless been issued. A serial implementation would
     // be sitting on ["grade", "lessons"] here.
+    // The school lookup that LABELS the bundle rides the same wave: it is keyed
+    // on the grade, so it has the same single dependency the catalog reads have
+    // and must not be paid for serially after them.
     expect(started).toEqual([
       "grade",
       "lessons",
       "subjects",
       "units",
       "standards",
+      "school",
     ]);
 
     // Sections must NOT start until the lessons are known — it is keyed on their
@@ -124,12 +145,14 @@ describe("buildPlannerHydrateBundle — concurrency", () => {
     subjects.resolve([]);
     units.resolve([]);
     standards.resolve({});
+    school.resolve("school-uuid");
     await settleMicrotasks();
     expect(started).toContain("sections");
 
     sections.resolve({});
     const result = await bundle;
     expect(result.gradeLevelId).toBe(GRADE);
+    expect(result.schoolId).toBe("school-uuid");
     expect(result.lessons).toHaveLength(1);
   });
 
@@ -146,6 +169,7 @@ describe("buildPlannerHydrateBundle — concurrency", () => {
       listStandards: async () => (count("standards"), {}),
       getSections: async () => (count("getSections"), []),
       getSectionsBatch: async () => (count("sections"), {}),
+      getGradeSchoolId: async () => (count("school"), "school-uuid"),
     } as unknown as PlannerDataSource;
 
     await buildPlannerHydrateBundle(source, OWNER);
@@ -157,6 +181,7 @@ describe("buildPlannerHydrateBundle — concurrency", () => {
       units: 1,
       standards: 1,
       sections: 1,
+      school: 1,
     });
     // The per-lesson read must never be reached from a hydrate — that N+1 is
     // what `getSectionsBatch` replaced.
@@ -175,6 +200,7 @@ describe("buildPlannerHydrateBundle — branches", () => {
       listUnits: vi.fn(async () => []),
       listStandards: vi.fn(async () => ({})),
       getSectionsBatch: vi.fn(async () => ({})),
+      getGradeSchoolId: vi.fn(async () => SCHOOL),
       ...over,
     } as unknown as PlannerDataSource &
       Record<string, ReturnType<typeof vi.fn>>;
@@ -271,6 +297,76 @@ describe("buildPlannerHydrateBundle — branches", () => {
     } finally {
       err.mockRestore();
     }
+  });
+
+  // ── WHOSE DOCUMENT IS THIS: the label must come from the DATA ──────────────
+  // The server-seed label used to be produced by reading the teacher's
+  // ACTIVE-WORKSPACE POINTER before and after the ~4.4 s hydrate and publishing
+  // only if it had not moved. A bracket cannot observe the middle of what it
+  // brackets, so an A → B → A switch inside the window produced a label
+  // asserting something the code never verified. These pin the replacement: the
+  // label is keyed on the GRADE the reads were actually scoped by.
+
+  it("reports the school of the grade it ACTUALLY scoped its reads by", async () => {
+    const src = spySource();
+
+    const bundle = await buildPlannerHydrateBundle(src, OWNER);
+
+    expect(bundle.schoolId).toBe(SCHOOL);
+    // THE ASSERTION THAT MAKES IT BY-CONSTRUCTION rather than coincidental: the
+    // label was looked up with the same grade id the catalog reads used. Keyed
+    // on the grade, the answer cannot drift with the teacher's active workspace
+    // — a grade does not change schools — so there is no window to slip through.
+    expect(src.getGradeSchoolId).toHaveBeenCalledWith(bundle.gradeLevelId);
+    expect(src.getGradeSchoolId).toHaveBeenCalledWith(GRADE);
+  });
+
+  it("reports NO school when there is no grade — never a stale one", async () => {
+    const src = spySource({
+      getActiveGradeLevelId: vi.fn(async () => null),
+    } as Partial<PlannerDataSource>);
+
+    const bundle = await buildPlannerHydrateBundle(src, OWNER);
+
+    expect(bundle.schoolId).toBeNull();
+    // Nothing to key the label on, so nothing is claimed. `buildServerSeed`
+    // refuses to publish a seed it cannot name, which is the fail-closed end of
+    // this: no label, no seed, ordinary backend read.
+    expect(src.getGradeSchoolId).not.toHaveBeenCalled();
+  });
+
+  it("keeps the document when the label lookup fails — it is a LABEL, not data", async () => {
+    // Asymmetry on purpose, matching the sections batch below rather than the
+    // primary reads: a teacher must not lose their plan because the thing that
+    // NAMES it fell over. The cost of the failure is that no seed is published.
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const src = spySource({
+        getGradeSchoolId: vi.fn(async () => {
+          throw new Error("grade_levels read refused");
+        }),
+      } as unknown as Partial<PlannerDataSource>);
+
+      const bundle = await buildPlannerHydrateBundle(src, OWNER);
+
+      expect(bundle.schoolId).toBeNull();
+      expect(bundle.gradeLevelId).toBe(GRADE);
+      expect(bundle.lessons).toHaveLength(1);
+      expect(err).toHaveBeenCalled();
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  it("labels a zero-lesson grade too, so a cold-start workspace can still be seeded", async () => {
+    const src = spySource({
+      listLessons: vi.fn(async () => []),
+    } as unknown as Partial<PlannerDataSource>);
+
+    const bundle = await buildPlannerHydrateBundle(src, OWNER);
+
+    expect(bundle.lessons).toEqual([]);
+    expect(bundle.schoolId).toBe(SCHOOL);
   });
 
   // The raw message must NOT ride back to the browser: Next redacts an uncaught

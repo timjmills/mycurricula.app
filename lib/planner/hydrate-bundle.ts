@@ -37,6 +37,7 @@
 import type { Lesson, StandardsMap, Subject, Unit } from "../types";
 import type { LessonSectionContent } from "../lesson-flow";
 import type { PlannerDataSource } from "./source";
+import { PLANNER_SERVER_SEED_ENABLED } from "./server-seed-enabled";
 
 /**
  * Everything one planner hydrate needs, resolved together.
@@ -49,6 +50,28 @@ export interface PlannerHydrateBundle {
    *  Null is a REAL answer (settle to "empty"), never an error — a failed lookup
    *  throws instead, exactly as `resolveGrade` documents. */
   gradeLevelId: string | null;
+  /**
+   * The school (workspace) that owns `gradeLevelId` — i.e. WHOSE DOCUMENT THIS
+   * IS, established from the data rather than asserted about it.
+   *
+   * Null when there is no grade to derive it from (the empty bundle), when the
+   * lookup failed or was refused by RLS, or — the ordinary case today — when the
+   * server seed is switched off and the lookup is never issued at all
+   * (lib/planner/server-seed-enabled.ts). Null is not "any workspace": the only
+   * consumer, the server-seed label (lib/planner/server-seed.ts), refuses to
+   * publish a seed it cannot name, and `scopeDescribesBundle` refuses a null
+   * school outright. Nothing else in the app reads this field, which is why it
+   * can be left unresolved on the path everyone is actually on.
+   *
+   * WHY IT IS RESOLVED HERE. The seed used to be labelled by reading the
+   * teacher's ACTIVE-WORKSPACE POINTER before and after the read and requiring
+   * it to be unchanged — evidence that the window was probably stable, not proof
+   * of what the reads used. A pointer read cannot observe the middle of a read
+   * it brackets. This is keyed on the grade the reads were ACTUALLY scoped by,
+   * so a workspace that moves mid-read cannot produce a wrong label: the answer
+   * is a fact about the rows, not an inference about a window.
+   */
+  schoolId: string | null;
   lessons: Lesson[];
   subjects: Subject[];
   units: Unit[];
@@ -74,6 +97,7 @@ export interface PlannerHydrateBundle {
 function emptyBundle(): PlannerHydrateBundle {
   return {
     gradeLevelId: null,
+    schoolId: null,
     lessons: [],
     subjects: [],
     units: [],
@@ -112,11 +136,40 @@ export async function buildPlannerHydrateBundle(
   // the sum. All four are grade-scoped, and none falls back to mock data — a
   // failure propagates so the store keeps EMPTY_DOC rather than showing another
   // grade's fixtures.
-  const [lessons, subjects, units, standards] = await Promise.all([
+  const [lessons, subjects, units, standards, schoolId] = await Promise.all([
     source.listLessons(gradeLevelId, ownerId),
     source.listSubjects(gradeLevelId),
     source.listUnits(gradeLevelId),
     source.listStandards(gradeLevelId),
+    // WHOSE document this is, keyed on the grade the four reads above are scoped
+    // by — see the `schoolId` field doc. It rides this `Promise.all` so it costs
+    // no wall-clock time, and its failure is NON-FATAL: it is a label, not part
+    // of the document, and a hydrate must not fail because the thing that names
+    // it did. A null label refuses a seed (fail closed) and changes nothing
+    // else, so the asymmetry matches the sections batch below rather than the
+    // primary reads.
+    //
+    // ⚠ AND IT IS NOT ISSUED AT ALL WHEN THE SEED IS OFF. This label exists ONLY
+    // to let `buildServerSeed` name a seed; nothing else reads `schoolId`. Left
+    // unconditional it would add a `grade_levels` lookup to EVERY ordinary
+    // hydrate — the path 100% of teachers are on — on behalf of a feature that
+    // is switched off. The `.catch` covers a failure, not LATENCY: a slow or
+    // hung lookup would delay the hydrate itself.
+    //
+    // The premise for landing this dark was that a disabled build behaves
+    // exactly as it did before the work existed. A disabled build that still
+    // pays for one of the feature's queries is not inert, so the read is gated
+    // rather than merely tolerated. An already-resolved promise in its place
+    // keeps this array's shape and adds nothing to the wall clock.
+    PLANNER_SERVER_SEED_ENABLED
+      ? source.getGradeSchoolId(gradeLevelId).catch((err: unknown) => {
+          console.error(
+            "[planner] hydrate bundle: could not resolve the grade's school; the document still loads and no server seed will be published",
+            err,
+          );
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
 
   // No lessons → skip the sections batch (there is nothing to batch) but STILL
@@ -126,6 +179,7 @@ export async function buildPlannerHydrateBundle(
   if (lessons.length === 0) {
     return {
       gradeLevelId,
+      schoolId,
       lessons,
       subjects,
       units,
@@ -155,6 +209,7 @@ export async function buildPlannerHydrateBundle(
 
   return {
     gradeLevelId,
+    schoolId,
     lessons,
     subjects,
     units,

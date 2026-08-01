@@ -23,6 +23,7 @@
 
 import type { PlannerDataSource } from "./source";
 import { isPlannerSupabaseConfigured } from "./source";
+import { isClientCallable } from "./dispatch-surface";
 import { plannerMockSource } from "./mock-source";
 import { plannerSupabaseSource } from "./supabase-source";
 import {
@@ -52,14 +53,27 @@ export async function plannerDispatch<M extends keyof PlannerDataSource>(
 ): Promise<Awaited<ReturnType<PlannerDataSource[M]>>> {
   const src = source();
   // SECURITY: see teachDispatch — a `'use server'` boundary (HTTP endpoint) with
-  // a runtime-erased generic, so `method` is an attacker-controlled string. Only
-  // dispatch to an OWN, callable property of the source object literal; fail
-  // closed otherwise.
+  // a runtime-erased generic, so `method` is an attacker-controlled string.
+  //
+  // TWO CHECKS, AND THE FIRST ONE IS THE ONE THAT DECIDES WHAT IS PUBLIC.
+  // `isClientCallable` consults an EXPLICIT allowlist (./dispatch-surface),
+  // because the own-property test below cannot: it admits whatever happens to be
+  // on the source object, so every method added to `PlannerDataSource` became a
+  // public endpoint whether or not anyone meant to publish one. The own-property
+  // + typeof pair stays as defence in depth — the allowlist says a method MAY be
+  // called, this says it exists and is callable on the source actually selected.
+  //
+  // ONE MESSAGE FOR BOTH OUTCOMES, deliberately: distinguishing "no such method"
+  // from "not exposed" would turn this endpoint into an enumeration oracle for
+  // the seam's shape.
   if (
+    !isClientCallable(method) ||
     !Object.prototype.hasOwnProperty.call(src, method) ||
     typeof src[method] !== "function"
   ) {
-    throw new Error(`plannerDispatch: unknown method "${String(method)}"`);
+    throw new Error(
+      `plannerDispatch: method "${String(method)}" is not client-callable`,
+    );
   }
   const fn = src[method] as (
     ...a: Parameters<PlannerDataSource[M]>

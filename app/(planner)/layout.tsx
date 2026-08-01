@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { headers } from "next/headers";
 import { AppStateProvider } from "@/lib/app-state";
+import { USER_ID_HEADER } from "@/lib/supabase/user-header";
 import { CatchupProvider } from "@/lib/catchup-state";
 import { ConsequenceToastProvider } from "@/lib/consequence-toast";
 import { EditModeProvider } from "@/lib/edit-mode-state";
@@ -19,6 +21,11 @@ import {
   WriteFailureBridge,
 } from "@/components/shell";
 import { ChromeShell } from "@/components/chrome";
+import { PlannerSeedGate, PlannerServerSeed } from "@/components/planner-seed";
+import {
+  PLANNER_SERVER_SEED_ENABLED,
+  SSR_USER_ID_FORWARDING_ENABLED,
+} from "@/lib/planner/server-seed-enabled";
 import { ComposerProvider } from "@/components/composer";
 import { UnitWorkspaceProvider } from "@/components/year-v2/workspace-host";
 import { V2 } from "@/lib/v2-flag";
@@ -123,19 +130,98 @@ function PlannerOverlayProviders({
 // into view above the top bar. The `<main>` element carries `id="main-content"`
 // so the link's href="#main-content" delivers focus to the canvas.
 
-export default function PlannerLayout({
+export default async function PlannerLayout({
   children,
 }: {
   children: ReactNode;
-}): ReactNode {
+}): Promise<ReactNode> {
+  // ── THE AUTH ROUND TRIP THE BROWSER NO LONGER HAS TO MAKE ─────────────────
+  // Middleware already called `supabase.auth.getUser()` for the auth gate on
+  // this very request and forwarded the answer on `x-mc-user-id`
+  // (lib/supabase/middleware.ts). Reading it here costs ZERO extra calls —
+  // notably NOT a second `getUser()`, which would be a real round trip on the
+  // TTFB path, in a layout that is not behind a Suspense boundary.
+  //
+  // ⚠ CACHE-ISOLATION INVARIANT, NOW CARRYING IDENTITY. app/layout.tsx §95-98
+  // already requires that this SSR HTML never enter a shared cache, because it
+  // varies on the theme cookie. The payload now also contains the teacher's auth
+  // uuid and (streamed below) their planner document, so a cache mistake would
+  // leak IDENTITY AND DATA, not a colour scheme. No `revalidate`, no
+  // `force-static`, no `"use cache"`, no `Cache-Control` on this path — reading
+  // headers here keeps the route dynamic on its own account as well.
+  //
+  // Signed out → no header → null → byte-identical to the previous behaviour:
+  // the store settles the empty document honestly rather than pretending.
+  //
+  // KNOWN GAP, deliberately not worked around: the Bearer-header form of the
+  // Claude bypass mints session cookies onto the RESPONSE but never onto
+  // `request.cookies` (lib/claude-bypass.ts), so middleware's `getUser()` sees
+  // no session and this renders signed-out. The `?claude=` URL form redirects
+  // first and is unaffected. Anyone smoke-testing SSR with a Bearer header will
+  // see a signed-out render and should not file it as broken SSR.
+  //
+  // ⚠ GATED OFF (lib/planner/server-seed-enabled.ts). Forwarding the server's
+  // identity is the ROOT CONDITION behind this lane's two cross-user findings:
+  // it makes `currentUser.id` the SERVER's answer for the whole window before
+  // the browser confirms who it is. With the switch off this reads null, and
+  // `currentUser` stays FALLBACK_USER until the browser's own auth resolves —
+  // the behaviour that shipped before any of this work.
+  const initialUserId = SSR_USER_ID_FORWARDING_ENABLED
+    ? (await headers()).get(USER_ID_HEADER)
+    : null;
+  // One id per SERVER render of this layout, handed to both halves of the
+  // server-seed handshake. It is what lets the client channel tell a FRESH page
+  // render — which supersedes any earlier seed, so a second planner navigation
+  // is seeded too — from a re-render of the same one, which must not disturb a
+  // hydrate already awaiting it. Never rendered into the DOM and never compared
+  // against anything a client supplies, so it carries no security weight; it is
+  // an identity, not a token.
+  const seedRenderId = crypto.randomUUID();
   return (
-    <AppStateProvider>
+    <AppStateProvider initialUserId={initialUserId}>
       {/* W-E NotebookProvider: workspace + notebook selection state.
           Sits inside AppStateProvider so Phase 1B can wire isWorkspaceAdmin
           from currentUser.id. Outside PlannerProvider — notebook selection
           is at the workspace tier, broader than any single planner session. */}
       <NotebookProvider>
         <PlannerProvider>
+          {/* ── SERVER-SEEDED HYDRATE ────────────────────────────────────
+              The planner document, read during THIS server render rather
+              than ~2.5s later from the browser. Measured on production
+              (scripts/probe-f3-ttu.mjs, n=5, cold): the client could not put
+              the hydrate POST on the wire until 1961–2519ms — after the app
+              bundle downloaded, React mounted, and the auth session
+              resolved — while the server held the session cookie the whole
+              time and did nothing with it.
+
+              TWO PARTS, AND THE SPLIT IS LOAD-BEARING.
+              • <PlannerSeedGate> never suspends, so it ships in the FIRST
+                flush and its render announces "a seed is coming" before the
+                store's hydrate effect runs and decides to fetch one.
+              • <PlannerServerSeed> awaits the database, so it MUST sit
+                behind <Suspense> — otherwise the whole document would block
+                on the read and the browser could not start downloading JS
+                until it finished, which is the serialisation this is
+                removing, relocated to the server.
+
+              Neither renders DOM. `fallback={null}` is the honest fallback:
+              there is nothing to show a placeholder FOR, and the surfaces
+              below already render their own loading state from the store's
+              `hydration` lifecycle. Nothing about what a teacher sees while
+              waiting changes — only how long they wait.
+
+              The store is untouched: the seed is collected inside
+              `loadPlannerHydrateBundle` (lib/planner/client.ts), the call the
+              store already makes. Flag OFF (the mock path) the seed resolves
+              `{ ok: false }` immediately and everything below is unchanged. */}
+          {PLANNER_SERVER_SEED_ENABLED ? (
+            <>
+              <PlannerSeedGate renderId={seedRenderId} />
+              <Suspense fallback={null}>
+                <PlannerServerSeed renderId={seedRenderId} />
+              </Suspense>
+            </>
+          ) : null}
           {/* UnitNotesProvider hosts per-unit "Don't miss" callout persistence.
               No seeds needed here — SubjectView reads from the live mock unit
               data; any saved notes come from localStorage post-mount.

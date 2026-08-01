@@ -1418,6 +1418,37 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return assign?.grade_level_id ?? null;
   },
 
+  async getGradeSchoolId(gradeLevelId) {
+    // The school that OWNS the grade, which is the school every read scoped by
+    // that grade belongs to. Same one-column lookup `resolveActiveSchoolYearId`
+    // already performs; kept separate rather than folded into it because that
+    // one is a per-request memo for a different purpose.
+    //
+    // RLS GATES THIS, BUT NOT UNIFORMLY — and the difference is worth stating
+    // rather than rounding off. `grade_levels_read` is
+    // `school_id = auth_teacher_school_id() OR is_school_admin(school_id)`
+    // (verified against the live catalog). For an ORDINARY member, a workspace
+    // that has moved away from this grade makes the row invisible, so this
+    // returns null, so no seed is published — the race resolves to "no
+    // optimisation". A SCHOOL ADMIN reads it successfully instead, because of
+    // the second arm.
+    //
+    // That difference costs nothing, because suppression was never the
+    // guarantee: the answer is the grade's REAL school either way, so an admin
+    // simply gets a correctly-labelled seed, which their client then accepts or
+    // refuses on its own expectation like anyone else's.
+    const client = await sb();
+    const res = await client
+      .from("grade_levels")
+      .select("school_id")
+      .eq("id", gradeLevelId)
+      .maybeSingle();
+    const row = unwrapMaybe(res, "get grade school") as {
+      school_id: string | null;
+    } | null;
+    return row?.school_id ?? null;
+  },
+
   async listLessons(gradeLevelId, ownerId, opts) {
     const client = await sb();
 

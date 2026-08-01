@@ -72,6 +72,9 @@ import { PlannerProvider } from "@/lib/planner-store";
 function bundleValue(lessonCount: number) {
   return {
     gradeLevelId: GRADE,
+    // The school the reads were scoped by — the bundle reports it so a server
+    // seed can be labelled with a fact about the rows rather than an inference.
+    schoolId: "school-uuid",
     lessons: Array.from({ length: lessonCount }, (_, i) => ({
       id: `l${i}`,
       subject: "math",

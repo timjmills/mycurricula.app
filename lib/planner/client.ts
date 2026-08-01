@@ -30,6 +30,9 @@ import {
   buildPlannerHydrateBundle,
   type PlannerHydrateBundle,
 } from "./hydrate-bundle";
+import { takeServerSeed } from "./hydrate-seed";
+import { readExpectedSeedIdentity } from "./seed-scope";
+import { PLANNER_SERVER_SEED_ENABLED } from "./server-seed-enabled";
 
 /** Whether the running app persists planner data to Supabase via the server
  *  action layer. Defaults OFF: the prototype renders against the mock. Flip on
@@ -75,18 +78,58 @@ export type { PlannerHydrateBundle };
  * here: there is exactly one place in the client bundle that decides mock vs.
  * server, so the flag can never disagree with itself.
  *
- *   • USE_SUPABASE → one Server Action (`plannerHydrateBundleAction`). The six
- *     reads it performs run inside that single invocation, so they finally
- *     overlap instead of queueing behind each other. See ./hydrate-bundle.
+ *   • USE_SUPABASE → the bundle the SERVER already built during this page's
+ *     render if one is waiting (see below), otherwise one Server Action
+ *     (`plannerHydrateBundleAction`). The reads it performs run inside that
+ *     single invocation, so they overlap instead of queueing. See
+ *     ./hydrate-bundle.
  *   • default (the mock, which is how localhost runs) → the SAME bundle
  *     function, executed directly against `plannerMockSource` in the browser.
  *     No server action, no round trip, and the identical sequence of source
  *     calls the store made before — so the mock path is unchanged in both
  *     behaviour and cost.
+ *
+ * ── THE SEED SHORT-CIRCUIT, AND WHY IT IS HERE ────────────────────────────────
+ * The store cannot ask for the document until React has mounted and the auth
+ * session has resolved. Measured on production (scripts/probe-f3-ttu.mjs, n=5,
+ * cold cache) that put the hydrate POST on the wire at 1961–2519 ms — time the
+ * server spent idle holding the session cookie it needed to answer.
+ * `app/(planner)/layout.tsx` therefore starts the identical read during the page
+ * render, and `takeServerSeed` collects it here.
+ *
+ * THIS FUNCTION IS THE ONLY PLACE THAT KNOWS. The store still performs exactly
+ * one hydrate, at the same point in its lifecycle, through the same call — so
+ * its undo/redo reset, prior-owner leak guard, retry budget and
+ * cancelled-vs-failed classification are all untouched, because none of them
+ * were ever about where the bytes came from. A seed that is absent, late,
+ * failed, or belongs to a different owner OR A DIFFERENT WORKSPACE returns null
+ * and this falls through to the action, which is the behaviour that shipped
+ * before it existed.
  */
 export async function loadPlannerHydrateBundle(
   ownerId: string,
 ): Promise<PlannerHydrateBundle> {
-  if (USE_SUPABASE) return plannerHydrateBundleAction(ownerId);
+  if (USE_SUPABASE) {
+    // THE OTHER HALF OF THE CONSUMER GATE (./server-seed-enabled). With the
+    // switch off this is the whole of the seed path: one constant, and the
+    // hydrate is the Server Action round trip it has always been — re-scoped by
+    // RLS under the browser's own cookies, which is the safety property the seed
+    // could not match. `takeServerSeed` refuses independently.
+    if (!PLANNER_SERVER_SEED_ENABLED) {
+      return plannerHydrateBundleAction(ownerId);
+    }
+    // The second argument answers WHO is looking and WHERE they are, read from
+    // the browser's own session rather than from anything the server put in the
+    // page — `ownerId` above is the server's answer forwarded through
+    // `x-mc-user-id`, so it cannot check itself. Passed as a thunk so it costs a
+    // request only when a seed is actually waiting to be checked:
+    // `takeServerSeed` calls it after it has claimed one, and lets it overlap
+    // the wait for a seed that is usually still streaming.
+    const seeded = await takeServerSeed(ownerId, () =>
+      readExpectedSeedIdentity(ownerId),
+    );
+    if (seeded) return seeded;
+    return plannerHydrateBundleAction(ownerId);
+  }
   return buildPlannerHydrateBundle(plannerMockSource, ownerId);
 }

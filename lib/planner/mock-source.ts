@@ -252,6 +252,19 @@ export const plannerMockSource: PlannerDataSource = {
     return "g5";
   },
 
+  async getGradeSchoolId(_gradeLevelId: string): Promise<string | null> {
+    // NULL, AND DELIBERATELY NOT A PLACEHOLDER STRING. The prototype has no
+    // `schools` entity at all — there is one implicit grade and no workspace to
+    // name. The only consumer is the server-seed label (lib/planner/
+    // server-seed.ts), which refuses to publish a seed it cannot name; the mock
+    // path never produces a seed in the first place (it never round-trips), so
+    // null is both the truthful answer and the fail-closed one. Inventing
+    // "mock-school" here would put a value into a tenancy check that means
+    // nothing.
+    void _gradeLevelId;
+    return null;
+  },
+
   async listLessons(
     _gradeLevelId: string,
     _ownerId: string,
