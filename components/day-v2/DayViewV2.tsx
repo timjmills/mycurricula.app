@@ -1,25 +1,76 @@
 "use client";
 
-// DayViewV2.tsx — the frame switcher for the v2 Day VIEW canvas. The appearance
-// frame (useTheme().frame) selects one of three faithful renderings of the same
-// day:
-//   • "glass" → DayA  — Calm Recede vertical timeline
-//   • "paper" → DayB  — Bright Workspace rail + focus
-//   • "color" → DayC  — Color-forward agenda + hero
+// DayViewV2.tsx — the v2 Day VIEW canvas, and the one place that decides what
+// /daily renders.
+//
+// ── WHAT SHIPS ─────────────────────────────────────────────────────────────
+// <DayFocus> — the handoff's focus card + agenda rail — for EVERY appearance
+// frame and EVERY theme. It used to be a frame SWITCHER ("glass" → DayA, a
+// vertical timeline; "paper" → DayB, a rail + white focus panel; "color" →
+// DayC, an agenda + tinted hero), so a teacher who changed their background
+// material also changed the Day's INFORMATION ARCHITECTURE. The user retired
+// that on 2026-08-01: the appearance axes drive material and colour, never
+// layout.
+//
+// ── WHY DayA / DayB / DayC ARE STILL HERE ──────────────────────────────────
+// They were deleted, and the user asked for them back the same day: "keep all
+// three of the views until later and then I will get rid of or merge some of
+// the views." So they are RETAINED, not rendered by default, and reachable on
+// demand:
+//
+//     /daily?dayview=a      the glass vertical timeline (legacy)
+//     /daily?dayview=b      the paper rail + white focus panel (legacy)
+//     /daily?dayview=c      the colour agenda + tinted hero (DayFocus's parent)
+//     /daily                <DayFocus> — the default, and the only one a
+//                           teacher sees without typing a URL
+//
+// This exists so the three can be COMPARED before the merge/delete decision.
+// It is not a preference, is not persisted, and appears in no UI. When that
+// decision lands, delete the files, this switch, and the three re-export lines
+// held open for them in ./atoms and ./util.
+//
+// Two deliberate mechanics:
+//   * The param is read from `window.location` in a mount effect, NOT via
+//     useSearchParams — the same call the repo already makes in
+//     components/daily/LessonDetail.tsx:282, because useSearchParams drags a
+//     Suspense-boundary requirement into a deep client tree. The consequence is
+//     that the FIRST paint is always DayFocus and a legacy frame swaps in after
+//     hydration. That is the right trade for an inspection affordance: the
+//     default render is never gated on client state.
+//   * The legacy frames are imported STATICALLY, which is the boring choice and
+//     a deliberate one. `next/dynamic({ ssr: false })` would keep them out of
+//     /daily's initial bundle (task #53's concern), but its chunk never
+//     resolves under the repo's test harness — react-dom/client over linkedom,
+//     no bundler — so the escape hatch became unverifiable: the "no param →
+//     DayFocus" tests passed and the control that proves the legacy branch is
+//     live could not. An untestable lazy boundary on three components that are
+//     scheduled for deletion is a worse trade than the bytes. They share almost
+//     every dependency with DayFocus (the same atoms, the same CSS module,
+//     day-status, lessonTime, UnitChip), so the marginal cost is the component
+//     bodies alone. Delete them and this is moot.
+//
+// It deliberately does NOT read useTheme(): a frame read HERE is what the
+// retirement removed, and re-adding one would reintroduce the layout branch.
 //
 // Builder B (DailyView) owns integration: it filters + orders the visible day's
 // lessons, renders the holiday banner/empty-state, and passes the existing
 // prev/next, planner-open, and quick-add seams through DayViewV2Props. Every
-// other piece of state (lessons, completion, selection, subjects) each frame
+// other piece of state (lessons, completion, selection, subjects) the canvas
 // reads directly from the stores (the W3.8c precedent), so the shell contract
 // stays small.
 
-import { type ReactNode } from "react";
-import { useTheme } from "@/lib/theme";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
+import { DayFocus } from "./DayFocus";
 import { DayA } from "./DayA";
 import { DayB } from "./DayB";
 import { DayC } from "./DayC";
+
+/** The retained legacy frames, by `?dayview=` value. Anything else — absent,
+ *  empty, misspelled, hostile — falls through to <DayFocus>. */
+const LEGACY = { a: DayA, b: DayB, c: DayC } as const;
+
+type LegacyKey = keyof typeof LEGACY;
 
 export interface DayViewV2Props {
   /** The visible day's lessons, already filtered + ordered by the shell. */
@@ -34,21 +85,21 @@ export interface DayViewV2Props {
   dateLabel: string;
   /** Whether the visible day IS today. Gates the live "now"/"upcoming" split:
    *  when false, the wall clock never paints a false "now" ring / pulsing
-   *  Finish (every non-done lesson reads "Planned") and the B/C focus fallback
+   *  Finish (every non-done lesson reads "Planned") and the focus fallback
    *  becomes selectedId → first lesson (current/next are skipped). */
   isToday: boolean;
   /** The selected/focused lesson id, OWNED BY THE SHELL. The canvas does NOT
    *  read global selection: the /daily deep-link resolver keeps its selection
    *  in the shell's LOCAL state and deliberately clears the global
    *  selectedLessonId (the PR#27 warm-nav-bounce fix), so a global binding here
-   *  focuses the wrong lesson. B/C focus fallback: selectedId → current → next
+   *  focuses the wrong lesson. Focus fallback: selectedId → current → next
    *  → first (current/next skipped off-today). */
   selectedId: string | null;
-  /** Select/focus a lesson (or clear). Called wherever a row/rail/agenda item
-   *  is clicked or keyboard-activated; the shell owns the resulting state. */
+  /** Select/focus a lesson (or clear). Called wherever a rail row is clicked or
+   *  keyboard-activated; the shell owns the resulting state. */
   onSelect: (id: string | null) => void;
-  /** Pre-rendered holiday banner / empty-state — rendered above the lessons
-   *  (DayA) or in place of the focus/hero when there are no lessons (DayB/C).
+  /** Pre-rendered holiday banner / empty-state — rendered above the lessons as
+   *  a banner, or in place of the focus card when there are no lessons.
    *  Lessons still render when present. */
   holidayNode?: ReactNode | null;
   /** Prev/next day handler (handles week rollover in the shell). */
@@ -66,9 +117,35 @@ export interface DayViewV2Props {
   onAddEvent?: (() => void) | null;
 }
 
+/**
+ * The `?dayview=` value on a query string, or null for "render the default".
+ *
+ * Exported so the test drives the SHIPPED parse rather than re-implementing it:
+ * this one function is the whole switch, and a test that re-derived it would
+ * stay green while /daily regressed.
+ */
+export function readDayViewParam(search: string): LegacyKey | null {
+  const raw = new URLSearchParams(search).get("dayview");
+  return raw === "a" || raw === "b" || raw === "c" ? raw : null;
+}
+
 export function DayViewV2(props: DayViewV2Props): ReactNode {
-  const { frame } = useTheme();
-  if (frame === "paper") return <DayB {...props} />;
-  if (frame === "color") return <DayC {...props} />;
-  return <DayA {...props} />;
+  // null on the server and on the first client paint — see the mechanics note
+  // above. Only a recognised legacy key ever leaves this state.
+  const [legacy, setLegacy] = useState<LegacyKey | null>(null);
+  useEffect(() => {
+    const read = () => setLegacy(readDayViewParam(window.location.search));
+    read();
+    // Back/forward between /daily and /daily?dayview=a keeps this component
+    // mounted, so a read that only ran on mount would leave the previous frame
+    // on screen while the URL said otherwise. `popstate` covers the history
+    // buttons; a `router.push` that changed only the query would NOT fire it,
+    // and is deliberately not handled — nothing in the app links to
+    // `?dayview=`, it is typed. Revisit if it ever gains a UI control.
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, []);
+
+  const Legacy = legacy ? LEGACY[legacy] : null;
+  return Legacy ? <Legacy {...props} /> : <DayFocus {...props} />;
 }
