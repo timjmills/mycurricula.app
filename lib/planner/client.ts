@@ -25,7 +25,11 @@
 
 import type { PlannerDataSource } from "./source";
 import { plannerMockSource } from "./mock-source";
-import { plannerDispatch } from "./actions";
+import { plannerDispatch, plannerHydrateBundleAction } from "./actions";
+import {
+  buildPlannerHydrateBundle,
+  type PlannerHydrateBundle,
+} from "./hydrate-bundle";
 
 /** Whether the running app persists planner data to Supabase via the server
  *  action layer. Defaults OFF: the prototype renders against the mock. Flip on
@@ -61,3 +65,28 @@ export const plannerClient: PlannerDataSource = new Proxy(
     },
   },
 );
+
+export type { PlannerHydrateBundle };
+
+/**
+ * The planner document load as ONE call — grade + lessons + catalog + sections.
+ *
+ * Same branch as the Proxy above, and that is the whole point of putting it
+ * here: there is exactly one place in the client bundle that decides mock vs.
+ * server, so the flag can never disagree with itself.
+ *
+ *   • USE_SUPABASE → one Server Action (`plannerHydrateBundleAction`). The six
+ *     reads it performs run inside that single invocation, so they finally
+ *     overlap instead of queueing behind each other. See ./hydrate-bundle.
+ *   • default (the mock, which is how localhost runs) → the SAME bundle
+ *     function, executed directly against `plannerMockSource` in the browser.
+ *     No server action, no round trip, and the identical sequence of source
+ *     calls the store made before — so the mock path is unchanged in both
+ *     behaviour and cost.
+ */
+export async function loadPlannerHydrateBundle(
+  ownerId: string,
+): Promise<PlannerHydrateBundle> {
+  if (USE_SUPABASE) return plannerHydrateBundleAction(ownerId);
+  return buildPlannerHydrateBundle(plannerMockSource, ownerId);
+}

@@ -1,5 +1,17 @@
 // lib/planner/grade.ts — a thin grade-resolution helper for the planner store.
 //
+// STATUS: no production caller today. The store's hydrate now resolves the grade
+// inside `buildPlannerHydrateBundle` (lib/planner/hydrate-bundle.ts) so it costs
+// no separate round trip, and that function calls `getActiveGradeLevelId`
+// directly with NO catch — which is precisely the contract this file documents
+// below, enforced in its new home (and pinned by
+// tests/planner-hydrate-bundle.test.ts). This module is kept because it IS the
+// revert path for that change: restoring the store's six-await hydrate means
+// importing `resolveGrade` again. Delete it only together with that option.
+//
+// Cannot simply be called BY the bundle: `plannerClient` imports the bundle, so
+// routing the bundle back through this file would close an import cycle.
+//
 // The store hydrates against a grade uuid, but the reducer only knows the
 // signed-in teacher's owner uuid (from the Supabase Auth session via
 // app-state's `currentUser.id`). This wrapper turns an owner uuid into the

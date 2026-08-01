@@ -110,6 +110,16 @@ import {
   sb,
   type ServerClient,
 } from "../supabase/helpers";
+// Ceiling-safe reads. PostgREST silently caps every response at this project's
+// measured 1000-row `db-max-rows`, so any read whose result set can grow past
+// that must paginate, and any read that does NOT paginate must assert it did
+// not land exactly on the ceiling. See the header of paged-read.ts.
+import {
+  assertNotTruncated,
+  pagedSelect,
+  type PageRequest,
+  type PageResult,
+} from "./paged-read";
 import {
   resolveCodesToStandardIds,
   resolveStandardsByIds,
@@ -127,6 +137,15 @@ const unwrapMaybe = makeUnwrapMaybe("Planner repository");
 // proxy length limit. `chunkedIn` slices the id set into fixed-size batches,
 // runs `query(idsChunk)` per batch, and concatenates the rows. An empty id set
 // short-circuits to `[]` (PostgREST `.in("col", [])` is valid but wasteful).
+//
+// CHUNKING IS NOT PAGINATION (task #48). Bounding the id set bounds the URL, not
+// the RESPONSE: one chunk of 150 lesson ids can match far more than 150 rows
+// (`lesson_sections` holds several sections per lesson, in both a team and a
+// personal flavour), and the response is still capped at the PostgREST row
+// ceiling — silently. So each chunk runs through `pagedSelect`, which means the
+// caller's builder must accept a cursor page: `.gt(cursorCol, after)` +
+// `.order(cursorCol)` + `.limit(page.limit)`, on a column that is unique under
+// that query's filters. See paged-read.ts for why the cursor is not an offset.
 
 /** Max ids per `.in(...)` batch. ~150 keeps each request URL well under the
  *  typical 2–8KB proxy/URL ceiling even with uuid (36-char) ids. */
@@ -134,19 +153,54 @@ const IN_CHUNK_SIZE = 150;
 
 async function chunkedIn<T>(
   ids: string[],
+  cursorOf: (row: T) => string,
   query: (
     idsChunk: string[],
-  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+    page: PageRequest,
+  ) => PromiseLike<PageResult<T>>,
   context: string,
 ): Promise<T[]> {
   if (ids.length === 0) return [];
   const out: T[] = [];
   for (let i = 0; i < ids.length; i += IN_CHUNK_SIZE) {
     const chunk = ids.slice(i, i + IN_CHUNK_SIZE);
-    const res = await query(chunk);
-    out.push(...(unwrap(res, context) as T[]));
+    out.push(
+      ...(await pagedSelect<T>(context, cursorOf, (page) =>
+        query(chunk, page),
+      )),
+    );
   }
   return out;
+}
+
+/** `.select()` options for one `pagedSelect` page. The exact row total is asked
+ *  for on the FIRST page only — it rides along on that request's
+ *  `content-range`, so completeness is checkable for one COUNT, not one per
+ *  page. */
+function countOpt(page: PageRequest): { count: "exact" } | undefined {
+  return page.withCount ? { count: "exact" } : undefined;
+}
+
+/** Restore the planner's presentation order after a cursor-paged read.
+ *
+ *  Cursor paging orders by the unique cursor column, not by the domain's
+ *  (week, position) order, so lesson reads re-sort here. `id` is the final
+ *  tiebreak, which makes the order TOTAL — the DB-side ordering it replaces was
+ *  not, and two rows tied on (week, position) could come back either way round
+ *  between requests. */
+function sortLessonRows<
+  T extends {
+    id: string;
+    week_number: number;
+    display_order_within_day: number | null;
+  },
+>(rows: T[]): T[] {
+  return [...rows].sort(
+    (a, b) =>
+      a.week_number - b.week_number ||
+      (a.display_order_within_day ?? 0) - (b.display_order_within_day ?? 0) ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
 }
 
 /** True when `s` looks like a canonical uuid (8-4-4-4-12 hex). Used to tell a
@@ -1045,21 +1099,100 @@ function subjectSlugOf(
   return (SUBJECT_IDS.has(row.color) ? row.color : "math") as SubjectId;
 }
 
-/** Load the grade's subjects as rows, plus uuid→slug + uuid→SubjectId indexes. */
-async function loadSubjectIndex(
+// ── Reference-index memos (per client, per grade) ────────────────────────────
+// Subjects / units / standards are REFERENCE data: a hydrate reads the same
+// three tables from several methods (`listLessons` needs all three, `listUnits`
+// needs units + subjects, `listSubjects` needs subjects, `listStandards` needs
+// standards), so one document load re-read subjects 3×, units 2× and the
+// standards pair 2×.
+//
+// Keyed on the CLIENT, exactly like `schoolWeekCache` / `activeYearCache` above,
+// which makes the scope self-limiting: while every call built its own client
+// these caches could never hit, so behaviour was unchanged; inside
+// `withSharedServerClient` (the hydrate bundle) one client is shared and the
+// duplicates collapse to one read each. Nothing survives the scope — the entry
+// dies with the client object.
+//
+// SAFE BECAUSE NO CALLER WRITES THESE TABLES AND THEN RE-READS THEM THROUGH THE
+// INDEX. `updateUnitFields` is the one path that writes `units` mid-request, and
+// its confirm read (`reloadUnit`) selects the row DIRECTLY rather than through
+// `loadUnitIndex`, so it cannot be served a pre-write row. If a future mutator
+// writes subjects/units/standards and then re-reads through one of these
+// loaders inside a shared-client scope, it must invalidate the entry (or resolve
+// the row directly, as `reloadUnit` does) — a memo that silently serves a
+// pre-write row is exactly the bug this note exists to prevent.
+//
+// A REJECTED load is EVICTED rather than cached, so a failure is never latched
+// for the rest of the scope; the next caller re-attempts, which is what an
+// un-memoized call would have done.
+function memoPerClient<T>(
+  cache: WeakMap<object, Map<string, Promise<T>>>,
   client: ServerClient,
-  gradeLevelId: string,
-): Promise<{
+  key: string,
+  load: () => Promise<T>,
+): Promise<T> {
+  let byKey = cache.get(client);
+  if (!byKey) {
+    byKey = new Map();
+    cache.set(client, byKey);
+  }
+  const hit = byKey.get(key);
+  if (hit) return hit;
+  const entries = byKey;
+  const pending = load().catch((err: unknown) => {
+    entries.delete(key);
+    throw err;
+  });
+  entries.set(key, pending);
+  return pending;
+}
+
+type SubjectIndex = {
   rows: SubjectRow[];
   uuidToSubjectId: Map<string, SubjectId>;
-}> {
+};
+type UnitIndex = { rows: UnitRow[]; uuidToUnitSlug: Map<string, string> };
+type StandardsIndex = { map: StandardsMap; uuidToCode: Map<string, string> };
+
+const subjectIndexCache = new WeakMap<
+  object,
+  Map<string, Promise<SubjectIndex>>
+>();
+const unitIndexCache = new WeakMap<object, Map<string, Promise<UnitIndex>>>();
+const standardsIndexCache = new WeakMap<
+  object,
+  Map<string, Promise<StandardsIndex>>
+>();
+
+/** Load the grade's subjects as rows, plus uuid→slug + uuid→SubjectId indexes. */
+function loadSubjectIndex(
+  client: ServerClient,
+  gradeLevelId: string,
+): Promise<SubjectIndex> {
+  return memoPerClient(subjectIndexCache, client, gradeLevelId, () =>
+    readSubjectIndex(client, gradeLevelId),
+  );
+}
+
+async function readSubjectIndex(
+  client: ServerClient,
+  gradeLevelId: string,
+): Promise<SubjectIndex> {
+  // Not paginated: a grade holds a handful of subjects. The `count: "exact"`
+  // rides along on the same request and makes the completeness check EXACT
+  // rather than a guess at the row ceiling — the point of the guard is to catch
+  // the day "a handful" stops being true (task #48).
   const res = await client
     .from("subjects")
-    .select(SUBJECT_COLS)
+    .select(SUBJECT_COLS, { count: "exact" })
     .eq("grade_level_id", gradeLevelId)
     .eq("scope", "team")
     .order("display_order", { ascending: true });
-  const rows = unwrap(res, "list subjects") as SubjectRow[];
+  const rows = assertNotTruncated(
+    unwrap(res, "list subjects") as SubjectRow[],
+    "list subjects",
+    res.count,
+  );
   // Reverse index over the locked subject slugs, so a uuid resolves to a slug
   // even when `color` is unexpectedly blank.
   const uuidToSlug = buildReverseIndex(
@@ -1079,34 +1212,70 @@ async function loadSubjectIndex(
  *  set, which we don't have from the DB — so we expose the DB uuid AS the unit
  *  id (stable + unique); the UI joins lessons↔units by this same id, so internal
  *  consistency holds even though it's a uuid rather than the human `u-m3` slug. */
-async function loadUnitIndex(
+function loadUnitIndex(
   client: ServerClient,
   gradeLevelId: string,
-): Promise<{ rows: UnitRow[]; uuidToUnitSlug: Map<string, string> }> {
+): Promise<UnitIndex> {
+  return memoPerClient(unitIndexCache, client, gradeLevelId, () =>
+    readUnitIndex(client, gradeLevelId),
+  );
+}
+
+async function readUnitIndex(
+  client: ServerClient,
+  gradeLevelId: string,
+): Promise<UnitIndex> {
   const res = await client
     .from("units")
-    .select(UNIT_COLS)
+    .select(UNIT_COLS, { count: "exact" })
     .eq("grade_level_id", gradeLevelId);
-  const rows = unwrap(res, "list units") as UnitRow[];
+  const rows = assertNotTruncated(
+    unwrap(res, "list units") as UnitRow[],
+    "list units",
+    res.count,
+  );
   const uuidToUnitSlug = new Map<string, string>();
   for (const row of rows) uuidToUnitSlug.set(row.id, row.id);
   return { rows, uuidToUnitSlug };
 }
 
 /** Resolve the grade's assigned frameworks → their standards rows, returning a
- *  `StandardsMap` (code → description) and a uuid→code index for lesson tagging. */
-async function loadStandardsIndex(
+ *  `StandardsMap` (code → description) and a uuid→code index for lesson tagging.
+ *
+ *  THE RETURNED INDEX IS A PER-CALLER COPY, and that is load-bearing rather than
+ *  defensive. `augmentStandardsIndex` mutates the index IN PLACE to add
+ *  out-of-grade codes a lesson references. Handing two callers the same object
+ *  inside a shared-client scope would let `listLessons`' augmentation leak into
+ *  whatever `listStandards` returned — a map whose contents depended on which
+ *  call happened to finish first. Only the READ is memoized (one round trip per
+ *  client+grade); each caller still gets its own mutable copy, so behaviour is
+ *  identical to the un-memoized path. */
+function loadStandardsIndex(
   client: ServerClient,
   gradeLevelId: string,
-): Promise<{ map: StandardsMap; uuidToCode: Map<string, string> }> {
+): Promise<StandardsIndex> {
+  return memoPerClient(standardsIndexCache, client, gradeLevelId, () =>
+    readStandardsIndex(client, gradeLevelId),
+  ).then((shared) => ({
+    map: { ...shared.map },
+    uuidToCode: new Map(shared.uuidToCode),
+  }));
+}
+
+async function readStandardsIndex(
+  client: ServerClient,
+  gradeLevelId: string,
+): Promise<StandardsIndex> {
   // grade → frameworks
   const gfa = await client
     .from("grade_framework_assignments")
-    .select("framework_id")
+    .select("framework_id", { count: "exact" })
     .eq("grade_level_id", gradeLevelId);
-  const frameworkRows = unwrap(gfa, "list grade frameworks") as {
-    framework_id: string;
-  }[];
+  const frameworkRows = assertNotTruncated(
+    unwrap(gfa, "list grade frameworks") as { framework_id: string }[],
+    "list grade frameworks",
+    gfa.count,
+  );
   const frameworkIds = frameworkRows.map((r) => r.framework_id);
   if (frameworkIds.length === 0) {
     return { map: {}, uuidToCode: new Map() };
@@ -1114,11 +1283,26 @@ async function loadStandardsIndex(
   // frameworks → standards. Scope to the grade as well (standards rows carry an
   // optional grade_level_id; a null grade_level_id means cross-grade, which we
   // still want, so we filter by framework only — RLS limits visibility).
-  const std = await client
-    .from("standards")
-    .select(STANDARD_COLS)
-    .in("framework_id", frameworkIds);
-  const rows = unwrap(std, "list standards") as StandardRow[];
+  //
+  // PAGINATED (task #48) — and this one was ALREADY truncating in production,
+  // not merely at risk: the beta grade's 7 assigned frameworks hold 1884
+  // standards and the read returned 1000, so 884 codes were missing from both
+  // `map` (the wording behind every standard chip) and `uuidToCode`. Cursor is
+  // the unique `id`; the result becomes a map, so row order is irrelevant.
+  const rows = await pagedSelect<StandardRow>(
+    "list standards",
+    (row) => row.id,
+    (page) => {
+      let q = client
+        .from("standards")
+        .select(STANDARD_COLS, countOpt(page))
+        .in("framework_id", frameworkIds);
+      if (page.after != null) q = q.gt("id", page.after);
+      return q
+        .order("id", { ascending: true })
+        .limit(page.limit) as unknown as PromiseLike<PageResult<StandardRow>>;
+    },
+  );
   const map: StandardsMap = {};
   const uuidToCode = new Map<string, string>();
   for (const row of rows) {
@@ -1313,7 +1497,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
     if (schoolYearId != null) {
       let unitsQuery = client
         .from("units")
-        .select("id")
+        .select("id", { count: "exact" })
         .eq("grade_level_id", gradeLevelId);
       unitsQuery =
         explicitYearId != null
@@ -1322,9 +1506,14 @@ export const plannerSupabaseSource: PlannerDataSource = {
               `school_year_id.eq.${schoolYearId},school_year_id.is.null`,
             );
       const unitsRes = await unitsQuery;
-      const unitRows = unwrap(unitsRes, "list school-year units") as {
-        id: string;
-      }[];
+      // A truncated unit list here would be worse than a truncated lesson list:
+      // the ids feed the year-scope filter below, so losing units would silently
+      // FILTER OUT their lessons rather than merely shorten the read.
+      const unitRows = assertNotTruncated(
+        unwrap(unitsRes, "list school-year units") as { id: string }[],
+        "list school-year units",
+        unitsRes.count,
+      );
       schoolYearUnitIds = unitRows.map((u) => u.id);
       // Explicit read of a year with no units → genuinely nothing to read.
       // The default read continues: untied (null-unit) lessons still apply.
@@ -1345,27 +1534,42 @@ export const plannerSupabaseSource: PlannerDataSource = {
     // 2. Master events for the grade — read the DENORMALIZED local
     //    grade_level_id column directly (no units join — the #1 scale fix),
     //    excluding soft-deletes. Optionally scoped to a school-year / week window.
-    let masterQuery = client
-      .from("master_core_lesson_events")
-      .select(MASTER_COLS)
-      .eq("grade_level_id", gradeLevelId)
-      .is("deleted_at", null);
-    if (schoolYearUnitIds != null) {
-      masterQuery =
-        yearScopeFilter != null
-          ? masterQuery.or(yearScopeFilter)
-          : masterQuery.in("unit_id", schoolYearUnitIds);
-    }
-    if (weekStart != null)
-      masterQuery = masterQuery.gte("week_number", weekStart);
-    if (weekEnd != null) masterQuery = masterQuery.lte("week_number", weekEnd);
-    const masterRes = await masterQuery
-      .order("week_number", { ascending: true })
-      .order("display_order_within_day", { ascending: true });
-    const masterRows = unwrap(
-      masterRes,
-      "list master lessons",
-    ) as MasterEventRow[];
+    //
+    //    PAGINATED (task #48). This read is year-wide: no caller passes
+    //    weekStart/weekEnd, so on the beta grade it matched 1069 rows and
+    //    PostgREST silently returned the first 1000 — every lesson from week 34
+    //    to week 37 vanished from Weekly, Daily, Year, Catch-Up and Print with
+    //    no error. Paged by CURSOR on the unique `id`, not by offset: master is
+    //    shared team content, so another teacher saving mid-hydrate would shift
+    //    an offset window and drop a lesson — reintroducing this exact bug by a
+    //    different route. Presentation order is restored by `sortLessonRows`.
+    const buildMasterQuery = (page: PageRequest) => {
+      let q = client
+        .from("master_core_lesson_events")
+        .select(MASTER_COLS, countOpt(page))
+        .eq("grade_level_id", gradeLevelId)
+        .is("deleted_at", null);
+      if (schoolYearUnitIds != null) {
+        q =
+          yearScopeFilter != null
+            ? q.or(yearScopeFilter)
+            : q.in("unit_id", schoolYearUnitIds);
+      }
+      if (weekStart != null) q = q.gte("week_number", weekStart);
+      if (weekEnd != null) q = q.lte("week_number", weekEnd);
+      if (page.after != null) q = q.gt("id", page.after);
+      return q.order("id", { ascending: true }).limit(page.limit);
+    };
+    const masterRows = sortLessonRows(
+      await pagedSelect<MasterEventRow>(
+        "list master lessons",
+        (row) => row.id,
+        (page) =>
+          buildMasterQuery(page) as unknown as PromiseLike<
+            PageResult<MasterEventRow>
+          >,
+      ),
+    );
 
     const masterIds = masterRows.map((m) => m.id);
 
@@ -1374,57 +1578,95 @@ export const plannerSupabaseSource: PlannerDataSource = {
     //    Copies/completion are keyed by the MASTER event id. The `.in(masterIds)`
     //    lookups are CHUNKED (a large grade can have thousands of master ids,
     //    which would otherwise blow the PostgREST/proxy URL length limit).
-    let authoredQuery = client
-      .from("personal_authored_lessons")
-      .select(AUTHORED_COLS)
-      .eq("owner_id", ownerId)
-      .eq("grade_level_id", gradeLevelId)
-      .is("deleted_at", null);
-    if (schoolYearUnitIds != null) {
-      // Authored lessons carry a nullable unit_id. EXPLICIT year reads keep
-      // only those tied to a unit in the requested year (untied authored
-      // lessons fall outside any school-year window by construction); the
-      // DEFAULT active-year read keeps untied lessons via the null branch of
-      // the shared year-scope filter.
-      authoredQuery =
-        yearScopeFilter != null
-          ? authoredQuery.or(yearScopeFilter)
-          : authoredQuery.in("unit_id", schoolYearUnitIds);
-    }
-    if (weekStart != null)
-      authoredQuery = authoredQuery.gte("week_number", weekStart);
-    if (weekEnd != null)
-      authoredQuery = authoredQuery.lte("week_number", weekEnd);
+    //    All three are PAGINATED (task #48). The authored read is year-wide on
+    //    exactly the same terms as the master read above — it is only under the
+    //    ceiling today because the beta grade has no authored lessons yet, and
+    //    "not yet large enough to lose data" is not a property worth relying on.
+    //    The two chunked reads page per chunk: chunking bounds the URL, not the
+    //    response. Every cursor below is unique UNDER THAT QUERY'S FILTERS —
+    //    `id` for the two row-per-id tables, and `core_lesson_event_id` for
+    //    completion, which is unique per teacher (UNIQUE (teacher_id,
+    //    core_lesson_event_id)) and this read is already scoped to one teacher.
+    const buildAuthoredQuery = (page: PageRequest) => {
+      let q = client
+        .from("personal_authored_lessons")
+        .select(AUTHORED_COLS, countOpt(page))
+        .eq("owner_id", ownerId)
+        .eq("grade_level_id", gradeLevelId)
+        .is("deleted_at", null);
+      if (schoolYearUnitIds != null) {
+        // Authored lessons carry a nullable unit_id. EXPLICIT year reads keep
+        // only those tied to a unit in the requested year (untied authored
+        // lessons fall outside any school-year window by construction); the
+        // DEFAULT active-year read keeps untied lessons via the null branch of
+        // the shared year-scope filter.
+        q =
+          yearScopeFilter != null
+            ? q.or(yearScopeFilter)
+            : q.in("unit_id", schoolYearUnitIds);
+      }
+      if (weekStart != null) q = q.gte("week_number", weekStart);
+      if (weekEnd != null) q = q.lte("week_number", weekEnd);
+      if (page.after != null) q = q.gt("id", page.after);
+      return q.order("id", { ascending: true }).limit(page.limit);
+    };
 
-    const [copyRows, complRows, authoredRes] = await Promise.all([
+    const [copyRows, complRows, authoredUnsorted] = await Promise.all([
       chunkedIn<PersonalCopyRow>(
         masterIds,
-        (ids) =>
-          client
+        (row) => row.id,
+        (ids, page) => {
+          let q = client
             .from("personal_core_lesson_event_copies")
-            .select(COPY_COLS)
+            .select(COPY_COLS, countOpt(page))
             .eq("teacher_id", ownerId)
-            .in("master_core_lesson_event_id", ids),
+            .in("master_core_lesson_event_id", ids);
+          if (page.after != null) q = q.gt("id", page.after);
+          return q
+            .order("id", { ascending: true })
+            .limit(page.limit) as unknown as PromiseLike<
+            PageResult<PersonalCopyRow>
+          >;
+        },
         "list personal copies",
       ),
       chunkedIn<CompletionRow>(
         masterIds,
-        (ids) =>
-          client
+        (row) => row.core_lesson_event_id,
+        (ids, page) => {
+          // ⚠ THE `.eq("teacher_id")` BELOW IS LOAD-BEARING FOR PAGINATION, not
+          // just for scoping. `core_lesson_event_id` is the cursor, and it is
+          // unique only via UNIQUE (teacher_id, core_lesson_event_id) — so it is
+          // unique HERE only because the query is already pinned to one teacher.
+          // Widening or dropping that filter silently makes the cursor
+          // non-unique, and `.gt()` would then skip every row sharing a boundary
+          // value. Widen it and you must change the cursor to `id` in the same
+          // edit (and add `id` to COMPLETION_COLS).
+          let q = client
             .from("completion_status")
-            .select(COMPLETION_COLS)
+            .select(COMPLETION_COLS, countOpt(page))
             .eq("teacher_id", ownerId)
-            .in("core_lesson_event_id", ids),
+            .in("core_lesson_event_id", ids);
+          if (page.after != null)
+            q = q.gt("core_lesson_event_id", page.after);
+          return q
+            .order("core_lesson_event_id", { ascending: true })
+            .limit(page.limit) as unknown as PromiseLike<
+            PageResult<CompletionRow>
+          >;
+        },
         "list completion",
       ),
-      authoredQuery
-        .order("week_number", { ascending: true })
-        .order("display_order_within_day", { ascending: true }),
+      pagedSelect<AuthoredLessonRow>(
+        "list authored lessons",
+        (row) => row.id,
+        (page) =>
+          buildAuthoredQuery(page) as unknown as PromiseLike<
+            PageResult<AuthoredLessonRow>
+          >,
+      ),
     ]);
-    const authoredRows = unwrap(
-      authoredRes,
-      "list authored lessons",
-    ) as AuthoredLessonRow[];
+    const authoredRows = sortLessonRows(authoredUnsorted);
 
     const copyByMaster = new Map<string, PersonalCopyRow>();
     for (const c of copyRows)
@@ -1605,15 +1847,27 @@ export const plannerSupabaseSource: PlannerDataSource = {
     const out: Record<string, LessonSectionContent[]> = {};
     if (lessonIds.length === 0) return out;
 
+    // Task #48: chunking bounds the URL, not the response — and this read is the
+    // clearest case of the difference. One chunk of 150 lesson ids can match far
+    // more than 150 rows (several sections per lesson, in both a team and a
+    // personal flavour), so a chunk could sit over the 1000-row ceiling and lose
+    // sections silently. `chunkedIn` pages each chunk by the unique `id`. The
+    // `display_order` sort that used to live on this query is not lost — it
+    // happens in `resolvePersonalOverTeam` below, which has always re-sorted.
     const client = await sb();
     const rows = await chunkedIn<SectionRow>(
       lessonIds,
-      (ids) =>
-        client
+      (row) => row.id,
+      (ids, page) => {
+        let q = client
           .from("lesson_sections")
-          .select(SECTION_COLS)
-          .in("owner_lesson_id", ids)
-          .order("display_order", { ascending: true }),
+          .select(SECTION_COLS, countOpt(page))
+          .in("owner_lesson_id", ids);
+        if (page.after != null) q = q.gt("id", page.after);
+        return q
+          .order("id", { ascending: true })
+          .limit(page.limit) as unknown as PromiseLike<PageResult<SectionRow>>;
+      },
       "get sections batch",
     );
 
@@ -2268,12 +2522,24 @@ export const plannerSupabaseSource: PlannerDataSource = {
     }
     const rows = await chunkedIn<UnitAssessmentRow>(
       [...dbToCaller.keys()],
-      (chunk) =>
-        client
+      // Paged per chunk (task #48): a chunk of 150 units carries many
+      // assessments each, so the response — unlike the URL — is not bounded by
+      // the chunk size. Cursor is the unique `id`; the `display_order` sort the
+      // query used to carry is redundant here, because `sortUnitAssessments`
+      // below already re-sorts to make the order total.
+      (row) => row.id,
+      (chunk, page) => {
+        let q = client
           .from("unit_assessments")
-          .select(UNIT_ASSESSMENT_COLS)
-          .in("unit_id", chunk)
-          .order("display_order", { ascending: true }),
+          .select(UNIT_ASSESSMENT_COLS, countOpt(page))
+          .in("unit_id", chunk);
+        if (page.after != null) q = q.gt("id", page.after);
+        return q
+          .order("id", { ascending: true })
+          .limit(page.limit) as unknown as PromiseLike<
+          PageResult<UnitAssessmentRow>
+        >;
+      },
       "list unit assessments",
     );
     // Seed EVERY requested id with an empty array first, so a unit with no
@@ -3045,10 +3311,17 @@ async function loadSectionRows(
 ): Promise<SectionRow[]> {
   const res = await client
     .from("lesson_sections")
-    .select(SECTION_COLS)
+    .select(SECTION_COLS, { count: "exact" })
     .eq("owner_lesson_id", lessonId)
     .order("display_order", { ascending: true });
-  const rows = unwrap(res, "get sections") as SectionRow[];
+  // One lesson's sections — nowhere near a page. Counted anyway, because the
+  // count makes the completeness check exact instead of a guess at the row
+  // ceiling, and on a set this small it costs nothing (task #48).
+  const rows = assertNotTruncated(
+    unwrap(res, "get sections") as SectionRow[],
+    "get sections",
+    res.count,
+  );
   return resolvePersonalOverTeam(rows, ownerId);
 }
 

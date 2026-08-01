@@ -25,6 +25,11 @@ import type { PlannerDataSource } from "./source";
 import { isPlannerSupabaseConfigured } from "./source";
 import { plannerMockSource } from "./mock-source";
 import { plannerSupabaseSource } from "./supabase-source";
+import {
+  buildPlannerHydrateBundle,
+  type PlannerHydrateBundle,
+} from "./hydrate-bundle";
+import { withSharedServerClient } from "../supabase/helpers";
 
 /** The server-resolved data source: real Supabase when configured, else the
  *  in-memory mock. Resolved per-call so an env flip is picked up without a
@@ -61,4 +66,43 @@ export async function plannerDispatch<M extends keyof PlannerDataSource>(
   ) => Promise<Awaited<ReturnType<PlannerDataSource[M]>>>;
   // Bind to the source so `this` is correct for object-method implementations.
   return fn.apply(src, args);
+}
+
+/**
+ * The whole planner hydrate — grade + lessons + catalog + sections — in ONE
+ * action. ADDITIVE: `plannerDispatch` above is untouched and still serves every
+ * other caller, so reverting is a one-line change at the store's call site.
+ *
+ * WHY IT IS A SEPARATE ACTION RATHER THAN A `plannerDispatch` METHOD. The whole
+ * point is to stop paying the client action queue six times; a bundle reached
+ * through `plannerDispatch` would still be one queued call, but making it a
+ * distinct action keeps `PlannerDataSource` — the frozen seam both sources
+ * implement — free of a method that is really a call-ordering strategy.
+ *
+ * TRUST MODEL, UNCHANGED. `ownerId` is supplied by the client, exactly as it is
+ * for every read `plannerDispatch` already forwards (`listLessons`,
+ * `getSectionsBatch`, …). It is not an authorization token: every underlying
+ * query runs under the caller's own session through the RLS-scoped server
+ * client, so a forged owner id cannot widen what the rows the caller may see —
+ * at worst it fails to resolve their personal forks. This action adds no new
+ * surface; it re-orders calls that were already reachable.
+ *
+ * `withSharedServerClient` makes the six reads share ONE Supabase client, which
+ * is what lets the per-request memos (school week, active school year, and the
+ * subject/unit/standards indexes) actually hit — see lib/supabase/helpers.ts.
+ * With the mock source selected it is inert: nothing inside calls `sb()`.
+ */
+export async function plannerHydrateBundleAction(
+  ownerId: string,
+): Promise<PlannerHydrateBundle> {
+  // A `'use server'` boundary is an HTTP endpoint, so the generic's type is
+  // erased at runtime and the argument is attacker-controlled. Fail closed on a
+  // non-string rather than handing an object/array to PostgREST and letting it
+  // decide what that means. An EMPTY string is not an error — the bundle treats
+  // it as "no owner" and returns the empty document without a query.
+  if (typeof ownerId !== "string") {
+    throw new Error("plannerHydrateBundleAction: ownerId must be a string");
+  }
+  const src = source();
+  return withSharedServerClient(() => buildPlannerHydrateBundle(src, ownerId));
 }

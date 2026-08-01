@@ -74,7 +74,10 @@ import {
 import { useAppState } from "@/lib/app-state";
 import { snapshotRestorePatch } from "@/lib/fork-diff-restore";
 import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
-import { plannerClient } from "@/lib/planner/client";
+import {
+  loadPlannerHydrateBundle,
+  plannerClient,
+} from "@/lib/planner/client";
 import {
   createSerialWriteQueue,
   SerialWriteTimeoutError,
@@ -84,7 +87,6 @@ import {
   shouldRetryRead,
 } from "@/lib/async-failure";
 import { diffLessonsForReplay } from "@/lib/planner/doc-replay";
-import { resolveGrade } from "@/lib/planner/grade";
 import {
   assertUnitWeekPatch,
   expandStaleUnitKeys,
@@ -2740,30 +2742,44 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     let attempt = 0;
     const runHydrate = async (): Promise<void> => {
       try {
-        const gradeLevelId = await resolveGrade(ownerId);
+        // ── ONE ROUND TRIP, NOT SIX ─────────────────────────────────────────
+        // This used to be six sequential awaits through `plannerClient`: the
+        // grade, then a `Promise.all` of lessons + subjects + units +
+        // standards, then the sections batch. Under the Supabase flag each of
+        // those is a Next Server Action, and Next runs client-initiated server
+        // actions ONE AT A TIME on a shared queue — so the `Promise.all` was
+        // parallel in the source and strictly serial on the wire. Measured on
+        // production: six POSTs handing off with −1 to −5 ms gaps, in array
+        // order, no overlapping pairs; replaying the same six requests
+        // concurrently instead of serially cut ~9.4 s to ~4.5 s.
+        //
+        // `loadPlannerHydrateBundle` performs the identical sequence inside a
+        // SINGLE invocation, where the `Promise.all` actually overlaps. The
+        // branches below are unchanged — they now read fields off the bundle
+        // instead of awaiting each read in turn.
+        //
+        // TO REVERT: restore the six awaits here. Nothing else changed —
+        // `plannerDispatch`, `plannerClient` and `resolveGrade` are all intact.
+        const bundle = await loadPlannerHydrateBundle(ownerId);
         if (!alive) return;
+        const { gradeLevelId, lessons, subjects, units, standards } = bundle;
         if (!gradeLevelId) {
-          // No grade → stay EMPTY_DOC (never mock), settle to "empty".
+          // No grade → stay EMPTY_DOC (never mock), settle to "empty". A FAILED
+          // lookup does not land here: the bundle throws it (the `resolveGrade`
+          // contract, preserved), so it reaches the catch below and settles to
+          // "error" rather than a false "empty".
           dispatchRef.current({ type: "setHydration", hydration: "empty" });
           return;
         }
         // Stash the resolved grade uuid so createLesson tees (duplicate*) have a
         // real grade to key new rows on without re-resolving per call.
         gradeLevelIdRef.current = gradeLevelId;
-        // Fetch lessons AND the catalog (subjects/units/standards) in ONE
-        // Promise.all so they resolve together — the success path then lands
-        // both in a single `hydrate` dispatch (no frame where lessons are live
-        // but the catalog is stale). All four reads are grade-scoped through
-        // plannerClient. Under the flag the catalog NEVER falls back to mock:
+        // The catalog (subjects/units/standards) travelled with the lessons, so
+        // the success path still lands both in a single `hydrate` dispatch (no
+        // frame where lessons are live but the catalog is stale). All four reads
+        // are grade-scoped. Under the flag the catalog NEVER falls back to mock:
         // any null owner / null grade / error keeps EMPTY_CATALOG, matching the
         // EMPTY_DOC lesson leak guard.
-        const [lessons, subjects, units, standards] = await Promise.all([
-          plannerClient.listLessons(gradeLevelId, ownerId),
-          plannerClient.listSubjects(gradeLevelId),
-          plannerClient.listUnits(gradeLevelId),
-          plannerClient.listStandards(gradeLevelId),
-        ]);
-        if (!alive) return;
         if (lessons.length === 0) {
           // Genuinely empty DOCUMENT — but NOT an empty catalog. The four reads
           // above all succeeded, so subjects/units/standards are live reference
@@ -2790,64 +2806,40 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
           });
           return;
         }
-        // Batched section hydrate — one round-trip seeds every lesson's
-        // sections (kills the prior per-lesson N+1). Lessons the batch omits
-        // (no persisted sections) are filled with READ-ONLY synthetic sections
-        // built from each lesson's ALREADY-LOADED flat `resources` — see
+        // Batched section hydrate — one read seeds every lesson's sections
+        // (kills the prior per-lesson N+1). Lessons the batch omits (no
+        // persisted sections) are filled with READ-ONLY synthetic sections built
+        // from each lesson's ALREADY-LOADED flat `resources` — see
         // fillSyntheticSections. This reuses data the listLessons read already
         // returned (no extra masters/authored round-trips) and never persists:
         // a section-less lesson's resources surface for display, but the backend
         // still has zero section rows until the teacher explicitly edits.
         //
-        // The batch read is DELIBERATELY not inside the primary try: it is
-        // SUPPLEMENTARY. All four primary reads have already succeeded at this
-        // point, so letting a sections RPC failure reach the outer catch would
-        // throw away a fully-loaded document and paint hydration:"error" — the
-        // whole planner blank because of a decoration. `fillSyntheticSections`
-        // already handles a lesson the batch omits, so an EMPTY batch is a
-        // first-class fallback: every lesson gets read-only synthetic sections
-        // from its own already-loaded `resources`, and the teacher's real
-        // sections re-appear on the next successful hydrate.
-        let batchedSections: Record<string, LessonSectionContent[]> = {};
-        try {
-          batchedSections = await plannerClient.getSectionsBatch(
-            lessons.map((l) => l.id),
-            ownerId,
+        // The batch is SUPPLEMENTARY, and the bundle preserves that: a sections
+        // failure is reported as `sectionsFailed` with an empty `sections`
+        // rather than thrown, so it can never discard a fully-loaded document
+        // and paint hydration:"error" — the whole planner blank because of a
+        // decoration. `fillSyntheticSections` already handles a lesson the batch
+        // omits, so an EMPTY batch is a first-class fallback.
+        //
+        // ONE LOG LINE NOW, NOT THREE, AND THAT IS A NARROWING OF THE CLAIM
+        // rather than a loss. The three-way split existed because the batch was
+        // its OWN client→server request, so a rejection could equally be the
+        // teacher navigating away (an abort) or the network dying, and
+        // `classifyAsyncFailure` cannot tell those apart from the error object.
+        // The batch is no longer a separate request: it runs inside the bundle
+        // invocation, and a client navigation aborts that whole invocation —
+        // which surfaces at the outer catch, where the three-way distinction is
+        // still made. So anything reaching this branch is a SERVER-side failure
+        // of the batch alone, which is unambiguously a failure. The full error
+        // is logged server-side by the bundle; only the flag crosses back (a raw
+        // Postgres message would otherwise route around Next's error redaction).
+        if (bundle.sectionsFailed) {
+          console.error(
+            "[planner] section batch failed server-side; falling back to synthetic sections. Persisted sections reappear on the next successful hydrate.",
           );
-        } catch (err) {
-          // Same cancelled-vs-failed distinction as the outer catch, minus the
-          // retry: this read is supplementary and the fallback is already
-          // correct, so a superseded batch is not worth a second round-trip.
-          //
-          // THREE MESSAGES, NOT TWO, and the middle one is the point. Collapsing
-          // "aborted" and "transport" into a single "cancelled (likely
-          // superseded by navigation)" line asserts a CAUSE that this file's own
-          // classifier documents as unknowable at this layer — and unlike the
-          // hydrate, there is no retry here to settle it by observation. A
-          // teacher whose network dropped would silently fall back to synthetic
-          // sections under a log line blaming their own navigation. That is the
-          // 7.16 misdiagnosis inverted, and it is the reason the classifier has
-          // three states rather than two.
-          const kind = classifyAsyncFailure(err);
-          if (kind === "failed") {
-            console.error(
-              "[planner] section batch failed; falling back to synthetic sections",
-              err,
-            );
-          } else if (kind === "aborted") {
-            console.info(
-              "[planner] section batch cancelled; using synthetic sections",
-              err,
-            );
-          } else {
-            console.warn(
-              "[planner] section batch did not settle — cancelled by navigation OR the network is down, we cannot tell here and do not retry; using synthetic sections. Persisted sections reappear on the next successful hydrate.",
-              err,
-            );
-          }
         }
-        if (!alive) return;
-        const sections = fillSyntheticSections(lessons, batchedSections);
+        const sections = fillSyntheticSections(lessons, bundle.sections);
         dispatchRef.current({
           type: "hydrate",
           doc: { lessons, sections, cellLayouts: {} },
