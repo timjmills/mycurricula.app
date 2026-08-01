@@ -131,14 +131,20 @@
   position: relative;
   width: 100%;
 }
+/* PORTALED TO <body> AND FIXED. It was `position: absolute` inside `.addWrap`,
+   which put it at the mercy of every ancestor's `overflow` — and in the week
+   track one always clips. Measured at 950px on a 5-day week: 90px past the
+   track, 37px off the viewport. Geometry now comes from AddLessonMenu's
+   `place()` as inline left/top, computed from the trigger's live rect and
+   clamped to the viewport, so no `left`/`transform`/`bottom` may be set here —
+   a static rule cannot express "wherever this trigger is now".
+   `--z-menu` is the token minted for exactly this case (tokens.css:899-903:
+   "portaled overflow/context menus"). */
 .vaDayAddMenu {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(100% + 8px);
-  z-index: 30;
+  position: fixed;
+  z-index: var(--z-menu);
   width: 300px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 16px);
   padding: 6px;
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -146,32 +152,25 @@
   box-shadow: var(--sh-lg);
 }
 
-/* ── Menu alignment overrides ────────────────────────────────────────────
-   AFTER `.vaDayAddMenu`, and DOUBLED. Both matter, and the ordering is the
-   one that was actually broken: these two rules and `.vaDayAddMenu` are all
-   (0,1,0), so at equal specificity the later declaration wins — and
-   `.menuStart` used to sit ABOVE it, which meant `left: 0` lost to
-   `left: 50%` and `align="start"` did nothing at any callsite. It read as
-   correct in review for as long as it shipped. Doubling makes the win
-   independent of position as well, so a future re-order cannot silently
-   revert it again. */
+/* ── Menu alignment overrides — DELETED, deliberately ─────────────────────
+   `.menuStart` / `.menuEnd` used to pin the menu to the trigger's left or right
+   edge, and the callsites chose between them BY COLUMN INDEX ("only the two
+   extreme columns overhang"). That premise is true at 1440px on a 5-day week
+   and false otherwise: `end` pins to the last COLUMN's edge, and once the track
+   scrolls that edge is itself outside the visible box — 90px past the track and
+   37px off-viewport at 950px, and at ordinary desktop widths on a 6- or 7-day
+   school week, which CLAUDE.md forbids assuming away.
 
-/* Rail / agenda menus open left-aligned (bundle .va-dayaddmenu.wk); the DayA
-   full-width row keeps the centered default. */
-.menuStart.menuStart {
-  left: 0;
-  transform: none;
-}
-/* Right-aligned. The menu is 300px and a week COLUMN is ~170px, so a centered
-   menu on the last column overhangs its track by ~65px and the week's
-   horizontal scroll container clips it (measured live: 39px lost off the right
-   edge on a 5-day week at 1440px). The two edge columns pin to their own edge
-   instead; every column between them keeps the centered default. */
-.menuEnd.menuEnd {
-  left: auto;
-  right: 0;
-  transform: none;
-}
+   No index-keyed rule can fix that, because the index does not know where the
+   viewport ends. Placement is now computed in AddLessonMenu against the
+   viewport and clamped, so these two rules had nothing left to do; `align`
+   survives as the PREFERRED anchor and the clamp overrules it.
+
+   (Their own history is worth keeping as a warning: they were also once dead
+   for a different reason — declared ABOVE `.vaDayAddMenu` at equal specificity
+   (0,1,0), so `left: 0` lost to `left: 50%` on source order and `align="start"`
+   did nothing at any callsite. Doubling and re-ordering fixed that. A rule can
+   be revived and still be the wrong rule.) */
 
 .addRowNew.addRowNew,
 .addRowEvent.addRowEvent {

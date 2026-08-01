@@ -174,3 +174,81 @@
   text-overflow: ellipsis;
   cursor: help;
 }
+
+/* ── Per-day add affordance ────────────────────────────────────────────
+ * The recipe is WeekColumns' `.addRow` / `.addTrigger` (the paper Week
+ * frame), so the control a teacher learns on a laptop is the control they
+ * meet on a phone — same dashed box, same "+ Add", same hover.
+ *
+ * `.addTrigger` is DOUBLED deliberately. `app/tokens.css`'s `.cp-root button`
+ * reset is (0,1,1) and would otherwise out-specify a single-class module rule
+ * and strip the padding, border and background straight back off — the trap
+ * that has already produced four dead rules in this codebase, one of which
+ * read as a missing design element rather than as broken CSS.
+ */
+
+.addRow {
+  display: flex;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.addTrigger.addTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  /* ≥44px touch target (CLAUDE.md §4), unconditional and load-bearing.
+     WeekColumns can argue its 44px is a formality because that surface only
+     renders above 900px; this one is the opposite case. WeeklyShell forces
+     List for EVERY frame at ≤900px, so this trigger is the phone and tablet
+     control — the tiers where the 44px floor is a real requirement rather
+     than a rounding of one. It is not behind a coarse-pointer query on
+     purpose: hybrids report a fine pointer and still get touched. */
+  min-height: 44px;
+  border: 1px dashed var(--border);
+  background: none;
+  border-radius: var(--r-md);
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: var(--t-12);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.addTrigger.addTrigger:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--brand-500) 8%, transparent);
+  border-style: solid;
+  color: var(--brand-600);
+}
+
+.addTrigger.addTrigger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.addPlus {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* ── Screen-reader only ────────────────────────────────────────────────
+ * Carries the per-day suffix on the add trigger's accessible name. */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

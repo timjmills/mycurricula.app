@@ -28,15 +28,16 @@
 // lesson, then navigates to /daily via Next.js router.
 
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels } from "@/lib/labels";
 import { useOrderedWeekdays } from "@/lib/week-order";
-import type { Lesson } from "@/lib/types";
+import type { Lesson, SubjectId } from "@/lib/types";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
 import { PlannerEmpty, Tooltip } from "@/components/ui";
+import { AddLessonMenu } from "@/components/planner-v2";
 import type { Holiday } from "@/lib/use-holidays";
 import { ListRow } from "./ListRow";
 import styles from "./WeeklyList.module.css";
@@ -69,6 +70,13 @@ interface DaySectionProps {
    *  what they had planned. */
   holiday: Holiday | null;
   onRowClick: (lesson: Lesson) => void;
+  /** Teaching tooltip for this day's add trigger — the OUTCOME, not the label. */
+  addTooltip: string;
+  onQuickAdd: () => void;
+  /** True while THIS day's quick-add round-trip is in flight. */
+  quickAdding: boolean;
+  /** Transient quick-add failure for THIS day, or null. */
+  quickAddError: string | null;
 }
 
 function DaySection({
@@ -77,6 +85,10 @@ function DaySection({
   lessons,
   holiday,
   onRowClick,
+  addTooltip,
+  onQuickAdd,
+  quickAdding,
+  quickAddError,
 }: DaySectionProps): ReactNode {
   const count = lessons.length;
   return (
@@ -130,6 +142,59 @@ function DaySection({
         // the plan loads instead of a false "No lessons planned".
         <PlannerEmpty size="sm" heading="No lessons planned" />
       )}
+
+      {/* Add affordance — one per configured school day, OUTSIDE the rows so
+          it is never mistaken for a lesson. A holiday day keeps it: a school
+          can still schedule a make-up session on a day the calendar calls off,
+          and hiding the control would push the only path to that onto a
+          different surface — which on a phone is the whole defect this fixes.
+
+          `onAddEvent` is deliberately NOT passed, so the menu offers the one
+          row that can actually persist. The other frames pass it, and this is
+          a considered asymmetry rather than an oversight: the event row opens
+          a form whose submit can only report "Events can’t be saved yet" (the
+          schedule store has no addBlock action —
+          components/daily/AddEventForm.tsx:182-199). On a desktop frame that
+          dead end is one of several paths; here it would sit on the ONLY way a
+          phone or tablet teacher can add anything, which is the worst place in
+          the app to promise something that discards their input.
+
+          DO NOT "fix" this for parity with the other frames — the asymmetry is
+          the decision, not an oversight (adjudicated with the orchestrator,
+          task #34). Its exit condition is explicit: when the schedule store can
+          actually persist an event, BOTH surfaces get the row and this comment
+          goes with it. */}
+      <div className={styles.addRow}>
+        <AddLessonMenu
+          triggerClassName={styles.addTrigger}
+          tooltipId="weekly-list-add"
+          tooltipContent={addTooltip}
+          // The trigger is full-width here (one column, not a scrolling track),
+          // so its left edge IS the content's left edge — `start` keeps the menu
+          // inside the section instead of centring it over the day above.
+          // Placement is clamped to the viewport regardless (AddLessonMenu's
+          // `place()`), so this is a preference, not the thing keeping it
+          // on-screen.
+          align="start"
+          onQuickAdd={onQuickAdd}
+          quickAdding={quickAdding}
+          quickAddError={quickAddError}
+          triggerContent={
+            <>
+              <span className={styles.addPlus} aria-hidden="true">
+                +
+              </span>
+              <span>Add</span>
+              {/* Every day's trigger is otherwise byte-identical, so a screen
+                  reader would announce "Add" once per day with no way to tell
+                  them apart. The day name is visually redundant (the heading is
+                  right there) but not redundant to a user navigating by
+                  control. */}
+              <span className={styles.srOnly}> to {dayName}</span>
+            </>
+          }
+        />
+      </div>
     </section>
   );
 }
@@ -140,7 +205,7 @@ export function WeeklyList(): ReactNode {
   const router = useRouter();
   const labels = useLabels();
   const { week, setSelectedDay, setSelectedLessonId } = useAppState();
-  const { lessons } = usePlanner();
+  const { lessons, subjects, addLesson } = usePlanner();
   // The configured school week — one entry per day column, in order. Drives
   // the day COUNT (holiday lookup, bucket array) and the section labels.
   const weekdays = useOrderedWeekdays();
@@ -169,6 +234,86 @@ export function WeeklyList(): ReactNode {
     // Sort each bucket by time slot.
     return buckets.map((bucket) => [...bucket].sort(compareByTime));
   }, [lessons, week, weekdays]);
+
+  // ── Quick-add (one-click blank lesson, PER DAY) ───────────────────────────
+  //
+  // WHY THIS SURFACE, WHICH IS NOT OBVIOUS FROM HERE. List looks like the least
+  // important Week canvas, and it had no way to create a lesson at all.
+  //
+  // The standing reason is width-independent: `WeeklyShell`'s `showList` is true
+  // whenever the teacher picks List from the Grid|List toggle, at ANY viewport.
+  // A desktop teacher in List mode was therefore in a dead end — no add
+  // affordance anywhere on the surface. That alone justifies this control and
+  // does not depend on any breakpoint.
+  //
+  // It was ALSO the ≤900px canvas for every frame: `showList = isNarrow ||
+  // viewMode === "list"` returned WeeklyList below 900px regardless of frame, so
+  // all three frames' add affordances were UNMOUNTED (not hidden) on every phone
+  // and tablet, and this component was what the teacher actually got. Whether
+  // that gate is still in place depends on a separate change to
+  // `WeeklyShell.tsx` — deliberately NOT assumed here, because this file must
+  // read correctly either way. If the gate is gone, the List-mode reason above
+  // still stands on its own.
+  //
+  // Ported from WeekColumns' per-day add, including its two hard-won details:
+  // the subject is INFERRED (this day's first lesson's subject — the likeliest
+  // continuation — else the catalog's first), and a synchronous ref guards the
+  // double-tap double-create that `addingDay` state alone cannot (two taps in
+  // one tick both pass a state check before the first setState commits). The
+  // sync guard matters more here than it did there: this is the touch surface,
+  // and a double-tap is the native way to mis-hit a button on a phone.
+  const [addingDay, setAddingDay] = useState<number | null>(null);
+  const [errorDay, setErrorDay] = useState<number | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quickAddInFlightRef = useRef(false);
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current !== null) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
+
+  const handleQuickAdd = useCallback(
+    async (day: number): Promise<void> => {
+      if (quickAddInFlightRef.current) return; // sync guard — never double-create
+      const subject: SubjectId | undefined =
+        grouped[day]?.[0]?.subject ?? subjects[0]?.id;
+      if (!subject) return; // catalog not settled yet (backend hydrate)
+      quickAddInFlightRef.current = true;
+      setAddingDay(day);
+      if (errorTimerRef.current !== null) {
+        clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = null;
+      }
+      setErrorDay(null);
+      setErrorMsg(null);
+      try {
+        const created = await addLesson({
+          subject,
+          week,
+          day,
+          title: `New ${labels.lesson.toLowerCase()}`,
+        });
+        if (created) {
+          setSelectedLessonId(created.id);
+        } else {
+          setErrorDay(day);
+          setErrorMsg(
+            `Couldn’t add the ${labels.lesson.toLowerCase()} — check your connection and try again.`,
+          );
+          errorTimerRef.current = setTimeout(() => {
+            errorTimerRef.current = null;
+            setErrorDay(null);
+            setErrorMsg(null);
+          }, 6000);
+        }
+      } finally {
+        quickAddInFlightRef.current = false;
+        setAddingDay(null);
+      }
+    },
+    [grouped, subjects, addLesson, week, labels.lesson, setSelectedLessonId],
+  );
 
   // Navigate to the Daily view focused on the clicked lesson.
   function handleRowClick(lesson: Lesson): void {
@@ -209,6 +354,13 @@ export function WeeklyList(): ReactNode {
           lessons={grouped[dayIndex] ?? []}
           holiday={holidaysByDay.get(dayIndex) ?? null}
           onRowClick={handleRowClick}
+          // CLAUDE.md §4: the tooltip says what the control ACCOMPLISHES, in
+          // context — not "Add", which would restate the label and teach a
+          // first-time teacher nothing.
+          addTooltip={`Add a ${labels.lesson.toLowerCase()} to this day`}
+          onQuickAdd={() => void handleQuickAdd(dayIndex)}
+          quickAdding={addingDay === dayIndex}
+          quickAddError={errorDay === dayIndex ? errorMsg : null}
         />
       ))}
     </div>
