@@ -30,6 +30,12 @@ const INSTALLED = [
   "HTMLElement",
   "MutationObserver",
   "IS_REACT_ACT_ENVIRONMENT",
+  // A LEAK OF THIS ONE IS PARTICULARLY NASTY, which is why it is listed rather
+  // than left to the general rule: the harness's `getComputedStyle` answers ""
+  // for every property. Leaked into a later file, it would not crash anything —
+  // it would quietly make every computed-style read return nothing, and any
+  // test that tolerated an absent value would go green having measured air.
+  "getComputedStyle",
 ] as const;
 
 function present(): string[] {
