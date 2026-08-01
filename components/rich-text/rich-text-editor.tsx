@@ -152,18 +152,28 @@ interface ColorSwatch {
   variable: string;
 }
 
+// A HUE PICKER, pinned to slots and labelled by hue — deliberately no subject
+// in either the token or the label.
+//
+// It used to read `{ label: "Math blue", variable: "--math" }`, and the tell was
+// that "Spelling pink" was CORRECT until the subject→slot map was brought back
+// to the v2 handoff, and wrong the moment it moved. A label that a subject remap
+// can falsify was never really about the subject: colouring a word pink is not
+// tagging it as Writing, so the coupling bought nothing and cost accuracy.
+// Pinned to `--subj-N` (the hues these resolved to, so nothing repaints) with
+// the slot's own name, no future subject move can make a label lie.
 const TEXT_COLORS: ColorSwatch[] = [
   { label: "Ink dark", variable: "--ink-900" },
   { label: "Ink mid", variable: "--ink-700" },
   { label: "Ink light", variable: "--ink-500" },
-  { label: "Math blue", variable: "--math" },
-  { label: "Reading green", variable: "--reading" },
-  { label: "Writing purple", variable: "--writing" },
-  { label: "Grammar teal", variable: "--grammar" },
-  { label: "Spelling pink", variable: "--spelling" },
-  { label: "UFLI orange", variable: "--ufli" },
-  { label: "Explorers gold", variable: "--explorers" },
-  { label: "SEL slate", variable: "--sel" },
+  { label: "Gold", variable: "--subj-1" },
+  { label: "Apricot", variable: "--subj-2" },
+  { label: "Pink", variable: "--subj-5" },
+  { label: "Purple", variable: "--subj-7" },
+  { label: "Periwinkle", variable: "--subj-9" },
+  { label: "Blue", variable: "--subj-10" },
+  { label: "Teal", variable: "--subj-12" },
+  { label: "Green", variable: "--subj-13" },
 ];
 
 // Highlight offers the same swatches as the text-color picker, so any

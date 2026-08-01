@@ -38,13 +38,22 @@ export interface AnnotationSwatch {
   label: string;
 }
 
-/** The fixed swatch palette — ink, subject, urgent, done + highlighter pens.
- *  All are tokens from app/tokens.css; never a literal hex. */
+/** The fixed swatch palette — four solid inks + highlighter pens. All are
+ *  tokens from app/tokens.css; never a literal hex.
+ *
+ *  The fourth ink was `{ id: "subject", token: "--writing", label: "Purple" }`
+ *  — three claims, none of them true. It is a drawing colour, not a subject
+ *  (nothing here reads the lesson's subject), and CLAUDE.md §4 is explicit that
+ *  subject colour always means subject; `--writing` had not resolved to purple
+ *  since the subject aliases moved onto the v1.3 scale, and it resolves to pink
+ *  now that Writing sits on its handoff slot. Re-pointed to a SLOT no team
+ *  subject owns and relabelled to the hue a teacher actually gets, so a future
+ *  subject remap cannot silently change the pen in a teacher's hand. */
 export const ANNOTATION_SWATCHES: readonly AnnotationSwatch[] = [
   { id: "ink", token: "--ink-900", label: "Black" },
   { id: "urgent", token: "--urgent", label: "Red" },
   { id: "done", token: "--done", label: "Green" },
-  { id: "subject", token: "--writing", label: "Purple" },
+  { id: "violet", token: "--subj-8", label: "Violet" },
   { id: "hl-lemon", token: "--hl-lemon", label: "Yellow highlighter" },
   { id: "hl-mint", token: "--hl-mint", label: "Green highlighter" },
   { id: "hl-maya", token: "--hl-maya", label: "Blue highlighter" },

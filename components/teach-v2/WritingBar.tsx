@@ -54,10 +54,12 @@ const TOOL_OPTIONS: Array<ToggleOption<BoardTool>> = WRITING_TOOLS.map((t) => ({
   tooltipId: `teach-v2-tool-${t.value}`,
 }));
 
-// Compact swatch set — the four solid inks (highlighter reuses them).
-const SWATCHES = ANNOTATION_SWATCHES.filter((s) =>
-  ["ink", "urgent", "done", "subject"].includes(s.id),
-);
+// Compact swatch set — the four solid inks (highlighter reuses them). Selected
+// by EXCLUDING the `hl-` highlighter pens rather than by listing the four ids:
+// an allow-list silently returns three swatches when an id is renamed upstream,
+// and one just was (`subject` → `violet`, when that pen stopped borrowing a
+// subject alias). Dropping a pen is not the kind of failure anyone notices.
+const SWATCHES = ANNOTATION_SWATCHES.filter((s) => !s.id.startsWith("hl-"));
 
 export interface WritingBarProps {
   activeTool: BoardTool;

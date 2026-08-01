@@ -122,14 +122,22 @@ import styles from "./planning-tabs.module.css";
  *  label instead of the bare code repeated twice. */
 const BUNDLED_DESCRIPTIONS = bundledDescriptions();
 
-/** Per-tool label (sentence case per the design system) + `--pc` accent. */
+/** Per-tool label (sentence case per the design system) + `--pc` accent.
+ *
+ *  The four coloured tools are pinned to SLOT tokens, not to the `--writing` /
+ *  `--grammar` / `--reading` / `--explorers` subject aliases they used to name.
+ *  A planning tool is not a subject — these only ever borrowed a subject alias
+ *  as a convenient hue, and CLAUDE.md §4 is explicit that subject colour always
+ *  means subject, so re-pointing a subject must not repaint the tool rail. The
+ *  slots below are the exact hues these rendered before the subject map moved
+ *  to the v2 handoff, so this is appearance-preserving. */
 const TOOL_META: Record<PlanningToolKey, { label: string; color: string }> = {
   objective: { label: "Objective", color: "var(--brand-500)" },
   standards: { label: "Standards", color: "var(--done)" },
-  notes: { label: "Lesson notes", color: "var(--writing-bright)" },
-  diff: { label: "Differentiation", color: "var(--grammar-bright)" },
-  chat: { label: "Chat", color: "var(--reading-bright)" },
-  resources: { label: "Resources", color: "var(--explorers-bright)" },
+  notes: { label: "Lesson notes", color: "var(--subj-2-bright)" },
+  diff: { label: "Differentiation", color: "var(--subj-7-bright)" },
+  chat: { label: "Chat", color: "var(--subj-10-bright)" },
+  resources: { label: "Resources", color: "var(--subj-13-bright)" },
 };
 
 /** Strip the app-wide plain-text "I can " objective prefix for editing.

@@ -685,11 +685,18 @@
   transform-origin: top left;
   opacity: 0.95;
   box-shadow: var(--sh-lg);
-  /* 2px ring (spec §7: "purple-300 ring"). --writing (#6b46c1, purple-600) is
-     the closest visible token; --writing-light (#ece5fa) is too pale to read
-     as a ring at 2px. A mid-opacity writing color reads correctly as a
-     "light purple" ring without needing a purple-300 token. */
-  outline: 2px solid color-mix(in oklch, var(--writing) 60%, transparent);
+  /* 2px drop-target ring. Pinned to a SLOT token, not the `--writing` subject
+     alias: this ring is chrome, not subject identity, so re-pointing a subject
+     must not recolour it. `--subj-2` is exactly what it rendered before the
+     subject map moved to the v2 handoff, so this is appearance-preserving.
+
+     KNOWN DIVERGENCE, deliberately left alone: spec §7 asks for a "purple-300
+     ring". The previous comment here justified `--writing` as "#6b46c1,
+     purple-600" — true of a much older token set, but `--writing` has resolved
+     to apricot since the subject aliases landed, so this ring has not been
+     purple for a long time. Making it purple (`--subj-7`) is a design decision,
+     not a token cleanup, so it is left as-is and reported rather than changed. */
+  outline: 2px solid color-mix(in oklch, var(--subj-2) 60%, transparent);
   outline-offset: 0;
   border-radius: var(--r-md);
   pointer-events: none;

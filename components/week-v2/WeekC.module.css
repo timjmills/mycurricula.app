@@ -206,9 +206,12 @@
   /* Subject hue → a DEEP gradient. The whole gradient is darkened toward a
      FIXED dark anchor (`black`, NOT var(--ink-900) which inverts to near-white
      on Night and would break the white text). Worst case is the lightest
-     subject (Math gold, #DCC674) at the START (58% hue / 42% black): white-on-
-     start = 6.52:1 in OKLab — above the 4.5 body floor; every other subject and
-     the darker 40% end land higher. This is the same recipe + AA reasoning the
+     subject at the START (58% hue / 42% black); since the subject scale was
+     re-derived for its own 3:1 floor (lib/subject-color.ts) every solid got
+     darker or stayed put, so that worst case is now --subj-6 magenta at
+     white-on-start 9.76:1 — well above the 4.5 body floor, and the darker 40%
+     end lands higher again. (It was 6.5:1 on the old, lighter gold; the number
+     moved, the conclusion did not.) This is the same recipe + AA reasoning the
      shipped DayC hero uses (day-v2.module.css) — the bundle's brighter 92%/58%
      recipe fails AA on gold, so it is deliberately darkened here. */
   background: linear-gradient(

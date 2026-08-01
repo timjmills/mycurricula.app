@@ -203,14 +203,16 @@ interface ColorSwatch {
 }
 
 // Text colors — 6 picks from rich-text-editor.tsx's TEXT_COLORS ramp: the
-// strong ink plus five well-separated subject hues.
+// strong ink plus five well-separated hues. Slot-pinned and hue-labelled, for
+// the reason set out in that file — a text-colour label must not be something a
+// subject remap can falsify.
 const TEXT_SWATCHES: ColorSwatch[] = [
   { label: "Ink dark", variable: "--ink-900" },
-  { label: "Math blue", variable: "--math" },
-  { label: "Reading green", variable: "--reading" },
-  { label: "Writing purple", variable: "--writing" },
-  { label: "UFLI orange", variable: "--ufli" },
-  { label: "Spelling pink", variable: "--spelling" },
+  { label: "Gold", variable: "--subj-1" },
+  { label: "Blue", variable: "--subj-10" },
+  { label: "Pink", variable: "--subj-5" },
+  { label: "Apricot", variable: "--subj-2" },
+  { label: "Periwinkle", variable: "--subj-9" },
 ];
 
 // Highlights — the remove-chip plus 5 picks spanning the HIGHLIGHTERS ramp

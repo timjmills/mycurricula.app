@@ -46,18 +46,25 @@ export const DEFAULT_TINT_SCOPE: SectionTintScope = "field";
 // through color-mix washes, the 14px ColorDot, and the banner-label ink mix,
 // which sits inside that scale's outline/dot register:
 //
-//   mock #2E6FD6 (blue)   → --subj-10-bright  #4788d1
-//   mock #4E9A5B (green)  → --subj-13-bright  #47d183
-//   mock #C8961A (gold)   → --subj-1-bright   #e8bb17
-//   mock #E07A3E (orange) → --subj-2-bright   #e87917
-//   mock #7A5BD6 (purple) → --subj-8-bright   #7147d1
-//   mock #3FA7C5 (cyan)   → --subj-11-bright  #47b6d1
-//   mock #E0566B (red)    → --subj-4-bright   #e8174b
-//   mock #8FB339 (lime)   → --subj-15-bright  #81d147
+//   mock #2E6FD6 (blue)   → --subj-10-bright
+//   mock #4E9A5B (green)  → --subj-13-bright
+//   mock #C8961A (gold)   → --subj-1-bright
+//   mock #E07A3E (orange) → --subj-2-bright
+//   mock #7A5BD6 (purple) → --subj-8-bright
+//   mock #3FA7C5 (cyan)   → --subj-11-bright
+//   mock #E0566B (red)    → --subj-4-bright
+//   mock #8FB339 (lime)   → --subj-15-bright
 //
 // The mock's ColorDot popover offers TWO extra swatches beyond the wash
-// ramp (its DOT_COLORS list): #C53F7B (berry) → --subj-5-bright #e8179b,
-// and #6E6C82 (neutral slate) → --ink-500 (the rich-text "Ink light").
+// ramp (its DOT_COLORS list): #C53F7B (berry) → --subj-5-bright, and
+// #6E6C82 (neutral slate) → --ink-500 (the rich-text "Ink light").
+//
+// Only the mock hexes are quoted; the token's own value deliberately is not.
+// The `--subj-N-bright` scale is DERIVED (lib/subject-color.ts) so it can meet
+// its contrast floor, and several of these accents moved when it was — a hex
+// copied in here would go stale silently and read as a promise about a colour
+// this file does not own. The token name is the contract; the pairing above is
+// "nearest hue", which the derivation preserves because it never changes hue.
 
 /** Round-robin wash assignment order — mirrors the mock's SECTION_WASHES. */
 export const SECTION_WASH_TOKENS = [

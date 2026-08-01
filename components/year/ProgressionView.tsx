@@ -413,7 +413,13 @@ function FlagIcon({ secondary }: { secondary?: boolean }) {
       height="12"
       viewBox="0 0 24 24"
       fill="none"
-      stroke={secondary ? "var(--grammar)" : "var(--writing)"}
+      /* Slot tokens, not subject aliases: this legend flag distinguishes a
+         primary from a secondary marker, which is not subject identity — it
+         only borrowed two subject aliases as a two-hue palette.
+         `--subj-2`/`--subj-7` are what these rendered before the subject map
+         moved to the v2 handoff, so pinning them is appearance-preserving and
+         immune to a future re-point. */
+      stroke={secondary ? "var(--subj-7)" : "var(--subj-2)"}
       strokeWidth="1.7"
       aria-hidden="true"
     >
