@@ -185,10 +185,17 @@ export function TimelineDrawer({
               </ul>
             )
           ) : attention.length === 0 ? (
-            // A specific, checkable claim rather than a decorative "All good!".
+            // A specific, checkable claim rather than a decorative "All good!"
+            // — and checkable means it has to match the PREDICATE. This list
+            // holds a lesson at `planningGapCount >= 2` (dots.ts:47-52), so an
+            // empty list never meant "every lesson has an objective, a resource
+            // and a standard": a lesson missing exactly one of the three is
+            // deliberately not here, and the old copy denied its existence.
             <p className={styles.drawerEmpty}>
-              Nothing needs a second look — every lesson has an objective, a
-              resource and a standard, and every unit has its weeks.
+              Nothing needs a second look — nothing is past its date and
+              untaught, no lesson is missing more than one of an objective, a
+              resource and a standard, and every unit and lesson is dated
+              somewhere this calendar can show.
             </p>
           ) : (
             <ul className={styles.drawerList}>

@@ -134,7 +134,14 @@ export function TimelineLaneRow({
           {lane.unplaceableLessons > 0 && (
             <span
               className={styles.laneUndated}
-              title={`${lane.unplaceableLessons} ${lane.name} lesson${lane.unplaceableLessons === 1 ? "" : "s"} fall on a day this school week no longer has, or outside the academic year, so they have no column here. Open them from the Lessons tab to re-date them.`}
+              // NOT "open them from the Lessons tab to re-date them": the unit
+              // workspace's Lessons tab is read-only about dates (its row
+              // actions are Plan / Teach / Finish — LessonsTab.tsx:51-85), and
+              // the one surface that CAN re-date a lesson is the weekly card's
+              // relocate picker, which by definition cannot show a lesson that
+              // has no column. What actually moves these back into view is the
+              // configuration that put them out of it.
+              title={`${lane.unplaceableLessons} ${lane.name} lesson${lane.unplaceableLessons === 1 ? "" : "s"} sit on a weekday this school week no longer has, or on a week outside this academic year, so they have no column here. Settings → Calendar is where the school week and the year's dates are set.`}
             >
               {lane.unplaceableLessons} off-calendar
             </span>
@@ -142,7 +149,14 @@ export function TimelineLaneRow({
           {lane.undatedUnits > 0 && (
             <span
               className={styles.laneUndated}
-              title={`${lane.undatedUnits} ${lane.name} unit${lane.undatedUnits === 1 ? "" : "s"} carry no weeks and no dated lesson, so they cannot be placed on this timeline. Open the unit to give it a week range.`}
+              // TWO populations, one count (lanes.ts:129 counts every unit
+              // `unitSpan` returns null for): units with no week range and no
+              // lesson to place them from, AND units whose STORED range lands
+              // wholly outside the academic year (bands.ts:106-111 — weeks
+              // 90–92 in a 40-week year). The old copy told the second kind it
+              // "carries no weeks" and offered a remedy it had already done, so
+              // the flag could not be cleared by following the instruction.
+              title={`${lane.undatedUnits} ${lane.name} unit${lane.undatedUnits === 1 ? "" : "s"} have no week range inside this academic year and no dated lesson to place them from, so they cannot be drawn here. Open the unit and set a week range that falls inside the year.`}
             >
               {lane.undatedUnits} unscheduled
             </span>

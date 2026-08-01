@@ -483,7 +483,13 @@ export function WeekA(): ReactNode {
               <AddLessonMenu
                 triggerClassName={styles.addTrigger}
                 tooltipId="week-a-add"
-                tooltipContent={`Add a ${labels.lesson.toLowerCase()} or a non-instructional event to this day`}
+                // Lesson only. The event half of this menu cannot persist —
+                // AddEventForm's submit raises "Events can’t be saved yet"
+                // because the schedule store has no addBlock action
+                // (components/daily/AddEventForm.tsx:182-199). Glass is the
+                // DEFAULT frame, so this is the Week trigger a teacher meets
+                // first; the menu row carries the rest of the truth.
+                tooltipContent={`Add a ${labels.lesson.toLowerCase()} to this day`}
                 align="center"
                 onQuickAdd={() => void handleQuickAdd(day)}
                 onAddEvent={() => setAddEventDay(day)}

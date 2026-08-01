@@ -444,3 +444,66 @@ describe("RefineTab — rich text is never flattened by a table cell", () => {
     expect(html).not.toContain('aria-readonly="true"');
   });
 });
+
+// ── The table says what its cells actually do ───────────────────────────────
+//
+// Two strings that described a table nobody shipped.
+//
+// The caption read "edit any cell in place", which is true of four columns of
+// seven: Standards and Resources are <button>s that open a picker, and a title
+// or objective carrying markup renders read-only (RichSafeCell). A teacher who
+// believes the caption goes hunting for the text cursor that is not there.
+//
+// The fill-down button carried a hard-coded `title={label}` naming the action.
+// Tooltip only mirrors its own content to native `title=` when the child does
+// not already have one (Tooltip.tsx:755-759), so the hard-coded value WON — and
+// native `title=` is exactly the path a DISABLED button falls back to, since
+// Chromium drops its pointer events. The one control whose tooltip CLAUDE.md §4
+// requires to explain why it is disabled was announcing the action instead.
+
+describe("RefineTab — the caption describes the cells that exist", () => {
+  it("no longer promises that every cell is editable in place", () => {
+    expect(render(LESSONS)).not.toContain("edit any cell in place");
+  });
+
+  it("names what the non-typing cells do instead", () => {
+    const html = render(LESSONS);
+    expect(html).toContain("Standards and Resources open a picker");
+    expect(html).toContain("formatted text opens in the Lesson Planner");
+    // The part that was always true must survive the rewrite.
+    expect(html).toContain("Changes save as you type");
+  });
+});
+
+describe("RefineTab — a disabled fill-down explains itself, not its action", () => {
+  // BARE first means every fillable column has an empty source, so all three
+  // buttons are disabled — the state whose explanation was being overridden.
+  const EMPTY_SOURCE = [BARE, PLANNED];
+  const REASON = "Nothing to copy";
+
+  it("puts the reason on the native title, which is the disabled path", () => {
+    const html = render(EMPTY_SOURCE);
+    expect(html).toContain(`title="${REASON}`);
+  });
+
+  it("does not announce an action the disabled button cannot perform", () => {
+    const html = render(EMPTY_SOURCE);
+    expect(html).not.toContain('title="Copy the first lesson');
+  });
+
+  it("still announces the action once the button works", () => {
+    const html = render(LESSONS);
+    expect(html).toContain('title="Copy the first lesson');
+    expect(html).not.toContain(`title="${REASON}`);
+  });
+
+  it("keeps the action as the button's accessible NAME in both states", () => {
+    // The name is what a screen reader reads to identify the control; the
+    // reason reaches it as the description. Swapping them would leave the
+    // button unnamed. Also what the live probes select on
+    // (scripts/probe-refine-tab.mjs:290).
+    for (const set of [LESSONS, EMPTY_SOURCE]) {
+      expect(render(set)).toContain('aria-label="Copy the first lesson');
+    }
+  });
+});

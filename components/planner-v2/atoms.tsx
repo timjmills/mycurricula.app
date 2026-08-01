@@ -313,9 +313,19 @@ export function AddLessonMenu({
               <span className={styles.addIc} aria-hidden="true">
                 ★
               </span>
+              {/* The second line says what the form will say at submit, BEFORE
+                  the teacher fills it in: the schedule store has no addBlock
+                  action, so AddEventForm can only validate and then report
+                  "Events can’t be saved yet" (AddEventForm.tsx:182-199,
+                  :379-383). The row stays — the form is real and the wiring is
+                  the Phase 1B editable-schedules item — but a menu row that
+                  reads like every other create action is a promise. */}
               <span className={styles.addTx}>
                 <b>Non-instructional event</b>
-                <span>Assembly, field trip, testing, holiday…</span>
+                <span>
+                  Assembly, field trip, testing — not saved yet, coming with
+                  editable schedules
+                </span>
               </span>
             </button>
           )}

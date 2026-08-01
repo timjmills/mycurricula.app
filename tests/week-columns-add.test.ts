@@ -157,8 +157,16 @@ describe("WeekColumns — the paper Week frame can add a lesson", () => {
   it("gives the trigger a tooltip that says what it accomplishes", () => {
     // CLAUDE.md §4: a non-obvious control explains its OUTCOME, not its label.
     const html = renderToStaticMarkup(createElement(WeekColumns));
-    expect(html).toContain(
-      "Add a lesson or a non-instructional event to this day",
-    );
+    expect(html).toContain("Add a lesson to this day");
+  });
+
+  it("does not offer an event the app cannot save", () => {
+    // The trigger used to promise "a lesson OR A NON-INSTRUCTIONAL EVENT". The
+    // lesson half works; the event half opens a form whose submit can only
+    // report "Events can’t be saved yet" — the schedule store has no addBlock
+    // action (components/daily/AddEventForm.tsx:182-199). A teacher who reads
+    // the promise plans their assembly into a dialog that discards it.
+    const html = renderToStaticMarkup(createElement(WeekColumns));
+    expect(html).not.toContain("non-instructional event");
   });
 });

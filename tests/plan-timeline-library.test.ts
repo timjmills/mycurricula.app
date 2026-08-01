@@ -357,6 +357,31 @@ describe("buildNeedsAttention", () => {
     );
     expect(buildNeedsAttention(rows, units)).toEqual([]);
   });
+
+  it("is empty for a lesson missing exactly ONE of the three", () => {
+    // The threshold this list is built on: `isThin` is `planningGapCount >= 2`
+    // (dots.ts:47-52) — one missing axis is an ordinary work-in-progress
+    // lesson. Pinned because the DRAWER'S EMPTY STATE makes a claim about it:
+    // it used to read "every lesson has an objective, a resource and a
+    // standard", which an empty list has never meant. If the threshold ever
+    // moves to >= 1, this test fails and the copy has to move with it
+    // (TimelineDrawer.tsx, the `attention.length === 0` branch).
+    for (const gap of [
+      { objective: "" },
+      { resources: [] },
+      { standards: [] },
+    ]) {
+      const rows = buildLessonLibrary(
+        input({
+          lessons: [lesson({ id: "l1", subject: "math", week: 2, ...gap })],
+        }),
+      );
+      expect(
+        buildNeedsAttention(rows, []),
+        `one gap: ${Object.keys(gap)[0]}`,
+      ).toEqual([]);
+    }
+  });
 });
 
 describe("filterLessons", () => {

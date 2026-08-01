@@ -433,7 +433,11 @@ export function WeekC(): ReactNode {
                           triggerClassName={styles.addBtn}
                           triggerContent="+"
                           tooltipId="weekc-add-lesson"
-                          tooltipContent={`Add a ${subject.name} ${labels.lesson.toLowerCase()} or a non-instructional event to this day`}
+                          // Lesson only — same reason as WeekA:486. The event
+                          // half opens a form whose submit can only report
+                          // "Events can’t be saved yet"
+                          // (components/daily/AddEventForm.tsx:182-199).
+                          tooltipContent={`Add a ${subject.name} ${labels.lesson.toLowerCase()} to this day`}
                           align="center"
                           onQuickAdd={() =>
                             void handleQuickAdd(subject.id, dayIdx)

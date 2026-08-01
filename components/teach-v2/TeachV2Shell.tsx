@@ -307,7 +307,11 @@ export function TeachV2Shell(props: TeachZonesProps): ReactNode {
             variant="icon"
             size="sm"
             iconAriaLabel="Board settings"
-            tooltip="Rename this board and manage its slides"
+            // The popover has no slide/page management at all — it renames,
+            // tags, saves as a template, and clears every widget
+            // (BoardSettingsPopover.tsx:180-318). Pages exist in the repo
+            // (`teach.listPages`) but nothing here edits them.
+            tooltip="Rename this board, tag where it shows up, or clear everything on it"
             onClick={onBoardSettings}
           >
             <V2Icon name="grip" size={16} />

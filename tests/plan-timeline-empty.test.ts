@@ -274,3 +274,52 @@ describe("an unconfigurable axis is named, not left blank", () => {
     vi.resetModules();
   });
 });
+
+// ── The lane's two "not on this timeline" notices ───────────────────────────
+//
+// Both are counts with an explanation attached, and both explanations named a
+// remedy that does not exist.
+//
+//   "N unscheduled" counts every unit `unitSpan` returns null for — which is
+//   TWO populations, not one (bands.ts:106-111): a unit with no week range at
+//   all, AND a unit whose STORED range lands wholly outside the academic year.
+//   The copy told the second kind it "carries no weeks" and told it to set a
+//   week range — which it has. Following the instruction could not clear the
+//   flag.
+//
+//   "N off-calendar" counts lessons with no column (lanes.ts:79-95), and sent
+//   the teacher to "the Lessons tab" to re-date them. That tab is read-only
+//   about dates — its row actions are Plan / Teach / Finish
+//   (components/year-v2/unit-tabs/LessonsTab.tsx:51-85) — and the one surface
+//   that CAN re-date a lesson is the weekly card's relocate picker, which
+//   cannot show a lesson that has no column.
+
+describe("a lane explains why something is missing with a remedy that exists", () => {
+  it("does not tell a unit stored for weeks 90–92 that it carries no weeks", async () => {
+    store.state = "settled";
+    store.subjects = [MATH];
+    // A real stored range, far past the end of any configured year.
+    store.units = [
+      { ...UNIT, weeks: "Wk 90–92", startWeek: 90, endWeek: 92 } as Unit,
+    ];
+    store.lessons = [];
+    const html = await render();
+    // The count still fires — the unit really cannot be drawn.
+    expect(html).toContain("1 unscheduled");
+    expect(html).not.toContain("carry no weeks and no dated lesson");
+    // …and the remedy names the constraint that makes the stored range wrong.
+    expect(html).toContain("inside this academic year");
+  });
+
+  it("does not send an off-calendar lesson to a tab that cannot re-date it", async () => {
+    store.state = "settled";
+    store.subjects = [MATH];
+    store.units = [UNIT];
+    // day 6 is off the configured school week, so the lesson has no column.
+    store.lessons = [lessonFixture({ day: 6 })];
+    const html = await render();
+    expect(html).toContain("1 off-calendar");
+    expect(html).not.toContain("Lessons tab");
+    expect(html).toContain("Settings → Calendar");
+  });
+});

@@ -70,6 +70,7 @@ import {
   densityFor,
   useDndSensors,
 } from "@/lib/collapse-on-drag";
+import { useWeekExpansion } from "@/lib/week-expansion";
 // Direct sibling import (folder convention — WeeklyShell does the same for
 // its ./WeeklyViewControls etc.): importing the folder's OWN barrel from a
 // module the barrel re-exports is a circular dependency.
@@ -135,10 +136,23 @@ export function WeekColumns(): ReactNode {
   } = usePlanner();
 
   // ── Inline expansion state (UI only — not part of history) ────────────────
-  // Multiple cards may be open at once; onSelect toggles membership. Mirrors
-  // WeeklyGrid's expandedIds Set + drag-start snapshot (WeeklyGrid 212-214).
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
-  const expandedSnapshotRef = useRef<Set<string> | null>(null);
+  // Multiple cards may be open at once; onSelect toggles membership.
+  //
+  // The Set used to be local useState here (mirroring WeeklyGrid 212-214). It
+  // moved to <WeekExpansionProvider> when /weekly lost its right panel: with
+  // the panel gone, expanding IS how a teacher reads a lesson, and the
+  // "Expand all" control that drives it lives in the page header — outside
+  // this component. Writer and reader on opposite sides of the shell need one
+  // shared instance; see lib/week-expansion.ts. Rendered standalone (no
+  // provider) the hook hands back a private instance, so this component still
+  // expands and collapses exactly as it did.
+  const {
+    isExpanded,
+    toggle: toggleExpanded,
+    publishVisible,
+    snapshotAndCollapse,
+    restoreSnapshot,
+  } = useWeekExpansion();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Previous app-state selection — lets the sync effect below collapse a card
   // when its detail panel is dismissed from OUTSIDE (WeeklyGrid 222).
@@ -257,6 +271,35 @@ export function WeekColumns(): ReactNode {
     }
     return buckets;
   }, [lessons, week, DAY_COUNT, lessonMatchesQuery, subjectRank]);
+
+  // ── Publish what "all" means for the header's Expand-all control ──────────
+  // The control lives in the page header and cannot see this canvas's week
+  // bucketing, archived exclusion, or search/filter predicate — so "expand
+  // all" would either have to guess or reach into the store and expand
+  // lessons that are not on screen. Instead the canvas reports the ids it is
+  // actually rendering, in render order, and the store expands exactly those.
+  // A filtered week therefore expands only what it shows.
+  //
+  // Derived from `byDay`, which is already memoized on every input that can
+  // change the visible set, and publishVisible ignores an unchanged list — so
+  // this settles in one pass rather than looping.
+  const visibleLessonIds = useMemo(
+    () => byDay.flat().map((l) => l.id),
+    [byDay],
+  );
+  //
+  // The CLEANUP is load-bearing, not tidiness. /weekly swaps this canvas out
+  // for WeeklyList, ScheduleTimeline, or WeekEditBoard — none of which have
+  // expandable cards and none of which publish. Without the unmount clear,
+  // the last grid's ids would linger, the header would keep offering an
+  // "Expand all" for a canvas that has nothing to expand, and pressing it
+  // would do nothing visible. Clearing on the way out lets the control's own
+  // visibleCount === 0 test hide it, so the header never has to re-derive
+  // which canvas is on screen.
+  useEffect(() => {
+    publishVisible(visibleLessonIds);
+    return () => publishVisible([]);
+  }, [visibleLessonIds, publishVisible]);
 
   // ── Quick-add (one-click blank lesson, PER DAY) ───────────────────────────
   // Paper was the only Week frame with no add affordance at all: an empty
@@ -409,30 +452,32 @@ export function WeekColumns(): ReactNode {
     }
   }, [lessons]);
 
-  // ── Sync: collapse a card when its detail panel is dismissed externally ───
-  // When app-state `selectedLessonId` transitions from a concrete id → null
-  // (the WeeklyShell drawer's close button / backdrop / Esc), undo exactly the
-  // expansion that the matching click added (WeeklyGrid 421-432).
+  // ── Sync: collapse a card when its selection is cleared externally ────────
+  // When app-state `selectedLessonId` transitions from a concrete id → null,
+  // undo exactly the expansion that the matching click added (WeeklyGrid
+  // 421-432). With the rail gone the external clearer is Esc (WeeklyShell's
+  // document listener) rather than a drawer's close button, but the contract
+  // is unchanged: whatever dismisses the selection also shuts the card.
+  //
+  // `toggleExpanded` is used rather than an unconditional delete BECAUSE it is
+  // guarded by isExpanded: a card the teacher had opened via "Expand all" and
+  // never selected must not be closed by someone else's Esc.
   useEffect(() => {
     const prev = prevSelectedLessonIdRef.current;
     prevSelectedLessonIdRef.current = selectedLessonId;
-    if (selectedLessonId === null && prev !== null) {
-      setExpandedIds((curr) => {
-        if (!curr.has(prev)) return curr;
-        const next = new Set(curr);
-        next.delete(prev);
-        return next;
-      });
+    if (selectedLessonId === null && prev !== null && isExpanded(prev)) {
+      toggleExpanded(prev);
     }
-  }, [selectedLessonId]);
+  }, [selectedLessonId, isExpanded, toggleExpanded]);
 
   // ── dnd-kit event handlers (mirror WeeklyGrid 445-514) ────────────────────
 
   function handleDragStart(event: DragStartEvent): void {
     const id = String(event.active.id);
     // Snapshot the expanded set, then collapse all to chips immediately.
-    expandedSnapshotRef.current = new Set(expandedIds);
-    setExpandedIds(new Set());
+    // Both halves now live in the shared store so the header control and the
+    // cards agree about what a drag temporarily hid.
+    snapshotAndCollapse();
     setDragState({ phase: "dragging", activeId: id, overId: null });
     const lesson = lessons.find((l) => l.id === id);
     const subjectName = lesson ? subjectById[lesson.subject]?.name : "";
@@ -463,9 +508,7 @@ export function WeekColumns(): ReactNode {
     // Restore the snapshotted expansion set + return to idle synchronously in
     // the same handler so there is no intermediate wrong-state render
     // (WeeklyGrid 484-487). The DragOverlay's own dropAnimation runs in parallel.
-    const snapshot = expandedSnapshotRef.current;
-    expandedSnapshotRef.current = null;
-    setExpandedIds(snapshot ?? new Set());
+    restoreSnapshot();
     setDragState({ phase: "idle" });
 
     const day = resolveOverDay(overId);
@@ -490,50 +533,47 @@ export function WeekColumns(): ReactNode {
   }
 
   function handleDragCancel(): void {
-    setExpandedIds(expandedSnapshotRef.current ?? new Set());
-    expandedSnapshotRef.current = null;
+    restoreSnapshot();
     setDragState({ phase: "idle" });
     setLiveAnnouncement("Drag cancelled.");
   }
 
   // ── Selection / expansion ──────────────────────────────────────────────────
 
-  // Plain SINGLE click — ONE combined toggle: inline expand AND the detail
-  // surface open/close together (WeeklyGrid.handleSelect, 523-548, minus the
+  // Plain SINGLE click — expand the card in place, and mirror that into the
+  // app-state selection (WeeklyGrid.handleSelect, 523-548, minus the
   // bulk-selection axis which is grid-only).
+  //
+  // The selection no longer opens anything: /weekly has no right panel, so the
+  // EXPANSION is the whole visible result of a click. `selectedLessonId` is
+  // still written because two things downstream read it — the card's selected
+  // ring, and WeeklyShell's `?lesson=` URL mirror, which is what makes an
+  // opened lesson shareable. Keeping the two in step is why this stayed one
+  // combined handler rather than becoming a pure expand toggle.
   const handleSelect = useCallback(
     (lessonId: string): void => {
       setSelectedId(lessonId);
-      const isExpanded = expandedIds.has(lessonId);
-      if (isExpanded) {
+      if (isExpanded(lessonId)) {
         if (selectedLessonId === lessonId) setSelectedLessonId(null);
       } else {
         setSelectedLessonId(lessonId);
       }
-      setExpandedIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(lessonId)) next.delete(lessonId);
-        else next.add(lessonId);
-        return next;
-      });
+      toggleExpanded(lessonId);
     },
-    [expandedIds, selectedLessonId, setSelectedLessonId],
+    [isExpanded, toggleExpanded, selectedLessonId, setSelectedLessonId],
   );
 
   // DOUBLE click / Shift+Enter — FORCE-OPEN (idempotent): the lesson ends up
-  // both expanded inline AND with its detail panel open (WeeklyGrid 575-590).
+  // expanded whether or not it already was (WeeklyGrid 575-590). Idempotence
+  // is the point — a double click arrives as click-then-click, so a toggle
+  // here would undo the expansion the first click just made.
   const handleActivateDetail = useCallback(
     (lessonId: string): void => {
       setSelectedLessonId(lessonId);
       setSelectedId(lessonId);
-      setExpandedIds((prev) => {
-        if (prev.has(lessonId)) return prev;
-        const next = new Set(prev);
-        next.add(lessonId);
-        return next;
-      });
+      if (!isExpanded(lessonId)) toggleExpanded(lessonId);
     },
-    [setSelectedLessonId],
+    [setSelectedLessonId, isExpanded, toggleExpanded],
   );
 
   const handleToggleComplete = useCallback(
@@ -657,11 +697,16 @@ export function WeekColumns(): ReactNode {
                 holiday={holidaysByDay.get(dayIdx) ?? null}
                 isDropTarget={dragOverDayIdx === dayIdx}
                 density={density}
-                expandedIds={expandedIds}
+                isExpanded={isExpanded}
                 selectedId={selectedLessonId ?? selectedId}
                 dragActiveId={dragActiveId}
                 emptyLabel={`No ${labels.lesson.toLowerCase()}s`}
-                addTooltip={`Add a ${labels.lesson.toLowerCase()} or a non-instructional event to this day`}
+                // Only the lesson half of this menu can persist: the schedule
+                // store has no addBlock action, so AddEventForm's submit only
+                // raises "Events can't be saved yet"
+                // (components/daily/AddEventForm.tsx:182-199). The trigger
+                // promises what works and the menu row carries the rest.
+                addTooltip={`Add a ${labels.lesson.toLowerCase()} to this day`}
                 // The menu is 300px and a column ~170px, so a centered menu on
                 // an EDGE column overhangs the horizontal scroll container and
                 // is clipped (live: 39px lost off the left on Sunday, 38px off
@@ -771,7 +816,11 @@ interface DayColumnProps {
    *  the parent — the column's own isOver misses hovers over its cards). */
   isDropTarget: boolean;
   density: Density;
-  expandedIds: Set<string>;
+  /** Membership test against the shared expansion store, passed rather than
+   *  read from the hook here: outside a provider each caller of
+   *  useWeekExpansion() gets its OWN instance, so a column that asked for
+   *  itself would answer from a set nothing else writes. */
+  isExpanded: (lessonId: string) => boolean;
   selectedId: string | null;
   dragActiveId: string | null;
   emptyLabel: string;
@@ -812,7 +861,7 @@ function DayColumn({
   holiday,
   isDropTarget,
   density,
-  expandedIds,
+  isExpanded,
   selectedId,
   dragActiveId,
   emptyLabel,
@@ -917,7 +966,7 @@ function DayColumn({
                 key={lesson.id}
                 lesson={lesson}
                 density={density}
-                expanded={expandedIds.has(lesson.id)}
+                expanded={isExpanded(lesson.id)}
                 selected={selectedId === lesson.id}
                 dragging={dragActiveId === lesson.id}
                 onSelect={onSelect}

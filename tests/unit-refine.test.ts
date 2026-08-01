@@ -3,12 +3,14 @@ import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  REFINE_ENTER_COLUMNS,
   REFINE_PASSES,
   refineCompleteness,
   refineFieldSet,
   refineFillCoalesceKey,
   refineFillDescriptors,
   refineFillPatch,
+  refinePassBanner,
   refinePassProgress,
 } from "@/lib/unit-refine";
 import type { Lesson } from "@/lib/types";
@@ -561,5 +563,79 @@ describe("RefineTab — a cell refuses to flatten formatting it cannot hold", ()
         'aria-readonly="true"',
       );
     }
+  });
+});
+
+// ── 5. The pass banner never promises a keyboard run the column cannot make ──
+//
+// The counter above the table used to append " — Enter jumps to the next
+// lesson" to EVERY unfinished pass. It is true of three of the four: `advance`
+// walks a column by looking up `${column}:${row + 1}` in the ref map that
+// `registerCell` fills, and the Standards cell is a <button> that opens the
+// tagging picker — it registers nothing, so Enter there ACTIVATES the button and
+// opens a modal. `REFINE_PASSES` already knew (its Standards tip omits the
+// sentence the objective and duration tips carry); the banner overrode it.
+//
+// Asserted against the pure builder because the banner only renders once a pass
+// is CHOSEN, and `renderToStaticMarkup` fires no change event — a rendered
+// assertion could only ever see the resting state, which has no banner at all.
+
+describe("refinePassBanner — the Enter claim matches the column", () => {
+  it("promises Enter only on the columns that register a cell", () => {
+    for (const field of ["objective", "duration", "assessment"] as const) {
+      expect(
+        refinePassBanner(field, { done: 1, total: 4 }),
+        `${field} pass`,
+      ).toContain("Enter jumps to the next lesson");
+    }
+  });
+
+  it("does NOT promise Enter on the Standards pass", () => {
+    const banner = refinePassBanner("standards", { done: 1, total: 4 });
+    expect(banner).not.toContain("Enter");
+    // Not merely silent: the teacher is told what DOES fill the column, or the
+    // pass reads as a highlighted column with no way in.
+    expect(banner).toContain("open a cell");
+  });
+
+  it("still counts the pass, on every field", () => {
+    for (const p of REFINE_PASSES) {
+      expect(refinePassBanner(p.key, { done: 2, total: 7 })).toContain(
+        `${p.label}: 2 of 7 done`,
+      );
+    }
+  });
+
+  it("drops the how-to once the pass is finished", () => {
+    // Nothing left to walk to, so a keyboard instruction is noise.
+    const banner = refinePassBanner("objective", { done: 4, total: 4 });
+    expect(banner).toBe("Objectives: 4 of 4 done");
+  });
+});
+
+describe("REFINE_ENTER_COLUMNS agrees with the component's real ref map", () => {
+  it("lists exactly the columns RefineTab registers a cell for", async () => {
+    // A PROVENANCE CHECK, and provenance checks are where this repo has been
+    // burned: a bare-word grep matched a file's own header comment and was read
+    // as the capability. This one matches the CALL — `registerCell("x", ` — with
+    // the trailing comma and argument that only a call site has, so a mention in
+    // prose ("registerCell covers title/objective") cannot satisfy it. It also
+    // asserts a non-empty result first, so a rename that makes the regex match
+    // nothing fails loudly instead of passing with two empty sets.
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(
+      new URL(
+        "../components/year-v2/unit-tabs/RefineTab.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const registered = [
+      ...src.matchAll(/registerCell\("([a-z]+)",\s*i\)/g),
+    ].map((m) => m[1]);
+    expect(registered.length).toBeGreaterThan(0);
+    expect([...new Set(registered)].sort()).toEqual(
+      [...REFINE_ENTER_COLUMNS].sort(),
+    );
   });
 });

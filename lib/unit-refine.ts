@@ -191,6 +191,59 @@ export interface RefinePassProgress {
 }
 
 /**
+ * The table columns Enter can actually walk down.
+ *
+ * THE GROUND TRUTH IS `registerCell` IN RefineTab.tsx. `advance()` focuses
+ * `${column}:${row + 1}` out of the ref map and RETURNS WITHOUT PREVENTING
+ * DEFAULT when there is no such entry — so a column that never registers a cell
+ * gets whatever Enter natively does there, not an advance. `standards` is that
+ * column and always will be: its cell is a `<button>` that opens the tagging
+ * picker (a code is unique only per framework, so a single-select cannot serve
+ * it), and Enter on a button ACTIVATES it. Promising an Enter run there sends a
+ * teacher down a column pressing a key that opens a modal each time.
+ *
+ * tests/unit-refine.test.ts scrapes RefineTab's real `registerCell("…"` calls
+ * and fails if this list and that file ever disagree.
+ */
+export const REFINE_ENTER_COLUMNS: readonly string[] = [
+  "title",
+  "objective",
+  "duration",
+  "assessment",
+];
+
+/** Does an Enter press in this pass's column move to the next lesson? */
+export function refinePassAdvances(field: RefineFieldKey): boolean {
+  return REFINE_ENTER_COLUMNS.includes(field);
+}
+
+/**
+ * The pass counter's line, as one string.
+ *
+ * Lives here rather than inline in the component because the interesting part
+ * is a CLAIM about the keyboard, and a claim is worth asserting: the banner used
+ * to append " — Enter jumps to the next lesson" to every unfinished pass,
+ * including Standards, where Enter opens the picker instead. `REFINE_PASSES`
+ * already knew — its Standards tip omits that sentence while the objective and
+ * duration tips carry it — and the banner overrode that care.
+ */
+export function refinePassBanner(
+  field: RefineFieldKey,
+  progress: RefinePassProgress,
+): string {
+  const label = REFINE_PASSES.find((p) => p.key === field)?.label ?? "";
+  const head = `${label}: ${progress.done} of ${progress.total} done`;
+  if (progress.done >= progress.total) return head;
+  if (refinePassAdvances(field)) return `${head} — Enter jumps to the next lesson`;
+  // Standards is the only non-advancing pass today, and its cell opens the
+  // tagging picker; the generic arm keeps a future one from inheriting copy
+  // about a control it does not have.
+  return field === "standards"
+    ? `${head} — open a cell to tag its standards`
+    : `${head} — open a cell to fill it in`;
+}
+
+/**
  * Progress for one pass across a unit's lessons.
  *
  * Counts EVERY lesson, taught or not — unlike `unitGaps`, which skips taught

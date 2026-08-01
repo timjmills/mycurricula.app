@@ -64,6 +64,7 @@ import {
   refineCompleteness,
   refineFillDescriptors,
   refineFillPatch,
+  refinePassBanner,
   refinePassProgress,
   type RefineFieldKey,
   type RefineFillableKey,
@@ -278,6 +279,16 @@ function FillDown({
   disabled: boolean;
   onClick: () => void;
 }): ReactNode {
+  // NO `title=` HERE, DELIBERATELY. Tooltip mirrors its own content to the
+  // native title= only when the child does not already carry one
+  // (Tooltip.tsx:755-759), so a hard-coded `title={label}` beat the
+  // disabled-aware content and announced the action a disabled button cannot
+  // perform — on touch (long-press) and as the OS tooltip, which is exactly
+  // where a disabled <button> falls back, since Chromium drops its pointer
+  // events. Letting Tooltip derive the title puts the REASON on both paths,
+  // which is what CLAUDE.md §4 asks a disabled control's tooltip to explain.
+  // `aria-label` stays the action: it is the button's NAME, and the reason
+  // reaches assistive tech as the description.
   return (
     <Tooltip
       content={
@@ -293,7 +304,6 @@ function FillDown({
         className={`${styles.fd} ${styles.fd}`}
         disabled={disabled}
         aria-label={label}
-        title={label}
         onClick={onClick}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -417,7 +427,6 @@ export function RefineTab({
   }
 
   const progress = pass ? refinePassProgress(lessons, pass, resOpts) : null;
-  const passLabel = REFINE_PASSES.find((p) => p.key === pass)?.label ?? "";
   const pickerLesson =
     stdFor === null ? null : (lessons.find((l) => l.id === stdFor) ?? null);
 
@@ -449,12 +458,13 @@ export function RefineTab({
             </select>
           </label>
         </Tooltip>
-        {progress ? (
+        {/* Composed by `refinePassBanner` as ONE string, not three JSX children:
+            the keyboard claim it makes is only true of the columns that
+            register a cell above (`REFINE_ENTER_COLUMNS`), and a claim worth
+            branching on is worth asserting in a test. */}
+        {progress && pass ? (
           <p className={styles.passProgress} role="status">
-            {passLabel}: {progress.done} of {progress.total} done
-            {progress.done < progress.total
-              ? " — Enter jumps to the next lesson"
-              : ""}
+            {refinePassBanner(pass, progress)}
           </p>
         ) : null}
       </div>
@@ -462,9 +472,16 @@ export function RefineTab({
       {/* ── The table ──────────────────────────────────────────────────── */}
       <div className={styles.tableWrap}>
         <table className={styles.table}>
+          {/* "Edit any cell in place" was true of four columns out of seven:
+              Standards and Resources are buttons that open a picker, and a
+              title or objective carrying markup renders read-only (see
+              `RichSafeCell`). The caption names what each kind of cell does
+              instead of promising one behaviour for all of them. */}
           <caption className={styles.caption}>
-            Every lesson in this unit, one row each — edit any cell in place.
-            Changes save as you type.
+            Every lesson in this unit, one row each. Type in a cell to change
+            it — Standards and Resources open a picker, and a cell holding
+            formatted text opens in the Lesson Planner. Changes save as you
+            type.
           </caption>
           <thead>
             <tr>
