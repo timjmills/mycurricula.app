@@ -211,7 +211,7 @@ function FocusPanel({
   onTeach: (id: string) => void;
   onPost: (id: string) => void;
 }): ReactNode {
-  const { subjectById, units, setLessonStatus } = usePlanner();
+  const { subjectById, units, setLessonStatus, describeStandard } = usePlanner();
   const isDone = lesson.status === "done";
   const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
   return (
@@ -251,9 +251,36 @@ function FocusPanel({
           {stripHtml(lesson.objective)}
         </div>
         <div className={styles.vbMeta}>
+          {/* The handoff's meta cell is `sel.std` — ONE code, because its
+              fixture lessons carry one (7.21 source-home/views-b.jsx:41). A
+              real lesson carries a list, and `standards[0] ?? "—"` showed the
+              first and dropped the rest with nothing on screen to say so. Every
+              code is listed here; unlike the focus card's chip row there is
+              nothing to collapse, because this is a text cell in a wrapping
+              meta grid. `title` carries each code's wording.
+              DayB has NO flow surface to correct alongside it — its handoff
+              panel is meta cells only, with no `dc-flow` equivalent. */}
           <div className={styles.mi}>
-            <span className={styles.mk}>Standard</span>
-            <span className={styles.mv}>{lesson.standards[0] ?? "—"}</span>
+            <span className={styles.mk}>
+              {lesson.standards.length === 1 ? "Standard" : "Standards"}
+            </span>
+            <span
+              className={styles.mv}
+              title={
+                lesson.standards.length > 0
+                  ? lesson.standards
+                      .map((code) => {
+                        const wording = describeStandard(code);
+                        return wording === code ? code : `${code} — ${wording}`;
+                      })
+                      .join("\n")
+                  : "This lesson has no standards tagged yet — tag them on its planning page."
+              }
+            >
+              {lesson.standards.length > 0
+                ? lesson.standards.join(", ")
+                : "None tagged"}
+            </span>
           </div>
           <div className={styles.mi}>
             <span className={styles.mk}>Time</span>

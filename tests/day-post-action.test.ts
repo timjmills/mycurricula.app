@@ -63,6 +63,14 @@ vi.mock("@/lib/planner-store", () => ({
     subjectById: store.subjectById,
     units: store.units,
     setLessonStatus: () => {},
+    // The focus card reads the lesson's REAL flow and standards from the store.
+    // These fixtures carry no sections, so `[]` is the honest answer and the
+    // card renders its "no lesson flow" empty state — which is what a lesson
+    // with no sections should show. Note there is deliberately no
+    // `getSections ?? (() => [])` fallback in the component: that would make a
+    // genuine store regression render as "no flow" instead of failing loudly.
+    getSections: () => [],
+    describeStandard: (code: string) => code,
   }),
   // Settled, so the view renders lessons rather than a hydrate skeleton.
   usePlannerDataState: () => "settled",

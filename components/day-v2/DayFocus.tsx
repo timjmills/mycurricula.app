@@ -7,11 +7,20 @@
 // vertical timeline of full-width rows, DayB (paper) a subject rail + a white
 // focus panel, DayC (color) an agenda + a subject-tinted hero. A teacher who
 // changed their background material got a different INFORMATION ARCHITECTURE,
-// which is not what an appearance axis is for — and the handoff only ever
-// specifies one Day ("Day = focus + agenda rail"). The user settled it on
+// which is not what an appearance axis is for. The user settled it on
 // 2026-08-01: one Day view, for every frame and every theme. This file is
-// DayC's agenda + hero — already the handoff's shape — promoted to the Day view
-// /daily renders.
+// DayC's agenda + hero — the handoff's focus-card shape — promoted to the Day
+// view /daily renders.
+//
+// THE HANDOFF SPECIFIES TWO DAYS, NOT ONE. An earlier version of this comment
+// claimed "the handoff only ever specifies one Day", and that is false: 7.21
+// source-home/app.jsx:522 dispatches `{A: ViewsA, B: ViewsC, C: ViewsC}`, so
+// frame A gets its own DayA (views-a.jsx:8-54) — a vertical timeline with a
+// per-row Finish pill (:33-40) and a per-row Plan|Post|Teach split (:41-45) —
+// while B and C share DayC. Shipping ONE Day is the user's decision above and
+// it stands; it is a deliberate divergence from the handoff, not conformance
+// with it, and the difference matters if anyone later re-reads the handoff to
+// settle a question about this view.
 //
 // DayA/DayB/DayC are still in the folder, at the user's request, until they
 // decide what to merge or delete ("keep all three of the views until later").
@@ -26,12 +35,13 @@
 //
 // ── EVERYTHING FLOATS ON THE PHOTOGRAPH ────────────────────────────────────
 // There is no containing panel: the day-nav bar, the rail and the focus card
-// are three independently floating surfaces. That is a readability hazard, not
-// a free win — commits d92a50d and be181cc were spent on text that sat on the
-// stage photo with no surface of its own (ratios as low as 2.7:1). So every
-// floating element in day-v2.module.css carries its OWN fill plus the
-// `inset 0 1px 0` lit edge; see the `.vhead` / `.vcAgenda` notes there for the
-// opacity reasoning and which of them may not blur.
+// float independently. That is a readability hazard, not a free win — commits
+// d92a50d and be181cc were spent on text that sat on the stage photo with no
+// surface of its own (ratios as low as 2.7:1). The handoff answers it three
+// DIFFERENT ways, and day-v2.module.css follows each: the day-nav bar is bare
+// and buys legibility with a text-shadow halo, the rail is a filled panel, and
+// the focus card is an opaque subject gradient. Read the notes on each there —
+// including which of them may not `backdrop-filter` — before thinning any.
 //
 // ── ONE PLACE TO ACT ───────────────────────────────────────────────────────
 // The rail is pure navigation: a row click focuses that lesson and nothing
@@ -54,23 +64,21 @@ import {
 import { lessonTime } from "@/lib/mock/schedule";
 import { stripHtml } from "@/lib/html-text";
 import { unitDisplayName } from "@/lib/unit-name";
+import { lessonResourceCount } from "@/lib/lesson-resources";
 import { Tooltip } from "@/components/ui";
 import { UnitChip } from "@/components/unit-chip";
 import type { Lesson } from "@/lib/types";
 import { ForkCues, FinishPill, AddLessonMenu, SelectTitle } from "./atoms";
-import { useNowMin, fromInteractive } from "./util";
+import {
+  useNowMin,
+  fromInteractive,
+  lessonFlowSteps,
+  splitStandardChips,
+} from "./util";
 import { DayEmptyState } from "./DayEmptyState";
 import { DayHeader } from "./DayHeader";
 import type { DayViewV2Props } from "./DayViewV2";
 import styles from "./day-v2.module.css";
-
-/** The static lesson-flow chips shown on the focus card (decorative, matches
- *  the bundle). NOT this lesson's real flow: live sections are store-owned
- *  (`usePlanner().getSections`) and a lesson on any template but the default
- *  has different phases. Wiring them is a separate change — see the report on
- *  task #56; this pass consolidates the layout and does not alter what the
- *  card claims. */
-const FLOW_STEPS = ["Warm-up", "Mini-lesson", "Guided practice", "Exit ticket"];
 
 function statusLine(status: DayStatus): string {
   if (status === "done") return "Complete";
@@ -238,6 +246,24 @@ export function DayFocus(props: DayViewV2Props): ReactNode {
 // The ONLY place the day's lessons can be acted on: Finish, Plan, Post, Open in
 // Teach. It is an opaque subject gradient in every tone, so it is its own
 // floating surface and needs no frosting.
+//
+// ── IT SHOWS THE LESSON'S OWN CONTENT, NOT THE MOCKUP'S ────────────────────
+// Every piece of this card is read from the lesson the teacher selected. Two
+// pieces were not, and both said something false:
+//
+//   • the flow strip painted a module constant ("Warm-up · Mini-lesson ·
+//     Guided practice · Exit ticket") on every lesson in the app. See
+//     ./util `lessonFlowSteps` for the full account; it now renders
+//     `getSections(lesson.id)` — the same phases Plan and Teach show.
+//   • the footer painted `lesson.standards[0] ?? "—"`, so a lesson tagged
+//     with four standards showed one and gave no sign of the other three.
+//     `splitStandardChips` paints them all, collapsing past the fourth.
+//
+// Neither read costs a round trip: sections hydrate with the document
+// (planner-store `getSectionsBatch` + the synthetic fill beside it) and the
+// standards catalog is already in the same context. If either is genuinely
+// empty the card SAYS so — there is no fallback that fills the space with
+// something plausible, because that is precisely the defect being removed.
 function FocusCard({
   lesson,
   subjectName,
@@ -253,9 +279,15 @@ function FocusCard({
   onTeach: (id: string) => void;
   onPost: (id: string) => void;
 }): ReactNode {
-  const { setLessonStatus, units } = usePlanner();
+  const { setLessonStatus, units, getSections, describeStandard } = usePlanner();
   const isDone = lesson.status === "done";
   const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
+  const sections = getSections(lesson.id);
+  const flow = lessonFlowSteps(sections);
+  const standards = splitStandardChips(lesson.standards);
+  // Counted off the SECTIONS, not `lesson.resources`, so the number agrees with
+  // what Post and Teach open (lib/lesson-resources is the one canonical view).
+  const resourceCount = lessonResourceCount(sections);
   return (
     <div
       className={`cp-subj ${lesson.subject} ${styles.vcDetail} ${
@@ -288,15 +320,90 @@ function FocusCard({
         <div className={styles.dobj}>{stripHtml(lesson.objective)}</div>
       </div>
       <div className={styles.dcFlow}>
-        {FLOW_STEPS.map((step, i) => (
-          <span key={step} className={styles.dcStep}>
-            <b>{i + 1}</b>
-            {step}
-          </span>
-        ))}
+        {flow.length > 0 ? (
+          flow.map((step) => (
+            // `title` carries the full phase name plus whatever the teacher has
+            // written into that phase — the only recovery for the label's
+            // ellipsis on a narrow card, and the phase's actual content on a
+            // wide one. A chip is a leaf <span>, so this is a plain native
+            // tooltip, not an onboarding one (CLAUDE.md §4 scopes those to
+            // controls and named panels).
+            <span
+              key={step.key}
+              className={styles.dcStep}
+              title={step.detail ? `${step.label} — ${step.detail}` : step.label}
+            >
+              <b>{step.n}</b>
+              <span className={styles.dcStepLabel}>{step.label}</span>
+              {/* Minutes are optional per phase and the separator goes with
+                  them — never a dangling "·" (lib/lesson-flow, 6.11.26 §7). */}
+              {step.minutes !== null && (
+                <span className={styles.dcStepMin}>{step.minutes} min</span>
+              )}
+            </span>
+          ))
+        ) : (
+          <p className={styles.dcFlowEmpty}>
+            No lesson flow yet — open Plan to add the phases you&rsquo;ll teach.
+          </p>
+        )}
       </div>
       <div className={styles.dfoot}>
-        <span className={styles.dchip}>{lesson.standards[0] ?? "—"}</span>
+        {/* The handoff puts a single standard chip here (7.21
+            source-home/views-c.jsx:51, `sel.std` — its fixture lessons carry
+            exactly one). Real lessons carry a list, so the chip becomes a
+            bounded GROUP in the same slot: it keeps the handoff's placement
+            while making the footer's width predictable however many standards a
+            teacher tags. */}
+        <div className={styles.dcStds}>
+          {standards.shown.length > 0 ? (
+            <>
+              {standards.shown.map((code) => {
+                const wording = describeStandard(code);
+                return (
+                  <span
+                    key={code}
+                    className={`${styles.dchip} cp-mono`}
+                    // describeStandard echoes the code back when the catalog
+                    // doesn't know it — a title identical to the visible text
+                    // teaches nothing, so it is omitted instead.
+                    title={wording === code ? undefined : wording}
+                  >
+                    {code}
+                  </span>
+                );
+              })}
+              {standards.hidden.length > 0 && (
+                <span
+                  className={styles.dchip}
+                  title={standards.hidden
+                    .map((code) => {
+                      const wording = describeStandard(code);
+                      return wording === code ? code : `${code} — ${wording}`;
+                    })
+                    .join("\n")}
+                >
+                  +{standards.hidden.length} more
+                </span>
+              )}
+            </>
+          ) : (
+            <span
+              className={`${styles.dchip} ${styles.dchipQuiet}`}
+              title="This lesson has no standards tagged yet — tag them on its planning page."
+            >
+              No standards
+            </span>
+          )}
+        </div>
+        {resourceCount > 0 && (
+          <span
+            className={styles.dchip}
+            title={`${resourceCount} resource${resourceCount === 1 ? "" : "s"} attached to this lesson's phases — open Post to see them.`}
+          >
+            {resourceCount} resource{resourceCount === 1 ? "" : "s"}
+          </span>
+        )}
         <span className={styles.dchip}>{statusLine(status)}</span>
         <FinishPill
           status={status}

@@ -24,11 +24,20 @@
  *
  * ── EVERYTHING FLOATS ON THE PHOTOGRAPH ────────────────────────────────────
  * There is no containing panel any more (DailyView.module.css `.pageFloating`
- * drops the `--canvas` fill in VIEW mode). Three surfaces float independently:
- * the day-nav bar `.vhead`, the rail `.vcAgenda`, and the focus card
- * `.vcDetail`. Each therefore has to carry its OWN fill — text on a bare stage
- * photo is the defect commits d92a50d and be181cc were spent on (2.73:1 at
- * worst). Read the notes on `.vhead` and `.vcAgenda` before thinning either.
+ * drops the `--canvas` fill in VIEW mode). Three things float independently,
+ * and the handoff gives them DIFFERENT answers to the same legibility problem —
+ * they are not three copies of one recipe:
+ *   • `.vhead` (day-nav) — BARE. No fill at all; legibility is bought with a
+ *     text-shadow halo (views.css:38, :48-52). The handoff's own choice, and
+ *     the user's decision 2.
+ *   • `.vcAgenda` (rail) — A PANEL. The handoff fills it too
+ *     (views.css:283, a white gradient + blur(22px)); here it is 92% of
+ *     `--surface` so one value serves both tone registers.
+ *   • `.vcDetail` (focus card) — an opaque subject gradient, its own surface.
+ * Text on the bare stage photo is the defect commits d92a50d and be181cc were
+ * spent on (2.73:1 at worst), so none of this is free: read the notes on each
+ * of the three, and the measurements in docs/screenshots/day-handoff/, before
+ * thinning any of them.
  */
 
 /* ── View body + shared header ──────────────────────────────────────────── */
@@ -52,47 +61,35 @@
 
 /* The day-nav bar — ‹ Sunday › on the left, the date on the right.
    ────────────────────────────────────────────────────────────────────────────
-   IT CARRIES A SURFACE BECAUSE IT FLOATS. Until the containing panel was
-   removed this row sat on `--canvas` (an OPAQUE cream/near-black), so its 32px
-   title and 13px date never met the photograph. Floating it puts `--ink` text
-   straight onto the stage image — the exact shape of the defect fixed in
-   d92a50d / be181cc, and the date line is the more fragile half (13px at 0.72
-   opacity). So the bar is its own frosted panel, on the same recipe the
-   Resource Wall's `.sec` proved over a photo.
+   IT FLOATS BARE. No fill, no border, no blur, no shadow: the handoff's
+   `.vhead` is `display:flex; align-items:flex-end; justify-content:space-between;
+   gap:16px; margin:2px 4px 16px` and nothing else (7.21 source-home/views.css:38),
+   and `V2 Framework.md`:468 calls these "View titles (top-left, OVER the
+   background)". It is also decision 2 of the user's four for this view —
+   everything floats on the photograph, no containing panel.
 
-   THE FILL IS 92% OF `--surface`, NOT THE WALL'S 86%. `--surface` inverts by
-   tone, so one value serves both registers. The wall lands 15px/700 --ink-800
-   text on 86%; this bar has to hold a 13px 0.72-opacity date, which starts
-   ~2.9× closer to its floor, so it buys back the margin with opacity rather
-   than by re-weighting handoff type. 8% of a bright photo patch is not enough
-   backdrop to move a ratio meaningfully.
+   IT USED TO BE A FROSTED PANEL, and that was not superstition: text on the
+   bare stage photo is the defect commits d92a50d / be181cc were spent on
+   (2.73:1 at worst), and a previous lane's answer was to give this row its own
+   92%-`--surface` fill. The handoff's answer is the HALO below instead. Both
+   were measured on this tree at 1440 across Photo-Dim / Photo-Bright / Wash /
+   Night × all seven themes; the numbers are in
+   docs/screenshots/day-handoff/{before,after}-vhead.json. Read them before
+   putting the panel back — and note what a halo can and cannot do:
 
-   IT MAY BLUR. `backdrop-filter` makes an element a stacking context, which is
-   why `.vcAgenda` below refuses one — but everything anchored in this bar
-   (the two `wkarrow` Tooltips) portals to <body>, so nothing is trapped. */
+   A TEXT-SHADOW IS NOT WCAG CONTRAST. WCAG 1.4.3 compares the text colour to
+   its background; a halo is a perceptual aid the maths does not credit. What
+   makes this row pass is that `--ink` INVERTS with the derived tone, so the ink
+   is already the correct polarity for whatever the photo is doing, and the halo
+   is the extra margin on top for the patches the average misses. If a future
+   photo lands this below AA, the fix is the halo's strength or a fill on the
+   TITLE, not a bar across the whole row — the bar is what the user removed. */
 .vhead {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin: 2px 0 16px;
-  padding: 10px 16px;
-  border-radius: var(--r-xl);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  backdrop-filter: blur(18px);
-  /* Glass always carries the lit top edge (CLAUDE.md §4). The two registers'
-     values branch on the DERIVED tone, never the theme: the white frosted
-     register lights at .95, the dark frosted one at .14 (app/themes.css:775
-     and :707). */
-  box-shadow:
-    0 16px 44px -28px rgba(28, 27, 46, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-}
-:global([data-tone="dark"]) .vhead {
-  box-shadow:
-    0 16px 44px -28px rgba(8, 12, 22, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  margin: 2px 4px 16px;
 }
 .wknav {
   display: flex;
@@ -131,12 +128,87 @@
   line-height: 1;
   color: var(--ink);
 }
+/* The date line. THE HANDOFF'S HALO IS NOT ENOUGH FOR THIS ONE ELEMENT, and
+   that is measured, not assumed. views.css:53 floats it bare at 13px/600 and
+   opacity .72 with only `text-shadow:0 1px 8px rgba(0,0,0,.4)`. Over the stage
+   photo that lands at 1.57–1.74:1 on every dark-tone row (docs/screenshots/
+   day-handoff/after-vhead-*.json) — roughly a third of the 4.5 floor, and the
+   same class of defect as d92a50d / be181cc. The frosted bar it used to sit on
+   measured 6.04–8.49 (before-live.json), so the panel WAS doing real work; it
+   was just doing it for the whole row when only this element needed it.
+
+   Why a halo cannot fix it: the worst pixel behind the date is LIGHT
+   (rgb 174,175,180 — a bright patch in the photo's top-right) while the derived
+   tone is dark, so the ink is white. White on a light pixel does not improve at
+   any opacity, and WCAG credits no shadow. The polarity is wrong, not the
+   strength, so the element needs its own backdrop or nothing will save it.
+
+   THE SMALLEST THING THAT WORKS: a chip on the date alone. The row still floats
+   — the bar is gone, the 32px title is bare over the photo exactly as the
+   handoff wants (it passes at 5.87–15.08 unaided, being large text with strong
+   ink), and this is the same concession the handoff itself makes for the
+   arrows, which it also refuses to float bare (views.css:52). The fill is
+   `--surface`, which INVERTS with tone, so one value is a dark chip behind
+   white ink and a light chip behind dark ink. Opacity goes to 1: at 13px the
+   demotion from the title is already carried by size and weight, and opacity is
+   the one form of de-emphasis that costs contrast (same reasoning as `.at`). */
 .vsub {
   font-size: 13px;
   font-weight: 600;
-  opacity: 0.72;
   text-align: right;
   color: var(--ink);
+}
+:global([data-bg="photo"]) .vsub {
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* ── The halo that replaces the panel (views.css:48-52) ──────────────────────
+   The handoff branches these on `[data-dim="bright"]`; this file branches on
+   the DERIVED `data-tone` instead, per CLAUDE.md §4 ("branch on data-tone,
+   never the theme"). Under `[data-bg="photo"]` the two are the same partition —
+   Photo-Dim and Photo-Normal derive tone=dark, Photo-Bright derives tone=light
+   — so this is the handoff's rule expressed in the axis the rest of the file
+   already reads, and it keeps working if the derivation ever gains a case.
+
+   Only the arrows take a fill (views.css:52); the type takes none. */
+:global([data-bg="photo"]) .vheadTitle {
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 2px 18px rgba(0, 0, 0, 0.35);
+}
+:global([data-bg="photo"]) .vsub {
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
+}
+:global([data-bg="photo"][data-tone="light"]) .vheadTitle {
+  text-shadow:
+    0 1px 3px rgba(255, 255, 255, 0.7),
+    0 0 14px rgba(255, 255, 255, 0.5);
+}
+:global([data-bg="photo"][data-tone="light"]) .vsub {
+  text-shadow: 0 1px 6px rgba(255, 255, 255, 0.6);
+}
+/* Off the photo (Wash), dark tone still wants a soft lift off the wash. */
+:global([data-bg="wash"][data-tone="dark"]) .vheadTitle {
+  text-shadow: 0 2px 24px rgba(12, 11, 20, 0.3);
+}
+/* The arrows keep a fill over the photo — the one element the handoff does
+   NOT float bare, because a 17px stroke glyph has no halo to hide behind.
+   These may blur: every Tooltip anchored in this bar portals to <body>, so
+   the stacking context `backdrop-filter` creates traps nothing. */
+:global([data-bg="photo"]) .wkarrow.wkarrow {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  backdrop-filter: blur(10px);
+}
+:global([data-bg="photo"][data-tone="light"]) .wkarrow.wkarrow {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.9);
+  color: var(--ink-soft);
 }
 
 .holiday {
@@ -334,6 +406,22 @@
   letter-spacing: -0.01em;
   line-height: 1.15;
 }
+/* The rail's subject name. THE HANDOFF CONTRADICTS ITSELF HERE and the
+   disagreement is settled deliberately, not by accident:
+     • views-c.jsx:28 sets this line to the subject's ink token
+       (`style={{color: cv(ls.ink)}}`) — subject identity.
+     • views.css:285 then overrides it with `#494857 !important` under
+       `[data-version="C"]`, so the runnable mockup RENDERS it grey.
+   The authority chain puts the mockup above the JSX, which would make grey the
+   conformant answer. It loses anyway, to something that outranks the handoff
+   entirely: CLAUDE.md §4, "Subject color always wins for subject identity, on
+   any background", and "colour is information, never decoration" — this line IS
+   the subject name, the one place on the row where the identity is spelled out.
+   A project's own design contract outranks the handoff, and `!important` on a
+   version-scoped selector reads much more like a stray override than an intent.
+   So: subject ink (`--cd`), measured against the rail's fill in all four modes
+   (docs/screenshots/day-handoff/after-rail.json). Recorded so the next reader
+   knows the divergence was chosen. */
 .au {
   font-size: 11px;
   font-weight: 600;
@@ -351,21 +439,55 @@
   box-shadow: var(--sh-lg);
   position: relative;
   min-height: 0;
-  /* Subject color as the hero — a DEEP saturated panel, dark enough that the
-     always-white hero text clears WCAG AA on every subject (M3). The WHOLE
-     gradient is darkened toward `black`: start 58%, end 40% of the subject
-     color in OKLab. Worst case is the lightest subject (Math gold, normal
-     palette #DCC674) at the START: white-on-start = 6.52:1 (> 4.5 body floor);
-     every other subject in both palettes, and the darker end, land higher. The
-     anchor is `black`, NOT var(--ink-900): that token INVERTS to near-white on
-     dark tone, which would lighten the gradient and break the white text on
-     Night — this hero is a fixed white-on-color surface in every theme, so it
-     needs a tone-stable dark anchor. Numbers verified in OKLab (the space
-     color-mix interpolates in). */
+  /* SUBJECT COLOUR IS THE HERO — a deep, SATURATED panel.
+     ──────────────────────────────────────────────────────────────────────────
+     The handoff is `linear-gradient(150deg, C, color-mix(in oklab, C 70%,
+     #1c1b2e))` — stop 1 the raw subject colour (7.21 source-home/views-c.jsx:34)
+     under `color:#fff` (views.css:293). Measured on this tree, THAT FAILS AA ON
+     EVERY SUBJECT: the binding element is the 11px/800 `.dcTl` eyebrow at 0.82
+     opacity inside `.dcTarget`'s rgba(255,255,255,.14) panel, which lands at
+     0.32–0.59× its 4.5 floor. The mockup is genuinely unreadable there, so the
+     code cannot follow it literally.
+
+     THE PREVIOUS ANSWER OVERSHOT, AND ALSO FAILED. `color-mix(in oklab, C 58%,
+     black)` → `… 40%, black)` reads as near-black faintly tinted, because
+     mixing toward black scales CHROMA down with lightness — it took stop 1 from
+     0.073–0.129 chroma to 0.042–0.076, roughly half the subject colour. Its
+     comment claimed a 6.52:1 worst case, but that was white-on-the-raw-stop; it
+     did not composite the translucent panels the small text actually sits on,
+     and against those it FAILS on math (0.83×), sel (0.90×), explorers (0.91×)
+     and ufli (0.94×). Both the old numbers and these are in
+     docs/screenshots/day-handoff/hero-recipes-asBuilt.json.
+
+     WHAT SHIPS: a LIGHTNESS RAMP in OKLCh. Clamping `l` leaves hue and chroma
+     alone, so the subject colour survives at full saturation — stop 1 comes
+     back to 0.072–0.129 chroma, i.e. the handoff's own chroma to three decimals
+     for seven of the eight subjects (math gamut-clips to 0.082 vs 0.105; gold
+     at L=0.40 simply cannot hold that much chroma in sRGB). Every one of the
+     card's seven text elements clears its own AA floor on every subject, with
+     1.05–1.17× margin. It is luminance-aware by construction: a subject already
+     darker than the ceiling passes through untouched, so this does not have to
+     be re-tuned when the §4 subject→slot map moves (task #50).
+
+     NO LITERAL COLOUR — the handoff's `#1c1b2e` anchor would be a hard-coded
+     hex (CLAUDE.md §4), and `var(--ink-900)` is not usable here because it
+     INVERTS to near-white on dark tone, which would lighten the gradient and
+     break the white text on Night. Clamping the subject's own lightness needs
+     no anchor at all and is tone-stable by construction.
+
+     The `color-mix` line below is the FALLBACK, not dead code: relative colour
+     syntax needs Chrome 119 / Safari 16.4 / Firefox 128, and a browser without
+     it drops the second declaration and keeps this one. Keep them in this
+     order. */
   background: linear-gradient(
     150deg,
     color-mix(in oklab, var(--c) 58%, black),
     color-mix(in oklab, var(--c) 40%, black)
+  );
+  background: linear-gradient(
+    150deg,
+    oklch(from var(--c) min(l, 0.4) c h),
+    oklch(from var(--c) min(l, 0.3) c h)
   );
 }
 .vcDetailModified {
@@ -469,6 +591,14 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* `max-width` + the ellipsis on `.dcStepLabel` below are load-bearing, not
+   polish. The chips used to hold four short mockup words; they now hold the
+   lesson's REAL phase names, and a real one runs to "Collaborative Practice —
+   You Do Together". Unconstrained, one chip is wider than the card at the phone
+   tier, and a flex child that overflows its wrapping row takes the DOCUMENT
+   sideways with it — the one thing CLAUDE.md §4 forbids outright. Capping the
+   chip at the card's width makes the label ellipsize instead; nothing is lost,
+   because the chip's `title` carries the full phase name and its body text. */
 .dcStep {
   display: flex;
   align-items: center;
@@ -479,12 +609,67 @@
   border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.22);
+  max-width: 100%;
+  min-width: 0;
 }
+.dcStepLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* "· 15 min" is the phase's planned length. Quieter than the name it follows —
+   the pacing is context, the phase is the content. 0.78 of the chip's own white
+   on the same rgba(255,255,255,.14) fill the AA note above measures; it is a
+   12px/600 run, one step up from the 11px/800 `.dcTl` that binds the card. */
+.dcStepMin {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.78;
+}
+.dcStepMin::before {
+  content: "· ";
+}
+/* A lesson with no phases. This is the whole point of the change — the strip
+   used to fill itself with four plausible names no matter what the lesson
+   actually contained, so the empty case must READ as empty and must never grow
+   a fallback chip. Plain white on the gradient rather than on a chip fill, so
+   it is the higher-contrast of the two surfaces the card offers. */
+.dcFlowEmpty {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  opacity: 0.92;
+}
+/* The footer's standards group — a bounded cluster in the single-chip slot the
+   handoff specifies, so N standards cannot stretch the footer arbitrarily. */
+.dcStds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* The step number. The handoff gives this disc rgba(255,255,255,.28) and lets
+   it inherit `.vc-detail`'s white (views.css:299) — white-on-28%-white, which
+   measures 3.07–3.93 against its 4.5 floor on EVERY subject, on both the old
+   gradient and the new one. It is the one element on this card the hero recipe
+   cannot rescue: the disc lightens its own backdrop faster than the gradient
+   behind it can be darkened, so the only fix is to stop painting white on it.
+
+   Inverted instead: an almost-solid white disc with the SUBJECT's deep tone as
+   the numeral. Same vocabulary the done Finish pill already uses on this card
+   (`.dfootFinish[aria-pressed="true"]`, rgba(255,255,255,.92)), no literal
+   colour — the numeral is the gradient's own dark stop — and it makes the step
+   index read as a badge rather than a ghost. */
 .dcStep b {
   width: 19px;
   height: 19px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+  color: oklch(from var(--c) min(l, 0.3) c h);
   display: grid;
   place-items: center;
   font-size: 11px;
@@ -498,6 +683,21 @@
   gap: 14px;
   flex-wrap: wrap;
 }
+/* THE HANDOFF'S `backdrop-filter: blur(6px)` (views.css:306) IS DELIBERATELY
+   NOT HERE. It was restored, measured, and reverted. The rail's objection does
+   not apply — a `.dchip` is a leaf <span> that traps nothing — but a different
+   one does: this chip sits on an OPAQUE gradient, so a backdrop blur has
+   nothing useful to sample, and what it actually samples is not confined to the
+   card. Measured on `math`, white-on-chip:
+
+       with blur(6px)     Wash 3.74   Photo-Dim 5.85
+       without            Wash 5.55   Photo-Dim 5.57
+
+   Without the blur the chip is tone-INVARIANT, as an opaque card should be, and
+   passes AA in both. With it, the page behind the card leaks into the chip and
+   Wash — a light page — pushes it under the 4.5 floor. The blur buys no visible
+   frost over an opaque fill and costs 1.8 points of contrast, so it stays off.
+   (scripts/_diag-day-chip.mjs reproduces this.) */
 .dchip {
   font-size: 12px;
   font-weight: 700;
@@ -505,6 +705,18 @@
   border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+/* The "No standards" chip — an absence, so it should not shout as loudly as a
+   real standard code beside it. It is quietened by REMOVING THE FILL, never by
+   fading the text: white on the raw gradient is the higher-contrast of the two
+   surfaces on this card (the fill lightens the backdrop; see the AA note on
+   `.dchip` above), so this reads calmer AND measures better than the chips it
+   sits with. Fading the ink instead would have traded legibility for tone on
+   the one chip whose job is to be believed. */
+.dchipQuiet {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.28);
+  font-weight: 600;
 }
 .dfootPlan.dfootPlan {
   margin-left: auto;
@@ -568,12 +780,51 @@
 /* The title-text select button (.selectTitle) moved to
    planner-v2/atoms.module.css with the SelectTitle atom. */
 
-/* ── Responsive — collapse the two-column day ≤880px ───────────────────── */
-/* The rail stacks above the focus card. Internal scroll only; the document
-   never scrolls sideways (CLAUDE.md §4). */
-@media (max-width: 880px) {
+/* ── Responsive — collapse the two-column day ≤900px ───────────────────── */
+/* The handoff has THREE rules here, at 900 (7.21 source-home/views.css:615-620):
+   collapse the grid, turn the rail into a horizontal STRIP
+   (`flex-direction:row; overflow-x:auto; gap:8px`), and `flex:0 0 auto` the
+   items. This file previously had only the first, at 880 — no strip — so a
+   phone rendered the entire day's lesson list before the focus card, and the
+   focus card is the entire point of this view. The before/after offset at
+   375px is measured in docs/screenshots/day-handoff/geometry.json.
+
+   Only the RAIL scrolls sideways; the document never does (CLAUDE.md §4). The
+   `.vcAadd` trigger has to be told to stop filling the width, since in column
+   flow it is `width:100%` — as a strip item that would be a full-viewport-wide
+   button wedged between the rows and the end of the scroll. */
+@media (max-width: 900px) {
   .vcDay {
     grid-template-columns: 1fr;
+  }
+  .vcAgenda {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+  }
+  .vcAitem,
+  .vcAadd.vcAadd {
+    flex: 0 0 auto;
+  }
+  .vcAadd.vcAadd {
+    width: auto;
+    margin-top: 0;
+  }
+  /* The handoff gives strip items `flex:0 0 auto` and no width, which sizes
+     each one to its content. Its mock titles are short; real lesson titles are
+     not, and measured at 375px that produced 322px rows inside a 327px rail —
+     one lesson visible, with nothing on screen to suggest there are seven more.
+     Capping the item makes the next row peek, which is the whole scroll
+     affordance. Two lines of title keeps the rows a uniform height. */
+  .vcAitem {
+    max-width: 210px;
+  }
+  .an {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
   }
 }
 
@@ -582,11 +833,17 @@
 @media (max-width: 480px) {
   .vhead {
     flex-wrap: wrap;
-    row-gap: 4px;
+    row-gap: 6px;
+    align-items: center;
   }
+  /* Wraps to its own line, but stays a CHIP. `flex: 1 0 100%` would stretch the
+     date's pill across the whole viewport, which reads as a second header bar —
+     the exact thing item A removed. It takes the line and hugs its text. */
   .vsub {
-    flex: 1 0 100%;
+    flex: 0 0 auto;
+    width: auto;
     text-align: left;
+    margin-inline-end: auto;
   }
 }
 

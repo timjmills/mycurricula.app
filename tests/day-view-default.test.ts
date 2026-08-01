@@ -38,6 +38,14 @@ vi.setConfig({ testTimeout: 30000 });
 const store = vi.hoisted(() => ({
   subjectById: {} as Record<string, Subject>,
   units: [] as unknown[],
+  // The flow marker lives here, in the hoisted block, so it is safe to read
+  // from anywhere in the mock — including the factory body itself, which
+  // `vi.mock` lifts above every `const` in this file. Today's reference sits
+  // inside `getSections`, which is not called until a test renders, so a plain
+  // `const` would happen to work; it would stop working the moment someone
+  // moved it up. Cheaper to be unconditionally safe than to leave a trap whose
+  // spring is a future refactor.
+  flowHeading: "Number-line warm-up",
 }));
 
 vi.mock("@/lib/planner-store", () => ({
@@ -46,6 +54,24 @@ vi.mock("@/lib/planner-store", () => ({
     units: store.units,
     setLessonStatus: () => {},
     lessons: [],
+    // The focus card reads the lesson's REAL flow from the store. This fixture
+    // returns one section on purpose: the marker below is its heading, so the
+    // test proves the card rendered data that came from the store rather than a
+    // string the component owns. The previous marker was "Warm-up", which was
+    // one of four hard-coded placeholder steps — it identified the view by the
+    // very bug that has now been fixed, so it went red the moment the fake flow
+    // was removed. A marker has to be something only the real implementation
+    // can produce.
+    //
+    // The component deliberately has no `getSections ?? (() => [])` fallback,
+    // so a store that stops supplying this fails loudly instead of rendering an
+    // empty flow that looks like a lesson nobody planned.
+    // `resources: []` is not padding — the card counts resources off the
+    // sections (lib/lesson-resources.ts), so a section without the field throws.
+    getSections: () => [
+      { id: "s-1", heading: FOCUS_FLOW, minutes: 10, body: "", resources: [] },
+    ],
+    describeStandard: (code: string) => code,
   }),
   // Settled, so the view renders lessons rather than a hydrate skeleton.
   usePlannerDataState: () => "settled",
@@ -113,7 +139,7 @@ const BASE_PROPS = {
 /** The focus card's learning-target box. No legacy frame has one. */
 const FOCUS_TARGET = "Learning target";
 /** The first of the focus card's numbered flow chips. */
-const FOCUS_FLOW = "Warm-up";
+const FOCUS_FLOW = store.flowHeading;
 
 beforeEach(() => {
   store.subjectById = { math: SUBJECT };

@@ -25,14 +25,16 @@ import {
   AddLessonMenu,
   SelectTitle,
 } from "./atoms";
-import { useNowMin, fromInteractive } from "./util";
+import {
+  useNowMin,
+  fromInteractive,
+  lessonFlowSteps,
+  splitStandardChips,
+} from "./util";
 import { DayEmptyState } from "./DayEmptyState";
 import { DayHeader } from "./DayHeader";
 import type { DayViewV2Props } from "./DayViewV2";
 import styles from "./day-v2.module.css";
-
-/** The static lesson-flow chips shown on the hero (decorative, matches bundle). */
-const FLOW_STEPS = ["Warm-up", "Mini-lesson", "Guided practice", "Exit ticket"];
 
 function statusLine(status: DayStatus): string {
   if (status === "done") return "Complete";
@@ -190,6 +192,13 @@ export function DayC(props: DayViewV2Props): ReactNode {
 }
 
 // ── Hero — the subject-colored focus panel (bundle .vc-detail) ──────────────
+// Kept in step with DayFocus's FocusCard, which is this component promoted to
+// the shipping Day view: the flow strip renders the lesson's OWN phases
+// (`getSections`) and the footer every standard it is tagged with, rather than
+// the mockup's four fixed chips and `standards[0]`. See DayFocus for the full
+// account. The JSX is duplicated rather than shared because this frame is
+// retained only until the user decides what to merge or delete — when it goes,
+// its copy goes with it, and the shipping card is left untouched.
 function Hero({
   lesson,
   subjectName,
@@ -205,9 +214,11 @@ function Hero({
   onTeach: (id: string) => void;
   onPost: (id: string) => void;
 }): ReactNode {
-  const { setLessonStatus, units } = usePlanner();
+  const { setLessonStatus, units, getSections, describeStandard } = usePlanner();
   const isDone = lesson.status === "done";
   const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
+  const flow = lessonFlowSteps(getSections(lesson.id));
+  const standards = splitStandardChips(lesson.standards);
   return (
     <div
       className={`cp-subj ${lesson.subject} ${styles.vcDetail} ${
@@ -240,15 +251,65 @@ function Hero({
         <div className={styles.dobj}>{stripHtml(lesson.objective)}</div>
       </div>
       <div className={styles.dcFlow}>
-        {FLOW_STEPS.map((step, i) => (
-          <span key={step} className={styles.dcStep}>
-            <b>{i + 1}</b>
-            {step}
-          </span>
-        ))}
+        {flow.length > 0 ? (
+          flow.map((step) => (
+            <span
+              key={step.key}
+              className={styles.dcStep}
+              title={step.detail ? `${step.label} — ${step.detail}` : step.label}
+            >
+              <b>{step.n}</b>
+              <span className={styles.dcStepLabel}>{step.label}</span>
+              {step.minutes !== null && (
+                <span className={styles.dcStepMin}>{step.minutes} min</span>
+              )}
+            </span>
+          ))
+        ) : (
+          <p className={styles.dcFlowEmpty}>
+            No lesson flow yet — open Plan to add the phases you&rsquo;ll teach.
+          </p>
+        )}
       </div>
       <div className={styles.dfoot}>
-        <span className={styles.dchip}>{lesson.standards[0] ?? "—"}</span>
+        <div className={styles.dcStds}>
+          {standards.shown.length > 0 ? (
+            <>
+              {standards.shown.map((code) => {
+                const wording = describeStandard(code);
+                return (
+                  <span
+                    key={code}
+                    className={`${styles.dchip} cp-mono`}
+                    title={wording === code ? undefined : wording}
+                  >
+                    {code}
+                  </span>
+                );
+              })}
+              {standards.hidden.length > 0 && (
+                <span
+                  className={styles.dchip}
+                  title={standards.hidden
+                    .map((code) => {
+                      const wording = describeStandard(code);
+                      return wording === code ? code : `${code} — ${wording}`;
+                    })
+                    .join("\n")}
+                >
+                  +{standards.hidden.length} more
+                </span>
+              )}
+            </>
+          ) : (
+            <span
+              className={`${styles.dchip} ${styles.dchipQuiet}`}
+              title="This lesson has no standards tagged yet — tag them on its planning page."
+            >
+              No standards
+            </span>
+          )}
+        </div>
         <span className={styles.dchip}>{statusLine(status)}</span>
         <FinishPill
           status={status}
