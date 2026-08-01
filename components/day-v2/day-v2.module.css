@@ -431,7 +431,6 @@
 .vcDetail {
   border-radius: var(--r-2xl);
   overflow: visible;
-  color: #fff;
   display: flex;
   flex-direction: column;
   gap: clamp(10px, 1.4vw, 16px);
@@ -489,9 +488,165 @@
     oklch(from var(--c) min(l, 0.4) c h),
     oklch(from var(--c) min(l, 0.3) c h)
   );
+
+  /* ── THE CARD'S INNER VOCABULARY, AS VARIABLES ─────────────────────────────
+     Everything inside this card used to write `rgba(255,255,255,.14)` and
+     friends literally, in eleven places. Those literals are not palette colours
+     — they are ALPHA OVERLAYS on the card's own fill, which is why the file is
+     allowed them at all — but hard-coding them eleven times meant the card had
+     exactly ONE material and no way to gain another.
+     Hoisting them into seven variables is what lets `[data-frame]` restyle the
+     card by setting seven values instead of rewriting eleven rules. The values
+     here are the COLOUR-FORWARD (Frame C) recipe, unchanged to the digit — this
+     block is a refactor, not a redesign, and the frame blocks below are the new
+     part. Every inner rule reads these; none reads a literal. */
+  --dc-ink: #fff;
+  --dc-fill: rgba(255, 255, 255, 0.14);
+  --dc-fill-strong: rgba(255, 255, 255, 0.22);
+  --dc-solid: rgba(255, 255, 255, 0.92);
+  --dc-solid-ink: oklch(from var(--c) min(l, 0.3) c h);
+  --dc-edge: rgba(255, 255, 255, 0.22);
+  --dc-edge-strong: rgba(255, 255, 255, 0.3);
+  color: var(--dc-ink);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   FRAME RESPONSE — MATERIAL ONLY
+   ────────────────────────────────────────────────────────────────────────────
+   THE BUG THIS FIXES. /daily rendered IDENTICALLY in Frame A, B and C, and the
+   reason is structural rather than an oversight: app/themes.css carries 134
+   `[data-frame="…"]` rules and every one of them targets a GLOBAL primitive
+   class (`.card`, `.lane`, `.chip`, `.badge`, `.bar`, `.fr-chrome`). This view
+   — like every other React surface in the repo — is styled by CSS Modules,
+   whose class names are hashed, so none of those selectors can ever match it.
+   Measured before the change: the card's computed background, ink and shadow
+   were byte-identical across all three frames in all four backdrops
+   (docs/screenshots/day-frame/baseline.json, "DISTINCT CARD MATERIALS: 1/3").
+
+   WHY NOT JUST ADD `className="card"` AND INHERIT THOSE 134 RULES. It was the
+   first thing tried and it is wrong for this surface, for three concrete
+   reasons:
+     • `[data-frame="glass"] .card` sets `backdrop-filter: blur(22px)`
+       unconditionally. The AGENDA RAIL must not become a stacking context — it
+       is the ancestor of the add-lesson trigger, and the note on `.vcAgenda`
+       records that trap being hit three times in this repo already.
+     • `[data-frame="…"][data-bg="…"] .card` sets an opaque NEUTRAL fill
+       (`rgba(24,28,42,.62)` and friends). The focus card is a SUBJECT gradient
+       whose recipe is the output of a documented contrast derivation (see the
+       note on `.vcDetail` above). A neutral fill would overwrite the subject —
+       the one thing this card exists to carry — and void that analysis.
+     • Those rules also set `color` directly, per frame, which is how a surface
+       ends up with ink chosen by the FRAME rather than by `data-tone`.
+   So the recipe is expressed here, in day-local `:global([data-frame])` rules
+   that set the seven variables above. The cost is that this recipe and the
+   themes.css one can drift; the note above is what a future reader needs to
+   know why they are separate.
+
+   MATERIAL, NEVER LAYOUT. Not one rule below changes a grid, a flex direction,
+   a size or an order — only fill, ink, edge, shadow and blur. The single Day
+   layout is the user's decision of 2026-08-01 and it stands.
+
+   TONE IS STILL THE AUTHORITY ON INK. The paper frame's fill is `var(--surface)`
+   and its ink `var(--ink-900)`; both invert together on `data-tone="dark"`, so
+   the frame chooses the MATERIAL and the tone chooses the INK — never the other
+   way round, and never the theme (CLAUDE.md §4).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── FRAME A · GLASS — frosted, the subject seen through it ───────────────── */
+/* Same white-on-subject vocabulary as colour-forward; what changes is the
+   MATERIAL: the fill becomes translucent, a real backdrop blur picks up the
+   photograph, and the lit top edge every glass surface in this system carries
+   appears.
+   THE FILL STAYS NEAR-OPAQUE ON PURPOSE (86%/80%, not the 50-60% themes.css
+   uses for neutral chrome). This card's header records two commits spent on
+   text that sat on a stage photo with no surface of its own; a genuinely sheer
+   card would put the objective and the flow chips back on an arbitrary
+   photograph, where no fixed recipe can hold a contrast floor. At this opacity
+   the blur has plenty to work with visually while the worst case the backdrop
+   can do is bounded — and it IS measured, in photo-bright, the brightest
+   backdrop the app can put behind it.
+   Safe to make this a stacking context: the two overlays that escape this card
+   both leave the subtree anyway — Tooltip portals to document.body
+   (components/ui/Tooltip.tsx:923) and UnitChip opens the global workspace host,
+   not a descendant popover. */
+:global([data-frame="glass"]) .vcDetail {
+  background: linear-gradient(
+    150deg,
+    color-mix(
+      in srgb,
+      color-mix(in oklab, var(--c) 58%, black) 86%,
+      transparent
+    ),
+    color-mix(
+      in srgb,
+      color-mix(in oklab, var(--c) 40%, black) 80%,
+      transparent
+    )
+  );
+  background: linear-gradient(
+    150deg,
+    oklch(from var(--c) min(l, 0.4) c h / 0.86),
+    oklch(from var(--c) min(l, 0.3) c h / 0.8)
+  );
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    var(--sh-lg),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* ── FRAME B · PAPER — a bright opaque card, crisp edge, soft shadow ──────── */
+/* The one frame that flips the card's INK, and it flips fill and ink together,
+   which is exactly what the legibility contract asks for. Both sides are
+   tone-derived tokens (`--surface` / `--ink-900`), so dark tone inverts the
+   pair by construction — there is no `[data-tone]` branch here and there must
+   not be one.
+   The subject is not lost, it is quieted: a 14% wash of `--c` over the surface
+   at the top stop keeps subject identity on a card whose job is still "which
+   lesson is this", while leaving the fill light enough for ink. The inner
+   overlays flip from white-alpha to SUBJECT-alpha for the same reason — a white
+   overlay on a white card is invisible.
+   The step-number disc reuses `oklch(from var(--c) min(l,.4) c h)` with white
+   on it: that is not a new colour, it is literally the colour-forward card's
+   own first gradient stop, i.e. a pair this file has already measured. */
+:global([data-frame="paper"]) .vcDetail {
+  --dc-ink: var(--ink-900);
+  --dc-fill: color-mix(in srgb, var(--c) 12%, transparent);
+  --dc-fill-strong: color-mix(in srgb, var(--c) 20%, transparent);
+  --dc-solid: color-mix(in oklab, var(--c) 58%, black);
+  --dc-solid: oklch(from var(--c) min(l, 0.4) c h);
+  --dc-solid-ink: #fff;
+  --dc-edge: color-mix(in srgb, var(--c) 30%, transparent);
+  --dc-edge-strong: color-mix(in srgb, var(--c) 48%, transparent);
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--c) 14%, var(--surface)),
+    var(--surface)
+  );
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-md);
+}
+
+/* ── FRAME C · COLOR — the base recipe above, stated so the set is explicit ─ */
+/* Deliberately empty of overrides: the `.vcDetail` block IS the colour-forward
+   card, and duplicating it here would be a second copy to keep in step. This
+   selector exists so a reader looking for "what does frame C do" finds an
+   answer rather than an absence, and so the three frames read as a set. */
+
+/* ── The rail — same job in every frame, different material ───────────────── */
+/* "The rail stays the rail" (user, 2026-08-01): its content, order and
+   behaviour do not move. Paper takes it fully opaque with a crisp border and
+   drops the lit inset edge, which is a glass signature; glass and colour keep
+   the translucent panel above. It still must NOT `backdrop-filter` in any
+   frame — see the note on `.vcAgenda`. */
+:global([data-frame="paper"]) .vcAgenda {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--sh-md);
 }
 .vcDetailModified {
-  outline: 2px dashed rgba(255, 255, 255, 0.55);
+  outline: 2px dashed var(--dc-edge-strong);
   outline-offset: -7px;
 }
 .dcTop {
@@ -516,8 +671,8 @@
   margin-top: 0;
 }
 .dcTopHead span[aria-label^="Moved"] {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
+  background: var(--dc-fill-strong);
+  color: var(--dc-ink);
 }
 .dlab {
   font-size: 12px;
@@ -549,24 +704,24 @@
    rules carry their own qualifiers so they clear `.btn.ghost:hover:not(:disabled)`
    (0,4,0) and `.btn:focus-visible` (0,2,0) by specificity, never by load order. */
 .dunChip.dunChip.dunChip {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.34);
-  color: #fff;
+  background: var(--dc-fill);
+  border-color: var(--dc-edge-strong);
+  color: var(--dc-ink);
 }
 .dunChip.dunChip.dunChip:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: #fff;
-  color: #fff;
+  background: var(--dc-fill-strong);
+  border-color: var(--dc-ink);
+  color: var(--dc-ink);
 }
 /* The primitive's --ink-900 ring is near-black in light tone — invisible on a
    deep subject gradient. White is the only ring that reads on this surface. */
 .dunChip.dunChip.dunChip:focus-visible {
-  outline-color: #fff;
+  outline-color: var(--dc-ink);
 }
 .dcTarget {
   flex: 0 0 auto;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: var(--dc-fill);
+  border: 1px solid var(--dc-edge);
   border-radius: var(--r-lg);
   padding: 16px 18px;
 }
@@ -607,8 +762,8 @@
   font-weight: 600;
   padding: 7px 13px 7px 8px;
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: var(--dc-fill);
+  border: 1px solid var(--dc-edge);
   max-width: 100%;
   min-width: 0;
 }
@@ -668,8 +823,8 @@
   width: 19px;
   height: 19px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  color: oklch(from var(--c) min(l, 0.3) c h);
+  background: var(--dc-solid);
+  color: var(--dc-solid-ink);
   display: grid;
   place-items: center;
   font-size: 11px;
@@ -703,8 +858,8 @@
   font-weight: 700;
   padding: 7px 14px;
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--dc-fill-strong);
+  border: 1px solid var(--dc-edge-strong);
 }
 /* The "No standards" chip — an absence, so it should not shout as loudly as a
    real standard code beside it. It is quietened by REMOVING THE FILL, never by
@@ -715,7 +870,7 @@
    the one chip whose job is to be believed. */
 .dchipQuiet {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--dc-edge-strong);
   font-weight: 600;
 }
 .dfootPlan.dfootPlan {
@@ -735,18 +890,18 @@
    so a future CSS-module extraction-order change can't silently flip the pill
    back to the base look (reviewer LOW — the doubled form only won by load order). */
 .dfootFinish.dfootFinish.dfootFinish {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.45);
+  color: var(--dc-ink);
+  border-color: var(--dc-edge-strong);
 }
 .dfootFinish.dfootFinish.dfootFinish:hover {
-  border-color: #fff;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--dc-ink);
+  color: var(--dc-ink);
+  background: var(--dc-fill);
 }
 /* Done state last so it wins on a done pill even while hovered (both (0,4,0)). */
 .dfootFinish.dfootFinish.dfootFinish[aria-pressed="true"] {
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--done);
+  background: var(--dc-solid);
+  color: var(--dc-solid-ink);
   border-color: transparent;
 }
 
