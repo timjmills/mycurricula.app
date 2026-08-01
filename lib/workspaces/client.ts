@@ -15,12 +15,12 @@
 import {
   createWorkspaceAction,
   getActiveWorkspaceAction,
-  getActiveWorkspaceContextAction,
   listMyWorkspacesAction,
   renameWorkspaceAction,
   setActiveWorkspaceAction,
   type ActiveWorkspaceContext,
 } from "./actions";
+import { readActiveWorkspaceContextRemote } from "./remote";
 import type { CreatedWorkspace, WorkspaceSummary } from "./row";
 
 /** Re-exported so client consumers can name the seam result types without
@@ -54,13 +54,32 @@ export async function getActiveWorkspace(): Promise<WorkspaceSummary | null> {
   return res.value;
 }
 
-/** The active workspace's identity + notebooks, resolved atomically in one
- *  request (no torn cross-tenant read). `{ workspace: null, notebooks: [] }`
- *  when the seam is off. */
+/**
+ * The active workspace's identity + notebooks. `{ workspace: null, notebooks: [] }`
+ * when the seam is off.
+ *
+ * ── READ DIRECTLY FROM THE BROWSER, NOT THROUGH THE SERVER ACTION (task #46) ──
+ * Next runs client-initiated Server Actions ONE AT A TIME. This read fires at
+ * t≈0 from `WorkspaceIdentitySync`'s mount effect with no awaited prerequisite,
+ * while the planner hydrate is gated behind `ownerId` (null until a browser auth
+ * round trip resolves) — so this one always won the queue and the planner waited
+ * out its full duration (677–1311 ms, measured on production by an earlier pass)
+ * before its own work began. Reordering does not help; whichever runs second
+ * still pays for the first. Taking this read OFF the queue is the only fix that
+ * does not simply move the cost onto the workspace chrome.
+ *
+ * Both underlying reads are RLS-gated and use no service-role client, so the
+ * browser has exactly the same authority the action had — see
+ * lib/workspaces/remote.ts for the full authority + atomicity analysis
+ * (particularly what the pinned notebook read guarantees, and which property
+ * this weakens).
+ *
+ * TO REVERT: call `getActiveWorkspaceContextAction()` here again and unwrap its
+ * envelope. That action is deliberately still exported and unchanged — it is
+ * both the revert path and the server-side entry point for any future caller.
+ */
 export async function getActiveWorkspaceContext(): Promise<ActiveWorkspaceContext> {
-  const res = await getActiveWorkspaceContextAction();
-  if (!res.ok) throw new Error(res.error.message);
-  return res.value;
+  return readActiveWorkspaceContextRemote();
 }
 
 // ── MUTATIONS — CALLER MUST RE-SOURCE THE PROVIDER AFTER SUCCESS ────────────
