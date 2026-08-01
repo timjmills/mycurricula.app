@@ -118,46 +118,19 @@ import {
   ChevronDownIcon,
 } from "@/components/icons";
 import { AllToolsMenu } from "./AllToolsMenu";
+// CapturedItem + the File→item mapping live in a separate LEAF module so the
+// surfaces that only need the mapping (ResourcesPanel's drag-drop, the lesson
+// editor's add menu) do not value-import this file and drag the whole composer
+// into every planner route's initial bundle. See captured-item.ts for why.
+// NOTE: the type is re-exported below for existing `import type` callsites, but
+// the VALUES deliberately are not — importing them from here would re-defeat
+// the next/dynamic boundary in ComposerHost.
+import { uid, fileToCapturedItem, type CapturedItem } from "./captured-item";
 import styles from "./ResourceComposer.module.css";
 
 // ── Public types (consumed by ResourcesPanel + section-wiring agent) ────
 
-/** A resource the teacher has captured but not yet committed. */
-export interface CapturedItem {
-  /** Stable id for the React key + remove handling. */
-  id: string;
-  /** Mapped from mime / source — drives the tile icon and the eventual LessonResource type. */
-  type: LessonResource["type"];
-  /** Human label — filename, URL, or "Pasted image" fallback. */
-  label: string;
-  /** Optional per-resource rich-text note. In resource mode the step-2
-   *  "+ Add a note to an item" reveal writes formatted notes (links, lists,
-   *  inline images) for THIS resource. Persisted to the resource's `body`
-   *  field on Add (NOT folded onto the label — the model carries `body`
-   *  on every resource). Default empty. Stored as sanitized HTML. */
-  body?: string;
-  /** Real URL (embed source for links; `blob:` for in-session files). */
-  url?: string;
-  /** Fine-grained provider from parseResourceUrl or mime detection. */
-  provider?: import("@/lib/types").ResourceProvider;
-  /** Link display mode — only meaningful when provider is "website". */
-  displayMode?: "literal" | "hyperlink" | "thumbnail";
-  /** Anchor text when displayMode === "hyperlink". */
-  linkText?: string;
-  mimeType?: string;
-  sizeBytes?: number;
-  thumbnailUrl?: string;
-  /** Set true for file items so the capture caps can bucket them. */
-  isFile?: boolean;
-  /** The underlying File, kept so a backend-mode Add can upload the bytes to
-   *  R2. Absent for links / title-only stubs. Not persisted anywhere. */
-  file?: File;
-  /** Notecard EDIT only — the original gallery LessonResource this strip
-   *  tile represents. Committed verbatim (so reorder/remove of existing
-   *  gallery media never rewrites the resource payload). Absent for fresh
-   *  captures. */
-  existing?: LessonResource;
-}
+export type { CapturedItem };
 
 /** Summary of what landed in the planner doc on Add — handed back through
  *  the optional `onCommitted` seam for any caller that wants to react to a
@@ -381,70 +354,10 @@ function validateCapturedItems(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
-
-/** Tiny unique id (strip keys + nothing else). */
-let _seq = 0;
-function uid(prefix: string): string {
-  _seq += 1;
-  return `${prefix}-${Date.now().toString(36)}-${_seq}`;
-}
-
-/** Map a File's mime type to a LessonResource type. Used by both the
- *  composer's file pickers and the drag-drop path in ResourcesPanel. */
-export function mimeToResourceType(file: File): LessonResource["type"] {
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type === "application/pdf") return "pdf";
-  if (
-    file.type === "application/msword" ||
-    file.type ===
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    file.type === "application/vnd.oasis.opendocument.text"
-  ) {
-    return "doc";
-  }
-  // Slides — DOC-style office package or .key fallback.
-  if (
-    file.type === "application/vnd.ms-powerpoint" ||
-    file.type ===
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-  ) {
-    return "slides";
-  }
-  // Anything else — treat as a generic "link/file" attachment.
-  return "link";
-}
-
-/** Map a File's mime to the fine-grained `ResourceProvider` tag used by
- *  the embed primitives. Mirrors `mimeToResourceType` but returns the
- *  newer provider taxonomy (image / pdf / video / audio) so renderers can
- *  pick the right branch from a session-only blob URL. Returns undefined
- *  for things we don't yet recognise. */
-function mimeToProvider(
-  file: File,
-): import("@/lib/types").ResourceProvider | undefined {
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type === "application/pdf") return "pdf";
-  if (file.type.startsWith("video/")) return "video";
-  if (file.type.startsWith("audio/")) return "audio";
-  return undefined;
-}
-
-/** Convert a File into a CapturedItem. Mints a session-only `blob:` URL
- *  so the captured strip can preview the file in-place before commit
- *  (the real R2 upload runs at commit time in backend mode). */
-export function fileToCapturedItem(file: File): CapturedItem {
-  return {
-    id: uid("cap"),
-    type: mimeToResourceType(file),
-    label: file.name || "File",
-    url: URL.createObjectURL(file),
-    provider: mimeToProvider(file),
-    mimeType: file.type,
-    sizeBytes: file.size,
-    isFile: true,
-    file,
-  };
-}
+//
+// `uid`, `mimeToResourceType`, `mimeToProvider` and `fileToCapturedItem` moved
+// to ./captured-item so non-composer surfaces can use them without importing
+// this module. They are imported above.
 
 /** Build a link CapturedItem from a raw URL via parseResourceUrl, so the
  *  tile carries a real provider + thumbnail + display name. Shared by the

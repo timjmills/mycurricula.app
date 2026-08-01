@@ -5,10 +5,13 @@ import {
   initialComposerState,
   composerPropsFrom,
   resMenuOpenUrl,
+  // Moved here from ./ResMenu so ResMenuTrigger can ask "would this menu render
+  // anything?" without value-importing the menu module (which put the lazy
+  // ResMenu back into /weekly's initial bundle). Same function, same intent.
+  hasResMenuActions,
   type ComposerOpenOptions,
   type ResMenuOptions,
 } from "@/components/composer/composer-state";
-import { hasResMenuActions } from "@/components/composer/ResMenu";
 import type { Lesson, LessonResource } from "@/lib/types";
 
 // Pure-core tests for the Shared Composer (B4.0 + B4.1). The React wrappers

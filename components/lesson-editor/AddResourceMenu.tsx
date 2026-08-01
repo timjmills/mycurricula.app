@@ -29,11 +29,15 @@
 
 import type { ReactNode } from "react";
 import { useRef } from "react";
-import type {
-  CapturedItem,
-  ResourceComposerMode,
-} from "@/components/daily/ResourceComposer";
-import { fileToCapturedItem } from "@/components/daily/ResourceComposer";
+import type { ResourceComposerMode } from "@/components/daily/ResourceComposer";
+// Value + type from the LEAF module, never from ResourceComposer itself: a
+// value import of the composer would drag the whole dialog into the initial
+// bundle of every route that can reach the lesson editor, defeating the
+// next/dynamic boundary in ComposerHost. See components/daily/captured-item.
+import {
+  fileToCapturedItem,
+  type CapturedItem,
+} from "@/components/daily/captured-item";
 import { Button, Tooltip } from "@/components/ui";
 import { useDismissableMenu } from "./SectionMenu";
 import styles from "./lesson-editor.module.css";

@@ -84,7 +84,11 @@ import { useUndoToastOptional } from "@/lib/undo-toast";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
-import { fileToCapturedItem } from "./ResourceComposer";
+// From the LEAF module, never from ./ResourceComposer — a value import of the
+// composer would pull the whole dialog (rich-text editor, PDF thumbnailer,
+// All-tools wall) into every planner route's initial bundle, defeating the
+// next/dynamic boundary in ComposerHost. See ./captured-item.
+import { fileToCapturedItem } from "./captured-item";
 import { useComposer } from "@/components/composer";
 import { OpenInBoardDialog } from "@/components/boards";
 import styles from "./ResourcesPanel.module.css";

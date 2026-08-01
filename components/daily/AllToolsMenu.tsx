@@ -69,8 +69,8 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import type { CapturedItem } from "./ResourceComposer";
-import { fileToCapturedItem } from "./ResourceComposer";
+import type { CapturedItem } from "./captured-item";
+import { fileToCapturedItem } from "./captured-item";
 import { Button, Tooltip } from "@/components/ui";
 import styles from "./AllToolsMenu.module.css";
 

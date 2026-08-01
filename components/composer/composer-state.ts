@@ -170,3 +170,31 @@ export function resMenuOpenUrl(
 ): string | null {
   return isSafeUrl(resource.url) ? resource.url : null;
 }
+
+/**
+ * Would a ResMenu built from these options render ANY item?
+ *
+ * Open / Edit / Remove each render only when their callback is supplied, and
+ * the two url items only when `resMenuOpenUrl` (the isSafeUrl sink) yields a
+ * url — so a resource with no safe url and no callbacks paints an EMPTY
+ * popover. A trigger consults this to decide whether to render at all: a
+ * control whose only outcome is a blank menu should not exist.
+ *
+ * LIVES HERE, NOT IN ResMenu.tsx (bundle boundary): ResMenuTrigger renders on
+ * the lesson-editor resource chips, which are in /weekly's initial module
+ * graph. Importing this predicate from ResMenu.tsx made the menu itself —
+ * portal, Tooltip, icons, CSS — statically reachable and defeated the
+ * next/dynamic wrapper in ComposerHost. It depends only on `resMenuOpenUrl`
+ * above, so this module is its natural home. It must stay in sync with
+ * ResMenu's render logic (which items actually appear).
+ */
+export function hasResMenuActions(
+  opts: Pick<ResMenuOptions, "resource" | "onOpen" | "onEdit" | "onRemove">,
+): boolean {
+  return Boolean(
+    opts.onOpen ||
+      opts.onEdit ||
+      opts.onRemove ||
+      resMenuOpenUrl(opts.resource),
+  );
+}

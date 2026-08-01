@@ -34,7 +34,11 @@ import { useCallback, type MouseEvent, type ReactNode } from "react";
 import { Tooltip } from "@/components/ui";
 import type { LessonResource } from "@/lib/types";
 import { useComposer } from "./ComposerProvider";
-import { hasResMenuActions } from "./ResMenu";
+// From ./composer-state, never from ./ResMenu — the trigger renders in
+// /weekly's initial graph, so a value import of the menu module would drag the
+// menu (portal, Tooltip, icons, CSS) into the initial bundle and defeat the
+// next/dynamic boundary in ComposerHost.
+import { hasResMenuActions } from "./composer-state";
 import styles from "./ResMenu.module.css";
 
 /** Gap between the trigger's bottom edge and the menu's top. */

@@ -51,26 +51,17 @@ export interface ResMenuProps extends ResMenuOptions {
 
 const VIEWPORT_MARGIN = 8;
 
-/**
- * Would a ResMenu built from these options render ANY item?
- *
- * Open / Edit / Remove each render only when their callback is supplied, and
- * the two url items only when `resMenuOpenUrl` (the isSafeUrl sink) yields a
- * url — so a resource with no safe url and no callbacks paints an EMPTY
- * popover. A trigger consults this to decide whether to render at all: a
- * control whose only outcome is a blank menu should not exist. Kept beside the
- * render it describes so the two cannot drift.
- */
-export function hasResMenuActions(
-  opts: Pick<ResMenuOptions, "resource" | "onOpen" | "onEdit" | "onRemove">,
-): boolean {
-  return Boolean(
-    opts.onOpen ||
-      opts.onEdit ||
-      opts.onRemove ||
-      resMenuOpenUrl(opts.resource),
-  );
-}
+// `hasResMenuActions` — the "would this menu render any item?" predicate — now
+// lives in ./composer-state, NOT here.
+//
+// WHY IT MOVED (bundle boundary): ResMenuTrigger has to ask that question to
+// decide whether to render at all, and it renders on the lesson-editor resource
+// chips — a surface in /weekly's initial graph. Importing the predicate from
+// THIS module made ResMenu.tsx (portal, Tooltip, icons, its CSS) statically
+// reachable, so the next/dynamic wrapper in ComposerHost bought nothing. The
+// predicate depends only on `resMenuOpenUrl`, which already lives in
+// composer-state, so it belongs there. Keep the two in sync: the render logic
+// below (which items appear) is what the predicate describes.
 
 export function ResMenu({
   resource,
