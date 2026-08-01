@@ -91,8 +91,26 @@ export interface WeekExpansion {
   /** How many lessons the canvas is currently showing. Zero hides the control. */
   visibleCount: number;
   /**
-   * The canvas reports the lesson ids it is rendering, post-filter. Safe to
-   * call every render: an unchanged set is ignored, so this never loops.
+   * The lesson ids the canvas is currently showing, post-filter, in render
+   * order. Exposed so a caller can ask whether a PARTICULAR lesson is on
+   * screen — `collapseAll()` only collapses these, so the header control needs
+   * them to know whether the collapse it just ran shut the selected card.
+   */
+  visibleIds: readonly string[];
+  /**
+   * The canvas reports the lesson ids it is rendering, post-filter.
+   *
+   * Safe to call every render: an unchanged set returns the SAME array, so
+   * React bails out and no render follows.
+   *
+   * THAT GUARANTEE COVERS THIS CALL AND NOTHING ELSE. It says publishing the
+   * same ids twice is free; it does NOT survive being paired with a cleanup
+   * that publishes `[]`, because `[]` is never the unchanged list and so always
+   * commits — which makes the next publish commit back, forever. Three canvases
+   * shipped that pairing on the strength of this sentence (fixed in `a82b8e2`
+   * for WeekA/WeekC, and later for WeekColumns), each time reasoning "publish
+   * ignores an unchanged list, so this cannot loop". Put the unmount clear in
+   * its OWN effect keyed on `publishVisible` alone.
    */
   publishVisible: (lessonIds: readonly string[]) => void;
   /**
@@ -221,6 +239,7 @@ function useWeekExpansionEngine(): WeekExpansion {
       collapseAll,
       allExpanded,
       visibleCount: visibleIds.length,
+      visibleIds,
       publishVisible,
       snapshotAndCollapse,
       restoreSnapshot,

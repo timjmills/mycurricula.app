@@ -282,25 +282,41 @@ export function WeekColumns(): ReactNode {
   // A filtered week therefore expands only what it shows.
   //
   // Derived from `byDay`, which is already memoized on every input that can
-  // change the visible set, and publishVisible ignores an unchanged list — so
-  // this settles in one pass rather than looping.
+  // change the visible set.
   const visibleLessonIds = useMemo(
     () => byDay.flat().map((l) => l.id),
     [byDay],
   );
   //
-  // The CLEANUP is load-bearing, not tidiness. /weekly swaps this canvas out
-  // for WeeklyList, ScheduleTimeline, or WeekEditBoard — none of which have
-  // expandable cards and none of which publish. Without the unmount clear,
-  // the last grid's ids would linger, the header would keep offering an
-  // "Expand all" for a canvas that has nothing to expand, and pressing it
-  // would do nothing visible. Clearing on the way out lets the control's own
-  // visibleCount === 0 test hide it, so the header never has to re-derive
-  // which canvas is on screen.
+  // TWO effects, not one with a cleanup — the same split `a82b8e2` made in WeekA
+  // and WeekC, and named this file as still needing.
+  //
+  // The sentence that used to end the comment above — "publishVisible ignores an
+  // unchanged list, so this settles in one pass rather than looping" — is true of
+  // the PUBLISH and false of the PAIR, which is why it read as correct in review.
+  // The effect's re-run condition is the IDENTITY of `visibleLessonIds`, not its
+  // contents, so a caller handing this canvas a fresh `filters`/`subjects` array
+  // (an unmemoized provider, and every hand-written double) re-ran the effect;
+  // the cleanup's `[]` is never the unchanged list, so it always committed, and
+  // the next publish always committed back. Measured: 302 renders for one mount,
+  // and because the loop blocks the event loop the symptom is a HANG rather than
+  // a failure. This is the frame the user's own appearance setting renders.
+  //
+  // Publishing alone cannot loop: publishVisible returns the SAME array when the
+  // contents match, so React bails and no render follows.
   useEffect(() => {
     publishVisible(visibleLessonIds);
-    return () => publishVisible([]);
   }, [visibleLessonIds, publishVisible]);
+  //
+  // The unmount clear is load-bearing, not tidiness. /weekly swaps this canvas
+  // out for WeeklyList, ScheduleTimeline, or WeekEditBoard — none of which have
+  // expandable cards and none of which publish. Without it the last grid's ids
+  // would linger, the header would keep offering an "Expand all" for a canvas
+  // with nothing to expand, and pressing it would do nothing visible. Clearing
+  // on the way out lets the control's own visibleCount === 0 test hide it.
+  // `publishVisible` is referentially stable, so this runs its cleanup only when
+  // the canvas really goes away.
+  useEffect(() => () => publishVisible([]), [publishVisible]);
 
   // ── Quick-add (one-click blank lesson, PER DAY) ───────────────────────────
   // Paper was the only Week frame with no add affordance at all: an empty

@@ -76,10 +76,36 @@ interface WeeklyViewControlsProps {
 export function WeeklyViewControls({
   isNarrow = false,
 }: WeeklyViewControlsProps): ReactNode {
-  const { viewMode, setViewMode } = useAppState();
+  const { viewMode, setViewMode, selectedLessonId, setSelectedLessonId } =
+    useAppState();
   const { setMode, scheduleMode, events, setEvents } = useWeeklyScheduleMode();
-  const { allExpanded, visibleCount, expandAll, collapseAll } =
+  const { allExpanded, visibleCount, visibleIds, expandAll, collapseAll } =
     useWeekExpansion();
+
+  // ── Collapse all releases the selection ───────────────────────────────────
+  // "Collapse all" used to leave the selection ring — and WeeklyShell's
+  // `?lesson=` URL mirror — on a card it had just shut. Nothing was open, yet
+  // something was still ringed.
+  //
+  // THE RULE IS NARROWER THAN "COLLAPSING RELEASES", deliberately. Collapsing a
+  // DIFFERENT card must NOT release: the selection then still sits on a card
+  // that is open, so the ring and the visible body agree, and clearing it would
+  // pull the ring off a lesson the teacher is reading. That case was adjudicated
+  // a false positive in `a82b8e2` and is pinned by tests — do not widen this.
+  // Collapsing the SELECTED card already releases at the canvas
+  // (WeekA.tsx:316-320). Collapse-all is the remaining hole.
+  //
+  // Gated on `visibleIds`, not fired unconditionally, because `collapseAll()`
+  // only collapses what the canvas is SHOWING. A lesson that a filter has hidden
+  // stays expanded, so if the selection sits on one of those, collapse-all did
+  // not shut it and must not drop it (nor the `?lesson=` deep link that would go
+  // with it).
+  const handleCollapseAll = (): void => {
+    const shutTheSelected =
+      selectedLessonId !== null && visibleIds.includes(selectedLessonId);
+    collapseAll();
+    if (shutTheSelected) setSelectedLessonId(null);
+  };
 
   // Offering "Schedule" on the narrow tier would let the control claim a mode
   // the body never shows — the header would flip to Schedule + reveal the scope
@@ -134,7 +160,7 @@ export function WeeklyViewControls({
             variant="secondary"
             size="sm"
             leadingIcon={<ExpandChevron open={allExpanded} />}
-            onClick={() => (allExpanded ? collapseAll() : expandAll())}
+            onClick={() => (allExpanded ? handleCollapseAll() : expandAll())}
             // The label already changes with the state, so aria-pressed would
             // say the same thing twice and screen readers would announce a
             // toggle that renames itself — confusing rather than helpful.
