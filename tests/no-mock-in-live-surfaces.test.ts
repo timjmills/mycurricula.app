@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 // ── The mock-fixture ratchet ────────────────────────────────────────────────
@@ -59,17 +59,43 @@ const repoRoot = path.resolve(__dirname, "..");
  * `lib/palette.tsx`, `lib/app-state.tsx` and `lib/day-status.ts` live. A
  * guard blind to two thirds of lib/ is worse than no guard, so the globbing
  * happens here where it can be read.
+ *
+ * ── TRACKED IS NOT THE SAME AS PRESENT, IN BOTH DIRECTIONS (2026-08-01) ─────
+ * A bare `git ls-files` enumerates the INDEX, and the index disagrees with the
+ * disk in two ways that both mattered while the retired Day frames were being
+ * deleted:
+ *
+ *   • Still listed, already gone. A file deleted in the working tree but not
+ *     yet staged is still in the index, and `readCode` threw ENOENT and took
+ *     the whole guard down with it. Red rather than silently under-scanning is
+ *     the right direction, but it is red for the wrong reason and points at the
+ *     wrong line. A path that does not exist cannot import anything, so it is
+ *     not a source file — dropping it cannot hide an offender.
+ *
+ *   • Present, not listed at all. A file that is NEW and not yet staged was
+ *     invisible to this guard entirely, so a fresh live surface could import
+ *     `SUBJECT_BY_ID` and pass right up until someone ran `git add`. That is
+ *     the same blind spot CLAUDE.md §4a names for the code-review gate
+ *     ("untracked (`??`) files … would be invisible to the reviewer"), and it
+ *     is worst at exactly the moment the guard is meant to earn its keep: while
+ *     the offending code is being written. `--others --exclude-standard` adds
+ *     them, honouring .gitignore, so build output and node_modules stay out.
  */
 function sourceFiles(): string[] {
-  const out = execFileSync("git", ["ls-files"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    maxBuffer: 32 * 1024 * 1024,
-  });
-  return out
-    .split("\n")
-    .map((s) => s.trim())
-    .filter((p) => /^(app|components|lib)\//.test(p) && /\.tsx?$/.test(p));
+  const ls = (...args: string[]): string[] =>
+    execFileSync("git", ["ls-files", ...args], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      maxBuffer: 32 * 1024 * 1024,
+    })
+      .split("\n")
+      .map((s) => s.trim());
+
+  const seen = new Set([...ls(), ...ls("--others", "--exclude-standard")]);
+  return [...seen]
+    .filter((p) => /^(app|components|lib)\//.test(p) && /\.tsx?$/.test(p))
+    .filter((p) => existsSync(path.join(repoRoot, p)))
+    .sort();
 }
 
 /**
@@ -243,6 +269,22 @@ function findOffenders(): Map<string, string[]> {
 // is a live surface reading beta-school fixture data. THIS LIST MUST ONLY
 // SHRINK. When you fix a file, delete its line here in the same commit — the
 // exact-equality assertion below fails if you don't.
+//
+// ── THE ONE TIME IT GREW, 2026-08-01, and why ──────────────────────────────
+// `components/day-v2/Day{A,B,C}.tsx` are back on this list. They were deleted
+// when /daily consolidated to a single Day view, which shrank the list for
+// free — the mock imports did not get fixed, the files just stopped existing.
+// The user then asked for the three views back ("keep all three of the views
+// until later"), so the files returned and their pre-existing, unchanged mock
+// imports returned with them.
+//
+// That is a restoration to the pre-deletion baseline, not new debt: no line
+// here is a surface that did not already carry it. It is recorded rather than
+// quietly re-added because a ratchet that moves backwards without an
+// explanation is not a ratchet. The three are scheduled for deletion — when the
+// user decides what to merge or drop, these lines go with the files (see
+// components/day-v2/DayViewV2.tsx). Nothing else may use this precedent: a NEW
+// surface reading fixtures still fails, which is the whole point.
 const ALLOWLIST: readonly string[] = [
   "app/(planner)/post/PostClient.tsx",
   "app/(planner)/weekly/print/WeeklyPrintSheet.tsx",
@@ -260,6 +302,7 @@ const ALLOWLIST: readonly string[] = [
   "components/day-v2/DayA.tsx",
   "components/day-v2/DayB.tsx",
   "components/day-v2/DayC.tsx",
+  "components/day-v2/DayFocus.tsx",
   "components/home/rows.tsx",
   "components/list/DailyList.tsx",
   "components/resource-wall-v2/ResourceWall.tsx",
