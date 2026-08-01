@@ -260,6 +260,39 @@
   overflow: hidden;
 }
 
+/* On a phone the strip gets its own ROW instead of a sliver of this one.
+   ────────────────────────────────────────────────────────────────────────────
+   Yielding (above) is the right behaviour while there is room to yield into. On
+   a phone there is not: the header's fixed furniture is grip 18 + chevron 28 +
+   dot 10 + count ~28 + FOUR 44px action buttons (the `any-pointer: coarse` rule
+   at the foot of this file) + six 8px gaps ≈ 300px, and a 375px viewport leaves
+   the header about 337px. Title and strip are left to share ~37px, and the
+   strip — the item that yields — collapsed to 7px. A 7px stub of colour is not
+   a smaller version of the information, it is a smear.
+
+   The handoff's phone answer (`.rw-sectag{max-width:84px}` at ≤680px) cannot
+   help here, because the constraint is not the chip's max-width — it is that
+   there are only 7px to put a chip in. So this is a layout call rather than a
+   value copy: let the header wrap and give the strip a full line of its own.
+   `order: 1` sends it past the count and the actions so THEY keep line 1 (they
+   are the controls; the chips are reference), and `flex-basis: 100%` forces the
+   break. Cost is ~24px of header height per section on a phone, which buys back
+   a legible "Tagged to <lesson>" instead of a smear.
+
+   560px is this file's existing phone breakpoint (see `.grid` below) rather
+   than a new number: by the arithmetic above the strip stops being usable
+   somewhere under ~550px, so the boundary already in the file is the right one.
+   Collapsed sections still hide the strip entirely (`[data-size="min"]`). */
+@media (max-width: 560px) {
+  .head {
+    flex-wrap: wrap;
+  }
+  .tags {
+    order: 1;
+    flex: 1 0 100%;
+  }
+}
+
 /* Subject-tinted, matching the section dot and every subject-relative
    background recipe: --sc is the section's subject color, so a palette change
    re-tints the chips with everything else. Color is INFORMATION here (which
@@ -285,6 +318,15 @@
      single-class @media rule could not override a doubled base elsewhere in
      this file, and keeping the technique uniform avoids that trap entirely. */
   max-width: min(130px, 34vw);
+  /* A flex item's automatic minimum size is its CONTENT size, so without this
+     the chip refuses to shrink below the full lesson name: it overflows its own
+     max-width, `.tags`'s `overflow: hidden` clips it mid-word, and the label
+     never gets a constrained box to ellipsize in. Measured at 375: `.tags` had
+     collapsed to 7px while the chip stayed 128px, so 95% of it was clipped and
+     `.tagLabel`'s layout rect lay across the count badge and the action buttons
+     (task #54). With `min-width: 0` the chip shrinks with the strip and
+     ellipsizes at every width instead of only below its max-width. */
+  min-width: 0;
   padding: 2px 8px 2px 6px;
   border-radius: var(--r-pill, 999px);
   /* Mixed into --surface, not into `transparent` — the 14% is unchanged, but

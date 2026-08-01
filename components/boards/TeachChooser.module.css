@@ -33,7 +33,27 @@
   }
 }
 
-.card {
+/* DOUBLED (`.card.card`) so it outguns the `.cp-root button` reset.
+   ────────────────────────────────────────────────────────────────────────────
+   /boards is `app/(planner)/boards/page.tsx`, so it renders inside the planner
+   shell's `.cp-root` — and `app/tokens.css:1156`'s `.cp-root button` (0,1,1)
+   beats a single-class rule (0,1,0). This rule was therefore DEAD in the app:
+   measured on the running page, the computed style of these two buttons was
+   `background: rgba(0, 0, 0, 0)`, `padding: 0px`, `border: 0px none`, while
+   `border-radius: 24px` and the box-shadow — properties the reset does not
+   name — survived. So the two chooser tiles were not "missing a panel"; they
+   had one and it was being stripped, which is why "Teach from a lesson" and
+   "Blank teach board" read as bare text on the stage photograph (the visible
+   remainder of audit finding B2, task #54). The sibling
+   BoardLibrary.module.css already carries the same fix on `.segment.segment`
+   for the same reason.
+
+   Only the BASE rule needs doubling: `.card:hover:not(:disabled)` (0,3,0),
+   `.card:focus-visible` (0,2,0) and `.card:disabled` (0,2,0) already outrank
+   the reset on their own. The dialog's `.close` / `.chip` / `.lessonRow` are
+   NOT affected — that subtree is portaled to `document.body`, outside
+   `.cp-root`, so the reset never reaches it. */
+.card.card {
   display: flex;
   flex-direction: column;
   gap: 4px;

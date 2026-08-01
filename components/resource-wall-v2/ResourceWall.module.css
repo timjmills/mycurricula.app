@@ -465,9 +465,35 @@
 }
 
 /* The color-by-subject switch tints each section from its own --sc. Section
-   sets --sc; this only decides whether the wall consumes it. */
+   sets --sc; this only decides whether the wall consumes it.
+   ────────────────────────────────────────────────────────────────────────────
+   THE 7% IS MIXED INTO THE SECTION'S PANEL, NOT INTO `transparent`.
+   This rule REPLACES Section.module.css's `.sec:not(.hasBg)` frosted panel — it
+   is (0,2,1) against that rule's (0,2,0), so whenever the switch is on it wins
+   outright. Mixed into `transparent`, the result was a 7% tint of subject hue
+   over bare stage photograph, which is not a surface at all: the section title
+   (15px/700 --ink-800) fell back onto the photo and the dark-tone AA failure
+   that be181cc had just closed came straight back — measured 2.58-3.08:1 worst
+   across all eight dark theme×dim cases, against a 4.5 floor, with the switch
+   on (task #54). Slightly WORSE than before the panel existed, because the gold
+   tint darkens the backdrop a little further.
+
+   Mixing into the same 86% --surface the panel uses keeps the identical 7%
+   subject tint but puts it on a real surface, so the tint decides the section's
+   HUE while the panel decides its legibility. --surface inverts by tone, so one
+   declaration serves both. Alpha lands at ~0.87 (0.07·1 + 0.93·0.86), which is
+   the panel's material to within a percent — the two renderings now look like
+   the same wall wearing a different colour, which is what the switch is for.
+
+   Deliberately NOT scoped `:not(hasBg)`: a pinned background is written as an
+   INLINE style, which already outranks this rule, so the extra selector would
+   buy nothing and CSS Modules cannot see Section's `hasBg` class from here. */
 .subjColor .sections > section {
-  background: color-mix(in srgb, var(--sc) 7%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--sc) 7%,
+    color-mix(in srgb, var(--surface) 86%, transparent)
+  );
 }
 
 .wallEmpty {

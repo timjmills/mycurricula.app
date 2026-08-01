@@ -56,6 +56,12 @@
 //          returns light on `glass === "light"` BEFORE it consults dim, so that
 //          register reaches light tone at EVERY dim value and matches the veil
 //          selector too. It was unmeasured until this flag existed.
+//      node scripts/probe-photo-bright-veil.mjs --subjcolor
+//        → seeds the wall's "Color sections by subject" switch ON. That mode is
+//          painted by a DIFFERENT rule than the default one (see the --subjcolor
+//          note further down), so a run without this flag says nothing about it.
+//          Gated in both directions: the run is abandoned if the wall did not
+//          actually render in the mode the flag claims.
 //      node scripts/probe-photo-bright-veil.mjs --selftest
 //        → EIGHT assertions, deliberately of two kinds. A gate that always
 //          fails is as useless as one that never does, so the rejections are
@@ -365,6 +371,22 @@ const BEFORE = argv.includes("--before");
 // coverage arithmetic checkable by hand: intended collapses to
 // widths × surfaces × elements.
 const GATED_ONLY = argv.includes("--gated-only");
+// `--subjcolor` seeds the wall's "Color sections by subject" switch ON.
+// ─────────────────────────────────────────────────────────────────────────────
+// That mode is a SECOND rendering of every section: ResourceWall.module.css's
+// `.subjColor .sections > section` (0,2,1) outranks Section.module.css's
+// `.sec:not(.hasBg)` panel (0,2,0), so with the switch on the section is painted
+// by a different rule than the one #43 measured. A probe that only ever ran with
+// the switch off therefore cannot see a regression in the mode a teacher may
+// well be sitting in — which is exactly how the be181cc panel came to be
+// silently defeated (task #54).
+//
+// The switch is CLIENT state: ResourceWall hydrates it from `cc_rw_subjcolor`
+// in a post-mount effect (ResourceWall.tsx:492), so seeding localStorage before
+// navigation is the whole mechanism. `subjColorGate` below then REQUIRES the
+// resulting class, in both directions — see the note there.
+const SUBJCOLOR = argv.includes("--subjcolor");
+const SUBJCOLOR_CLASS = '[class*="ResourceWall_subjColor__"]';
 const VEIL_SELECTOR =
   '[data-tone="light"][data-frame="glass"][data-bg="photo"] .stage::after';
 
@@ -436,6 +458,7 @@ const SEED = {
   bg: "photo",
   theme: "clear",
   dim: DIM,
+  subjcolor: SUBJCOLOR,
 };
 // The gate requires tone=light. `glass=dark` + `dim=dim` derives DARK, so that
 // combination cannot be gated here and asking for it is an error, not a run.
@@ -467,6 +490,11 @@ async function makeContext(browser, viewport) {
       localStorage.setItem("mycurricula:user:theme-bg", ax.bg);
       localStorage.setItem("mycurricula:user:theme", ax.theme);
       localStorage.setItem("mycurricula:user:theme-dim", ax.dim);
+      // The wall's subject-colour switch. Written in BOTH directions on purpose:
+      // an explicit "0" means a stale value left by another probe or a manual
+      // session cannot silently put a default run into subject-colour mode and
+      // have it reported as the default rendering.
+      localStorage.setItem("cc_rw_subjcolor", ax.subjcolor ? "1" : "0");
     } catch {
       /* storage disabled — the read-back below turns this into ABSENT */
     }
@@ -565,6 +593,61 @@ async function nativeGate(page, w, id) {
   return wrong.length ? null : got;
 }
 
+/**
+ * THE WALL-MODE GATE. Requires the subject-colour switch to be in the state the
+ * run says it is in, and returns false on ANY mismatch so the caller abandons
+ * the surface.
+ *
+ * Both directions are checked, and that symmetry is the point. Requiring the
+ * class only when `--subjcolor` was passed would leave the DEFAULT run unguarded
+ * — a stale `cc_rw_subjcolor` from an earlier session would silently render
+ * every "default" case in subject-colour mode and file the numbers under the
+ * wrong rendering. That is the same shape as the cookie-only theme seed this
+ * repo has already shipped once: a probe measuring one state and labelling it
+ * another. Only /post has a wall, so other surfaces are not gated here.
+ */
+async function subjColorGate(page, w, id) {
+  // WAIT for the mode, do not sample it.
+  // ───────────────────────────────────────────────────────────────────────────
+  // ResourceWall hydrates this switch from localStorage in a post-mount effect
+  // (ResourceWall.tsx:490-493), and that effect lands LATE — traced at ~140 s on
+  // this machine under normal multi-lane dev load, well after `[data-sectags]`
+  // is on screen. A single read after the surface gate therefore catches the
+  // pre-hydration render about as often as not: the first --subjcolor run here
+  // reported the wall OFF while `cc_rw_subjcolor` was provably "1" and the class
+  // arrived moments later. The gate was right to refuse — sampling was wrong.
+  //
+  // Note the asymmetry, because it is real and should not be dressed up: the ON
+  // wait is strong (it cannot pass until the class actually exists), while the
+  // OFF wait is satisfied immediately. OFF is safe only because makeContext
+  // writes "0" EXPLICITLY, so the late effect can resolve to false and nothing
+  // else can ever turn it on mid-run. If that write is ever removed, this gate
+  // stops protecting the default direction.
+  try {
+    await page.waitForFunction(
+      ([sel, want]) => !!document.querySelector(sel) === want,
+      [SUBJCOLOR_CLASS, SUBJCOLOR],
+      { timeout: 120000, polling: 500 },
+    );
+  } catch {
+    /* fall through — the read-back below reports what it actually is */
+  }
+  const on = await page.evaluate(
+    (sel) => !!document.querySelector(sel),
+    SUBJCOLOR_CLASS,
+  );
+  const ok = on === SUBJCOLOR;
+  record(
+    ok ? "PASS" : "FAIL",
+    `${w}/${id} — [gate] wall subject-colour mode = ${SUBJCOLOR ? "ON" : "OFF"}`,
+    ok
+      ? `${SUBJCOLOR_CLASS} ${on ? "present" : "absent"} as expected`
+      : `MISMATCH seeded ${SUBJCOLOR ? "ON" : "OFF"} but the wall rendered ${on ? "ON" : "OFF"} — ` +
+          `every section would be painted by the other rule and filed under this one`,
+  );
+  return ok;
+}
+
 async function run() {
   // DECLARE THE INTENDED MATRIX BEFORE MEASURING ANYTHING.
   // One gated case per surface (the engine's own derivation) plus every stamped
@@ -585,7 +668,13 @@ async function run() {
   console.log(
     `\nINTENDED COVERAGE: ${intended} ratios ` +
       `(${widths.length} width(s) × ${SURFACES.length} surface(s) × ` +
-      `[1 gated + ${stampedCases} stamped] cases × elements)`,
+      `[1 gated + ${stampedCases} stamped] cases × elements)` +
+      `\nWALL MODE: subject-colour ${SUBJCOLOR ? "ON (--subjcolor)" : "OFF (default)"}` +
+      ` — /post sections are painted by ${
+        SUBJCOLOR
+          ? "ResourceWall.module.css `.subjColor .sections > section` (0,2,1)"
+          : "Section.module.css `.sec:not(.hasBg)` (0,2,0)"
+      }`,
   );
 
   const browser = await chromium.launch({ channel: "chrome" });
@@ -658,6 +747,8 @@ async function run() {
       // stamped case "pass" while never touching the glass+photo selector.
       const native = await nativeGate(page, w, s.id);
       if (!native) continue;
+      // Only the wall has a subject-colour switch; /boards has no such mode.
+      if (s.id === "post" && !(await subjColorGate(page, w, s.id))) continue;
 
       // --before: strip the veil rule so the base dark scrim applies again.
       // A removal count of 0 means the rule was never found, which would turn
@@ -705,6 +796,7 @@ async function run() {
             theme: SEED.theme,
             dim: SEED.dim,
             glass: SEED.glass,
+            subjcolor: SUBJCOLOR,
             tone: "light",
             gated: true,
             ...m,
@@ -726,7 +818,12 @@ async function run() {
           .screenshot({
             path: path.join(
               SHOTS,
-              `${s.id}-${w}-glass-${SEED.glass}-${SEED.theme}-${SEED.dim}${BEFORE ? "-BEFORE" : ""}.png`,
+              // The mode is in the FILENAME, not only in the log: the two wall
+              // renderings are different pictures of the same surface, and
+              // without it the second run silently overwrites the first's
+              // evidence with an image that looks plausible either way.
+              `${s.id}-${w}-glass-${SEED.glass}-${SEED.theme}-${SEED.dim}` +
+                `${s.id === "post" && SUBJCOLOR ? "-subjcolor" : ""}${BEFORE ? "-BEFORE" : ""}.png`,
             ),
           })
           .catch(() => {});
@@ -757,7 +854,9 @@ async function run() {
           await page.waitForTimeout(220); // let the stage repaint
           for (const [label, sel] of s.text) {
             const m = await measureText(page, sel, label);
-            const tag = `${w}/${s.id}/${theme}-${c.dim}(${tone},glass-${SEED.glass})`;
+            const tag =
+              `${w}/${s.id}/${theme}-${c.dim}(${tone},glass-${SEED.glass}` +
+              `${s.id === "post" ? `,subjcolor-${SUBJCOLOR ? "on" : "off"}` : ""})`;
             if (m.status !== "ok") {
               // ABSENT, not FAIL — see the note in the gated block above.
               record(
@@ -774,6 +873,7 @@ async function run() {
               dim: c.dim,
               tone,
               glass: SEED.glass,
+              subjcolor: SUBJCOLOR,
               ...m,
             });
             record(
