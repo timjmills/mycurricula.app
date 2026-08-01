@@ -272,9 +272,26 @@ describe("/weekly/print — the configured school week, not a hard-coded Sun–T
     // and nothing on the page says so.
     store.schoolWeek = ["mon", "tue", "wed", "thu", "fri"];
     const html = await renderWeekly();
-    expect(html).toContain("Mon");
-    expect(html).toContain("Fri");
-    expect(html).not.toContain("Sun");
+
+    // Scoped to the COLUMN HEADERS, not the whole document, and matching the
+    // full day name in the `<abbr title>` rather than a three-letter prefix.
+    //
+    // `expect(html).not.toContain("Sun")` is what this used to say, and it was a
+    // time bomb: the sheet footer renders "Printed Sunday, 2 August 2026" from
+    // an unstubbed clock, and "Sunday" contains "Sun". The assertion passed six
+    // days a week and failed every Sunday — on a test that has nothing to do
+    // with what day it is run. Same substring trap as the "1 out" / "11 out"
+    // case fixed earlier in this suite; a prefix is not a word.
+    const headers = [...html.matchAll(/<abbr title="([A-Za-z]+)">/g)].map(
+      (m) => m[1],
+    );
+    expect(headers).toEqual([
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+    ]);
   });
 
   it("prints every day of a six-day week", async () => {
