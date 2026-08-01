@@ -280,7 +280,6 @@ const ALLOWLIST: readonly string[] = [
   "components/weekly/WeeklyShellV1.tsx",
   "components/weekly/weekly-lesson-card.tsx",
   "lib/app-state.tsx",
-  "lib/catchup-scope.ts",
   "lib/day-status.ts",
   "lib/deep-links.ts",
   "lib/home/today.ts",

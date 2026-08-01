@@ -70,6 +70,7 @@ import {
   planScope,
   standardGaps,
   type CatchupScopeV2,
+  type ScopeToday,
 } from "@/lib/catchup-scope";
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { todayColumnIndex, todayIsInConfiguredYear } from "@/lib/now-anchor";
@@ -505,22 +506,34 @@ function CatchUpModalBody({
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
-  // The lateness anchor. It is null — and every row then shows no lateness at
-  // all — in three real cases, each of which would otherwise produce a
-  // confident wrong number:
-  //   • before the first paint, while `todayCol` is still unresolved;
-  //   • on a non-school day, where today has no column in the school week;
-  //   • when `currentWeekBasis` is a CLAMP rather than a derivation — today
-  //     outside the configured academic year. That is not hypothetical: a
-  //     school whose year starts in August is in `before-start` right now, and
-  //     measuring lateness against the clamped Week 1 would report the whole
-  //     plan as late before term begins.
+  // WHERE THE CLOCK IS — the one anchor every "now" claim on this surface is
+  // measured against, and deliberately not `week` above. Each half is
+  // separately unknowable, and each null is a real state rather than a
+  // defensive fiction:
+  //   • `week` is null when `currentWeekBasis` is a CLAMP rather than a
+  //     derivation — today outside the configured academic year. Not
+  //     hypothetical: a school whose year starts in August is in `before-start`
+  //     right now, and the clamped "Week 1" it reports is not where now is.
+  //   • `day` is null on a non-school day (today has no column in the school
+  //     week), and before the first paint while `todayCol` is unresolved.
+  const scopeToday: ScopeToday = useMemo(
+    () => ({
+      week: todayIsInConfiguredYear(currentWeekBasis) ? currentWeek : null,
+      day: todayCol,
+    }),
+    [currentWeek, currentWeekBasis, todayCol],
+  );
+
+  // The lateness anchor: the BOTH-RESOLVED case of the above, because lateness
+  // arithmetic needs a day column where the scope filters do not always. Null
+  // here means every row shows no lateness at all, rather than a confident
+  // wrong number (see lib/catchup-data's CatchupToday).
   const today = useMemo(
     () =>
-      todayCol !== null && todayIsInConfiguredYear(currentWeekBasis)
-        ? { week: currentWeek, day: todayCol }
+      scopeToday.week !== null && scopeToday.day !== null
+        ? { week: scopeToday.week, day: scopeToday.day }
         : null,
-    [todayCol, currentWeek, currentWeekBasis],
+    [scopeToday],
   );
 
   const allItems = useMemo(
@@ -538,17 +551,21 @@ function CatchUpModalBody({
     () => coverageSummary(lessons, { currentWeek: week, actions }),
     [lessons, week, actions],
   );
+  // `week` (browsed) is the eligibility horizon inside `allItems`; `scopeToday`
+  // is the clock. The two chips that say "now" get the clock — passing the
+  // browsed week here made "Today" mean "the Tuesday of the week you're looking
+  // at", the same defect 41aab70 fixed in `daysLate`.
   const plan = useMemo(
-    () => planScope(scope, allItems, week, todayCol),
-    [scope, allItems, week, todayCol],
+    () => planScope(scope, allItems, scopeToday),
+    [scope, allItems, scopeToday],
   );
   const groups = useMemo(() => groupItems(plan.items, plan.groupBy), [plan]);
   const gaps = useMemo(
     () =>
       scope === "standards"
-        ? standardGaps(lessons, week, describeStandard)
+        ? standardGaps(lessons, week, describeStandard, units)
         : [],
-    [scope, lessons, week, describeStandard],
+    [scope, lessons, week, describeStandard, units],
   );
 
   // ── Row action handlers ─────────────────────────────────────────────────
@@ -727,7 +744,23 @@ function CatchUpModalBody({
         {/* ── Body ──────────────────────────────────────────────────────── */}
         <div className={styles.body}>
           {showEmpty ? (
-            <PlannerEmpty size="sm" heading="All caught up for this scope 🎉" />
+            plan.todayUnknown ? (
+              // The list is empty because the CLOCK could not be placed in the
+              // plan, not because the work is done — so it must not say the
+              // work is done. Today sits outside the configured academic year
+              // (before it starts, after it ends, or no year configured), and
+              // the week the app falls back to is a clamp, not an answer.
+              <PlannerEmpty
+                size="sm"
+                heading="Today isn’t inside your school year"
+                body="“Today” and “This week” need to know where now sits in your plan, and your academic year doesn’t cover today. Set your year dates in Settings → Calendar, or use Everything to see the whole backlog."
+              />
+            ) : (
+              <PlannerEmpty
+                size="sm"
+                heading="All caught up for this scope 🎉"
+              />
+            )
           ) : isGaps ? (
             gaps.map((g, i) => {
               const subj = g.subject ? subjectById[g.subject] : null;
