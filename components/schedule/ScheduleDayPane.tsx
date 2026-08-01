@@ -47,7 +47,7 @@ import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { useNowTick } from "@/lib/use-now-tick";
 import { useSchoolWeek } from "@/lib/use-school-week";
-import { todayColumnIndex } from "@/lib/now-anchor";
+import { isTodayEmphasisWeek, todayColumnIndex } from "@/lib/now-anchor";
 import { EmptyState, Tooltip } from "@/components/ui";
 import { ScheduleRow } from "./ScheduleRow";
 import { ScheduleTabs, type ScheduleTab } from "./ScheduleTabs";
@@ -93,13 +93,30 @@ export interface ScheduleDayPaneProps {
    * differ via the corresponding CSS class.
    */
   variant?: "rail" | "page";
+  /**
+   * Override the week this pane describes. Defaults to the shared
+   * `useAppState().week`, which is what every routine caller wants.
+   *
+   * /daily passes it while a `?lesson=` deep link is still settling: the day
+   * canvas renders the linked lesson's week from the FIRST render, but the
+   * shared week only moves once the resolver's effect runs, so without this the
+   * rail would sit beside the right day headed "WEEK <default>" with the wrong
+   * date — one surface contradicting the other on the same screen.
+   */
+  week?: number;
 }
 
 export function ScheduleDayPane({
   day,
   variant = "rail",
+  week: weekProp,
 }: ScheduleDayPaneProps): ReactNode {
-  const { week } = useAppState();
+  const {
+    week: sharedWeek,
+    currentWeek,
+    currentWeekBasis,
+  } = useAppState();
+  const week = weekProp ?? sharedWeek;
   const { getLesson } = usePlanner();
   const { days: schoolWeekDays } = useSchoolWeek();
   const weekdays = useOrderedWeekdays();
@@ -119,7 +136,17 @@ export function ScheduleDayPane({
     const id = window.setInterval(sync, 60_000);
     return () => window.clearInterval(id);
   }, [schoolWeekDays]);
-  const isToday = todayIdx !== null && todayIdx === day;
+  // The pane is "today" only when BOTH the weekday column AND the WEEK are
+  // today's. The week half was missing: the check was purely positional, so any
+  // week whose same weekday column was open — paging back three weeks, or a
+  // `/daily?lesson=` deep link into a past unit — drew the live now-line and ran
+  // the now-tick over a day that is not today. Same rule (and the same clamped-
+  // basis handling) the Day canvas and WeeklyGrid use: lib/now-anchor's
+  // isTodayEmphasisWeek. Found by the §4a gate while wiring the `week` override.
+  const isToday =
+    todayIdx !== null &&
+    todayIdx === day &&
+    isTodayEmphasisWeek(week, currentWeek, currentWeekBasis);
 
   // Now-tick is only enabled for today's pane — every other day's pane has
   // no live state and shouldn't run an interval. `isToday` is false until
