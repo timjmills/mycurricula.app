@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { mountReact } from "./mount-react";
 import type { Lesson, Subject, SubjectId, Unit } from "@/lib/types";
 // Imported statically, from the BARREL the app itself imports — `vi.mock` is
 // hoisted above this, so the mocks below still apply. A dynamic `await
@@ -465,6 +466,49 @@ describe("YearB — every unit stays reachable in the unit workspace", () => {
     const html = renderB();
     // u1 (100%) and u2 (50%) are started; u3 and r1 are not.
     expect(html.match(/data-started=""/g) ?? []).toHaveLength(2);
+  });
+
+  it("opens the unit the teacher actually pressed, under ITS OWN subject", async () => {
+    // WHAT THE THREE TESTS ABOVE CANNOT SEE. They establish that four pills
+    // render and that each is a real <button> — the markup half of
+    // "every unit stays reachable". The other half is where the button GOES,
+    // and `renderToStaticMarkup` fires no events, so `opened.calls` (declared at
+    // the top of this file and pushed to by `onOpenUnit`) could never be
+    // anything but empty. Four pills wired to one unit, or to none, passed
+    // every assertion in this describe.
+    //
+    // The subject argument is the part worth pinning hardest. Unit ids are
+    // unique only WITHIN a subject (the rule lib/wall-scope.ts is built on), so
+    // a pill that reports its LANE's subject correctly for Math and wrongly for
+    // Reading opens a different unit's plan with no error anywhere. Reading's
+    // "r1" is in the fixture precisely so a hard-coded "math" fails here.
+    const h = await mountReact(YearB);
+    try {
+      await h.render({
+        lanes: buildLanes(store.subjects, store.lessons, store.units),
+        onOpenUnit: (s: SubjectId, u: string) => opened.calls.push([s, u]),
+      } as never);
+
+      for (const name of [
+        "Place Value",
+        "Fractions",
+        "Geometry",
+        "Novels",
+      ]) {
+        // `mountReact.click` throws when nothing matches, so a pill that
+        // stopped rendering fails here rather than quietly reducing the list.
+        await h.click((el) => (el.textContent ?? "").includes(name));
+      }
+
+      expect(opened.calls).toEqual([
+        ["math", "u1"],
+        ["math", "u2"],
+        ["math", "u3"],
+        ["reading", "r1"],
+      ]);
+    } finally {
+      await h.unmount();
+    }
   });
 });
 
