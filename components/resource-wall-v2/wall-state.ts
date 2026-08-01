@@ -332,6 +332,97 @@ function clearWallSubjectSectionKeys(wallKey: string, subjectId: string): void {
   }
 }
 
+/** Every "this section" override belonging to one wall, as `[suffix, value]`
+ *  where the suffix is the `<subjectId>:<sectionId>` tail. Reading the tail
+ *  rather than re-deriving it is what lets a section id containing ":" (the
+ *  day-column walls use "day:0") survive a re-key unchanged. */
+function wallSectionEntries(wallKey: string): [string, string][] {
+  if (typeof window === "undefined") return [];
+  const prefix = `${SECTION_BG_PREFIX}${wallKey}:`;
+  const out: [string, string][] = [];
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const k = window.localStorage.key(i);
+      if (!k || !k.startsWith(prefix)) continue;
+      const value = window.localStorage.getItem(k);
+      if (value !== null) out.push([k.slice(prefix.length), value]);
+    }
+  } catch {
+    /* private mode / access denied — nothing to read */
+  }
+  return out;
+}
+
+/**
+ * Drop the section-background records left behind by the pre-8d445df fork race
+ * (task #37).
+ *
+ * Before that fix, the FIRST pin on a shared preset wrote under the PRESET's key
+ * while the section re-read under the freshly-forked wall's — so the pin looked
+ * like it did nothing and left a record at `cc_secbg_<presetId>:…`. Nothing
+ * addresses those any more except a teacher reopening that same shared preset,
+ * where they surface as a background nobody deliberately pinned there. "Follow
+ * page style" does not reach them either: reset forks first and clears only the
+ * new wall's keys.
+ *
+ * THE RULE IS THE NARROW ONE, AND IT IS PROVABLE. A record is deleted only when
+ * its wall key is EXACTLY one of the six preset ids. Since 8d445df every writer
+ * takes the post-fork key — `saveSectionBackground` and both reset paths are
+ * called with what `onEdit()` returns, and `copyWallSectionBackgrounds` writes a
+ * custom wall id — so no code path can produce a preset-scoped record any more,
+ * which makes every one of them provably orphaned. Custom wall ids are minted as
+ * `cw<uuid>` and can never collide with a preset id, so a live wall's records are
+ * out of reach of this sweep by construction rather than by a guard.
+ *
+ * The wider shape — "delete anything whose wall key matches no known custom
+ * wall" — was considered and REJECTED as a data-loss risk: `loadCustomWalls`
+ * returns `[]` on any parse or storage failure, so one unreadable
+ * `cc_customwalls` would make that rule delete every section background in the
+ * browser.
+ *
+ * NOT INVISIBLE, by design: a teacher who has been seeing an accidental
+ * background on a SHARED preset wall will see it go. That is the point of the
+ * cleanup — the same pin already exists under their own fork, which is where
+ * they put it.
+ */
+export function sweepOrphanPresetBackgrounds(
+  presets: readonly WallPreset[],
+): number {
+  let removed = 0;
+  for (const preset of presets) {
+    for (const [suffix] of wallSectionEntries(preset)) {
+      removeRaw(`${SECTION_BG_PREFIX}${preset}:${suffix}`);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+/**
+ * Carry one wall's section backgrounds onto another wall — the "this wall's
+ * scoped records" operation, kept HERE because this module is the only thing
+ * that knows the key shape.
+ *
+ * Section backgrounds are wall-scoped (see the precedence note above), so a
+ * copy that mints a new wall id starts blank unless its records come with it:
+ * `duplicateWall` copied `layout` and nothing else, so every per-section colour
+ * and photo vanished from the duplicate with no warning (task #39). Same
+ * identity class as task #25 — wall identity is derived state, and a path that
+ * changes it has to carry the storage across.
+ *
+ * COPY, NEVER MOVE. The source wall keeps every record: a teacher who
+ * duplicates a wall still has the original open, and it must look untouched.
+ * Only the source's own section overrides are copied — the global
+ * `cc_subjbg_<subject>` pin is not wall-scoped and is deliberately left alone,
+ * since it already applies to both walls.
+ */
+export function copyWallSectionBackgrounds(from: string, to: string): void {
+  if (from === to) return;
+  for (const [suffix, value] of wallSectionEntries(from)) {
+    writeRaw(`${SECTION_BG_PREFIX}${to}:${suffix}`, value);
+  }
+}
+
 /**
  * The background for a section: its own (wall-scoped) override first, then its
  * subject's global pin, then null (follow the page). Enforces the precedence

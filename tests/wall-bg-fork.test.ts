@@ -5,6 +5,15 @@ import type { ResourceWallProps } from "@/components/resource-wall-v2/ResourceWa
 import type { Lesson, Unit } from "@/lib/types";
 import { mountReact } from "./mount-react";
 
+// A real react-dom/client mount plus a click sequence is genuinely slow — a few
+// hundred ms per test in isolation. vitest's 5s default is comfortable for that,
+// but NOT under the full suite's parallel load, where CPU contention stretched
+// these past it and turned correct tests red (seen: 7 timeouts in one `vitest
+// run`, all green when the file ran alone). Raised deliberately for slow-but-
+// honest work; it does not mask a hang, because every one of these tests fails
+// on an assertion — never a timeout — when the fix under test is mutated out.
+vi.setConfig({ testTimeout: 30000 });
+
 // Regression test for the /post section-background fork race (task #25).
 //
 // THE BUG. Pinning a background on a shared preset wall is an EDIT, so the
@@ -161,6 +170,75 @@ describe("the FIRST section background pinned on a preset wall", () => {
     // first prove this run DID write a section-background record at all.
     expect(keys).toHaveLength(1);
     expect(keys.filter((k) => k.startsWith(`${SECTION_BG_PREFIX}lesson:`))).toEqual([]);
+    await dom.unmount();
+  });
+});
+
+describe("duplicating a wall carries its section backgrounds (task #39)", () => {
+  // SAME IDENTITY CLASS AS THE FORK RACE ABOVE, DIFFERENT TRIGGER. #25 was "the
+  // write used a wall key that changed underneath it"; this is "a new wall key
+  // was minted and the records were not carried across". `duplicateWall` copied
+  // `layout` and nothing else, so a duplicate opened blank and every per-section
+  // colour and photo was gone with no warning.
+  const CUSTOM_WALLS_KEY = "cc_customwalls";
+
+  /** Pin a background (which auto-forks), then Duplicate from the wall menu. */
+  async function pinThenDuplicate() {
+    const dom = await openWallWithASection();
+    await dom.click((b) => b.getAttribute("aria-label") === "Section background");
+    await dom.click((b) => b.getAttribute("aria-label") === "honey");
+    const before = sectionBgKeys(dom.storage);
+    // POSITIVE CONTROL for everything below: the pin really landed, so a later
+    // "the duplicate has one too" cannot pass on a run that stored nothing.
+    expect(before).toHaveLength(1);
+
+    await dom.click((b) => b.getAttribute("aria-label") === "Wall menu");
+    await dom.click((b) => b.textContent === "Duplicate");
+    return { dom, sourceKey: before[0], sourceValue: dom.storage.get(before[0]) };
+  }
+
+  it("paints the background on the duplicate immediately", async () => {
+    const { dom } = await pinThenDuplicate();
+    expect(dom.query('[class*="ddName"]')?.textContent).toBe(
+      "Copy of My Current Lesson",
+    );
+    expect(sectionHasBackground(dom)).toBe(true);
+    await dom.unmount();
+  });
+
+  it("files the copy under the NEW wall id", async () => {
+    const { dom } = await pinThenDuplicate();
+    const walls = JSON.parse(dom.storage.get(CUSTOM_WALLS_KEY) ?? "[]") as {
+      id: string;
+      name: string;
+    }[];
+    const copy = walls.find((w) => w.name === "Copy of My Current Lesson");
+    expect(copy).toBeDefined();
+    expect(
+      sectionBgKeys(dom.storage).some((k) =>
+        k.startsWith(`${SECTION_BG_PREFIX}${copy!.id}:`),
+      ),
+    ).toBe(true);
+    await dom.unmount();
+  });
+
+  it("COPIES rather than moves — the original wall is untouched", async () => {
+    // The failure mode a "the duplicate has backgrounds" test passes straight
+    // through: an implementation that RE-KEYED the records would satisfy it and
+    // strip the wall the teacher still has open.
+    const { dom, sourceKey, sourceValue } = await pinThenDuplicate();
+    expect(dom.storage.get(sourceKey)).toBe(sourceValue);
+    expect(sectionBgKeys(dom.storage)).toHaveLength(2);
+    await dom.unmount();
+  });
+
+  it("does not touch the global subject pin", async () => {
+    // `cc_subjbg_<subject>` is NOT wall-scoped — it already applies to both
+    // walls, so a duplicate must neither copy nor disturb it.
+    const { dom } = await pinThenDuplicate();
+    expect(
+      Array.from(dom.storage.keys()).filter((k) => k.startsWith("cc_subjbg_")),
+    ).toEqual([]);
     await dom.unmount();
   });
 });

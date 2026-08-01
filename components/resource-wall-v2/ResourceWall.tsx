@@ -39,6 +39,7 @@ import {
 } from "react";
 
 import { PlannerEmpty, Tooltip, UndoToast } from "@/components/ui";
+import { useComposerOptional } from "@/components/composer";
 import { OpenInBoardDialog } from "@/components/boards";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
@@ -63,12 +64,14 @@ import { Section, WALL_FILTERS, type WallFilter, type WallLayout } from "./Secti
 import { WallLibrary } from "./WallLibrary";
 import { backgroundStyle, type WallBackground } from "./backgrounds";
 import {
+  copyWallSectionBackgrounds,
   loadCustomWalls,
   loadPresetBackgrounds,
   loadSubjectColorPref,
   newWallId,
   saveCustomWalls,
   saveSubjectColorPref,
+  sweepOrphanPresetBackgrounds,
   type CustomWall,
 } from "./wall-state";
 import styles from "./ResourceWall.module.css";
@@ -244,6 +247,40 @@ export function shouldFollowAnchor(state: {
   return state.anchored !== state.preset;
 }
 
+/**
+ * The teacher's own fork of a preset wall, if they have one — PERSONAL-FIRST
+ * VIEWING applied to walls (CLAUDE.md §2: "a teacher always sees their version
+ * where one exists").
+ *
+ * Without this, every load of /post opens the SHARED preset even for a teacher
+ * who forked it minutes ago: the fork is on disk and its section backgrounds are
+ * on disk, but the wall that addresses them is never reopened, so a pinned photo
+ * reads as lost. (Measured on /post?lesson=m-11-1: pin → "My Current Lesson",
+ * `hasBg:true`; reload → "Current Lesson", `hasBg:false`, record still in
+ * storage.) Nothing is lost — it is unreachable until the teacher navigates back
+ * by hand, which is worse, because it looks like data loss.
+ *
+ * Matching is on `anchor === "forked"` + the source label, so a DUPLICATE of a
+ * fork is never auto-opened: `duplicateWall` marks a copy `unanchored` while
+ * carrying `forkedFrom` forward, and a copy is a deliberate side branch rather
+ * than the teacher's working version of that preset. Newest wins when a teacher
+ * has forked the same preset more than once. Returns null when there is no fork
+ * — including when the wall was deleted, since a deleted wall is simply absent
+ * from the list, so the caller falls back to the preset and never to a blank.
+ */
+export function personalWallFor(
+  preset: WallPreset,
+  walls: readonly CustomWall[],
+): CustomWall | null {
+  const label = WALL_PRESET_LABEL[preset];
+  let best: CustomWall | null = null;
+  for (const w of walls) {
+    if (w.anchor !== "forked" || w.forkedFrom !== label) continue;
+    if (!best || w.created > best.created) best = w;
+  }
+  return best;
+}
+
 export function ResourceWall({
   focusLessonId,
   focusSubject,
@@ -252,6 +289,9 @@ export function ResourceWall({
   resourcesFor,
 }: ResourceWallProps): ReactNode {
   const readOnly = usePhoneViewport();
+  // The shared composer, or null outside <ComposerProvider>. OPTIONAL rather
+  // than the throwing useComposer() — see `addCard`.
+  const composer = useComposerOptional();
 
   // The landing preset honors whichever anchor the deep link carried (see
   // `anchoredPreset`). Without it a /post?subject=math link would open on Today
@@ -451,7 +491,14 @@ export function ResourceWall({
     setCustomWalls(loadCustomWalls());
     setSubjectColor(loadSubjectColorPref());
     setPresetBackgrounds(loadPresetBackgrounds());
+    // One sweep per mount for the pre-8d445df orphans (task #37). It rides the
+    // storage-load effect rather than a migration flag because it is idempotent
+    // and self-limiting: after the first pass there is nothing left to find, and
+    // no code path can create another. A persisted "already migrated" flag would
+    // add a key that can itself go wrong for no benefit.
+    sweepOrphanPresetBackgrounds(WALL_PRESETS);
   }, []);
+
 
   // SINGLE PERSISTENCE SINK for the wall list. Every mutator just updates
   // `customWalls`; this is the one place that writes it to storage. That keeps
@@ -497,6 +544,31 @@ export function ResourceWall({
     setOverride(wall.layout);
     setView(wall.view);
   }, []);
+
+  // PERSONAL-FIRST: open the teacher's own fork of the wall the URL selects,
+  // when they have one. See `personalWallFor` for why — in short, a forked wall
+  // and its section backgrounds both survive a reload today, but the wall is
+  // never reopened, so the work reads as lost.
+  //
+  // GATED ON `settled`, which is what keeps this from fighting the anchor
+  // follow above. Until the store settles, `anchored` is still moving (a
+  // deep-linked lesson resolves late), and opening the fork of a wall the URL
+  // never asked for would be sticky: `wallMode === "custom"` latches
+  // `teacherChoseWall`, and the real anchor would then arrive to find the
+  // follow disarmed. Once settled, `anchored` is final for this URL — the only
+  // thing that moves it after that is a genuine navigation, which re-arms via
+  // `anchorKey` and re-runs this rule for the new preset.
+  //
+  // It never forks and never writes: `openCustom` loads an EXISTING wall's
+  // stored layout. And it only ever moves a teacher OFF the shared preset onto
+  // their own copy — the safe direction under the forking model, since the
+  // preset is the team's.
+  useEffect(() => {
+    if (!settled || teacherChoseWall.current || wallMode !== "preset") return;
+    const mine = personalWallFor(anchored, customWalls);
+    if (!mine) return; // no fork (or it was deleted) → stay on the preset
+    openCustom(mine);
+  }, [settled, anchored, customWalls, wallMode, openCustom]);
 
   // ── Auto-fork ─────────────────────────────────────────────────────────────
 
@@ -610,7 +682,12 @@ export function ResourceWall({
     [withFork],
   );
 
-  const addCard = useCallback(
+  /** The bare inline note — the handoff's own add flow (resource-wall.jsx:368
+   *  seeds `{type:'note', composing:true}` and Card renders a "Type a note…"
+   *  textarea). Kept as the FALLBACK, not deleted: it is the only thing that can
+   *  work outside <ComposerProvider>, and the only thing that can work on a
+   *  hand-made section with no lesson behind it. */
+  const addInlineNote = useCallback(
     (sectionId: string) => {
       withFork((prev) =>
         prev.map((s) => {
@@ -641,6 +718,91 @@ export function ResourceWall({
     },
     [withFork],
   );
+
+  // A section whose commit still has to be absorbed into a CUSTOM wall's frozen
+  // layout — see `addCard`. Null when there is nothing pending.
+  const [absorbInto, setAbsorbInto] = useState<string | null>(null);
+
+  /**
+   * "Add note" — opens the SHARED composer (components/composer), the same
+   * engine seven other surfaces use, rather than the bare inline textarea.
+   *
+   * `useComposerOptional`, never the throwing `useComposer`: /post sits under
+   * app/(planner)/layout.tsx which does mount the provider, but this component
+   * is not the thing that guarantees that, and a throwing hook would take the
+   * whole wall down instead of degrading one button. No provider → the inline
+   * note, which still works.
+   *
+   * No `initialSectionId`. A wall SECTION is not a lesson section — it is a
+   * lesson group or a day column — so there is no section id to pass, and
+   * guessing one is the exact mistake 951bc1a removed from the Week card.
+   * Routing defaults to "Whole lesson" and the teacher picks in the composer.
+   */
+  const addCard = useCallback(
+    (sectionId: string) => {
+      const section = sections.find((s) => s.id === sectionId);
+      const lessonId = section?.lessonIds?.[0] ?? section?.items[0]?.lessonId ?? "";
+      const lesson = lessonId ? lessons.find((l) => l.id === lessonId) : undefined;
+      // A hand-made section has no lesson to compose onto, and the composer
+      // requires one. Fall back rather than dead-end.
+      if (!composer || !lesson) {
+        addInlineNote(sectionId);
+        return;
+      }
+      composer.openComposer({
+        lesson,
+        // The button says "Add note", and notecard mode is the single rich note
+        // (gallery + rich body). "resource" mode — the capture-many flow the
+        // Week/Day callsites use — is one word away if that is preferred.
+        mode: "notecard",
+        // THE COMMIT LANDS ON THE LESSON, NOT ON THE WALL. A preset wall is a
+        // LIVE projection of lesson resources, so it re-renders with the new
+        // card by itself. A teacher's own wall is a frozen `override` snapshot,
+        // and would show nothing at all — the same silent no-op this surface has
+        // been paying for all week. Flag it here; the effect below merges it in
+        // once the store has actually updated.
+        onCommitted: () => setAbsorbInto(sectionId),
+      });
+    },
+    [sections, lessons, composer, addInlineNote],
+  );
+
+  // Absorb a composer commit into a CUSTOM wall's frozen layout. Deferred to an
+  // effect rather than done in `onCommitted` because that callback fires inside
+  // the composer's commit handler — before this component has re-rendered, so
+  // `presetSections` there is still the pre-commit projection. Waiting for the
+  // projection to actually contain the new items is the difference between
+  // merging them and merging nothing.
+  //
+  // Items are matched by `key`, which wall-scope mints as `${lesson.id}#${i}`
+  // (lib/wall-scope itemsOf) — appending a resource yields a NEW index and
+  // leaves every existing key untouched, so "keys the override has not got yet"
+  // is exactly the set that just landed.
+  useEffect(() => {
+    if (!absorbInto) return;
+    if (override === null) {
+      setAbsorbInto(null); // live projection — it already shows the new card
+      return;
+    }
+    const fresh = presetSections.find((s) => s.id === absorbInto);
+    if (!fresh) {
+      setAbsorbInto(null);
+      return;
+    }
+    const have = new Set(
+      override.find((s) => s.id === absorbInto)?.items.map((i) => i.key) ?? [],
+    );
+    const added = fresh.items.filter((i) => !have.has(i.key));
+    if (added.length === 0) return; // not in the projection yet — try next render
+    setAbsorbInto(null);
+    setOverride((prev) =>
+      prev
+        ? prev.map((s) =>
+            s.id === absorbInto ? { ...s, items: [...s.items, ...added] } : s,
+          )
+        : prev,
+    );
+  }, [absorbInto, override, presetSections]);
 
   const addSection = useCallback(
     (after?: WallSection) => {
@@ -689,14 +851,24 @@ export function ResourceWall({
       view,
       created: Date.now(),
     };
+    // A duplicate mints a NEW wall id, and section backgrounds are stored under
+    // it — so without this the copy opens blank and every per-section colour and
+    // photo is silently gone (task #39). Copy, never move: the source wall is
+    // still on disk and still open behind the toast, and must look untouched.
+    copyWallSectionBackgrounds(wallKey, wall.id);
     setCustomWalls((prev) => {
       const next = [wall, ...prev];      return next;
     });
     setActiveCustom(wall);
     setWallMode("custom");
     setOverride(sections);
+    // The sections' own bg state is keyed on `wallKey`, which changes on the
+    // next render; bumping the revision makes every mounted Section re-read
+    // under the new key so the copy paints its backgrounds immediately rather
+    // than only after a reload.
+    bumpBgRevision();
     say(`Duplicated as “${wall.name}”`);
-  }, [activeCustom, preset, sections, view, say]);
+  }, [activeCustom, preset, sections, view, wallKey, bumpBgRevision, say]);
 
   /** Start a fresh, empty custom wall. Unlike the auto-fork (which copies the
    *  current preset), this is a deliberate blank slate the teacher fills with

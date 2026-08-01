@@ -11,6 +11,15 @@ import {
 import type { Lesson, Unit } from "@/lib/types";
 import { mountReact, type ReactHarness } from "./mount-react";
 
+// A real react-dom/client mount plus a click sequence is genuinely slow — a few
+// hundred ms per test in isolation. vitest's 5s default is comfortable for that,
+// but NOT under the full suite's parallel load, where CPU contention stretched
+// these past it and turned correct tests red (seen: 7 timeouts in one `vitest
+// run`, all green when the file ran alone). Raised deliberately for slow-but-
+// honest work; it does not mask a hang, because every one of these tests fails
+// on an assertion — never a timeout — when the fix under test is mutated out.
+vi.setConfig({ testTimeout: 30000 });
+
 // Regression tests for the two /post defects — the same false-empty class as the
 // hub browse pickers (tests/hub-browse-empty.test.ts) plus a deep link that was
 // silently dropped.
