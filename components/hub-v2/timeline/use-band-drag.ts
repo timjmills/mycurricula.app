@@ -34,6 +34,49 @@ const DRAG_THRESHOLD_PX = 4;
 
 export type BandDragKind = "move" | "resize";
 
+/**
+ * Is this pointer event part of the gesture `ownerId` started?
+ *
+ * The ONLY thing standing between a second contact and a reschedule. A teacher
+ * resting a thumb on a tablet while dragging a band with a finger produces a
+ * full second stream of `pointermove` / `pointerup` on the same window, and
+ * `pointerId` is the only field that distinguishes them — the events are
+ * otherwise identical. Unfiltered, the thumb's `pointermove` steers a drag it
+ * never started and its `pointerup` COMMITS one. Under the forking model a
+ * commit made in Team Curriculum mode reaches every teacher on the grade
+ * (CLAUDE.md §2), so this predicate is the last gate before a stray contact
+ * republishes a shared plan.
+ *
+ * FAILS CLOSED. A null owner means "no gesture owns the window right now", and
+ * every event is therefore foreign. This used to read
+ * `ownerId === null || ev.pointerId === ownerId` — permissive in exactly the
+ * state where nothing should be accepted at all. That was latent rather than
+ * live (every site that nulls the owner does so AFTER detaching the listeners,
+ * so the handlers cannot observe a null owner today), but the failure it was
+ * one edit away from is an unfiltered team-visible write, and nothing is lost
+ * by closing it: the session ref is nulled in the same breath as the owner, so
+ * a handler reaching a null owner would bail on its own `!live` check anyway.
+ *
+ * Takes the id and a bare `{ pointerId }` rather than a `PointerEvent` so it is
+ * exercisable without a DOM — `tests/mount-react.ts` supports clicks and
+ * effects but ships no `PointerEvent` and no `setPointerCapture`, which is why
+ * this predicate is extracted instead of driven through the harness.
+ *
+ * Ownership is `pointerId` and nothing else: `pointerType` and `buttons` are
+ * deliberately NOT consulted. A drag legitimately starts from a mouse, a pen or
+ * a finger, and `buttons` is 0 on a normal `pointerup` — filtering on either
+ * would break the gesture it is supposed to protect.
+ */
+export function isOwnPointer(
+  ownerId: number | null,
+  ev: { pointerId: number },
+): boolean {
+  // `!== null`, not a truthiness check: `pointerId` 0 is a REAL id (it is the
+  // usual id for a mouse in several engines), and `ownerId && …` would treat
+  // the owning pointer as foreign and silently kill every drag it started.
+  return ownerId !== null && ev.pointerId === ownerId;
+}
+
 export interface BandDragSession {
   subject: SubjectId;
   unitId: string;
@@ -183,14 +226,12 @@ export function useBandDrag({
         // because a failed capture has no user-visible consequence.
       }
 
-      // EVERY window listener filters on the initiating pointer. Without it a
-      // second finger's `pointermove` steers a drag it never started, and its
-      // `pointerup` COMMITS one — a teacher resting a thumb on a tablet while
-      // dragging with a finger would reschedule a unit to wherever the thumb
-      // happened to be. `pointerId` is the only thing that distinguishes them:
-      // the events are otherwise identical.
+      // EVERY window listener filters on the initiating pointer — see
+      // `isOwnPointer` above for what a second contact does without it, and why
+      // the predicate fails closed. Kept as a local alias so each handler still
+      // reads `if (!mine(ev)) return;` as its first line.
       const mine = (ev: PointerEvent): boolean =>
-        pointerIdRef.current === null || ev.pointerId === pointerIdRef.current;
+        isOwnPointer(pointerIdRef.current, ev);
 
       const onMove = (ev: PointerEvent): void => {
         if (!mine(ev)) return;
