@@ -2,6 +2,10 @@
   "name": "mycurricula-app",
   "version": "0.1.0",
   "private": true,
+  "//sideEffects": "CSS-scoped ON PURPOSE. Do NOT simplify to `false`, and do NOT drop the `**/` (webpack matches paths relative to package.json, so `*.css` would miss app/globals.css). `false` happens to work today only because Next marks its own CSS rules sideEffects:true and webpack's rule tap overwrites the package.json tap — a dependency internal that a Next 16 / Turbopack move re-opens silently, with an unstyled app as the failure mode. The glob wins the same tree-shaking without depending on it.",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

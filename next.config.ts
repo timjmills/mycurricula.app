@@ -71,6 +71,61 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // ── Keep `linkedom` out of the CLIENT bundle ────────────────────────────────
+  //
+  // linkedom is a SERVER-only DOM shim. Its only consumer is
+  // `makeServerWindow()` in lib/sanitize-html.ts, which runs only on the
+  // `!hasBrowserDOM` branch. The import is static so the Cloudflare Worker
+  // bundle keeps it (the Worker has no DOM and genuinely needs it), but that
+  // also dragged ~232 kB into the browser bundle, where it is dead weight — the
+  // browser already has a real DOM, so `getInstance()` hands DOMPurify the real
+  // `window`. Alias it away for the CLIENT compilation only. `isServer` is true
+  // for BOTH the nodejs- and edge-server compilations, so the Worker is
+  // unaffected.
+  //
+  // WHY `resolve.alias`, NOT `resolve.fallback`: `fallback` only fires when
+  // normal resolution FAILS, and linkedom is an installed dependency that
+  // resolves fine — a fallback would look applied and change nothing. `alias`
+  // runs before resolution and always fires.
+  //
+  // WHY the un-`$`'d key: `linkedom$` would match only the exact request. The
+  // bare key also covers `linkedom/*`, so a future `linkedom/cached` import
+  // cannot sneak back into the client bundle.
+  //
+  // `serverExternalPackages` does NOT solve this — it is a server-compilation
+  // directive with zero client effect, and it would be actively harmful here:
+  // Cloudflare Workers have no `node_modules` at runtime, so linkedom must stay
+  // bundled INTO the Worker. An async `import()` inside `makeServerWindow` was
+  // also rejected: it would force `sanitizeHtml` to become async across ~10
+  // synchronous render-path callsites, including `useMemo` bodies and
+  // `el.innerHTML = sanitizeHtml(value)`.
+  //
+  // SECURITY — this fails CLOSED. Aliasing the module away makes `parseHTML`
+  // and `NodeFilter` undefined in the client bundle, but they are referenced
+  // only inside `makeServerWindow()` (sanitize-html.ts:310-395), whose only
+  // callsite is the false arm of `hasBrowserDOM` — always true in a browser.
+  // If client code ever did reach it, the explicit guard at the top of
+  // `makeServerWindow` throws. No `sanitizeHtml(` callsite has a surrounding
+  // try/catch or `|| raw` fallback, so a throw surfaces as a React render error
+  // or an aborted paste; in no path does the dirty string reach
+  // `dangerouslySetInnerHTML`. This matches the module's existing
+  // `if (!dompurify.isSupported) throw`.
+  //
+  // FORWARD TRIPWIRE (Next 16): Turbopack becomes the default and Next hard-
+  // exits on a webpack config with no turbopack config. So this alias becomes a
+  // BUILD FAILURE, not a silent regression — the good failure mode. The fix at
+  // that point is to add `turbopack: {}` or pin `next build --webpack`.
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve ??= {};
+      config.resolve.alias = {
+        ...(config.resolve.alias ?? {}),
+        linkedom: false,
+      };
+    }
+    return config;
+  },
+
   async headers() {
     // `nosniff` is intentionally production-only: Next.js dev mode serves
     // static chunks (CSS / JS bundles) with `text/plain` Content-Type in

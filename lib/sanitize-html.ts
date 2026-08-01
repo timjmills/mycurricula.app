@@ -308,6 +308,22 @@ let instance: DOMPurifyInstance | null = null;
 // statically imported so the Cloudflare Worker bundle includes it (and never
 // jsdom). On the client this function is never invoked.
 function makeServerWindow(): Window {
+  // linkedom is aliased away in the CLIENT bundle (see the `webpack` hook in
+  // next.config.ts) because it is server-only dead weight there. This function
+  // is unreachable in a browser — `getInstance()` picks the real `window` — so
+  // the alias is safe. If someone later moves this module into a Web Worker or
+  // any other no-`window` client context, `parseHTML` would be undefined and
+  // the next line would throw a bare, confusing TypeError. Name the cause
+  // instead. Security posture is unchanged either way: we throw rather than
+  // return unsanitized HTML, matching the isSupported check in getInstance().
+  if (typeof parseHTML !== "function") {
+    throw new Error(
+      "sanitizeHtml: linkedom is aliased away in the client bundle " +
+        "(next.config.ts) and makeServerWindow() was reached anyway. " +
+        "Refusing to return unsanitized HTML.",
+    );
+  }
+
   const base = parseHTML(
     "<!DOCTYPE html><html><head></head><body></body></html>",
   );
