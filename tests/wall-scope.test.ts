@@ -417,6 +417,9 @@ describe("anchors", () => {
 
 describe("archived lessons never render", () => {
   it("is filtered from every preset", () => {
+    // The live lesson and the archived one are IDENTICAL in every field the
+    // presets scope on — same subject, unit, week and day — so the only thing
+    // that can separate them is `archived`.
     const lessons = [
       lesson({ id: "live", subject: "math", unit: "u-1", week: 12, day: 0 }),
       lesson({
@@ -429,31 +432,58 @@ describe("archived lessons never render", () => {
       }),
     ];
     for (const preset of WALL_PRESETS) {
-      const got = scopeLessons(
-        input({
-          scope: { preset, lessonId: "gone", subject: "math", unit: "u-1" },
-          lessons,
-          todayCol: 0,
-        }),
+      const scope = (lessonId: string) => ({
+        preset,
+        lessonId,
+        subject: "math" as const,
+        unit: "u-1",
+      });
+      // THE CONTROL, and it is not decoration. `.some(...) === false` is
+      // satisfied by an EMPTY array, and the `lesson` preset returns exactly
+      // that for an anchor it cannot resolve — so that iteration used to pass
+      // no matter what the filter did. Anchoring the same preset at the LIVE
+      // lesson proves the scope can return something here; only then does the
+      // exclusion below carry information.
+      const control = scopeLessons(
+        input({ scope: scope("live"), lessons, todayCol: 0 }),
       );
-      expect(got.some((l) => l.id === "gone")).toBe(false);
+      expect(control.map((l) => l.id), `${preset} control`).toContain("live");
+
+      const got = scopeLessons(
+        input({ scope: scope("gone"), lessons, todayCol: 0 }),
+      );
+      expect(got.some((l) => l.id === "gone"), preset).toBe(false);
     }
   });
 
   it("an archived lesson is not resolvable as the Current Lesson", () => {
-    const lessons = [
-      lesson({
-        id: "gone",
-        subject: "math",
-        unit: "u-1",
-        week: 12,
-        day: 0,
-        archived: true,
-      }),
-    ];
+    const archived = {
+      id: "gone",
+      subject: "math" as const,
+      unit: "u-1",
+      week: 12,
+      day: 0,
+    };
+    // The control: the SAME lesson, same anchor, differing only in `archived`,
+    // resolves to a real wall. Without it `toEqual([])` is satisfied by every
+    // way `resolveWall` can return nothing — a bad anchor, a missing resource
+    // resolver, a thrown-away fixture — none of which is what this pins.
     expect(
       resolveWall(
-        input({ scope: { preset: "lesson", lessonId: "gone" }, lessons }),
+        input({
+          scope: { preset: "lesson", lessonId: "gone" },
+          lessons: [lesson(archived)],
+        }),
+      ).length,
+      "control: the un-archived lesson resolves",
+    ).toBeGreaterThan(0);
+
+    expect(
+      resolveWall(
+        input({
+          scope: { preset: "lesson", lessonId: "gone" },
+          lessons: [lesson({ ...archived, archived: true })],
+        }),
       ),
     ).toEqual([]);
   });

@@ -160,7 +160,6 @@ describe("BoardHeadIdentity — a resolved lesson shows what is being taught", (
     expect(html).not.toContain("5.NF.A.2");
     expect(html).toContain("+1");
   });
-
 });
 
 // ── 2. Rich text is stripped ────────────────────────────────────────────────
@@ -202,6 +201,15 @@ describe("BoardHeadIdentity — an unresolved lesson is never described", () => 
     // post-delete render). No objective is claimed about a lesson we do not
     // hold, so a backend outage can never surface as "No objective recorded."
     const html = render("m-12-0");
+    // THE CONTROL, IN THE SAME EVALUATION. Both assertions below are absence
+    // assertions, and an absence assertion cannot tell "the block correctly
+    // withheld its copy" from "the component rendered nothing at all" — a
+    // crash, a bad prop, a module that failed to import. The subject label is
+    // the one thing this header renders unconditionally, so seeing it is what
+    // licenses the two `not.toContain`s beneath it. Asserting it in a separate
+    // `it` (which is where it used to live) does not count: a different render
+    // is a different fact.
+    expect(html, "control: the header rendered at all").toContain("Math");
     expect(html).not.toContain(NO_OBJECTIVE);
     expect(html).not.toContain("I can");
   });

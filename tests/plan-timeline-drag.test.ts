@@ -17,11 +17,13 @@ import {
   axisWeekCount,
   moveWeekRange,
   resizeWeekRange,
+  lessonsOutsideRange,
   weekOfSlot,
   weekRangeEquals,
   weekRangeSlots,
   weeksLabel,
 } from "@/lib/plan-timeline/drag";
+import type { Lesson } from "@/lib/types";
 // Hoisted to module scope, not `await import`ed inside a test.
 //
 // A dynamic import inside a test charges that ONE test the cold transform cost
@@ -382,5 +384,72 @@ describe("expandStaleUnitKeys", () => {
     const out = expandStaleUnitKeys(["startWeek", "endWeek", "notes"]);
     expect(out).toHaveLength(3);
     expect(new Set(out).size).toBe(3);
+  });
+});
+
+// ── lessonsOutsideRange ─────────────────────────────────────────────────────
+//
+// WHY THIS BLOCK EXISTS. `drag.ts:31-32` states "Every function here is
+// unit-tested in tests/plan-timeline-drag.test.ts" — and this function was the
+// one exception. It was not even imported here. A file-level claim that a test
+// file does not honour is worse than silence, because the next person reads it
+// and stops looking; the fix is to make the claim true rather than to soften it.
+//
+// It is also the number a teacher acts on. A unit drag moves the DECLARED week
+// range and deliberately leaves the lessons where they are, so this count is
+// the only thing that turns "the bar and its dots have come apart" from
+// something you have to notice into something the band says. `rescheduleUnit`
+// puts it straight into the undo toast ("… · 3 lessons still dated outside"),
+// so an undercount tells a teacher a drag was clean when it was not.
+
+/** A lesson with only the fields this counter reads. */
+function wk(week: unknown, over: { archived?: boolean } = {}): Lesson {
+  return { id: `l${String(week)}`, week, ...over } as unknown as Lesson;
+}
+
+describe("lessonsOutsideRange", () => {
+  it("counts only the lessons outside, and the range is INCLUSIVE at both ends", () => {
+    // 9 and 14 are the boundary weeks: an exclusive comparison would report 4.
+    const lessons = [wk(8), wk(9), wk(12), wk(14), wk(15)];
+    expect(lessonsOutsideRange(lessons, { start: 9, end: 14 })).toBe(2);
+  });
+
+  it("returns 0 when every lesson is inside — not a truthy sentinel", () => {
+    // The consequence copy branches on `outside > 0`, so a function that
+    // returned something else falsy-but-not-zero (or -1 for "unknown") would
+    // read as "no divergence" in one place and print as text in another.
+    expect(lessonsOutsideRange([wk(9), wk(14)], { start: 9, end: 14 })).toBe(0);
+    expect(lessonsOutsideRange([], { start: 9, end: 14 })).toBe(0);
+  });
+
+  it("ignores ARCHIVED lessons, which are not on the timeline either", () => {
+    const lessons = [wk(30, { archived: true }), wk(31)];
+    // Control first: without the archived flag both would count, so a 1 below
+    // is the flag doing work rather than the fixture being thin.
+    expect(lessonsOutsideRange([wk(30), wk(31)], { start: 9, end: 14 })).toBe(2);
+    expect(lessonsOutsideRange(lessons, { start: 9, end: 14 })).toBe(1);
+  });
+
+  it("ignores a lesson with no usable week rather than counting it as outside", () => {
+    // `undefined`, `null` and a fractional week all reach here from real data
+    // paths (an un-dated draft, a hand-built row, a bad import). Counting them
+    // as "outside" would print a divergence a teacher cannot find or fix.
+    const lessons = [wk(undefined), wk(null), wk(12.5), wk(NaN), wk(12)];
+    expect(lessonsOutsideRange(lessons, { start: 9, end: 14 })).toBe(0);
+  });
+
+  it("normalises an inverted range instead of counting everything", () => {
+    // A resize dragged past its own opposite edge hands over `end < start`
+    // mid-gesture. Compared literally, EVERY lesson is outside and the band
+    // flashes a false divergence for the length of the drag.
+    const lessons = [wk(8), wk(10), wk(15)];
+    expect(lessonsOutsideRange(lessons, { start: 14, end: 9 })).toBe(
+      lessonsOutsideRange(lessons, { start: 9, end: 14 }),
+    );
+    expect(lessonsOutsideRange(lessons, { start: 14, end: 9 })).toBe(2);
+  });
+
+  it("handles a single-week range, which is the smallest a unit can be", () => {
+    expect(lessonsOutsideRange([wk(11), wk(12), wk(13)], { start: 12, end: 12 })).toBe(2);
   });
 });

@@ -141,7 +141,14 @@ describe("buildLessonLibrary", () => {
       }),
     );
     expect(rows[0].placeable).toBe(false);
-    expect(rows[0].state).not.toBe("missed");
+    // ASSERTED POSITIVELY, not as `.not.toBe("missed")`. `state` is a union of
+    // several values, so a negative assertion is satisfied by every other one
+    // of them AND by `undefined` — including the case where the row was never
+    // classified at all, which is a worse bug than the one being excluded. The
+    // lesson here is thin (no objective, no resources, no standards) and
+    // off-calendar, so `needs_work` is the answer, the same one the holiday
+    // case below pins.
+    expect(rows[0].state).toBe("needs_work");
   });
 
   it("never calls a HOLIDAY lesson missed", () => {
@@ -339,6 +346,94 @@ describe("buildNeedsAttention", () => {
     );
     const items = buildNeedsAttention(rows, []);
     expect(items.map((i) => i.kind)).toEqual(["off_calendar"]);
+  });
+
+  it("reports a unit whose lessons are dated outside its own weeks", () => {
+    // THE BRANCH A DRAG CREATES, and it had no test at all. A unit-band drag
+    // moves the declared week range and deliberately leaves the lessons where
+    // they are (lib/plan-timeline/drag.ts's header), so `outside_range` is the
+    // one attention kind the surface's own primary gesture manufactures — the
+    // ONLY thing that turns "the bar and its dots have come apart" from
+    // something a teacher has to spot into something the plan says.
+    //
+    // The unit rows are built by `buildUnitLibrary` rather than hand-written,
+    // so `lessonsOutside` is DERIVED by the shipped code. A hand-set count
+    // would test the reporting while leaving the counting — the part a drag
+    // actually changes — unmeasured.
+    const lessons = [
+      lesson({ id: "in", subject: "math", unit: "u1", week: 2 }),
+      lesson({ id: "out", subject: "math", unit: "u1", week: 20 }),
+    ];
+    const units = buildUnitLibrary(
+      input({
+        units: [unit({ id: "u1", subject: "math", startWeek: 1, endWeek: 4 })],
+        lessons,
+      }),
+    );
+    // CONTROL: the derivation really did find one lesson outside. Without this
+    // the kind assertion could pass on a unit the builder never scored.
+    expect(units[0].lessonsOutside, "derived outside count").toBe(1);
+
+    const items = buildNeedsAttention(
+      buildLessonLibrary(input({ lessons })),
+      units,
+    );
+
+    expect(items.map((i) => i.kind)).toEqual(["outside_range"]);
+    // The teacher-facing number, in the row, singular.
+    expect(items[0].detail).toContain("1 lesson dated outside Wk 1–4");
+  });
+
+  it("says “Wk 12” for a one-week unit, never “Wk 12–12”", () => {
+    // The same shared-formatter rule the `off_axis_unit` branch documents, on
+    // the branch beside it: an inline `Wk ${start}–${end}` has no
+    // `start === end` case, and `lib/mock/units.ts` ships a one-week unit, so
+    // this is reproducible rather than theoretical.
+    const lessons = [
+      lesson({ id: "in", subject: "math", unit: "u1", week: 12 }),
+      lesson({ id: "out", subject: "math", unit: "u1", week: 20 }),
+    ];
+    const units = buildUnitLibrary(
+      input({
+        units: [unit({ id: "u1", subject: "math", startWeek: 12, endWeek: 12 })],
+        lessons,
+      }),
+    );
+    const items = buildNeedsAttention(
+      buildLessonLibrary(input({ lessons })),
+      units,
+    );
+
+    expect(items[0].kind).toBe("outside_range");
+    expect(items[0].detail).toContain("Wk 12");
+    expect(items[0].detail).not.toContain("Wk 12–12");
+  });
+
+  it("prefers off_axis_unit over outside_range for a unit parked past the year", () => {
+    // The branch ORDER, which is a deliberate ruling in library.ts: a unit set
+    // for weeks 999–1000 has every lesson "outside" it, so the unordered form
+    // would report "N lessons dated outside Wk 999–1000" — true, useless, and
+    // it buries the real problem. Pinned because nothing else stops a later
+    // refactor reordering the `if`s.
+    const lessons = [lesson({ id: "l1", subject: "math", unit: "u1", week: 2 })];
+    const units = buildUnitLibrary(
+      input({
+        units: [
+          unit({ id: "u1", subject: "math", startWeek: 999, endWeek: 1000 }),
+        ],
+        lessons,
+      }),
+    );
+    expect(units[0].offAxis, "control: the unit really is off the axis").toBe(
+      true,
+    );
+    expect(units[0].lessonsOutside, "…and would have reported as outside").toBeGreaterThan(0);
+
+    const items = buildNeedsAttention(
+      buildLessonLibrary(input({ lessons })),
+      units,
+    );
+    expect(items.map((i) => i.kind)).toEqual(["off_axis_unit"]);
   });
 
   it("is empty for a healthy plan", () => {

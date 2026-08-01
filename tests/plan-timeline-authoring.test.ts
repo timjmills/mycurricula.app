@@ -30,7 +30,6 @@ const store = vi.hoisted(() => ({
   lessons: [] as Lesson[],
   subjects: [] as Subject[],
   units: [] as Unit[],
-  patches: [] as { unitId: string; patch: Record<string, unknown> }[],
 }));
 
 vi.mock("@/lib/planner-store", () => ({
@@ -40,9 +39,13 @@ vi.mock("@/lib/planner-store", () => ({
     subjectById: Object.fromEntries(store.subjects.map((s) => [s.id, s])),
     units: store.units,
     getSections: () => [],
-    editUnitFields: (unitId: string, patch: Record<string, unknown>) => {
-      store.patches.push({ unitId, patch });
-    },
+    // A DELIBERATE NO-OP, not a capture. This file renders statically, so no
+    // event can ever reach a write from here and a capture array would sit
+    // permanently empty while making the file look like it covered the write
+    // path — which is exactly what it used to do. What a unit drag actually
+    // writes, including the same-slug refusal, is asserted through a real mount
+    // in tests/plan-timeline-reschedule.test.ts.
+    editUnitFields: () => {},
   }),
   usePlannerDataState: () => "settled",
 }));
@@ -164,7 +167,6 @@ beforeAll(() => {
     store.subjects = [MATH];
     store.units = [UNIT];
     store.lessons = [LESSON];
-    store.patches = [];
   };
 
   base();
@@ -186,6 +188,21 @@ beforeAll(() => {
   store.editMode = "master";
   store.lessons = [LESSON, { ...LESSON, id: "l2", week: 30 } as Lesson];
   html.masterOutside = renderNow();
+
+  // ELEVEN outside, for the substring trap below: `toContain("1 out")` is
+  // satisfied by "11 out", so the one-lesson assertion could not tell the
+  // right number from a wrong one until there was a fixture that produced a
+  // wrong one.
+  base();
+  store.editMode = "master";
+  store.lessons = [
+    LESSON,
+    ...Array.from(
+      { length: 11 },
+      (_, i) => ({ ...LESSON, id: `far-${i}`, week: 30 + i }) as Lesson,
+    ),
+  ];
+  html.masterOutsideEleven = renderNow();
 
   base();
   store.editMode = "personal";
@@ -239,19 +256,66 @@ describe("Plan timeline — the band states its real week range", () => {
   it("flags lessons dated outside the unit's own weeks", () => {
     // The divergence a week-granularity drag can CREATE: the bar moves, the
     // lessons do not. Silent, it reads as a rendering bug.
-    expect(html.masterOutside).toContain("1 out");
+    //
+    // ANCHORED ON THE `>`. The badge renders `{n} out` as the element's first
+    // child, so ">1 out" can only be a badge whose number is exactly 1 —
+    // whereas the bare `toContain("1 out")` this used to be is a substring of
+    // "11 out", "21 out", "101 out" and every other count ending in 1. A
+    // counter that reported the wrong number would have passed unchanged, and
+    // an off-by-N count is the likeliest way this goes wrong.
+    expect(html.masterOutside).toContain(">1 out");
     expect(html.masterOutside).toContain("dated outside those weeks");
+  });
+
+  it("reports the real count, not a number that merely ends in one", () => {
+    // The pair that gives the assertion above its teeth: the same markup with
+    // ELEVEN outside lessons must read "11 out" and must NOT satisfy the
+    // one-lesson matcher.
+    expect(html.masterOutsideEleven).toContain(">11 out");
+    expect(html.masterOutsideEleven).not.toContain(">1 out");
+    // The sentence agrees with the badge, and pluralises.
+    expect(html.masterOutsideEleven).toContain(
+      "11 of its lessons are dated outside those weeks",
+    );
+    expect(html.masterOutside).toContain(
+      "1 of its lessons is dated outside those weeks",
+    );
   });
 });
 
 describe("Plan timeline — the library drawer", () => {
+  /** The drawer's own always-present marker — the collapsed toggle's CSS-module
+   *  class, which the transform emits as `_drawerToggle_<hash>`.
+   *
+   *  It is the positive control for every absence assertion below, because
+   *  those assertions are about the DRAWER and `data-lane-subject` is not: that
+   *  attribute belongs to TimelineLaneRow, a SIBLING subtree. A drawer that
+   *  failed to render at all — or that PlanTimeline stopped mounting — left the
+   *  lane rows untouched, so the old control passed while the thing under test
+   *  was simply absent. A control has to live in the same subtree as the thing
+   *  whose absence it licenses.
+   *
+   *  Structural rather than a copy string on purpose: the toggle's tooltip
+   *  wording is live product copy and has already been reworded once, and a
+   *  control that breaks on a copy edit trains people to weaken controls. */
+  const DRAWER = "drawerToggle";
+
   it("publishes a needs-attention count on the collapsed bar", () => {
+    expect(html.personalThin).toContain(DRAWER);
     expect(html.personalThin).toContain("1 needs attention");
   });
 
   it("publishes NO count when the plan is healthy", () => {
     // A permanent "0 need attention" trains the eye to stop reading it.
-    expect(html.personal).toContain("data-lane-subject"); // not a vacuous pass
+    expect(html.personal, "control: the drawer rendered").toContain(DRAWER);
     expect(html.personal).not.toContain("need attention");
+    // The badge is a BUTTON with its own tooltip ("N thing(s) in your plan
+    // need(s) a second look"), so assert on that too: a count rendered without
+    // its label — or a label rendered without its count — still fails.
+    // Matched on "in your plan need" rather than "needs a second look",
+    // because the DRAWER ROOT's own title carries that phrase unconditionally
+    // (TimelineDrawer.tsx:177) and would make this assertion fail for a reason
+    // that has nothing to do with the badge.
+    expect(html.personal).not.toContain("in your plan need");
   });
 });

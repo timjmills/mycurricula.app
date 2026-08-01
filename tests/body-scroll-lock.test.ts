@@ -211,14 +211,58 @@ describe("body-scroll lock — adoption", () => {
   });
 });
 
-/** Every tracked .ts/.tsx under app/, components/ and lib/. */
+/**
+ * Every .ts/.tsx under app/, components/ and lib/ that is ON DISK right now.
+ *
+ * ── WHY IT IS NOT JUST `git ls-files` (2026-08-01) ─────────────────────────
+ * `git ls-files` enumerates the INDEX, which disagrees with the disk in two
+ * ways, and this guard met both while the retired Day frames were deleted:
+ *
+ *   • Listed but gone — a file deleted in the working tree and not yet staged
+ *     is still in the index, and `readSource` threw ENOENT, taking the whole
+ *     assertion down. A path that does not exist cannot hand-roll anything, so
+ *     dropping it here cannot hide an offender.
+ *   • On disk but not listed — a file that is NEW and not yet staged was not
+ *     scanned at all, so a tenth overlay could hand-roll `body.style.overflow`
+ *     and pass this guard until someone ran `git add`. That is precisely the
+ *     case this test exists to catch, and precisely the moment it was blind.
+ *     `--others --exclude-standard` adds them while honouring .gitignore.
+ *
+ * KNOWN REMAINING HOLE, deliberately left for its owner: the tracked half uses
+ * `git ls-files "lib/**\/*.ts"`-style pathspecs, which silently require at
+ * least one intermediate directory — so every top-level `lib/*.ts` is invisible
+ * to the tracked listing (tests/no-mock-in-live-surfaces.test.ts documents the
+ * same trap and globs in JS instead to avoid it). Widening it here could surface
+ * pre-existing offenders that belong to other work; it is reported rather than
+ * fixed in passing.
+ */
 function execFileSyncSafe(): string[] {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { execFileSync } = require("node:child_process") as typeof import("node:child_process");
-  const out = execFileSync(
-    "git",
-    ["ls-files", "app/**/*.ts", "app/**/*.tsx", "components/**/*.ts", "components/**/*.tsx", "lib/**/*.ts", "lib/**/*.tsx"],
-    { cwd: repoRoot, encoding: "utf8" },
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { existsSync } = require("node:fs") as typeof import("node:fs");
+  const run = (args: string[]): string[] =>
+    execFileSync("git", ["ls-files", ...args], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      maxBuffer: 32 * 1024 * 1024,
+    })
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const tracked = run([
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+  ]);
+  const untracked = run(["--others", "--exclude-standard"]).filter(
+    (p) => /^(app|components|lib)\//.test(p) && /\.tsx?$/.test(p),
   );
-  return out.split("\n").map((s) => s.trim()).filter(Boolean);
+  return [...new Set([...tracked, ...untracked])]
+    .filter((rel) => existsSync(path.join(repoRoot, rel)))
+    .sort();
 }

@@ -37,10 +37,22 @@ vi.mock("@/lib/palette", () => ({
 }));
 
 // The card body is not what this asserts, and it reaches for wall context this
-// test does not provide.
-vi.mock("@/components/resource-wall-v2/Card", () => ({
-  Card: () => null,
-}));
+// test does not provide — so it is stubbed. It is NOT stubbed to `() => null`,
+// which is what it used to be: a stub that renders nothing makes the rendered
+// card set UNOBSERVABLE, and one test below ("derives the chips from the FULL
+// item list") is entirely about the difference between the full list and the
+// filtered one. With an empty stub a Section that ignored `filter` altogether
+// passed it identically — the assertion had nothing to compare against.
+//
+// The marker is inert (no styles, no context, no events) and carries the item's
+// key, so "which cards survived the filter" becomes a fact the test can read.
+vi.mock("@/components/resource-wall-v2/Card", async () => {
+  const { createElement: h } = await import("react");
+  return {
+    Card: ({ item }: { item: WallItem }) =>
+      h("div", { "data-card-key": item.key }),
+  };
+});
 
 const { Section } = await import("@/components/resource-wall-v2/Section");
 
@@ -77,7 +89,7 @@ function section(items: WallItem[]): WallSection {
 
 const NOOP = (): void => {};
 
-function render(sec: WallSection): string {
+function render(sec: WallSection, filter: string = "All"): string {
   return renderToStaticMarkup(
     createElement(Section as never, {
       section: sec,
@@ -85,7 +97,7 @@ function render(sec: WallSection): string {
       view: "grid",
       layout: "comfortable",
       query: "",
-      filter: "All",
+      filter,
       readOnly: false,
       sectionDragging: false,
       cardDragging: false,
@@ -203,42 +215,39 @@ describe("Resource Wall — section headers name the lessons they collect", () =
   });
 
   it("derives the chips from the FULL item list, not the filtered one", () => {
-    // The type filter hides the second card; its lesson must still be named,
-    // because "whose material is this" is a property of the section.
-    const sec = section([
-      item("Deck", [FRACTIONS], "slides"),
-      item("Reading", [DECIMALS], "pdf"),
-    ]);
-    const html = renderToStaticMarkup(
-      createElement(Section as never, {
-        section: sec,
-        wallKey: "preset:today",
-        view: "grid",
-        layout: "comfortable",
-        query: "",
-        filter: "Documents",
-        readOnly: false,
-        sectionDragging: false,
-        cardDragging: false,
-        onCardDragState: NOOP,
-        onEdit: NOOP,
-        onOpen: NOOP,
-        onEnlarge: NOOP,
-        onBoard: NOOP,
-        onModal: NOOP,
-        onAddCard: NOOP,
-        onAddSection: NOOP,
-        onCommitCard: NOOP,
-        onDropCard: NOOP,
-        onDropSection: NOOP,
-        onDragStartSection: NOOP,
-        onDragEndSection: NOOP,
-        onSolo: NOOP,
-        bgRevision: 0,
-        onBgChange: NOOP,
-      } as never),
+    // "Documents" is `["doc", "slides"]` (Section.tsx FILTER_TYPES), so the pdf
+    // card is the one the filter drops.
+    const deck = item("Deck", [FRACTIONS], "slides");
+    const reading = item("Reading", [DECIMALS], "pdf");
+    const cardKey = (it: WallItem): string => `data-card-key="${it.key}"`;
+
+    // CONTROL 1 — unfiltered, BOTH cards render. Without this the "absent"
+    // assertion below could pass because the section rendered no cards at all.
+    const all = render(section([deck, reading]));
+    expect(all, "control: both cards render unfiltered").toContain(
+      cardKey(deck),
     );
+    expect(all).toContain(cardKey(reading));
+
+    const html = render(section([deck, reading]), "Documents");
+
+    // CONTROL 2 — and this is the one the old version of this test lacked
+    // entirely. `Card` used to be stubbed to `() => null`, so NOTHING in the
+    // markup could show whether the filter had hidden anything: a Section that
+    // ignored `filter` outright passed the chip assertion below unchanged, and
+    // the test's whole name ("from the FULL item list, not the filtered one")
+    // rested on a distinction the render could not express.
+    expect(html, "the filter really did drop the pdf card").not.toContain(
+      cardKey(reading),
+    );
+    expect(html, "and really did keep the slides card").toContain(
+      cardKey(deck),
+    );
+
+    // THE PROPERTY: the hidden card's lesson is still named, because "whose
+    // material is this" is a fact about the section, not about the current view.
     expect(html).toContain("Tagged to Decimals to hundredths");
+    expect(html).toContain("Tagged to Fractions on a number line");
   });
 
   it("escapes a teacher-authored lesson title", () => {
