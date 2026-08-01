@@ -75,6 +75,8 @@ import {
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { todayColumnIndex, todayIsInConfiguredYear } from "@/lib/now-anchor";
 import { useSchoolWeek } from "@/lib/use-school-week";
+import { useAcademicYear } from "@/lib/use-academic-year";
+import { weeksInRange } from "@/lib/year-calendar";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { stripHtml } from "@/lib/html-text";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -328,7 +330,17 @@ export function CatchUpRowMeta({ item }: { item: CatchupItem }): ReactNode {
 
 interface RowActionsProps {
   onMarkTaught: () => void;
-  onReschedule: () => void;
+  /**
+   * Either the action, or the REASON it cannot be offered — one field, never a
+   * handler plus a separate flag, so the renderer cannot show an enabled button
+   * carrying a "why this is disabled" tooltip (or the reverse). This action
+   * MOVES a team-visible lesson, so an unanswerable state has to reach the
+   * renderer as a disabled control with an explanation, never as a button that
+   * silently does nothing or writes a guessed week. The two reasons are today
+   * outside the configured academic year, and today already in its last week —
+   * see `rescheduleTarget`.
+   */
+  onReschedule: (() => void) | { blocked: string };
   onBump: () => void;
   onPlan: () => void;
   onTeach: () => void;
@@ -344,6 +356,10 @@ function LessonRow({
   actions: RowActionsProps;
 }) {
   const title = stripHtml(item.title) || "Untitled lesson";
+  // Narrow once, here, so the pill below reads the handler and the tooltip from
+  // the same decision rather than testing the union twice.
+  const rescheduleBlocked =
+    typeof actions.onReschedule === "function" ? null : actions.onReschedule.blocked;
   const statusWord = CATCHUP_STATUS_LABEL[item.status];
   const standard = item.standards[0];
   const sub = [item.unit, standard, statusWord].filter(Boolean).join(" · ");
@@ -353,7 +369,8 @@ function LessonRow({
     label: string;
     tip: string;
     icon: ReactNode;
-    onClick: () => void;
+    /** Null ⇒ the action has no answer right now; the pill renders disabled. */
+    onClick: (() => void) | null;
     done?: boolean;
   }> = [
     {
@@ -367,9 +384,15 @@ function LessonRow({
     {
       key: "reschedule",
       label: "Reschedule",
-      tip: "Move this lesson forward to next week so it lands back on the calendar.",
+      // A disabled control's tooltip explains WHY it is disabled and names the
+      // way out (CLAUDE.md §4) — otherwise the teacher just meets a dead button.
+      // The reason travels WITH the absent handler, so the two can't disagree.
+      tip:
+        rescheduleBlocked ??
+        "Move this lesson forward to next week so it lands back on the calendar.",
       icon: <IconCalendar />,
-      onClick: actions.onReschedule,
+      onClick:
+        typeof actions.onReschedule === "function" ? actions.onReschedule : null,
     },
     {
       key: "bump",
@@ -415,8 +438,26 @@ function LessonRow({
             <button
               type="button"
               className={`${styles.action} ${p.done ? styles.actionDone : ""}`}
-              onClick={p.onClick}
-              aria-label={`${p.label}: ${title}`}
+              onClick={p.onClick ?? undefined}
+              // `aria-disabled`, NOT the `disabled` attribute. A natively
+              // disabled button cannot take focus, so a keyboard user would
+              // meet a dead control and never reach the explanation — and the
+              // Tooltip primitive's disabled path only restores HOVER (via a
+              // wrapper span), not focus. aria-disabled keeps the button in the
+              // tab order, so the same tooltip opens on focus and its native
+              // title= mirror is long-pressable on touch. Rendered `undefined`
+              // rather than `false` when the action is live: React emits
+              // aria-disabled="false" for a literal false, and "unavailable,
+              // sort of" is not a state this control has.
+              // §4a review gate, round 2.
+              aria-disabled={p.onClick === null ? true : undefined}
+              // The reason also rides the accessible name, so a screen-reader
+              // user gets it with no hover, no focus dwell, and no tooltip.
+              aria-label={
+                p.onClick === null
+                  ? `${p.label}: ${title} — unavailable. ${p.tip}`
+                  : `${p.label}: ${title}`
+              }
             >
               {p.icon}
               <span className={styles.actionLabel}>{p.label}</span>
@@ -537,6 +578,57 @@ function CatchUpModalBody({
     [scopeToday],
   );
 
+  // WHERE "NEXT WEEK" IS — the destination the Reschedule action writes to.
+  //
+  // Reschedule's own tooltip promises "Move this lesson forward to next week so
+  // it lands back on the calendar". That is a claim about the CALENDAR, so it
+  // has to come from the clock. It used to be `week + 1` — the FOCUSED week —
+  // which made it "the week after the one you happen to be looking at". A
+  // teacher paging back to review week 5 and rescheduling a gap there sent the
+  // lesson to week 6: months into the PAST, still uncovered, and dressed as a
+  // success because 6 is past the week-5 horizon so the row left the list. Same
+  // conflation as 41aab70's `daysLate`, except this one WRITES.
+  //
+  // There are TWO states with no answer, and each is real rather than a
+  // defensive fiction. Both refuse instead of guessing, because the consequence
+  // is a team-visible move of a real lesson, not a wrong label:
+  //
+  //   • NO CLOCK — `scopeToday.week` is null exactly when `currentWeekBasis` is
+  //     a CLAMP rather than a derivation (today outside the configured academic
+  //     year; live right now for an August-start school). "Next week" has no
+  //     referent at all then.
+  //   • YEAR END — today IS the last configured week, so `currentWeek + 1` is
+  //     off the end of the year. Every calendar surface draws exactly
+  //     `weeksInRange(start, end)` columns (lib/year-calendar, and
+  //     `resolveCurrentWeek` clamps against the same total), so a lesson placed
+  //     there is not rescheduled, it is DISAPPEARED — off the Weekly navigator,
+  //     off the Year roadmap, and out of `dateForWeekDay`'s range. Found by the
+  //     §4a review gate; the pre-fix `week + 1` had the same hole from any
+  //     browsed week at the end of the year.
+  //
+  // Only the week half of the clock is needed — a reschedule places a week, not
+  // a day. The value carries its own reason so the renderer cannot pair an
+  // enabled button with a "why it is disabled" tooltip, or the reverse.
+  const { start: yearStart, end: yearEnd } = useAcademicYear();
+  const rescheduleTarget = useMemo<number | { blocked: string }>(() => {
+    if (scopeToday.week === null) {
+      return {
+        blocked:
+          "Rescheduling needs to know which week is the current one, and today falls outside this curriculum’s academic year. Set the year under Settings → Academic year to use this.",
+      };
+    }
+    const next = scopeToday.week + 1;
+    // `weeksInRange` is the same function every calendar surface counts columns
+    // with, so this bound cannot drift from what the app actually draws.
+    if (next > weeksInRange(yearStart, yearEnd)) {
+      return {
+        blocked:
+          "This is the last week of the school year, so there is no next week to move this lesson into. Use Bump to find another slot, or extend the year under Settings → Academic year.",
+      };
+    }
+    return next;
+  }, [scopeToday, yearStart, yearEnd]);
+
   const allItems = useMemo(
     () =>
       deriveCatchupItems(lessons, {
@@ -575,11 +667,17 @@ function CatchUpModalBody({
       // The REAL mark-taught: setLessonStatus commits + persists and NEVER
       // forks (CLAUDE.md §2). The item then drops from deriveCatchupItems.
       onMarkTaught: () => setLessonStatus(item.lessonId, "done"),
-      // Reschedule → move forward one week (keepOriginal false). Undoable and
-      // applied in-session; the lesson leaves the uncovered list (now a future
-      // week). Durable cross-reload persistence is Phase-1B (see file header).
-      onReschedule: () =>
-        relocateLesson(item.lessonId, { week: week + 1 }, false),
+      // Reschedule → move to the week after TODAY's (keepOriginal false), never
+      // to the week after the one being browsed; see `rescheduleWeek` above.
+      // Undoable and applied in-session; the lesson leaves the uncovered list
+      // (now a genuinely future week). Null when we cannot say where now is —
+      // the row renders the action disabled rather than writing a guess.
+      // Durable cross-reload persistence is Phase-1B (see file header).
+      onReschedule:
+        typeof rescheduleTarget === "number"
+          ? () =>
+              relocateLesson(item.lessonId, { week: rescheduleTarget }, false)
+          : rescheduleTarget,
       // Bump → next open instructional slot for the subject (school-week aware);
       // in-session + undoable, same Phase-1B persistence caveat as Reschedule.
       onBump: () => bumpLesson(item.lessonId),
@@ -595,7 +693,14 @@ function CatchUpModalBody({
         onClose("navigated");
       },
     }),
-    [setLessonStatus, relocateLesson, bumpLesson, week, router, onClose],
+    [
+      setLessonStatus,
+      relocateLesson,
+      bumpLesson,
+      rescheduleTarget,
+      router,
+      onClose,
+    ],
   );
 
   // ── Modal lifecycle: focus in, restore on close, lock body scroll ─────────

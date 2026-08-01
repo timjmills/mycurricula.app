@@ -375,6 +375,23 @@
   outline: 2px solid var(--accent, var(--chrome-accent));
   outline-offset: 1px;
 }
+/* An action with no answer right now (today outside the configured academic
+   year, or already in its last week ⇒ no "next week" to reschedule INTO).
+   Reads as unavailable rather than broken, and stays FOCUSABLE — it carries
+   `aria-disabled`, not the `disabled` attribute, so keyboard users can reach
+   the tooltip that explains why (see the button in CatchUpModal.tsx).
+   [aria-disabled] is an attribute selector, so `.action.action[…]` (0,3,0)
+   outranks the doubled `.action.action` base (0,2,0) that the `.cp-root button`
+   reset forces on every rule here. The hover/focus rules above are neutralised
+   explicitly: both still match, since this button is not natively disabled. */
+.action.action[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.action.action[aria-disabled="true"]:hover {
+  border-color: var(--border);
+  background: var(--surface);
+}
 /* Mark taught — the affirmative commit gets the green done token. */
 .actionDone.actionDone:hover {
   border-color: color-mix(in srgb, var(--done) 55%, var(--border));
