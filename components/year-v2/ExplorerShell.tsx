@@ -127,10 +127,10 @@ export interface ExplorerShellProps<K extends string = string> {
   /**
    * Optional RIGHT context-drawer slot (B3) — the mirror of `rail`, rendered
    * after the body in the same row. It hosts the unit-scoped panels
-   * (Assessments / Insights / Prep) that deliberately did NOT become tabs: the
-   * tab strip is the unit's five PARTS, while the drawer is commentary ABOUT
-   * the unit, and mixing the two would have grown a seven-tab strip nobody can
-   * scan.
+   * (Insights / Prep) that deliberately did NOT become tabs: the tab strip is
+   * the unit's PARTS, while the drawer is commentary ABOUT the unit. (B3 had a
+   * third pane here, Assessments; task #45 moved it into the strip, where the
+   * v2 handoff has it.)
    *
    * Like the rail it is MOUNTED whenever supplied and revealed by CSS
    * (`drawerOpen`), never by conditional mounting — so toggling it never

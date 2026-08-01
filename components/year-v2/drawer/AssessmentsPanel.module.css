@@ -668,3 +668,70 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ── Tab layout (`data-ap-layout="tab"`, task #45) ────────────────────────────
+ *
+ * The same panel, hosted in the workspace's Assessments TAB instead of the
+ * ~320px drawer. Everything above is narrow-first and stays exactly as it is —
+ * this block only spends the width the tab body has and the drawer never did.
+ *
+ * WHY CARDS. The v2 handoff's assessments tab (mockup :8779) is a stack of
+ * `ph-ovcard`s — a heading over a bordered, rounded panel — so the two halves
+ * become two cards here. In the drawer they are bare sections, because a card
+ * border inside a 320px rail costs width the kind tray cannot spare (see the
+ * "NO EXTRA CONTAINER PADDING" note above). That constraint is a property of
+ * the DRAWER, not of the panel, so the padding arrives with the width.
+ *
+ * TWO COLUMNS ONLY WHERE THEY FIT — AND THE CONTAINER DECIDES, NOT THE
+ * VIEWPORT. The unit half's kind tray is 273px of inline-flex that cannot wrap;
+ * a column narrower than ~380px puts it back in the clip the drawer note
+ * describes. A `@media (min-width: 900px)` split looked right and was wrong:
+ * the workspace's DEFAULT presentation is the compact modal, whose tab body is
+ * ~460px at a 1440px viewport, so the media query fired and handed each half a
+ * 220px column. Measured live, not reasoned about.
+ *
+ * `auto-fit` + `minmax(min(380px, 100%), 1fr)` reads the real container instead:
+ * one column until it can give both halves 380px, two after — so the compact
+ * modal stacks, the ⤢ full workspace splits, and neither needs to know the
+ * viewport. The inner `min(…, 100%)` is what stops a 287px phone container from
+ * being handed a 380px track it cannot hold (the classic auto-fit overflow).
+ *
+ * `align-items: start` — the two halves have wildly different heights (a unit
+ * with 12 lesson assessments beside one unit row), and stretching the short one
+ * would paint a card whose border runs a screen past its last row.
+ *
+ * Zero hex, zero px font sizes; every colour is a tone-branching token, as
+ * above. */
+
+.root[data-ap-layout="tab"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+  align-items: start;
+  gap: 20px;
+}
+
+.root[data-ap-layout="tab"] > .uSection,
+.root[data-ap-layout="tab"] > .half {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl, 24px);
+  background: var(--surface);
+}
+
+/* The unit half keeps its warmer identity between the two cards — the same job
+   `.uRow` does inside the drawer, moved up to the card now that the card is the
+   thing being told apart. */
+.root[data-ap-layout="tab"] > .uSection {
+  background: var(--surface-warm);
+}
+
+/* …which would leave its rows warm-on-warm, so they take the plain surface
+   instead. Doubled (0,3,0 vs `.uRow.uRow`'s 0,2,0) so it actually lands. */
+.root[data-ap-layout="tab"] > .uSection .uRow.uRow {
+  background: var(--surface);
+}
+
+.root[data-ap-layout="tab"] .halfTitle,
+.root[data-ap-layout="tab"] .uTitle {
+  font-size: var(--t-15);
+}

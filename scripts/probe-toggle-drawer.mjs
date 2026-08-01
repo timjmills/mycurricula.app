@@ -235,12 +235,19 @@ async function openDrawer(ctx, label) {
     await toggle.waitFor({ timeout: 20000 });
     if ((await toggle.getAttribute("aria-pressed")) !== "true")
       await toggle.click();
+    // The drawer's Assessments pane MOVED to the workspace's Assessments TAB
+    // (task #45), so `#ue-pane-assessments` no longer exists and Insights is
+    // now the default pane. This wait is not cosmetic: on failure `drawer`
+    // stays false, `scope` falls back to "", and every contrast check below
+    // silently retargets /weekly's OWN segmented controls — the probe keeps
+    // reporting drawer numbers it never measured. Assertions about the
+    // assessments panel live in scripts/probe-b17-assessments-tab.mjs now.
     await page
-      .locator('[role="tab"]#ue-pane-assessments')
+      .locator('[role="tab"]#ue-pane-insights')
       .waitFor({ timeout: 20000 });
     await page.waitForTimeout(1500);
     drawer = true;
-    check(true, `[${label}] drawer opened on the Assessments pane`);
+    check(true, `[${label}] drawer opened on the Insights pane`);
   } catch (err) {
     check(
       false,
@@ -261,7 +268,7 @@ async function openDrawer(ctx, label) {
   const ctx = await makeContext({ theme: "clear", width: 1280 });
   const { page, consoleErrors, drawer, scope } = await openDrawer(ctx, "clear/1280");
 
-  const shot = `${SHOTS}/drawer-assessments-clear-1280.png`;
+  const shot = `${SHOTS}/drawer-insights-clear-1280.png`;
   await page.screenshot({ path: shot });
 
   // ── H7: inactive segmented labels ────────────────────────────────────────
@@ -351,7 +358,7 @@ async function openDrawer(ctx, label) {
   // ── L5: heading tiers across the three panes ─────────────────────────────
   const headings = {};
   if (drawer) {
-  for (const pane of ["assessments", "insights", "prep"]) {
+  for (const pane of ["insights", "prep"]) {
     await page.locator(`#ue-pane-${pane}`).click();
     await page.waitForTimeout(900);
     headings[pane] = await page.evaluate(() =>
@@ -363,39 +370,21 @@ async function openDrawer(ctx, label) {
   const allH3 = Object.values(headings).every((v) => v[0] === "H3");
   check(
     allH3,
-    "L5 all three panes open at the same heading tier (h3)",
+    "L5 both panes open at the same heading tier (h3)",
     firsts.join(" "),
   );
-  check(
-    headings.assessments.join(",").startsWith("H3,H3,H4") ||
-      headings.assessments.every((h) => h === "H3" || h === "H4"),
-    "L5 Assessments nests h4 groups under h3 halves",
-    headings.assessments.join(","),
-  );
+  // The third pane's "h4 groups under h3 halves" assertion moved with the
+  // panel — scripts/probe-b17-assessments-tab.mjs owns it now.
   }
 
-  // ── M4: the lesson half now carries a scope badge ────────────────────────
-  if (drawer) {
-  await page.locator("#ue-pane-assessments").click();
-  await page.waitForTimeout(900);
-  const badges = await page.evaluate(() =>
-    [...document.querySelectorAll('#ue-drawer-panel [role="note"]')].map((b) => ({
-      text: (b.textContent || "").trim(),
-      described: !!b.getAttribute("aria-describedby") || !!b.getAttribute("title"),
-      tabbable: b.tabIndex === 0,
-    })),
-  );
-  check(
-    badges.length >= 2,
-    "M4 both halves carry a scope badge",
-    badges.map((b) => `"${b.text}"`).join(" + ") || "none found",
-  );
-  check(
-    badges.every((b) => b.tabbable),
-    "L4 badges are keyboard-reachable and carry a role",
-    JSON.stringify(badges),
-  );
-  }
+  // ── M4/L4: the scope badges MOVED with the panel ─────────────────────────
+  //
+  // "M4 both halves carry a scope badge" and "L4 badges are keyboard-reachable"
+  // asserted `#ue-drawer-panel [role="note"]` on the Assessments pane. That
+  // panel is now the workspace's Assessments TAB (task #45), so the drawer holds
+  // neither badge. The two checks were not dropped — they moved, intact, to
+  // scripts/probe-b17-assessments-tab.mjs, which measures them where the badges
+  // actually are. Leaving them here would have failed against the wrong surface.
 
   // ── HYDRATION CANARY — everything below is a KEYBOARD result ─────────────
   //
@@ -531,7 +520,7 @@ async function openDrawer(ctx, label) {
 {
   const ctx = await makeContext({ theme: "night", width: 1280 });
   const { page, scope } = await openDrawer(ctx, "night/1280");
-  await page.screenshot({ path: `${SHOTS}/drawer-assessments-night-1280.png` });
+  await page.screenshot({ path: `${SHOTS}/drawer-insights-night-1280.png` });
   const dark = await page.evaluate(([lib, scope]) => {
     const { measure, SANITY } = eval(lib);
     const out = { tone: document.documentElement.dataset.tone, opts: [] };

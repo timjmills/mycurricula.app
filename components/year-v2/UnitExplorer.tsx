@@ -33,9 +33,11 @@
 // parent folder, so the hashed class names — and the render — are unchanged.
 //
 // B3: a right-hand CONTEXT DRAWER (./drawer) rides beside the tab bodies —
-// Assessments · Insights · Prep. Those three are commentary ABOUT the unit, not
-// parts OF it, which is why they are drawer panes and not a sixth/seventh/eighth
-// tab (see TABS below).
+// Insights · Prep. Both are commentary ABOUT the unit, not parts OF it, which is
+// why they are drawer panes and not more tabs (see TABS below). B3 shipped
+// Assessments as a third pane on the same reasoning; task #45 moved it to a TAB,
+// because the handoff puts it there and because a unit's assessments are a part
+// of the unit — and the only editable thing the drawer ever held.
 //
 // DATA IDENTITY: `unit` is the unit-id SLUG as it sits on `Lesson.unit`
 // (e.g. "u-m3"). The display name / week span / "Unit n of N" resolve from the
@@ -76,7 +78,6 @@ import { ExplorerShell, type ExplorerMode } from "./ExplorerShell";
 import { UnitWorkspaceRail } from "./UnitWorkspaceRail";
 import {
   UnitContextDrawer,
-  AssessmentsPanel,
   InsightsPanel,
   PrepPanel,
   type UnitContextDrawerPane,
@@ -87,6 +88,7 @@ import {
   LessonsTab,
   RefineTab,
   StandardsTab,
+  AssessmentsTab,
   ResourcesTab,
   NotesTab,
 } from "./unit-tabs";
@@ -145,14 +147,26 @@ function splitUnitName(name: string): { prefix: string; rest: string } {
   };
 }
 
-/** The tab strip. B3 deliberately kept Assessments and Insights OUT of it: they
- *  went to the right-hand context drawer instead, because the strip lists the
- *  unit's PARTS (its plan, its lessons, its standards, its resources, its notes)
- *  while the drawer holds commentary ABOUT the unit. Let commentary in and the
- *  strip becomes a junk drawer that buries the parts a teacher opened the unit
- *  to reach. That ruling stands.
+/** The tab strip. B3 kept Assessments and Insights OUT of it: they went to the
+ *  right-hand context drawer instead, because the strip lists the unit's PARTS
+ *  (its plan, its lessons, its standards, its resources, its notes) while the
+ *  drawer holds commentary ABOUT the unit.
  *
- *  WAVE 5 adds **Refine**, which does NOT reopen it. Refine is not commentary —
+ *  TASK #45 OVERTURNS THAT FOR ASSESSMENTS — on two authorities at once. The v2
+ *  handoff puts Assessments in the strip on BOTH its unit surfaces (mockup
+ *  :8651, between Standards and Resources; :7573 for the explorer set), and the
+ *  handoff wins for look and behaviour (CLAUDE.md §4a); and a teacher reported
+ *  the missing tab by name. The B3 reasoning was not wrong about what a drawer
+ *  is for — it was wrong that assessments are commentary. A unit's assessments
+ *  are one of its parts, and they are EDITABLE, which nothing else in the
+ *  drawer is. Insights (read-only) and Prep (a roll-up of other tabs' fields)
+ *  stay where they are; the B3 ruling stands for them.
+ *
+ *  It MOVED, it was not copied — see AssessmentsTab.tsx for the divergent-draft
+ *  race that rules out mounting the panel in both places.
+ *
+ *  WAVE 5 adds **Refine**, which does NOT reopen it either. Refine is not
+ *  commentary —
  *  it is the unit's lessons themselves, laid out as an editable table so one
  *  planning field can be filled down the whole unit in a single keyboard run.
  *  The drawer REPORTS the gaps; Refine is where they get fixed, and there is no
@@ -168,6 +182,7 @@ type TabKey =
   | "lessons"
   | "refine"
   | "standards"
+  | "assessments"
   | "resources"
   | "notes";
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
@@ -175,6 +190,9 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: "lessons", label: "Lessons" },
   { key: "refine", label: "Refine" },
   { key: "standards", label: "Standards" },
+  // Between Standards and Resources — the handoff's own position in both of its
+  // tab sets (mockup :8651 and :7573).
+  { key: "assessments", label: "Assessments" },
   { key: "resources", label: "Resources" },
   { key: "notes", label: "Notes" },
 ];
@@ -265,7 +283,7 @@ export function UnitExplorer({
   const { presentation, toggle: togglePresentation } =
     useWorkspacePresentation();
 
-  // Context drawer (B3) — Assessments · Insights · Prep. Available in BOTH
+  // Context drawer (B3) — Insights · Prep. Available in BOTH
   // presentations (unlike the rail): these panels are the only home for that
   // information, so the compact Planner Hub modal must reach them too.
   const {
@@ -499,29 +517,16 @@ export function UnitExplorer({
   const { prefix, rest } = splitUnitName(rawName);
   const pct = progress.total > 0 ? progress.taught / progress.total : 0;
 
-  // The drawer's three panes. Built after the early returns above (so NOT a
+  // The drawer's two panes. Built after the early returns above (so NOT a
   // hook — a useMemo here would sit below a conditional return). Cheap: each
   // panel memoizes its own derivations, and only the active pane mounts.
+  //
+  // Assessments used to be the first pane and the default. It is now the
+  // Assessments TAB (task #45) and it MOVED — the panel must not be mounted
+  // twice over the same rows. `WorkspaceDrawerPane` no longer includes the key,
+  // so a stored "assessments" preference falls back to Insights on read.
   const drawerPanes: ReadonlyArray<UnitContextDrawerPane<WorkspaceDrawerPane>> =
     [
-      {
-        key: "assessments",
-        label: "Assessments",
-        tip: "Every assessment in this unit — the ones the unit owns, and the ones attached to individual lessons.",
-        tipId: "b3-pane-assessments",
-        content: (
-          <AssessmentsPanel
-            unitId={unit}
-            // The drawer subtree stays mounted while closed (display:none) and
-            // "assessments" is the default pane — so the unit-assessment read
-            // must wait for a real reveal, not for the mount.
-            visible={drawerOpen && drawerPane === "assessments"}
-            lessons={lessons}
-            onOpenLesson={openPlan}
-            dataState={dataState}
-          />
-        ),
-      },
       {
         key: "insights",
         label: "Insights",
@@ -603,7 +608,7 @@ export function UnitExplorer({
             content={
               drawerOpen
                 ? "Hide the context panel."
-                : "Show assessments, insights and prep for this unit — alongside whatever you're editing."
+                : "Show insights and prep for this unit — alongside whatever you're editing."
             }
             tooltipId="ue-drawer"
             side="bottom"
@@ -673,7 +678,7 @@ export function UnitExplorer({
       }
       drawerOpen={drawerOpen}
       drawerLabel="Unit context"
-      drawerTitle="Assessments, insights and prep for this unit — read alongside whichever tab you’re working in."
+      drawerTitle="Insights and prep for this unit — read alongside whichever tab you’re working in."
       onClose={onClose}
       body={
         <>
@@ -709,6 +714,14 @@ export function UnitExplorer({
             />
           )}
           {tab === "standards" && <StandardsTab standards={standards} />}
+          {tab === "assessments" && (
+            <AssessmentsTab
+              unitId={unit}
+              lessons={lessons}
+              onOpenLesson={openPlan}
+              dataState={dataState}
+            />
+          )}
           {tab === "resources" && <ResourcesTab resources={resources} />}
           {tab === "notes" && <NotesTab subjectId={subjectId} unitId={unit} />}
         </>

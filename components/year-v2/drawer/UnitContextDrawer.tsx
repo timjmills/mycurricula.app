@@ -2,15 +2,18 @@
 
 // UnitContextDrawer.tsx — the chrome inside ExplorerShell's right `drawer` slot
 // (B3). It owns a pane switcher and a close control; the panes themselves
-// (Assessments · Insights · Prep) are passed in, so this file knows nothing
-// about assessments or metrics and never has to change when a pane does.
+// (Insights · Prep) are passed in, so this file knows nothing about metrics or
+// materials and never has to change when a pane does.
 //
-// WHY A DRAWER AND NOT TWO MORE TABS: the shell's tab strip lists the unit's
-// PARTS — Unit Plan, Lessons, Standards, Resources, Notes. Assessments and
-// Insights are commentary ABOUT the unit, read alongside whichever part you are
-// editing rather than instead of it. Folding them into the strip would have made
-// seven tabs, and would have forced a teacher to leave the lesson list to answer
-// "have I actually assessed this?". Side-by-side is the whole point.
+// WHY A DRAWER AND NOT MORE TABS: the shell's tab strip lists the unit's PARTS
+// — Unit Plan, Lessons, Standards, Assessments, Resources, Notes. Insights and
+// Prep are commentary ABOUT the unit, read alongside whichever part you are
+// editing rather than instead of it. Side-by-side is the whole point.
+//
+// Assessments was a third pane on that reasoning until task #45, and it was the
+// exception that proved the rule: it was the only pane a teacher EDITED, and
+// editing is what a part gets. The handoff had it in the strip all along
+// (mockup :8651), and that is where it lives now.
 //
 // MOUNTING: only the active pane's content renders — same single-tabpanel model
 // the shell uses, so an idle pane costs nothing. The DRAWER, however, stays

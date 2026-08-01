@@ -91,20 +91,29 @@ export function useWorkspacePresentation(): WorkspacePresentationPref {
 // ── Context drawer (B3) ────────────────────────────────────────────────────
 
 /** The right context drawer's panes — commentary ABOUT the unit, kept out of
- *  the tab strip (which lists the unit's parts). */
-export type WorkspaceDrawerPane = "assessments" | "insights" | "prep";
+ *  the tab strip (which lists the unit's parts).
+ *
+ *  "assessments" WAS the first pane and the default. It is now the workspace's
+ *  own **Assessments tab** (the v2 handoff specifies one — mockup :8651 —, and
+ *  a teacher asked for it by name), and it MOVED rather than being copied: two
+ *  mounted `<AssessmentsPanel>`s would each carry their own debounce timer,
+ *  their own confirm-only row list, and their own write queue over the SAME
+ *  `unit_assessments` rows, with nothing serialising between them. See
+ *  components/year-v2/unit-tabs/AssessmentsTab.tsx. */
+export type WorkspaceDrawerPane = "insights" | "prep";
 
 const DRAWER_OPEN_KEY = "mycurricula:user:workspace-drawer-open";
 const DRAWER_PANE_KEY = "mycurricula:user:workspace-drawer-pane";
-const DRAWER_PANES: readonly WorkspaceDrawerPane[] = [
-  "assessments",
-  "insights",
-  "prep",
-];
+const DRAWER_PANES: readonly WorkspaceDrawerPane[] = ["insights", "prep"];
 /** Closed by default: the drawer is a deliberate second read, and opening it
  *  unasked would narrow the lesson list for teachers who never wanted it. */
 const DEFAULT_DRAWER_OPEN = false;
-const DEFAULT_DRAWER_PANE: WorkspaceDrawerPane = "assessments";
+/** Insights, because "assessments" — the previous default — no longer names a
+ *  pane. Every device that used the drawer before the move has the retired
+ *  value in localStorage; `isDrawerPane` no longer accepts it, so those reads
+ *  fall back HERE. Without that the drawer would reopen on a pane key that
+ *  matches no tab: an empty drawer with no tab selected. */
+const DEFAULT_DRAWER_PANE: WorkspaceDrawerPane = "insights";
 
 /** Persist one drawer key. A blocked localStorage (private mode, quota) is
  *  swallowed — the in-memory state still drives this session. */

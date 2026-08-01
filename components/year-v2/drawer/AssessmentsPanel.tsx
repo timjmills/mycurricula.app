@@ -51,6 +51,21 @@
 //
 // NARROW-FIRST. The drawer is ~320px on desktop and a full-width band below
 // 900px; every row is a single column, and no control assumes a wide pane.
+//
+// TWO HOSTS, ONE AT A TIME (task #45). This panel now renders in the
+// workspace's **Assessments TAB** as well — the v2 handoff specifies that tab
+// (mockup :8651) and never had the drawer at all. `layout` picks the host's
+// geometry ("drawer" = the narrow-first default above; "tab" = the handoff's
+// card page, which has room the drawer never had). It changes nothing else:
+// same rows, same single write path, same three buckets.
+//
+// The tab is where the panel lives NOW — the drawer's Assessments pane was
+// REMOVED, not duplicated. Both mounted at once would be two debounce timers,
+// two confirm-only row lists and two write queues over one set of
+// `unit_assessments` rows; and two `AssessmentDetail` drafts, each holding an
+// `editing.current` guard that blocks the OTHER's reseed, so the stale one
+// commits over the fresh one on its next keystroke. `layout` is a presentation
+// switch, never a licence to mount this twice.
 
 import {
   useCallback,
@@ -122,6 +137,17 @@ export interface AssessmentsPanelProps {
    * "settled") means the empty list is real, not a hydrate in flight.
    */
   dataState?: PlannerDataState;
+  /**
+   * Which host's geometry to render at. Presentation ONLY — no branch below
+   * reads it, and the CSS keys off `data-ap-layout` on the root.
+   *
+   * "drawer" (default) is the narrow-first column the header describes.
+   * "tab" is the workspace's Assessments tab: the handoff's card page, two
+   * columns once there is room for them. Defaulted rather than required
+   * because the drawer geometry is the conservative one — a host that forgets
+   * the prop gets a narrow column in a wide pane, which is plain, not broken.
+   */
+  layout?: "drawer" | "tab";
   className?: string;
 }
 
@@ -461,6 +487,7 @@ export function AssessmentsPanel({
   lessons,
   onOpenLesson,
   dataState,
+  layout = "drawer",
   className,
 }: AssessmentsPanelProps): ReactNode {
   const { editLesson } = usePlanner();
@@ -726,7 +753,7 @@ export function AssessmentsPanel({
   const teamMode = editMode === "master";
 
   return (
-    <div ref={rootRef} className={rootClass}>
+    <div ref={rootRef} className={rootClass} data-ap-layout={layout}>
       {/* UNIT-owned first: it is the unit's own answer to "how is this unit
           assessed?", and it stays visible even when the lesson list is empty or
           still hydrating. Keyed by unit so a rail switch starts a clean read
