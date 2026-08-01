@@ -10,3 +10,30 @@
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* ── Expand-all chevron ───────────────────────────────────────────────────
+   Points down when the week is closed, up when everything on screen is open —
+   the direction the press will take it. 200ms is CLAUDE.md §4's card-expand
+   timing, so the glyph turns in step with the cards it is turning.
+
+   The rule is qualified with `.expandChevron.expandChevron` deliberately. This
+   is an SVG inside <Button>, and the `.cp-root` reset strips single-class
+   rules on button descendants (BUILD_STANDARD §8 / the repo's recurring
+   dead-CSS trap) — the doubled class raises specificity above it so the
+   rotation actually lands. */
+.expandChevron.expandChevron {
+  transform: rotate(0deg);
+  transition: transform 200ms ease-out;
+}
+
+.expandChevron.expandChevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Reduced motion drops the TRANSITION, never the rotation: the glyph must
+   still point the right way, it just gets there instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .expandChevron.expandChevron {
+    transition: none;
+  }
+}

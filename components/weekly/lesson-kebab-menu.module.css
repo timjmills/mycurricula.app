@@ -1,0 +1,204 @@
+/* lesson-kebab-menu.module.css — the Week lesson's ⋮ and its four-destination
+   popover. Values traced from the v2 handoff's `.lesson-menu`
+   (source/views.css:600-607) and re-cut against the token system: the mockup's
+   literal `#fff` background becomes --panel-bg so the menu survives Night and
+   Photo-Dim, and every other value maps to an existing token. */
+
+/* ── Trigger ──────────────────────────────────────────────────────────────
+   The visible glyph is small — it sits on a lesson tile that is only ~58px
+   tall — but the TARGET is 44px, per CLAUDE.md §4. That is bought with a
+   pseudo-element rather than padding, because real padding this size would
+   push the tile's own layout around and overlap the neighbouring cell's
+   click area.
+
+   Every selector is doubled (`.trigger.trigger`). This is a <button>, and the
+   `.cp-root` reset strips single-class rules on button descendants — the trap
+   that has silently killed CSS three separate times in this repo
+   (BUILD_STANDARD §8). Doubling raises specificity above the reset. */
+.trigger.trigger {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: currentColor;
+  opacity: 0.55;
+  cursor: pointer;
+  /* No transform transition — the tile beneath it already lifts on hover, and
+     a second moving part on the same hover reads as jitter. */
+  transition: opacity 0.14s ease;
+}
+
+/* The ≥44px target. `content: ""` grows the hit area without changing the
+   button's own 22px box, so the tile's layout is untouched.
+
+   ANCHORED TO THE CORNER, NOT CENTRED — and that is a measured fix, not a
+   preference. Centred on the 22px glyph, the 44px box extended 11px past the
+   button on every side and, at 375px where a WeekA day column is only ~108px
+   wide, **overhung the tile's right edge by 9px** (measured live). That strip
+   sits over the NEXT day's column, so a tap meant for Monday would have opened
+   Sunday's lesson menu — the precise mis-tap the two-target cell was flagged
+   for. Offsetting by the trigger's own 2px inset lands the box flush with the
+   tile's corner, so all 44px grow INWARD over the tile the menu belongs to. */
+.trigger.trigger::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  left: auto;
+  width: 44px;
+  height: 44px;
+  transform: none;
+}
+
+.trigger.trigger svg {
+  width: 14px;
+  height: 14px;
+}
+
+.trigger.trigger:hover,
+.trigger.trigger:focus-visible {
+  opacity: 1;
+  background: color-mix(in oklab, currentColor 14%, transparent);
+}
+
+/* Keyboard focus must be visible on a control this quiet — without it the
+   trigger is effectively invisible to a keyboard user until it is activated. */
+.trigger.trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ── Menu ─────────────────────────────────────────────────────────────────
+   Handoff: position:fixed, z 140, min-width 158, padding 6, --r-lg, --sh-lg,
+   1px --border, and a .14s open animation. */
+.menu {
+  position: fixed;
+  /* --z-menu, the repo's own "portaled overflow/context menus" tier, rather
+     than the handoff's literal 140. This menu is position:fixed specifically
+     to escape the canvas's scroll container, and the z-scale in tokens.css is
+     what guarantees it also clears the drawer scrims above that. */
+  z-index: var(--z-menu);
+  min-width: 158px;
+  width: 178px;
+  padding: 6px;
+  border-radius: var(--r-lg);
+  /* --panel-bg, not the mockup's literal #fff: this menu renders over Photo,
+     Wash and Night alike, and a hard white box would be a white slab on the
+     dark tone. The tone-aware panel token carries the right fill in each, and
+     the ink below inherits from it. */
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-lg);
+  animation: lessonMenuIn 0.14s ease;
+}
+
+@keyframes lessonMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The handoff's open keyframe is a movement, so reduced motion drops it to a
+   plain appearance rather than sliding the box in. */
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--ink-500);
+}
+
+/* The subject dot. `var(--c)` is supplied by the `.cp-subj.<cls>` pair on this
+   element — the palette bridge — so the colour is the subject's own and never
+   a literal (CLAUDE.md §4). */
+.dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+}
+
+/* One line, ellipsised: a long lesson title must not push the menu wider than
+   the box the viewport clamp was computed against. */
+.titleText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Rows. `.menu.menu button` — the DOUBLED CLASS IS LOAD-BEARING, and the
+   version of this rule I first wrote was dead.
+
+   The menu root carries `cp-root`, so the global `.cp-root button` reset
+   applies to every row. A plain `.menu button` has specificity (0,1,1) —
+   IDENTICAL to `.cp-root button` — so which one wins is decided by source
+   order between a global stylesheet and a CSS module, which is not something
+   this file can guarantee. Doubling the class takes it to (0,2,1) and the rule
+   is safe. This is the same trap that has silently killed CSS three separate
+   times in this repo (BUILD_STANDARD §8).
+
+   48px min-height clears the ≥44px touch target with room for the row's own
+   padding, so the menu is usable on a tablet as well as a mouse. */
+.menu.menu button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink-700);
+  cursor: pointer;
+}
+
+.menu.menu button:hover,
+.menu.menu button:focus-visible {
+  background: var(--hairline);
+}
+
+.menu.menu button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.menu.menu button svg {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  color: var(--brand-500);
+}
+
+/* Teach is the one row the handoff tints differently (views.css:607). */
+.menu.menu button.teach svg {
+  color: var(--honey-600);
+}

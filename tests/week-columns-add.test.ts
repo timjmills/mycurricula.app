@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { mountReact } from "./mount-react";
+
+// 30s, matching the other mount-based suites — a real mount plus a click
+// sequence breaches vitest's 5s default under parallel lane load. Not a hang
+// mask: these fail on an ASSERTION when the behaviour is mutated out.
+vi.setConfig({ testTimeout: 30000 });
 import type { Lesson, Subject } from "@/lib/types";
 
 // The paper Week frame had NO way to add a lesson.
@@ -33,6 +39,8 @@ const store = vi.hoisted(() => ({
   lessons: [] as Lesson[],
   subjects: [] as Subject[],
   subjectById: {} as Record<string, Subject>,
+  /** Every `addLesson` call, in order — READ by the wiring block at the bottom. */
+  added: [] as { subject: string; week: number; day: number }[],
 }));
 
 vi.mock("@/lib/planner-store", () => ({
@@ -46,7 +54,14 @@ vi.mock("@/lib/planner-store", () => ({
     duplicateLesson: () => {},
     setSaveTarget: () => {},
     unarchiveLesson: () => {},
-    addLesson: async () => null,
+    addLesson: async (draft: { subject: string; week: number; day: number }) => {
+      store.added.push({
+        subject: draft.subject,
+        week: draft.week,
+        day: draft.day,
+      });
+      return null;
+    },
     lastChange: null,
   }),
   scrollPlannerItemIntoView: () => {},
@@ -131,6 +146,7 @@ beforeEach(() => {
   store.lessons = [];
   store.subjects = [SUBJECT];
   store.subjectById = { math: SUBJECT };
+  store.added.length = 0;
 });
 
 describe("WeekColumns — the paper Week frame can add a lesson", () => {
@@ -168,5 +184,69 @@ describe("WeekColumns — the paper Week frame can add a lesson", () => {
     // the promise plans their assembly into a dialog that discards it.
     const html = renderToStaticMarkup(createElement(WeekColumns));
     expect(html).not.toContain("non-instructional event");
+  });
+});
+
+// ── Which DAY each trigger adds to ──────────────────────────────────────────
+//
+// THE HOLE THE COUNTING TESTS ABOVE LEAVE. All three triggers render
+// BYTE-IDENTICALLY — `<span>+</span><span>Add</span>`, same class, same
+// tooltip — so `count(html, ">Add</span>") === 3` is satisfied by three
+// triggers all wired to `handleQuickAdd(0)`. That is not a hypothetical
+// slip: the callsite reads `onQuickAdd={() => void handleQuickAdd(dayIdx)}`
+// inside a `.map`, and closing over the wrong variable (or over a stale `pos`)
+// is the classic way that line goes wrong. Every assertion above would still
+// pass while Monday's and Tuesday's Add buttons silently created Sunday
+// lessons — a lesson landing on the wrong day with no error anywhere.
+//
+// Only a real click can see the argument. `tests/mount-react.ts` mounts with
+// react-dom/client over linkedom, so the menu opens, "New lesson" is clickable,
+// and `addLesson` records the `day` the closure actually passed.
+//
+// (The three triggers being indistinguishable in the markup is ALSO an
+// accessibility defect — CLAUDE.md §4 wants a per-day accessible name, so a
+// screen-reader user does not hear "Add" three times with no way to tell the
+// columns apart. That is a change to the shipped component and is reported
+// separately; this block covers the wiring, which is the data bug.)
+
+/** Matcher for the nth (0-based) add trigger in document order. */
+function nthAddTrigger(n: number): (el: Element) => boolean {
+  let seen = -1;
+  return (el) => {
+    if ((el.textContent ?? "") !== "+Add") return false;
+    seen += 1;
+    return seen === n;
+  };
+}
+
+const NEW_LESSON_ROW = (el: Element): boolean =>
+  (el.textContent ?? "").startsWith("+New lesson");
+
+describe("WeekColumns — each column's trigger adds to ITS OWN day", () => {
+  it("passes the column's day index, not a shared one", async () => {
+    const h = await mountReact(WeekColumns as never);
+    try {
+      await h.render({} as never);
+
+      for (let i = 0; i < WEEKDAYS.length; i += 1) {
+        await h.click(nthAddTrigger(i));
+        await h.click(NEW_LESSON_ROW);
+      }
+
+      // VACUITY GUARD FIRST: a matcher that silently matched nothing, or a menu
+      // that never opened, would leave `added` empty and make every claim below
+      // an assertion about nothing. `mountReact.click` throws on no match, but
+      // the count is the cheap belt-and-braces.
+      expect(store.added).toHaveLength(WEEKDAYS.length);
+
+      // THE PROPERTY: the nth trigger adds to the nth configured school day.
+      expect(store.added.map((a) => a.day)).toEqual(
+        WEEKDAYS.map((d) => d.index),
+      );
+      // And it carries the browsed week, not a default.
+      expect(store.added.every((a) => a.week === 12)).toBe(true);
+    } finally {
+      await h.unmount();
+    }
   });
 });

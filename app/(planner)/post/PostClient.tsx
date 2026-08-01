@@ -20,15 +20,28 @@ import { lessonResources } from "@/lib/lesson-resources";
 import { dedupeLessonResources } from "@/lib/resources-dedup";
 import { SUBJECT_BY_ID } from "@/lib/mock/subjects";
 import type { Lesson, LessonResource, SubjectId } from "@/lib/types";
+import type { WallPreset } from "@/lib/wall-scope";
 
 export function PostClient({
   lessonId,
   subjectId,
   unitId,
+  preset = null,
 }: {
   lessonId: string | null;
   subjectId: string | null;
   unitId: string | null;
+  /**
+   * A landing preset asked for by `?preset=`, already narrowed to the union by
+   * the route. Null when the URL carried none — the overwhelmingly common
+   * case — and the wall then infers its landing preset from the anchors below,
+   * exactly as before.
+   *
+   * This is the ONLY route onto the two WEEK presets: `anchoredPreset` maps
+   * anchors to lesson / subject / unit / today and can never return
+   * "week-mixed" or "week-subject".
+   */
+  preset?: WallPreset | null;
 }) {
   const { getLesson, getSections } = usePlanner();
 
@@ -57,7 +70,12 @@ export function PostClient({
       // which the resolved anchors above cannot carry. They go null and back
       // again every time the planner (re-)hydrates — `getLesson` has nothing to
       // answer with until it lands — whereas this changes only when the URL does.
-      anchorKey={`${lessonId ?? ""}|${subjectId ?? ""}|${unitId ?? ""}`}
+      initialPreset={preset}
+      // The preset joins the deep link's IDENTITY. Without it, navigating from
+      // /post?preset=week-mixed to /post?preset=subject would leave anchorKey
+      // unchanged (both have no anchors) and the wall would not treat the
+      // second link as a new deep link at all.
+      anchorKey={`${lessonId ?? ""}|${subjectId ?? ""}|${unitId ?? ""}|${preset ?? ""}`}
       resourcesFor={resourcesFor}
     />
   );

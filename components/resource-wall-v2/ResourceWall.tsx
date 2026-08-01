@@ -174,6 +174,20 @@ export interface ResourceWallProps {
    * working wall; inject to widen it without touching this file.
    */
   resourcesFor?: (lesson: Lesson) => readonly LessonResource[];
+  /**
+   * A landing preset asked for EXPLICITLY, overriding the anchor inference.
+   *
+   * `anchoredPreset` below maps anchors to `unit | lesson | subject | today`
+   * and can never return either WEEK preset, so before this prop
+   * "This Week · Mixed" and "This Week · Subject" were reachable only by
+   * clicking the toolbar — not by any URL. /weekly's Resources button needs
+   * exactly that (task #47: the Week lost its resources rail, and the Wall's
+   * week preset is the richer surface that replaces it), and
+   * app/(planner)/post/page.tsx now narrows `?preset=` to this union.
+   *
+   * Absent or null → the anchor inference, unchanged. This is purely additive.
+   */
+  initialPreset?: WallPreset | null;
   // "Send to board" is handled internally by OpenInBoardDialog (it does the real
   // write + owns its own navigation), so this surface needs no navigation
   // callback. A prior `onTeach` prop was removed with the board-seam fix.
@@ -287,6 +301,7 @@ export function ResourceWall({
   focusUnit,
   anchorKey,
   resourcesFor,
+  initialPreset = null,
 }: ResourceWallProps): ReactNode {
   const readOnly = usePhoneViewport();
   // The shared composer, or null outside <ComposerProvider>. OPTIONAL rather
@@ -302,7 +317,11 @@ export function ResourceWall({
   // 11–16s Supabase hydrate, so a deep-linked lesson arrives here as `null` and
   // turns real seconds later. The re-resolve effect below is what catches that.
   const anchored = anchoredPreset({ focusLessonId, focusSubject, focusUnit });
-  const [preset, setPreset] = useState<WallPreset>(anchored);
+  // An explicit `?preset=` wins over the anchor inference for the INITIAL
+  // value only — it seeds state and never re-applies, so the teacher's own
+  // later choice of wall is never fought (the "never fight the teacher" rule
+  // the re-resolve effect below already follows).
+  const [preset, setPreset] = useState<WallPreset>(initialPreset ?? anchored);
   const [wallMode, setWallMode] = useState<WallMode>("preset");
   const [activeCustom, setActiveCustom] = useState<CustomWall | null>(null);
   const [customWalls, setCustomWalls] = useState<CustomWall[]>([]);

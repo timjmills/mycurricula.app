@@ -448,7 +448,12 @@
    `.printLink.printLink` — specificity (0,2,0) so the `.cp-root button` /
    anchor reset in tokens.css cannot strip it (see the same doubling on
    `.actionBtn.actionBtn`). min-height 44px is the §4 touch-target floor. */
-.printLink.printLink {
+/* `.headerLink` is the same recipe under an honest name: the Resources entry
+   beside Print is not a print affordance, and reusing `.printLink` for it
+   would leave a class whose name contradicts its callsite. Same rule, two
+   selectors, no duplicated values. */
+.printLink.printLink,
+.headerLink.headerLink {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -472,14 +477,16 @@
     box-shadow 120ms ease;
 }
 
-.printLink:hover {
+.printLink:hover,
+.headerLink:hover {
   background: var(--ink-200);
   border-color: var(--chrome-accent-mid);
   color: var(--chrome-accent-deep);
   box-shadow: var(--sh-sm);
 }
 
-.printLink:focus-visible {
+.printLink:focus-visible,
+.headerLink:focus-visible {
   outline: 2px solid var(--chrome-accent-mid);
   outline-offset: 2px;
 }

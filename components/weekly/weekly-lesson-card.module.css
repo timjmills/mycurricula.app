@@ -1042,3 +1042,20 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ── Band ⋮ (task #47) ────────────────────────────────────────────────────
+   The handoff's four Week destinations, parked in the band's top-right. The
+   base geometry (44px target, quiet resting opacity) lives in
+   lesson-kebab-menu.module.css; this rule only PLACES it, and re-cuts the
+   colour so it reads on the band's subject gradient rather than on the tile
+   fill the base rule assumes.
+
+   `right: 26px` clears the caret that already sits bottom-right of the band —
+   the two must not stack on the same corner. */
+.bandKebab.bandKebab {
+  top: 4px;
+  right: 4px;
+  /* Inherits the band's on-subject ink, so it flips with the band rather than
+     needing its own tone branch. */
+  color: currentColor;
+}

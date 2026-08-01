@@ -32,7 +32,7 @@
 // CSS Modules in right-panel.module.css.
 // All colors and sizing come from CSS custom properties (tokens.css).
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
@@ -40,13 +40,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { TODOS, TAG_BY_ID, LESSONS, LESSON_BY_ID } from "@/lib/mock";
 import type { LessonStatus, Subject, SubjectId, Unit } from "@/lib/types";
 import { Button, Tooltip } from "@/components/ui";
-// DELIBERATE DEEP IMPORT (bundle-slim lever A1): this panel mounts on every
-// planner route via app/(planner)/layout.tsx, and it needs exactly ONE
-// constant from the Weekly family. Importing the barrel here dragged the
-// entire weekly+daily+lesson-editor+teach graph (~195 kB gzip) into every
-// planner route's first load — the leaf module exists precisely so this
-// callsite can bypass it (see components/weekly/drawer-mq.ts).
-import { DRAWER_MQ } from "@/components/weekly/drawer-mq";
+// NOTE for whoever next needs something from the Weekly family here: this
+// panel mounts on EVERY planner route via app/(planner)/layout.tsx, so import
+// the leaf module directly, never `@/components/weekly`. The barrel drags the
+// whole weekly+daily+lesson-editor+teach graph (~195 kB gzip) into every
+// planner route's first load (bundle-slim lever A1). The one such import this
+// file used to carry — DRAWER_MQ, for the /weekly gate — is gone with the gate.
 import styles from "./right-panel.module.css";
 
 // ── Status display helpers ───────────────────────────────────────────────────
@@ -1068,44 +1067,39 @@ export function RightPanel(): ReactNode {
   const { todoPanelOpen, commentsPanelOpen, selectedLessonId } = useAppState();
   const pathname = usePathname();
 
-  // ── Weekly drawer-band detection (SSR-safe) ─────────────────────────────
-  // Mirrors WeeklyShell's drawerMode: true on viewports ≤1280px, where the
-  // <WeeklyRailDrawer> overlay owns the lesson-scoped content. Initialized
-  // false so the server render matches the first client paint; the real
-  // value lands in the post-mount effect (selectedLessonId starts null on
-  // load, so the brief default can't flash a panel).
-  const [weeklyDrawerBand, setWeeklyDrawerBand] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia(DRAWER_MQ);
-    setWeeklyDrawerBand(mq.matches);
-    const handler = (e: MediaQueryListEvent): void =>
-      setWeeklyDrawerBand(e.matches);
-    if (mq.addEventListener) {
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    } else {
-      // Older Safari / Chrome (pre-2020) shipped addListener.
-      mq.addListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
-      return () => mq.removeListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
-    }
-  }, []);
+  // The Weekly drawer-band matchMedia listener that used to live here is gone
+  // with the gate that read it: /weekly no longer splits its right-hand
+  // content between an inline rail and an overlay drawer by viewport, so there
+  // is no breakpoint left for this component to track.
 
-  // ── /weekly gate (W3 carry-over fix, narrowed) ───────────────────────────
-  // On the Weekly view the <WeeklyRailDrawer> overlay is the canonical
-  // surface for the to-do / Shoutbox / lesson rail content on ≤1280px
-  // viewports, and the inline RightRail carries the To-do / Chat tabs on
-  // wider ones — so those two flags never mount this shell panel on
-  // /weekly (without the gate BOTH surfaces would pop for one click).
-  // Lesson detail is the exception: on >1280px viewports the inline rail
-  // only re-scopes its Resources list when a card is clicked — there is no
-  // lesson panel at all — so the shell-level LessonDetailPanel mounts here
-  // to be that panel. The drawer-band check keeps the two surfaces
-  // mutually exclusive at ≤1280px.
+  // ── /weekly gate (rewritten — the Week view has no right panel) ──────────
+  // The Weekly view answers a lesson click by EXPANDING THE CARD IN PLACE
+  // (lib/week-expansion.ts + the three Week canvases), so it must never mount
+  // a lesson-detail panel: doing both would put the same lesson on screen
+  // twice and hand the surface a second job (CLAUDE.md §3, "each UI surface
+  // has one clear job"). This mirrors the /year gate immediately below, which
+  // suppresses the panel for the same reason — that view has its own in-layout
+  // lesson pane.
+  //
+  // This branch used to be the inverse of what it is now, and both halves
+  // flipped together for one reason:
+  //
+  //   • Lesson detail USED to mount here (on >1280px) precisely because
+  //     WeeklyShell's inline rail had no lesson panel of its own. The rail is
+  //     gone, and so is the panel — the expanded card is the detail surface.
+  //   • To-dos and Shoutbox used to return null here, because the rail (>1280)
+  //     and the <WeeklyRailDrawer> overlay (≤1280) already carried them and a
+  //     second surface would have popped on the same click. Both of those are
+  //     gone too, so returning null now would leave the GlobalRail's To-dos
+  //     and Shoutbox icons DEAD on /weekly — a live control silently lost
+  //     behind an otherwise-correct panel removal. They mount here instead,
+  //     exactly as they do on /year and every other route.
+  //
+  // `weeklyDrawerBand` is no longer consulted: with one surface instead of
+  // three there is nothing left to keep mutually exclusive by viewport.
   if (pathname?.startsWith("/weekly")) {
-    if (todoPanelOpen || commentsPanelOpen) return null;
-    if (selectedLessonId && !weeklyDrawerBand)
-      return <LessonDetailPanel lessonId={selectedLessonId} />;
+    if (todoPanelOpen) return <TodoPanel />;
+    if (commentsPanelOpen) return <CommentsPanel />;
     return null;
   }
 

@@ -54,6 +54,7 @@ import {
   type WeekPeriod,
 } from "@/lib/week-edit-periods";
 import { deriveDayStatus } from "@/lib/day-status";
+import { useWeekExpansion } from "@/lib/week-expansion";
 import { stripHtml } from "@/lib/html-text";
 import {
   SelectTitle,
@@ -72,6 +73,10 @@ import { AddEventForm } from "@/components/daily/AddEventForm";
 // Lesson → unit-workspace pop-in (B5.5). Opens the workspace as an overlay via
 // the global host — no navigation, so the teacher keeps this week on screen.
 import { UnitChip } from "@/components/unit-chip";
+// The handoff's four Week destinations (Plan · Teach · Post · Planner). Deep
+// import, not the @/components/weekly barrel, which re-exports WeeklyShell →
+// a cycle (same reason as OpenLessonEditorContext above).
+import { LessonKebabMenu } from "@/components/weekly/lesson-kebab-menu";
 import styles from "./WeekA.module.css";
 
 // ── Today resolution ────────────────────────────────────────────────────────
@@ -106,7 +111,37 @@ export function WeekA(): ReactNode {
   } = useAppState();
   const { lessons, subjects, subjectById, addLesson } = usePlanner();
   const openLessonEditor = useContext(OpenLessonEditorContext);
+  // Shared with the page-header Expand-all control and every other Week
+  // canvas — see lib/week-expansion.ts.
+  const {
+    isExpanded,
+    toggle: toggleExpanded,
+    collapse,
+    publishVisible,
+  } = useWeekExpansion();
   const nowMin = useNowMin();
+
+  // ── Sync: collapse a card when its selection is cleared externally ────────
+  // WeeklyShell's document-level Esc handler clears `selectedLessonId`. Before
+  // the panel was removed that closed the detail surface; now the EXPANDED
+  // CARD is the detail surface, so Esc has to close that instead — otherwise
+  // the ring and the URL clear while the body stays open, and the key that is
+  // supposed to close things closes nothing the teacher can see.
+  //
+  // WeekColumns has carried this effect all along; WeekA and WeekC did not,
+  // because they had nothing to collapse. Added here so all three canvases
+  // agree (Codex gate, Medium).
+  //
+  // Guarded on the set→null TRANSITION, and `collapse` is a no-op on a card
+  // that is already shut, so a card opened via "Expand all" and never selected
+  // is not closed by someone else's Esc.
+  const prevSelectedRef = useRef<string | null>(selectedLessonId);
+  useEffect(() => {
+    const prev = prevSelectedRef.current;
+    prevSelectedRef.current = selectedLessonId;
+    if (selectedLessonId === null && prev !== null) collapse(prev);
+  }, [selectedLessonId, collapse]);
+
 
   // ── Configured school week — the one ordered-week contract ────────────────
   const weekdays = useOrderedWeekdays();
@@ -208,6 +243,22 @@ export function WeekA(): ReactNode {
     return buckets;
   }, [lessons, week, DAY_COUNT, lessonMatchesQuery, subjectRank]);
 
+  // ── Publish what "all" means for the header's Expand-all control ──────────
+  // Same contract as WeekColumns: this canvas owns the week bucketing, the
+  // archived exclusion and the search/filter predicate, so it is the only
+  // thing that can say which lessons are actually on screen. The cleanup is
+  // load-bearing — /weekly swaps this canvas out for List / Schedule / the
+  // Edit board, none of which expand anything, and a stale list would leave
+  // the header offering an Expand-all that does nothing visible.
+  const visibleLessonIds = useMemo(
+    () => byDay.flat().map((l) => l.id),
+    [byDay],
+  );
+  useEffect(() => {
+    publishVisible(visibleLessonIds);
+    return () => publishVisible([]);
+  }, [visibleLessonIds, publishVisible]);
+
   // ── Cell placement: `${day}:${periodKey}` → lessons[] (+ unscheduled) ─────
   // Same assignment the edit board uses. Real data is NOT one-lesson-per-period
   // (the bundle's positional grid was) — a cell stacks every lesson that lands
@@ -241,14 +292,35 @@ export function WeekA(): ReactNode {
       [periods, anyUnscheduled],
     );
 
-  // ── Selection / open (mirrors WeekC) ──────────────────────────────────────
-  // Idempotent SELECT (not a toggle): the tile onClick AND the SelectTitle
-  // button both call this, so a toggle would cancel itself on a title click.
+  // ── Selection / expansion / open (mirrors WeekC) ──────────────────────────
+  // A click now EXPANDS THE TILE IN PLACE. It used to only select, because
+  // selecting was how the right panel opened; /weekly has no right panel any
+  // more, so a select that expanded nothing would leave a click with no
+  // visible result at all. `selectedLessonId` is still written — the selected
+  // ring and WeeklyShell's `?lesson=` URL mirror both read it.
+  //
+  // THE DOUBLE-FIRE HAZARD this replaces an idempotent handler with a toggle
+  // over: the tile div's onClick and the <SelectTitle> button's onClick BOTH
+  // reach this for a single click on the title, because SelectTitle does not
+  // stop propagation (components/planner-v2/atoms.tsx:33-55). Idempotent
+  // select survived that; a toggle called twice cancels itself and the tile
+  // never opens. The fix is at the tile's onClick, which now ignores clicks
+  // that came from an interactive child — the same `fromInteractive` guard the
+  // double-click handler beside it already uses, rather than a new mechanism.
   const handleSelect = useCallback(
     (lessonId: string): void => {
-      setSelectedLessonId(lessonId);
+      // Collapsing also RELEASES the selection, so a shut card does not keep
+      // the selected ring (and `?lesson=` in the URL) pointing at a lesson the
+      // teacher just closed. Verbatim with WeekColumns' handler — the three
+      // canvases must not disagree about what a click leaves behind.
+      if (isExpanded(lessonId)) {
+        if (selectedLessonId === lessonId) setSelectedLessonId(null);
+      } else {
+        setSelectedLessonId(lessonId);
+      }
+      toggleExpanded(lessonId);
     },
-    [setSelectedLessonId],
+    [isExpanded, selectedLessonId, setSelectedLessonId, toggleExpanded],
   );
   // Double-click OPENS the full lesson editor (the shell's canonical open);
   // outside <WeeklyShell> the context is null → fall back to selecting.
@@ -344,6 +416,7 @@ export function WeekA(): ReactNode {
     if (!subject) return null;
     const status = deriveDayStatus(lesson, nowMin, isToday);
     const selected = selectedLessonId === lesson.id;
+    const expanded = isExpanded(lesson.id);
     return (
       <div
         key={lesson.id}
@@ -352,8 +425,15 @@ export function WeekA(): ReactNode {
           lesson.modified ? styles.tileModified : ""
         } ${status === "now" ? styles.tileNow : ""} ${
           selected ? styles.tileSelected : ""
-        } ${status === "done" ? styles.tileDone : ""}`}
-        onClick={() => handleSelect(lesson.id)}
+        } ${status === "done" ? styles.tileDone : ""} ${
+          expanded ? styles.tileExpanded : ""
+        }`}
+        // Guarded: without `fromInteractive` a click on the <SelectTitle>
+        // button would ALSO bubble here and toggle the tile a second time,
+        // shutting it in the same tick it opened (see handleSelect's note).
+        onClick={(e: MouseEvent<HTMLDivElement>) => {
+          if (!fromInteractive(e)) handleSelect(lesson.id);
+        }}
         onDoubleClick={(e: MouseEvent<HTMLDivElement>) => {
           if (!fromInteractive(e)) handleOpen(lesson.id);
         }}
@@ -366,6 +446,15 @@ export function WeekA(): ReactNode {
         >
           {stripHtml(lesson.title)}
         </SelectTitle>
+        {/* The handoff's Plan/Teach/Post/Planner popover. The body click
+            expands (the user's design); these four keep the one-click routes
+            off the Week the handoff specifies. */}
+        <LessonKebabMenu
+          lessonId={lesson.id}
+          lessonTitle={stripHtml(lesson.title)}
+          subjectClass={subject.cls}
+          onPlan={openLessonEditor}
+        />
         <div className={styles.tileSubject}>{subject.name}</div>
         {/* Which unit is this lesson part of — and the way into it. The Week
             canvas never named the lesson's unit at all before B5.5 (it existed
@@ -377,6 +466,42 @@ export function WeekA(): ReactNode {
           unit={lesson.unit}
           className={styles.tileUnit}
         />
+        {/* ── Expanded body ────────────────────────────────────────────────
+            What the right panel used to show, shown where the lesson is. Only
+            the fields that carry content are rendered — a tile that expands to
+            three empty labels teaches nothing and makes the grid taller for
+            no reason. Anything deeper (resources, standards, differentiation)
+            stays behind "Open the full lesson" on double-click: this is a
+            reading affordance on a week overview, not a second editor. */}
+        {expanded && (
+          <div className={styles.tileBody}>
+            {lesson.objective && (
+              <p className={styles.tileBodyRow}>
+                <span className={styles.tileBodyLabel}>Objective</span>
+                {stripHtml(lesson.objective)}
+              </p>
+            )}
+            {lesson.preview && (
+              <p className={styles.tileBodyRow}>
+                <span className={styles.tileBodyLabel}>Preview</span>
+                {stripHtml(lesson.preview)}
+              </p>
+            )}
+            {lesson.notes && (
+              <p className={styles.tileBodyRow}>
+                <span className={styles.tileBodyLabel}>Notes</span>
+                {stripHtml(lesson.notes)}
+              </p>
+            )}
+            {!lesson.objective && !lesson.preview && !lesson.notes && (
+              /* Expanding an empty lesson must not look like a broken tile —
+                 say it is empty and where to fix it. */
+              <p className={styles.tileBodyEmpty}>
+                Nothing written yet — double-click to plan this lesson.
+              </p>
+            )}
+          </div>
+        )}
         <ForkCues lesson={lesson} />
       </div>
     );

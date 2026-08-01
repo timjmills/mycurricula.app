@@ -1,74 +1,57 @@
 "use client";
 
-// WeeklyShell.tsx — the Weekly view's 3-panel shell.
+// WeeklyShell.tsx — the Weekly view's shell.
 //
-// Mirrors the Daily view's IconRail + content + RightRail composition
-// (see components/daily/DailyView.tsx), but tailored to Weekly:
+//   body row → [icon rail] [weekly canvas]
 //
-//   body row → [icon rail] [weekly grid] [splitter] [right rail]
+// There is NO lesson-list column for Weekly — the canvas IS the lessons.
 //
-// There is NO lesson-list column for Weekly — the grid IS the lessons.
-// The grid sits in the center 1fr track; a draggable PaneSplitter governs
-// the boundary between the grid and the right rail. The rail's width is
-// persisted to its OWN localStorage key so a teacher can keep Weekly and
-// Daily sized differently.
+// ── THE WEEK HAS NO RIGHT PANEL (2026-08-01, user-directed) ─────────────
+// It used to. A click on a lesson card opened one, and this file was built
+// around that: a resizable <RightRail mode="week">, a <PaneSplitter> between
+// it and the canvas, a drag-to-swap panel reorder, an overlay
+// <WeeklyRailDrawer> for the ≤1280px band where the inline rail could not
+// fit, and three localStorage keys persisting the width, the collapsed state,
+// and the panel order. All of it is gone. The instruction was plain: "I don't
+// want any right panel on the weekly view — a click should expand the lesson
+// and there should be a button to expand all."
+//
+// So the Week now answers a click IN PLACE. The card expands where it sits
+// (lib/week-expansion.ts holds the shared set; each canvas renders it), and
+// <WeeklyViewControls> carries one "Expand all" / "Collapse all" control in
+// the page header. THREE separate surfaces had to go for that to be true, and
+// only two of them lived in this file — the third is the shell-level
+// <RightPanel>'s /weekly gate (components/shell/right-panel.tsx), which mounts
+// on every planner route and so cannot be suppressed from here. If a lesson
+// panel ever reappears on /weekly, check that gate first.
+//
+// What did NOT go, and must not: the GlobalRail's To-dos and Shoutbox icons.
+// The rail was their /weekly home, so deleting it without a new one would
+// have left two live icons doing nothing. They now open the same shell-level
+// panels every other route uses — see the rewritten /weekly gate.
 //
 // ── Reuse, not rebuild ──────────────────────────────────────────────────
-// We reuse three Daily-view components verbatim:
+// One Daily-view component is still consumed verbatim:
 //
 //   • <IconRail>       — the 56px far-left nav strip; presentational only
 //                        in Phase 1A. Subject-neutral chrome, same for
 //                        both views.
-//   • <RightRail>      — passed `mode="week"` plus the active week's
-//                        lessons so the Resources panel aggregates across
-//                        the whole week instead of one lesson. To-dos +
-//                        Shoutbox stay day-scoped (we forward the active
-//                        day index — `selectedDay` from app state).
-//   • <PaneSplitter>   — the same separator the Daily list↔detail boundary
-//                        uses. The wrapper styles in this shell pin it to
-//                        live between the grid and the rail.
 //
-// The grid itself (<WeeklyGrid>) is rendered untouched in the center slot;
-// a thin module wrapper carries `min-width: 0; min-height: 0` so the grid
-// shrinks gracefully when the rail grows.
+// <RightRail> and <PaneSplitter> are no longer imported here. They are NOT
+// deleted from components/daily: /daily is a different surface with a
+// different job (CLAUDE.md §3) and still uses both, as does WeeklyShellV1
+// (the NEXT_PUBLIC_V2-off fallback, which keeps the whole rail composition
+// this file just shed). Same for <WeeklyRailDrawer> and ./drawer-mq — still
+// live, still V1's.
 //
-// ── Panel drag-reorder ──────────────────────────────────────────────────
-// The Weekly view has two large panels — the WeeklyGrid ("grid") and the
-// RightRail ("rail") — that a teacher can drag to swap sides. The pattern
-// mirrors the Daily view's column-reorder exactly:
-//
-//   • DndContext + SortableContext (horizontalListSortingStrategy) wraps
-//     both panels.
-//   • Each panel is a SortablePanel (a useSortable wrapper) that renders a
-//     ColumnDragGrip in the panel's top-left corner as the activator.
-//   • PaneSplitter sits between the two adjacent panels; when the panels
-//     are swapped the splitter drag math inverts so the rail still grows
-//     toward its own side.
-//   • Panel order persists to localStorage under
-//     `mycurricula:weekly-column-order` (DISTINCT from Daily's key).
-//   • Screen-reader live announcements follow the Daily pattern
-//     (role="status" + aria-live="polite").
-//
-// ── Pane width persistence ──────────────────────────────────────────────
-// Same "no fixed clamps; sanity-bounded by the live container" model the
-// Daily view uses:
-//
-//   • PANE_FLOOR (40px) is the absolute minimum width for the rail AND
-//     the reservation kept for the center grid.
-//   • The right-rail width persists to localStorage under
-//     `mycurricula:weekly-right-width` (NOT shared with Daily's keys).
-//   • State initializes to the DEFAULT (not the persisted value) so the
-//     server-rendered HTML matches the first client render; a post-mount
-//     effect hydrates from localStorage. This avoids hydration mismatches
-//     — same SSR-guarded pattern as DailyView's pane persistence.
+// The canvas is rendered in a single full-width slot; a thin module wrapper
+// carries `min-width: 0; min-height: 0` so it shrinks gracefully.
 //
 // ── Accessibility ──────────────────────────────────────────────────────
-// Every interactive control is keyboard-operable. The splitter is a real
-// role="separator" with aria-orientation + aria-valuemin/max/now (handled
-// inside <PaneSplitter>). Column drag uses dnd-kit's KeyboardSensor so
-// Space lifts, arrows move, Space/Enter drops, Esc cancels. The rail
-// wrapper carries an aria-label. Reduced motion is honored by the consumed
-// components and by the drag ghost (transform: none under reduced-motion).
+// Every interactive control is keyboard-operable. Expansion is driven from
+// the card's own header band (a real button, Enter/Space) and from the header
+// control, so the panel-era splitter/drag keyboard affordances are not lost
+// capability — they governed chrome that no longer exists.
 //
 // ── Deep links (UX roadmap item 07) ────────────────────────────────────
 // Two halves, both speaking lib/deep-links' frozen scheme:
@@ -90,10 +73,8 @@
 //           viewer resolves Personal-first per the forking model.
 
 import {
-  Fragment,
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -101,29 +82,13 @@ import {
   type SVGProps,
 } from "react";
 import Link from "next/link";
-import { Button, PlannerEmpty, Tooltip } from "@/components/ui";
-import {
-  DndContext,
-  DragOverlay,
-  type DragEndEvent,
-  type DragStartEvent,
-  closestCenter,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  horizontalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { PlannerEmpty, Tooltip } from "@/components/ui";
 import { useRouter } from "next/navigation";
-import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
+import { IconRail } from "@/components/daily";
 import { WeekNavigator } from "@/components/grid";
 import { WeeklyList } from "@/components/list";
 import { ScheduleTimeline } from "@/components/schedule";
 import { WeeklyViewControls } from "./WeeklyViewControls";
-import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
-import { DRAWER_MQ } from "./drawer-mq";
 import { WeekColumns } from "./WeekColumns";
 import { WeekGridSkeleton } from "./WeekGridSkeleton";
 // W5 — the three Week VIEW frames: WeekA (glass, read-only period×day grid),
@@ -147,7 +112,7 @@ import {
   WeeklyScheduleProvider,
   useWeeklyScheduleMode,
 } from "@/lib/weekly-schedule-state";
-import { useDndSensors } from "@/lib/collapse-on-drag";
+import { WeekExpansionProvider, useWeekExpansion } from "@/lib/week-expansion";
 import {
   usePlanner,
   usePlannerDataState,
@@ -157,6 +122,8 @@ import { useTheme } from "@/lib/theme";
 import { useViewEditMode } from "@/lib/edit-mode-state";
 import { usePhoneViewport } from "@/lib/use-phone-viewport";
 import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
+// The Wall URL for "what resources does this week use?" — see lib/wall-link.
+import { weekResourcesHref } from "@/lib/wall-link";
 import type { Lesson } from "@/lib/types";
 import styles from "./WeeklyShell.module.css";
 
@@ -173,6 +140,22 @@ import styles from "./WeeklyShell.module.css";
 // are NOT in the href: /weekly/print sits under the same (planner) layout, so a
 // client-side navigation preserves the AppStateProvider and the sheet reads
 // them straight from the store (see WeeklyPrintSheet's precedence note).
+// The Resources entry's glyph — a stack of cards, matching the ⋮ menu's "Post"
+// row so the two routes to the Wall read as the same destination.
+const IconResources = (p: SVGProps<SVGSVGElement>) => (
+  <svg
+    {...p}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    aria-hidden="true"
+  >
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 9h18M8 14h5" />
+  </svg>
+);
+
 const IconPrint = (p: SVGProps<SVGSVGElement>) => (
   <svg
     {...p}
@@ -188,331 +171,6 @@ const IconPrint = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-// ── Pane-width constants (mirror of the DailyView model) ─────────────────
-// PANE_FLOOR — absolute minimum width for the rail AND the reservation
-// kept for the center grid. Identical floor to DailyView so the chrome
-// reads consistently across views.
-const PANE_FLOOR = 40;
-/** Default right-rail width on first paint (pre-localStorage hydration). */
-const RIGHT_PANE_DEFAULT = 320;
-/** Collapsed rail stub width — a slim strip so the teacher can still see
- *  the hide-rail toggle button and re-expand. */
-const RAIL_STUB_WIDTH = 32;
-/** Keyboard nudge step (px) for the splitter's arrow-key resize. */
-const PANE_STEP = 16;
-/** localStorage key — DISTINCT from Daily's so the two views can size
- *  their rails independently. */
-const RIGHT_PANE_WIDTH_KEY = "mycurricula:weekly-right-width";
-/** localStorage key for the rail's hidden/visible state. */
-const RAIL_HIDDEN_KEY = "mycurricula:weekly-rail-hidden";
-/** localStorage key for the two-panel column order. */
-const COLUMN_ORDER_KEY = "mycurricula:weekly-column-order";
-
-// ── Panel column ids ──────────────────────────────────────────────────────
-// The Weekly body has TWO reorderable panels — the WeeklyGrid and the
-// RightRail. The icon rail is NOT part of this group: it stays pinned
-// to the far left as a sibling of the reorderable body.
-
-const PANEL_IDS = ["grid", "rail"] as const;
-type PanelId = (typeof PANEL_IDS)[number];
-
-const DEFAULT_COLUMN_ORDER: PanelId[] = [...PANEL_IDS];
-
-/** Human-readable labels — used in drag-grip aria-labels, the DragOverlay
- *  ghost chip, and the aria-live announcement string. */
-const COLUMN_LABEL: Record<PanelId, string> = {
-  grid: "Weekly grid",
-  rail: "Resources rail",
-};
-
-/** Type-guard a parsed string against the closed PanelId set. */
-function isPanelId(value: unknown): value is PanelId {
-  return (
-    typeof value === "string" &&
-    (PANEL_IDS as readonly string[]).includes(value)
-  );
-}
-
-/** Normalize a parsed order: drop unknown ids, de-duplicate, append any
- *  missing defaults so a future panel addition never disappears. */
-function normalizeColumnOrder(raw: unknown): PanelId[] {
-  const candidate = Array.isArray(raw) ? raw.filter(isPanelId) : [];
-  const seen = new Set<PanelId>();
-  const out: PanelId[] = [];
-  for (const id of candidate) {
-    if (!seen.has(id)) {
-      seen.add(id);
-      out.push(id);
-    }
-  }
-  for (const id of DEFAULT_COLUMN_ORDER) {
-    if (!seen.has(id)) {
-      seen.add(id);
-      out.push(id);
-    }
-  }
-  return out;
-}
-
-/** Read the saved column order from localStorage, or the default. */
-function readColumnOrder(): PanelId[] {
-  if (typeof window === "undefined") return DEFAULT_COLUMN_ORDER;
-  try {
-    const raw = window.localStorage.getItem(COLUMN_ORDER_KEY);
-    if (!raw) return DEFAULT_COLUMN_ORDER;
-    return normalizeColumnOrder(JSON.parse(raw) as unknown);
-  } catch {
-    // Corrupt or unavailable storage — fall back to the default.
-    return DEFAULT_COLUMN_ORDER;
-  }
-}
-
-/** Persist the chosen column order. Non-fatal on failure. */
-function writeColumnOrder(order: PanelId[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
-  } catch {
-    // Storage full / unavailable — order simply won't persist; non-fatal.
-  }
-}
-
-// ── Width helpers (mirror of the DailyView model) ────────────────────────
-
-/** Clamp a candidate rail width to dynamic, sanity-only bounds.
- *
- *  - `bodyWidth` is the live container width.
- *  - We reserve PANE_FLOOR for the center grid track so a teacher cannot
- *    drag the rail wide enough to crush the grid to nothing. (The icon
- *    rail is fixed-width and sits OUTSIDE the resizable body row, so its
- *    width is not part of this math.)
- *
- *  When `bodyWidth` is unavailable (initial paint, ref not yet attached)
- *  we fall back to a permissive lower-bound clamp so persisted values are
- *  honoured. */
-function clampRightWidth(px: number, bodyWidth: number): number {
-  const rounded = Math.round(px);
-  if (!Number.isFinite(bodyWidth) || bodyWidth <= 0) {
-    return Math.max(PANE_FLOOR, rounded);
-  }
-  const max = Math.max(PANE_FLOOR, bodyWidth - PANE_FLOOR);
-  return Math.min(max, Math.max(PANE_FLOOR, rounded));
-}
-
-/** Compute the live (min, max) bounds for the rail given the container
- *  width. Used for aria-valuemin / aria-valuemax on the splitter and the
- *  resize-observer re-clamp. */
-function rightBounds(bodyWidth: number): { min: number; max: number } {
-  if (!Number.isFinite(bodyWidth) || bodyWidth <= 0) {
-    return { min: PANE_FLOOR, max: Number.MAX_SAFE_INTEGER };
-  }
-  return { min: PANE_FLOOR, max: Math.max(PANE_FLOOR, bodyWidth - PANE_FLOOR) };
-}
-
-/** Read the saved right-rail width, or the default. SSR-guarded. */
-function readRightWidth(): number {
-  if (typeof window === "undefined") return RIGHT_PANE_DEFAULT;
-  try {
-    const raw = window.localStorage.getItem(RIGHT_PANE_WIDTH_KEY);
-    if (!raw) return RIGHT_PANE_DEFAULT;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed)
-      ? Math.max(PANE_FLOOR, Math.round(parsed))
-      : RIGHT_PANE_DEFAULT;
-  } catch {
-    // Corrupt or unavailable storage — fall back to the default width.
-    return RIGHT_PANE_DEFAULT;
-  }
-}
-
-/** Persist the chosen right-rail width. Non-fatal on failure. */
-function writeRightWidth(px: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(RIGHT_PANE_WIDTH_KEY, String(px));
-  } catch {
-    // Storage full / unavailable — width simply won't persist; non-fatal.
-  }
-}
-
-/** Read whether the rail was left hidden. SSR-guarded. */
-function readRailHidden(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(RAIL_HIDDEN_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-/** Persist the rail hidden state. Non-fatal on failure. */
-function writeRailHidden(hidden: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (hidden) {
-      window.localStorage.setItem(RAIL_HIDDEN_KEY, "1");
-    } else {
-      window.localStorage.removeItem(RAIL_HIDDEN_KEY);
-    }
-  } catch {
-    // Storage full / unavailable — state simply won't persist; non-fatal.
-  }
-}
-
-// ── GripHorizontalIcon ────────────────────────────────────────────────────
-// Lucide-style GripHorizontal — two rows of three dots, oriented for the
-// column-reorder grip (a HORIZONTAL grip on each panel's top edge reads as
-// "drag me sideways"). Mirrors DailyView's identical icon so the affordance
-// reads the same across both views.
-
-function GripHorizontalIcon(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <circle cx="5" cy="9" r="1.5" />
-      <circle cx="12" cy="9" r="1.5" />
-      <circle cx="19" cy="9" r="1.5" />
-      <circle cx="5" cy="15" r="1.5" />
-      <circle cx="12" cy="15" r="1.5" />
-      <circle cx="19" cy="15" r="1.5" />
-    </svg>
-  );
-}
-
-// ── ColumnDragGrip ────────────────────────────────────────────────────────
-// A small GripHorizontal chip that lives in the top-left of each large
-// content panel and acts as the dnd-kit activator for panel reordering.
-// Visually identical to DailyView's columnDragGrip — an ink-300 dot
-// pattern that lifts to ink-500 on hover / focus. The visible chip is
-// 24×24; the wrapping button enlarges the tap target to ≥44px via padding.
-// `aria-label` carries the human-readable panel name so a screen-reader
-// hears "Drag to reorder weekly grid panel".
-
-interface ColumnDragGripProps {
-  /** Stable panel id — must match SortableContext items. */
-  id: PanelId;
-  /** setActivatorNodeRef from useSortable — the grip is the SOLE activator. */
-  activatorRef: (el: HTMLElement | null) => void;
-  /** dnd-kit pointer + keyboard activation listeners. */
-  listeners: Record<string, unknown> | undefined;
-  /** dnd-kit a11y attributes (role, aria-roledescription, etc.). */
-  attributes: Record<string, unknown>;
-}
-
-function ColumnDragGrip({
-  id,
-  activatorRef,
-  listeners,
-  attributes,
-}: ColumnDragGripProps): ReactNode {
-  return (
-    <Tooltip
-      content={`Drag the ${COLUMN_LABEL[id].toLowerCase()} panel to rearrange the weekly layout — your layout is remembered between sessions.`}
-      side="bottom"
-    >
-      <button
-        type="button"
-        ref={activatorRef}
-        // Spread dnd-kit's pointer + keyboard listeners + a11y attributes.
-        // The listeners object is typed loosely because dnd-kit's
-        // SyntheticListenerMap is a record of arbitrary event-handler keys.
-        {...(listeners ?? {})}
-        {...attributes}
-        className={styles.columnDragGrip}
-        aria-label={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} panel`}
-        title={`Drag the ${COLUMN_LABEL[id].toLowerCase()} panel to rearrange the weekly layout — your layout is remembered between sessions`}
-      >
-        <span className={styles.columnDragGripIcon} aria-hidden="true">
-          <GripHorizontalIcon />
-        </span>
-      </button>
-    </Tooltip>
-  );
-}
-
-// ── SortablePanel ─────────────────────────────────────────────────────────
-// Each large content panel (WeeklyGrid, RightRail) wraps its content in
-// this component. The wrapper:
-//   • holds the useSortable transform (so the panel slides into its new
-//     slot when the order changes);
-//   • exposes the grip activator props so the panel's content can render
-//     a ColumnDragGrip in its own top-left corner;
-//   • carries the per-panel className from the caller so the wrapper
-//     itself remains stylistically transparent.
-//
-// IMPORTANT: the wrapper is also the SortableContext item. It must occupy
-// the same grid track its panel would occupy in the static layout — its
-// inline style adds no extra grid sizing so the parent grid keeps its
-// track math.
-
-interface SortablePanelProps {
-  id: PanelId;
-  className: string;
-  children: (grip: ReactNode) => ReactNode;
-}
-
-function SortablePanel({
-  id,
-  className,
-  children,
-}: SortablePanelProps): ReactNode {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  // Apply the sortable transform to the OUTER wrapper so the whole panel
-  // slides into its new position. While dragging, dim the in-place
-  // placeholder — the floating overlay carries the visible chip.
-  const wrapperStyle: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : undefined,
-  };
-
-  const grip = (
-    <ColumnDragGrip
-      id={id}
-      activatorRef={setActivatorNodeRef}
-      listeners={listeners as unknown as Record<string, unknown>}
-      attributes={attributes as unknown as Record<string, unknown>}
-    />
-  );
-
-  return (
-    <div ref={setNodeRef} style={wrapperStyle} className={className}>
-      {children(grip)}
-    </div>
-  );
-}
-
-// ── ColumnDragGhost ───────────────────────────────────────────────────────
-// While a panel rides the DragOverlay we show a small header-style chip
-// with the panel's label. Reuses the Daily view's visual vocabulary (paper
-// card + hairline + soft lift + slight tilt) so the chip reads as "the
-// same thing, picked up". Matches DailyView's columnDragGhost class; here
-// those styles live in WeeklyShell.module.css.
-
-function ColumnDragGhost({ id }: { id: PanelId }): ReactNode {
-  return (
-    <div className={styles.columnDragGhost} aria-hidden="true">
-      <span className={styles.columnDragGhostGrip}>
-        <GripHorizontalIcon />
-      </span>
-      <span className={styles.columnDragGhostTitle}>{COLUMN_LABEL[id]}</span>
-    </div>
-  );
-}
 
 // ── Narrow-viewport breakpoint ────────────────────────────────────────────
 // The Weekly grid has a hard min-width (~1082px) that forces document-level
@@ -529,15 +187,10 @@ function ColumnDragGhost({ id }: { id: PanelId }): ReactNode {
 
 const NARROW_MQ = "(max-width: 900px)";
 
-// ── W3-C3 — drawer-mode breakpoint ───────────────────────────────────────
-// The constant lives in the dependency-free leaf ./drawer-mq (bundle-slim
-// lever A1): the shell-level <RightPanel> — mounted on every planner route —
-// keys its Weekly lesson-detail gate off the SAME breakpoint (drawer owns
-// ≤1280, the shell panel owns wider), and importing it from THIS module
-// dragged the whole weekly+daily+editor subtree into the layout bundle.
-// Full rationale in ./drawer-mq.ts. Re-exported so this module's public
-// surface is unchanged for existing consumers.
-export { DRAWER_MQ };
+// The W3-C3 drawer-mode breakpoint that used to be imported and re-exported
+// here is gone with the drawer. ./drawer-mq.ts itself stays — WeeklyShellV1
+// (the NEXT_PUBLIC_V2-off fallback) still runs the rail + drawer composition
+// and imports the leaf directly, as does the weekly barrel.
 
 // ── WeeklyShell ──────────────────────────────────────────────────────────
 
@@ -558,53 +211,54 @@ function isSyncableWeek(week: number): boolean {
 }
 
 /**
- * Exported shell — mounts the <WeeklyScheduleProvider> ONCE so the
- * Subject↔Schedule state has a single shared instance above both consumers:
- * <WeeklyViewControls> (writer, in the WeekNavigator actions slot) and the
- * canvas reader inside <WeeklyShellInner>. Without this single mount the
- * writer and reader held independent useState copies and the canvas only
- * switched Grid↔Schedule after a reload. The inner component holds all the
- * existing shell logic and is the sole caller of useWeeklyScheduleMode().
+ * Exported shell — mounts the two Week-wide providers ONCE, so each has a
+ * single shared instance above ALL of its consumers:
+ *
+ *   • <WeeklyScheduleProvider> — the Subject↔Schedule state, written by
+ *     <WeeklyViewControls> (in the WeekNavigator actions slot) and read by the
+ *     canvas branch inside <WeeklyShellInner>. Without one mount above both,
+ *     writer and reader held independent useState copies and the canvas only
+ *     switched Grid↔Schedule after a reload.
+ *   • <WeekExpansionProvider> — the expanded-card set, written by BOTH the
+ *     "Expand all" control (also in the actions slot) and each card's own
+ *     click, and read by whichever canvas the frame axis picked. Exactly the
+ *     same writer-above-reader problem, so exactly the same shape; the header
+ *     button and the cards must be operating on one set or "expand all"
+ *     expands nothing anyone can see.
+ *
+ * Both wrap the WHOLE shell rather than just the body, because the header's
+ * actions slot is a consumer of each. The inner component holds all the
+ * existing shell logic.
  */
 export function WeeklyShell(props: WeeklyShellProps = {}): ReactNode {
   return (
     <WeeklyScheduleProvider>
-      <WeeklyShellInner {...props} />
+      <WeekExpansionProvider>
+        <WeeklyShellInner {...props} />
+      </WeekExpansionProvider>
     </WeeklyScheduleProvider>
   );
 }
 
 function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
-  // The active week + day are shared planner state — same source the
-  // <WeeklyGrid> already reads. We don't pin a local copy here; the
-  // RightRail just needs the current value to scope its Resources +
-  // Shoutbox panels.
+  // The active week is shared planner state — the same source the canvases
+  // read. We don't pin a local copy here.
   //
-  // ── W3-C3 drawer-open signal ─────────────────────────────────────────
-  // The narrow-viewport overlay drawer (<WeeklyRailDrawer>) consumes the
-  // EXISTING To-do + Shoutbox panel-open flags rather than introducing a
-  // new piece of app-state. The two flags are already mutually exclusive
-  // (toggleTodoPanel closes commentsPanelOpen and vice versa, see
-  // lib/app-state.tsx) so OR-ing them gives one clean drawer-open signal.
-  // Closing the drawer flips BOTH to false so the rail icons' aria-pressed
-  // state stays accurate. The Resources rail panel is mounted inside
-  // <RightRail> too — there's no dedicated "resources" icon yet (it's
-  // marked SOON in rail-icons.tsx); when it graduates this hook adds
-  // `resourcesPanelOpen` alongside the existing two.
+  // `todoPanelOpen` / `commentsPanelOpen` are NOT read any more. They used to
+  // drive this shell's overlay drawer; those two icons are now served by the
+  // shell-level <RightPanel> on /weekly like on every other route, so nothing
+  // in the Weekly subtree needs to know whether they are open. Likewise
+  // `selectedDay`, which existed only to day-scope the rail's To-do and
+  // Shoutbox panels.
   const {
     week,
     currentWeek,
     setWeek,
-    selectedDay,
     selectedLessonId,
     setSelectedLessonId,
     viewMode,
     filters,
     updateFilters,
-    todoPanelOpen,
-    commentsPanelOpen,
-    toggleTodoPanel,
-    toggleCommentsPanel,
   } = useAppState();
   const { lessons, activeGradeId } = usePlanner();
   // Loading/error honesty for the Week VIEW canvases (renderGridPanel). During
@@ -631,6 +285,9 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // offer the unit roll-up. An id with no live lesson opens nothing rather
   // than an empty dialog — it can only mean the row was archived from
   // another surface between render and click.
+  // Deep links open the lesson they name — see the expand call in the
+  // initialLink effect below.
+  const { expand: expandLesson } = useWeekExpansion();
   const { openUnitWorkspace } = useUnitWorkspace();
   const openLessonEditor = useCallback(
     (id: string): void => {
@@ -697,32 +354,11 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     }
   }, []);
 
-  // ── W3-C3 — drawer-mode state ────────────────────────────────────────
-  // Mirrors the isNarrow pattern above. `drawerMode` is true on viewports
-  // where the inline rail is `display: none` (≤1280px in
-  // WeeklyShell.module.css). When true, the overlay drawer replaces the
-  // inline rail render; when false, the inline rail behaves exactly as it
-  // does today.
-  const [drawerMode, setDrawerMode] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia(DRAWER_MQ);
-    setDrawerMode(mq.matches);
-    const handler = (e: MediaQueryListEvent): void => setDrawerMode(e.matches);
-    if (mq.addEventListener) {
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    } else {
-      mq.addListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
-      return () => mq.removeListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
-    }
-  }, []);
-
-  // ── Lessons-for-this-week — fed to RightRail for week-mode aggregation ─
-  // Filter once per (lessons, week) change so the right rail's
-  // ResourcesPanel sees a stable array identity until something actually
-  // moves into / out of the week.
+  // ── Lessons-for-this-week ─────────────────────────────────────────────
+  // Filter once per (lessons, week) change so the consumers below see a
+  // stable array identity until something actually moves into / out of the
+  // week. It fed the rail's week-aggregated ResourcesPanel; what still needs
+  // it is the selected-lesson lookup and the deep-link scroll target.
   // Archived lessons are excluded: WeekColumns hides them from the lanes, so
   // they must also vanish from every shell surface fed by this list (right
   // rail, selected-lesson lookup, drawer, deep-link scroll) — otherwise a
@@ -840,6 +476,12 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
       // share degrades to "right week, no selection" (§4a L4).
       setSelectedLessonId(target.id);
       setPendingScrollId(target.id);
+      // …and OPEN it. Before the panel was removed, `?lesson=` landed on a
+      // lesson and its detail appeared in the rail; selecting alone now shows
+      // nothing but a ring, so a shared link would arrive at a closed card and
+      // silently lose the thing it was shared to show (Codex gate, Medium).
+      // `expand` is idempotent, so this cannot toggle a card shut.
+      expandLesson(target.id);
     }
     // Mount-only by design: the link is the page's INITIAL state; later
     // navigation must never re-apply it.
@@ -901,117 +543,18 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     }
   }, [week, filters.subjects, selectedLesson, activeGradeId, router]);
 
-  // ── Right-rail width — state + post-mount hydration ──────────────────
-  // Initialize to the DEFAULT (not localStorage) so the server-rendered
-  // HTML matches the first client render. The effect below hydrates the
-  // saved value once mounted. Same pattern DailyView uses.
-  const [rightWidth, setRightWidth] = useState<number>(RIGHT_PANE_DEFAULT);
-
-  // ── Rail hidden state — true collapses the rail to a RAIL_STUB_WIDTH
-  //    stub so it is no longer a full 320px. Also hidden automatically on
-  //    viewports narrower than 1280px (handled purely in CSS via a media
-  //    query on the body's grid template). Initialize to false so the SSR
-  //    HTML is predictable; the effect below hydrates the saved preference.
-  const [railHidden, setRailHidden] = useState<boolean>(false);
-
-  // Track whether the post-mount hydration completed. We only START
-  // persisting writes after that point so the very first effect (loading
-  // the saved value) doesn't immediately overwrite localStorage with the
-  // default.
-  const hydratedRef = useRef(false);
-
-  // Body-row ref — we read its width to clamp the rail against the live
-  // container (so a window resize never strands the rail at a width
-  // bigger than the body). Stored as a number in state so the splitter's
-  // aria-valuemax stays in sync.
-  const bodyRef = useRef<HTMLDivElement | null>(null);
-  const [bodyWidth, setBodyWidth] = useState<number>(0);
-
-  // ── Panel column order + drag state ──────────────────────────────────
-  // The two large panels (grid + rail) can be reordered by dragging the
-  // small grip on each panel's top-left corner. Order is a per-teacher
-  // viewing preference; it persists to localStorage under
-  // `mycurricula:weekly-column-order` (DISTINCT from Daily's key).
+  // ── Esc key — clear the lesson selection. Listens on the document so it
+  //    fires even when focus is inside the canvas.
   //
-  // Hydration discipline: `columnOrder` starts at the default so the
-  // server-rendered HTML and the first client render match. The mount
-  // effect below loads any persisted order and `hydratedColumnRef` then
-  // gates persistence so the first load doesn't overwrite storage with
-  // the default. Same pattern as DailyView's column order.
-  const [columnOrder, setColumnOrder] =
-    useState<PanelId[]>(DEFAULT_COLUMN_ORDER);
-  const [draggingColumnId, setDraggingColumnId] = useState<PanelId | null>(
-    null,
-  );
-  const hydratedColumnRef = useRef(false);
-
-  // Screen-reader live announcement — committed when the order changes so
-  // a keyboard reorder is audible. Uses role="status" + aria-live="polite"
-  // so the SR speaks the new order without interrupting current speech.
-  const [columnAnnouncement, setColumnAnnouncement] = useState<string>("");
-  const columnAnnounceRegionId = useId();
-
-  // dnd-kit sensors — pointer + touch + keyboard (keyboard makes the drag
-  // reorder operable without a mouse). The same useDndSensors hook that
-  // DailyView uses; it bundles PointerSensor + KeyboardSensor with
-  // distance-based activation so accidental drags don't fire.
-  const sensors = useDndSensors();
-
-  // ── Hydrate the saved width + hidden state + column order once on mount ─
-  useEffect(() => {
-    setRightWidth(readRightWidth());
-    setRailHidden(readRailHidden());
-    hydratedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    setColumnOrder(readColumnOrder());
-    hydratedColumnRef.current = true;
-  }, []);
-
-  // ── Persist on change (after hydration) ──────────────────────────────
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-    writeRightWidth(rightWidth);
-  }, [rightWidth]);
-
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-    writeRailHidden(railHidden);
-  }, [railHidden]);
-
-  useEffect(() => {
-    if (!hydratedColumnRef.current) return;
-    writeColumnOrder(columnOrder);
-  }, [columnOrder]);
-
-  // ── Observe container size so the bound follows window resizes ───────
-  // When the body row shrinks (window resize, devtools opened, …) we
-  // re-clamp the rail width against the new bound. This mirrors the
-  // Daily view's resize-observer behavior so a rail dragged wide on a
-  // big monitor doesn't get stuck off-screen on a narrow one.
-  useEffect(() => {
-    const el = bodyRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = Math.round(entry.contentRect.width);
-        setBodyWidth(w);
-        // Only re-clamp once we're past hydration so the first paint
-        // doesn't double-write to localStorage.
-        if (hydratedRef.current) {
-          setRightWidth((prev) => clampRightWidth(prev, w));
-        }
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // ── Esc key — clear the lesson selection so the Resources panel reverts
-  //    to the week aggregate. Listens on the document so it fires even when
-  //    focus is inside the grid or the rail.
+  //    What this accomplishes changed with the rail: clearing the selection
+  //    used to revert the Resources panel to its week aggregate, and it now
+  //    COLLAPSES the expanded card — each canvas watches selectedLessonId for
+  //    a set→null transition and drops that id from the expanded set. So Esc
+  //    still means "close the thing I opened", which is what a teacher who
+  //    pressed it was reaching for; it just closes a card instead of a panel.
+  //    It deliberately does NOT collapse the whole week: Esc undoing an
+  //    "Expand all" a teacher deliberately chose would be a much larger,
+  //    unasked-for undo than the keypress implies.
   //
   //    W3.8 innermost-first guard, B5.7 repointed: while the lesson editor
   //    is open, Esc belongs to it (ExplorerShell's window-level listener
@@ -1038,250 +581,33 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [selectedLessonId, setSelectedLessonId]);
 
-  // ── Column drag handlers ──────────────────────────────────────────────
-  const handleColumnDragStart = useCallback((e: DragStartEvent): void => {
-    const id = String(e.active.id);
-    if (isPanelId(id)) setDraggingColumnId(id);
-  }, []);
+  // ── Canvas renderer ───────────────────────────────────────────────────
+  // One renderer now, not two: the rail panel's is gone, and with a single
+  // panel there is nothing to reorder, so the ColumnDragGrip this used to
+  // take and place has gone with it.
 
-  const handleColumnDragEnd = useCallback((e: DragEndEvent): void => {
-    setDraggingColumnId(null);
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const from = String(active.id);
-    const to = String(over.id);
-    if (!isPanelId(from) || !isPanelId(to)) return;
-    setColumnOrder((prev) => {
-      const fromIdx = prev.indexOf(from);
-      const toIdx = prev.indexOf(to);
-      if (fromIdx === -1 || toIdx === -1) return prev;
-      const next = arrayMove(prev, fromIdx, toIdx);
-      // Build an aria-live announcement reading each panel's new home so a
-      // keyboard user hears confirmation when they release Space to drop.
-      const orderLabels = next.map((id) => COLUMN_LABEL[id]).join(", ");
-      const newPos = next.indexOf(from);
-      const posLabel = newPos === 0 ? "first" : "second";
-      setColumnAnnouncement(
-        `${COLUMN_LABEL[from]} panel moved to ${posLabel}. New order: ${orderLabels}.`,
-      );
-      return next;
-    });
-  }, []);
-
-  const handleColumnDragCancel = useCallback((): void => {
-    setDraggingColumnId(null);
-  }, []);
-
-  // ── Splitter drag wiring ──────────────────────────────────────────────
-  // The splitter sits BETWEEN the grid and the rail — in either order. The
-  // rail is the only FIXED-width panel; the grid is always the 1fr flex
-  // track. We resolve the drag against the rail's live bounding rect so
-  // the math works regardless of which side the rail is on.
-  //
-  // resolveRailRect walks the rendered body to find the rail's wrapper via
-  // data-pane="rail", then returns its DOMRect. The body ref is the root.
-  const resolveRailRect = useCallback((): DOMRect | null => {
-    const body = bodyRef.current;
-    if (!body) return null;
-    const el = body.querySelector<HTMLElement>('[data-pane="rail"]');
-    return el ? el.getBoundingClientRect() : null;
-  }, []);
-
-  // Splitter onDrag — clientX → new rail width. The rail can be on either
-  // side of the grid after a reorder, so we can't anchor to the body's
-  // left or right edge directly. Instead we resolve the rail's own rect
-  // and compute the width as the distance from clientX to whichever of
-  // the rail's edges is NOT adjacent to the splitter.
-  //
-  // railOnRight → the splitter is to the LEFT of the rail; moving the
-  //   pointer leftward grows the rail (width = rect.right − clientX).
-  // railOnLeft  → the splitter is to the RIGHT of the rail; moving the
-  //   pointer rightward grows the rail (width = clientX − rect.left).
-  const handleSplitterDrag = useCallback(
-    (clientX: number): void => {
-      // Home / End (keyboard) arrive as ±Infinity; delegate to clamp.
-      if (!Number.isFinite(clientX)) {
-        const body = bodyRef.current;
-        const liveBodyWidth = body
-          ? Math.round(body.getBoundingClientRect().width)
-          : bodyWidth;
-        // Keyboard Home clamps to min, End to max (no need to read prev
-        // because the target value is computed absolutely, not relatively).
-        const target =
-          clientX === Infinity ? Number.MAX_SAFE_INTEGER : PANE_FLOOR;
-        setRightWidth(clampRightWidth(target, liveBodyWidth));
-        return;
-      }
-      const rect = resolveRailRect();
-      if (!rect) return;
-      // Determine which side the rail is on by checking column order.
-      const railOnRight = columnOrder[columnOrder.length - 1] === "rail";
-      const desired = railOnRight ? rect.right - clientX : clientX - rect.left;
-      const body = bodyRef.current;
-      const liveBodyWidth = body
-        ? Math.round(body.getBoundingClientRect().width)
-        : bodyWidth;
-      setRightWidth(clampRightWidth(desired, liveBodyWidth));
-    },
-    [resolveRailRect, columnOrder, bodyWidth],
-  );
-
-  // Splitter onStep — keyboard nudge. PaneSplitter reports +1 for
-  // ArrowRight / ArrowDown, −1 for ArrowLeft / ArrowUp. We translate that
-  // into "grow/shrink the rail" with the correct sign for the rail's
-  // current position:
-  //   • railOnRight: the splitter sits LEFT of the rail; ArrowRight
-  //     (direction = +1) moves the divider rightward, SHRINKING the rail.
-  //     So delta = −direction.
-  //   • railOnLeft: the splitter sits RIGHT of the rail; ArrowRight
-  //     moves the divider rightward, GROWING the rail. delta = +direction.
-  const handleSplitterStep = useCallback(
-    (direction: -1 | 1): void => {
-      const body = bodyRef.current;
-      const live = body?.getBoundingClientRect().width ?? bodyWidth;
-      const railOnRight = columnOrder[columnOrder.length - 1] === "rail";
-      const sign = railOnRight ? -1 : 1;
-      setRightWidth((prev) =>
-        clampRightWidth(prev + sign * direction * PANE_STEP, live),
-      );
-    },
-    [bodyWidth, columnOrder],
-  );
-
-  // ── Hide-rail toggle — collapses the rail to a stub or back to full ──
-  // The stub (RAIL_STUB_WIDTH) is narrow enough that the grid reclaims
-  // nearly all of the body, but the toggle button remains reachable so
-  // the teacher can re-expand without a menu.
-  const handleToggleRail = useCallback((): void => {
-    setRailHidden((prev) => !prev);
-  }, []);
-
-  // ── Splitter bounds for ARIA — live + clamped ────────────────────────
-  const bounds = useMemo(() => rightBounds(bodyWidth), [bodyWidth]);
-
-  // Effective rail track width: stub when hidden, full width when visible.
-  // The CSS media query at ≤1280px overrides the inline style to 0 so no
-  // footprint overlaps the grid on narrow viewports.
-  const effectiveRailWidth = railHidden
-    ? RAIL_STUB_WIDTH
-    : Math.round(rightWidth);
-
-  // Rail scope: when a lesson is selected we switch from week-aggregation
-  // to lesson-scoped day mode so the Resources panel shows only that
-  // lesson's resources. The RightRail `mode` prop controls this.
-  const railMode: "day" | "week" = selectedLesson !== null ? "day" : "week";
-
-  // ── W3-C3 — drawer open signal + close handler ────────────────────────
-  // The drawer is "open" when we're in drawer mode (≤1280px viewport) AND
-  // any of THREE triggers is active:
-  //   • todoPanelOpen / commentsPanelOpen — the GlobalRail To-dos / Shoutbox
-  //     icons. These two flags are mutually exclusive (toggleTodoPanel /
-  //     toggleCommentsPanel each close the other — see lib/app-state.tsx).
-  //   • selectedLessonId !== null AND !isNarrow — a lesson card was clicked
-  //     in the GRID. On desktop the inline rail simply re-scopes to the
-  //     lesson; in the 901–1280 band the Grid still renders but the inline
-  //     rail is `display: none`, so the SAME lesson-scoped content has to
-  //     surface through this overlay drawer instead. Without this term,
-  //     clicking a card in that band expanded the chip but showed no panel
-  //     (the original bug). The drawer's content is already lesson-scoped —
-  //     it receives `selectedLesson` / `railMode` and forwards them to
-  //     <RightRail>, which renders the lesson's detail + resources when a
-  //     lesson is present (mode="day"), exactly like the inline rail.
-  //     The `!isNarrow` guard is load-bearing: at ≤900px the Grid is replaced
-  //     by <WeeklyList>, whose row click sets `selectedLessonId` purely to
-  //     hand off focus to the Daily view (router.push("/daily")). Without the
-  //     guard that transient selection would flash this drawer open for a
-  //     frame before navigation unmounts the shell. So the lesson term only
-  //     fires in the Grid band, never in the List fallback. The To-do /
-  //     Shoutbox terms stay ungated — those icons are reachable at every
-  //     narrow width.
-  //
-  // The close handler clears ALL THREE triggers so the drawer can't re-open
-  // itself on the next render:
-  //   • flips both panel flags back to false (keeps the rail icons'
-  //     aria-pressed state honest). We toggle whichever is currently true;
-  //     defensively toggling both if (against the mutual-exclusion contract)
-  //     both were set.
-  //   • clears selectedLessonId so a drawer opened by a lesson selection also
-  //     deselects on close. WeeklyGrid keys its inline card expansion off the
-  //     selection transition-to-null (see its sync effect), so clearing the
-  //     selection here ALSO collapses the expanded card — close ⇒ panel
-  //     closed AND card collapsed, the required end state.
-  const drawerOpen =
-    drawerMode &&
-    (todoPanelOpen ||
-      commentsPanelOpen ||
-      (selectedLessonId !== null && !isNarrow));
-
-  const handleDrawerClose = useCallback((): void => {
-    if (todoPanelOpen) toggleTodoPanel();
-    if (commentsPanelOpen) toggleCommentsPanel();
-    if (selectedLessonId !== null) setSelectedLessonId(null);
-  }, [
-    todoPanelOpen,
-    commentsPanelOpen,
-    selectedLessonId,
-    toggleTodoPanel,
-    toggleCommentsPanel,
-    setSelectedLessonId,
-  ]);
-
-  // ── Dynamic grid template ─────────────────────────────────────────────
-  // Walk the column order, emitting a track size per panel AND an `auto`
-  // track between the two panels for the splitter. The grid is always 1fr;
-  // the rail is `effectiveRailWidth`px.
-  const gridTemplate = useMemo(() => {
-    // RES-CRIT-001: the grid panel track is `minmax(0, 1fr)` rather than
-    // bare `1fr`. CSS Grid resolves `1fr` to `minmax(auto, 1fr)`, where
-    // `auto` is the track content's `min-content`. Our gridSlot contains
-    // a WeeklyGrid with a 1082px intrinsic min-width — so bare `1fr`
-    // refuses to shrink below that and forces the planner shell past
-    // the viewport at every desktop tier. `minmax(0, 1fr)` lets the
-    // track shrink and the WeeklyGrid's internal `.scroll` overflow
-    // takes over inside the slot instead. The same applies even at
-    // wide desktop where the rail is open: shrinking the grid track
-    // when the rail is dragged wide should never push the bodyRow
-    // wider than its container.
-    const trackFor = (id: PanelId): string =>
-      id === "rail" ? `${effectiveRailWidth}px` : "minmax(0, 1fr)";
-    const parts: string[] = [];
-    columnOrder.forEach((id, i) => {
-      parts.push(trackFor(id));
-      if (i < columnOrder.length - 1) parts.push("auto"); // splitter track
-    });
-    return parts.join(" ");
-  }, [columnOrder, effectiveRailWidth]);
-
-  // ── Panel renderers ───────────────────────────────────────────────────
-  // Each panel's content is captured in a small render fn that receives the
-  // ColumnDragGrip node and returns the panel's inner subtree. The wrapper
-  // div carries `position: relative` so the grip can sit absolutely on the
-  // top-left corner without touching the inner component's root.
-
-  function renderGridPanel(grip: ReactNode): ReactNode {
+  function renderGridPanel(): ReactNode {
     // Render selection, in precedence order:
     //   0. isEdit (Week EDIT mode) → WeekEditBoard. Edit WINS over every other
     //      branch, INCLUDING the ≤900px narrow-forced-List gate below: the
     //      board scrolls internally and stays usable at phone widths, so the
     //      teacher keeps a single editing surface at every tier (decision
     //      locked by the orchestrator, W3.8c). The board owns its own
-    //      grip placement + `data-pane="grid"` wrapper, so it is returned
-    //      directly (grip is threaded in, not rendered as a sibling here).
+    //      `data-pane="grid"` wrapper, so it is returned directly.
     //   1. isNarrow (≤900px) → WeeklyList. The narrow-viewport gate WINS
     //      over schedule mode because a 5-column timeline at 360–900px is
     //      unusable; the dedicated /schedule route is the phone/tablet
     //      entry. Forcing List in the shell at narrow widths keeps the
     //      Weekly canvas usable.
     //   2. Schedule pill ON (and not narrow) → ScheduleTimeline (week
-    //      scope), driven by the inline pill in the Weekly chrome. The
-    //      timeline replaces the grid in the same 1fr slot; splitter +
-    //      rail math is unaffected because the slot still spans 1fr.
+    //      scope), driven by the inline pill in the Weekly chrome.
     //   3. viewMode === "list" → WeeklyList. Same as before.
     //   4. Default → the frame-picked Week VIEW canvas: paper → WeekColumns,
     //      glass → WeekA, color → WeekC (all self-contained, no props).
     //
-    // The drag grip stays so the teacher can still reorder the panel at
-    // any width or mode. The pills bar sits above whatever renders below.
+    // Every branch now gets the FULL body width — there is no rail to share
+    // it with, so the splitter/rail track math these comments used to carry
+    // is gone rather than merely satisfied.
     if (isEdit) {
       // Loading/error honesty for the Week EDIT board — the same 3-state gate
       // the VIEW canvases get below. With the Supabase flag ON a teacher can
@@ -1293,12 +619,10 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
       // "Couldn't load your plan" copy; settled → WeekEditBoard, unchanged.
       // Permanently "settled" with the Supabase flag OFF, so mock/v1 is a no-op.
       // Wrapped in the same columnWithGrip/data-pane="grid" host as the view
-      // branch so the panel grip still places and the splitter/rail math is
-      // unaffected while loading.
+      // branch so the loading state occupies exactly the canvas's own box.
       if (gridDataState === "pending" || gridDataState === "error") {
         return (
           <div className={styles.columnWithGrip} data-pane="grid">
-            {grip}
             {gridDataState === "pending" ? (
               <WeekGridSkeleton />
             ) : (
@@ -1309,13 +633,14 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           </div>
         );
       }
-      return <WeekEditBoard grip={grip} />;
+      // `grip` is omitted, not passed as null: the board's prop is optional
+      // and it places nothing when there is no grip to place.
+      return <WeekEditBoard />;
     }
     const showList = isNarrow || viewMode === "list";
     const showSchedule = !isNarrow && scheduleMode;
     return (
       <div className={styles.columnWithGrip} data-pane="grid">
-        {grip}
         {/* The Subject↔Schedule + Lessons/All toggles that used to live in a
             standalone in-grid "VIEW" bar are now merged into the page-header
             <WeeklyViewControls />. The grid panel renders just the canvas
@@ -1324,10 +649,9 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
         {showSchedule ? (
           <ScheduleTimeline scope="week" showNonAcademic={includeAllEvents} />
         ) : showList ? (
-          // WeeklyList replaces the grid but occupies the same 1fr slot
-          // so the splitter and rail math are unaffected. (It carries its own
-          // PlannerEmpty loading/error honesty, so it is gated ABOVE the
-          // grid-state branch below.)
+          // WeeklyList replaces the grid in the same full-width slot. (It
+          // carries its own PlannerEmpty loading/error honesty, so it is gated
+          // ABOVE the grid-state branch below.)
           <WeeklyList />
         ) : gridDataState === "pending" ? (
           /* Hydrate in flight (Supabase, 11–16s) — a day-column skeleton in
@@ -1357,93 +681,22 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
              new frames are self-contained (no props), reading the planner +
              app-state stores directly exactly like WeekColumns/WeeklyGrid, so
              selection flows through the shared selectedLessonId the shell's
-             URL-sync + RightRail already consume. The v1 WeeklyGrid is no
-             longer reachable from the plain color/glass VIEW frame. */
+             URL-sync consumes, and expansion through the shared
+             <WeekExpansionProvider> set. The v1 WeeklyGrid is no longer
+             reachable from the plain color/glass VIEW frame. */
           <WeekC />
         )}
       </div>
     );
   }
 
-  function renderRailPanel(grip: ReactNode): ReactNode {
-    return (
-      <div
-        className={[
-          styles.columnWithGrip,
-          styles.railColumnWithGrip,
-          railHidden ? styles.railSlotHidden : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        data-pane="rail"
-      >
-        {/* Hide-rail toggle button — always visible so the teacher can
-            re-expand after collapsing. Positioned at the top of the slot. */}
-        <Tooltip content={railHidden ? "Show rail" : "Hide rail"} side="left">
-          <Button
-            variant="icon"
-            size="sm"
-            iconAriaLabel={
-              railHidden ? "Show resources rail" : "Hide resources rail"
-            }
-            className={styles.railToggleBtn}
-            onClick={handleToggleRail}
-          >
-            <RailToggleIcon hidden={railHidden} />
-          </Button>
-        </Tooltip>
-
-        {/* The drag grip sits above the toggle so both affordances live in
-            the top-left region without overlap. The grip is hidden (same
-            as other content) when the rail is collapsed. */}
-        {!railHidden && grip}
-
-        {/* Full rail content — hidden (but still mounted) when collapsed
-            so state (panel order, heights, collapsed-set) survives
-            toggling. The railSlotHidden class clips the overflow so no
-            content peeks past the stub boundary. */}
-        {!railHidden && (
-          <RightRail
-            lesson={selectedLesson}
-            week={week}
-            day={selectedDay}
-            mode={railMode}
-            lessons={railMode === "week" ? weekLessons : undefined}
-            onClearLesson={
-              selectedLesson !== null
-                ? () => setSelectedLessonId(null)
-                : undefined
-            }
-          />
-        )}
-      </div>
-    );
-  }
-
-  const PANEL_RENDERERS: Record<PanelId, (grip: ReactNode) => ReactNode> = {
-    grid: renderGridPanel,
-    rail: renderRailPanel,
-  };
-
   return (
     /* W3.8 — the provider sits at the very top of the shell tree so every
-       card parent (grid slot, columns, drawer) can reach the opener. */
+       card parent (grid slot, columns) can reach the opener. */
     <OpenLessonEditorContext.Provider value={openLessonEditor}>
       <div className={styles.page}>
-        {/* ── aria-live region: column reorder announcements ───────────────
-          A visually hidden polite live region — when a panel moves
-          (mouse, touch, or keyboard) we write the new order into it so
-          screen-readers hear the change. Always in DOM so the live
-          attribute is observed from the start. */}
-        <div
-          id={columnAnnounceRegionId}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className={styles.srOnly}
-        >
-          {columnAnnouncement}
-        </div>
+        {/* The panel-reorder aria-live region that used to sit here is gone
+          with the reorder: one panel has no order to announce. */}
 
         {/* ── Single shared week row ──────────────────────────────────────
           The Weekly view's only header chrome. The former "Weekly View"
@@ -1464,6 +717,35 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           headingLevel="h1"
           actions={
             <>
+              {/* ── Resources → the Wall, on "This Week · Mixed" ────────────
+                  THE ONE CAPABILITY THE RAIL REMOVAL COSTS. The old right rail
+                  aggregated every resource across the week; nothing else in the
+                  product answered that. The replacement is not a rebuilt panel
+                  but a route to the Wall's own week preset — ONE resource
+                  surface instead of two, so the Wall's sections, per-card
+                  colours, photos and composer are not shadowed by a lesser copy
+                  that drifts as the Wall gains features.
+
+                  The href comes from `weekResourcesHref()` rather than an
+                  inline query string: it names the QUESTION, so this header
+                  never learns which preset answers it. <Link>, like Print, so
+                  it works without JS and stays keyboard-operable. */}
+              <Tooltip
+                content="Open this week's resources on the Wall — every resource across every lesson in the week, in one place."
+                side="bottom"
+                tooltipId="weekly-resources-link"
+              >
+                <Link
+                  href={weekResourcesHref()}
+                  className={styles.headerLink}
+                  aria-label="Open this week's resources on the Wall"
+                  title="Open this week's resources on the Wall"
+                >
+                  <IconResources width={14} height={14} />
+                  Resources
+                </Link>
+              </Tooltip>
+
               {/* Print → /weekly/print, the paper-friendly subject × day sheet.
                   See the IconPrint note at the top of this file for why this
                   exists and why the href carries only `?week=`. */}
@@ -1486,137 +768,31 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           }
         />
 
-        {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}
+        {/* ── Body row: icon rail (fixed) + the single canvas ───────────── */}
         <div className={styles.bodyRow}>
           {/* Far-left slim icon nav strip — shared with Daily. */}
           <IconRail />
 
-          {/* Week EDIT — the board is a dedicated FULL-WIDTH canvas (bundle:
-            WeekEdit mounts alone in the viewbody; no resources rail). The
-            reorderable grid+rail body below is View-mode chrome; suppressing
-            it here mirrors how Day edit takes over /daily. Rail state
-            (width, order, collapsed panels) is untouched and returns intact
-            when the teacher flips back to View. */}
-          {isEdit ? (
-            <div className={styles.body} style={{ gridTemplateColumns: "1fr" }}>
-              <div className={styles.gridSlot}>{renderGridPanel(null)}</div>
-            </div>
-          ) : (
-          <div
-            ref={bodyRef}
-            className={styles.body}
-            style={{ gridTemplateColumns: gridTemplate }}
-          >
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleColumnDragStart}
-              onDragEnd={handleColumnDragEnd}
-              onDragCancel={handleColumnDragCancel}
-            >
-              <SortableContext
-                items={columnOrder}
-                strategy={horizontalListSortingStrategy}
-              >
-                {columnOrder.map((id, i) => {
-                  const render = PANEL_RENDERERS[id];
-                  // Build a unique CSS class per panel id so its inner
-                  // chrome keeps its existing look regardless of position.
-                  const slotClass =
-                    id === "rail" ? styles.railSlot : styles.gridSlot;
-                  return (
-                    <Fragment key={id}>
-                      <SortablePanel id={id} className={slotClass}>
-                        {(grip) => render(grip)}
-                      </SortablePanel>
-                      {/* Splitter sits between this panel and the next; the
-                        last panel has no trailing splitter. When the rail
-                        is hidden we suppress the splitter so the teacher
-                        uses the toggle button to re-expand. */}
-                      {i < columnOrder.length - 1 && !railHidden && (
-                        <PaneSplitter
-                          width={Math.round(rightWidth)}
-                          min={bounds.min}
-                          max={bounds.max}
-                          onDrag={handleSplitterDrag}
-                          onStep={handleSplitterStep}
-                          label="Resize resources rail"
-                        />
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </SortableContext>
-
-              {/* Floating ghost of the dragged panel — a small chip with
-                the panel's label, reusing the right-rail panel-ghost
-                visual vocabulary (paper card + hairline + soft lift). */}
-              <DragOverlay>
-                {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
-              </DragOverlay>
-            </DndContext>
+          {/* One full-width canvas slot, View and Edit alike. Edit used to be
+            the special case here — the board mounted alone while View split
+            the row with the rail — and now both take the whole row, so the
+            branch that existed only to suppress the rail is gone with it.
+            renderGridPanel still routes Edit to the board internally. */}
+          <div className={styles.body} style={{ gridTemplateColumns: "1fr" }}>
+            <div className={styles.gridSlot}>{renderGridPanel()}</div>
           </div>
-          )}
         </div>
 
-        {/* ── W3-C3 — narrow-viewport overlay drawer ──────────────────────
-          At ≤1280px the inline rail is `display: none` (see
-          WeeklyShell.module.css RES-CRIT-001) so the WeeklyGrid has
-          breathing room. The drawer brings the same <RightRail> content
-          back as a slide-in overlay triggered by the GlobalRail's
-          To-dos / Shoutbox icons. State is the existing
-          todoPanelOpen / commentsPanelOpen flags on useAppState —
-          no new app-state introduced (drawer close flips both off so
-          the icons' aria-pressed stays accurate). The inline rail
-          render above is untouched; the drawer is a parallel surface
-          that only mounts when `drawerMode` is true. */}
-        <WeeklyRailDrawer
-          open={drawerOpen}
-          onClose={handleDrawerClose}
-          selectedLesson={selectedLesson}
-          week={week}
-          selectedDay={selectedDay}
-          railMode={railMode}
-          weekLessons={weekLessons}
-          onClearLesson={
-            selectedLesson !== null
-              ? () => setSelectedLessonId(null)
-              : undefined
-          }
-        />
         {/* B5.7 — no lesson popup is mounted here any more. "Open in
             editor" calls the global unit-workspace host (mounted once in
             app/(planner)/layout.tsx), which renders the dialog above every
-            planner route. One mount, one focus trap, one scroll lock. */}
+            planner route. One mount, one focus trap, one scroll lock.
+
+            W3-C3 — and no overlay rail drawer either. It hosted the rail's
+            content in the ≤1280px band; with no rail there is nothing for it
+            to host. <WeeklyRailDrawer> itself stays in the folder for
+            WeeklyShellV1. */}
       </div>
     </OpenLessonEditorContext.Provider>
-  );
-}
-
-// ── Rail toggle icon ──────────────────────────────────────────────────────
-// A simple chevron that flips direction based on whether the rail is hidden
-// (pointing left = "open it") or visible (pointing right = "close it").
-// aria-hidden because the parent button carries the label.
-
-function RailToggleIcon({ hidden }: { hidden: boolean }): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{
-        transform: hidden ? "rotate(180deg)" : "rotate(0deg)",
-        transition: "transform 0.15s ease-out",
-      }}
-    >
-      {/* Right-pointing chevron › — rotated 180° when rail is hidden */}
-      <polyline points="9 6 15 12 9 18" />
-    </svg>
   );
 }

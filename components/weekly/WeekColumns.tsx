@@ -149,6 +149,7 @@ export function WeekColumns(): ReactNode {
   const {
     isExpanded,
     toggle: toggleExpanded,
+    collapse,
     publishVisible,
     snapshotAndCollapse,
     restoreSnapshot,
@@ -459,16 +460,16 @@ export function WeekColumns(): ReactNode {
   // document listener) rather than a drawer's close button, but the contract
   // is unchanged: whatever dismisses the selection also shuts the card.
   //
-  // `toggleExpanded` is used rather than an unconditional delete BECAUSE it is
-  // guarded by isExpanded: a card the teacher had opened via "Expand all" and
-  // never selected must not be closed by someone else's Esc.
+  // `collapse` rather than a guarded `toggle`: it is already a no-op on a card
+  // that is shut, so it cannot re-OPEN one, and it drops the `isExpanded`
+  // dependency that made this effect re-run on every expansion anywhere in the
+  // week. WeekA and WeekC run the identical effect — the three canvases must
+  // not disagree about what Esc leaves behind.
   useEffect(() => {
     const prev = prevSelectedLessonIdRef.current;
     prevSelectedLessonIdRef.current = selectedLessonId;
-    if (selectedLessonId === null && prev !== null && isExpanded(prev)) {
-      toggleExpanded(prev);
-    }
-  }, [selectedLessonId, isExpanded, toggleExpanded]);
+    if (selectedLessonId === null && prev !== null) collapse(prev);
+  }, [selectedLessonId, collapse]);
 
   // ── dnd-kit event handlers (mirror WeeklyGrid 445-514) ────────────────────
 

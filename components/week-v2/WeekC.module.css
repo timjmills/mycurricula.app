@@ -406,3 +406,58 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ── Expanded tile (task #47) ──────────────────────────────────────────────
+   /weekly has no right panel any more, so a click opens the lesson HERE.
+
+   `justify-content` flips to flex-start: the collapsed tile centres its one or
+   two lines inside a 52px box, and keeping that once there is a body would
+   float the whole stack in the middle of a tall card. `min-height` releases so
+   the tile sizes to its content. */
+.tileExpanded {
+  justify-content: flex-start;
+  min-height: 0;
+}
+/* The hover lift fights an expanded tile — it is already the focus, and a
+   translate on a tall card makes the lane jitter under the pointer. */
+.tileExpanded:hover {
+  transform: none;
+}
+
+.tileBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgb(255 255 255 / 0.3);
+}
+
+/* `color: inherit` rather than a token: this tile is a saturated subject
+   gradient and sets its own on-colour ink (plus the text-shadow that keeps it
+   readable at the light end of the ramp). Inheriting means the body can never
+   drift away from the title it sits under, in any tone or theme. */
+.tileBodyRow {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: inherit;
+}
+
+.tileBodyLabel {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.tileBodyEmpty {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  font-style: italic;
+  color: inherit;
+  opacity: 0.82;
+}

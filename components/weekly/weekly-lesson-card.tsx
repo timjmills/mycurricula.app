@@ -79,6 +79,9 @@ import { RelocatePicker } from "@/components/lesson-card/relocate-picker";
 import type { RelocateTarget } from "@/components/lesson-card/relocate-picker";
 import { CompareToMaster } from "@/components/lesson-card/compare-to-master";
 import { ArchiveToast } from "@/components/lesson-card/archive-toast";
+// The handoff's four Week destinations, hung off the band's ⋮ (see the
+// callsite note in the band).
+import { LessonKebabMenu } from "./lesson-kebab-menu";
 import {
   CompletionCheck,
   ResourceList,
@@ -1217,6 +1220,21 @@ export function WeeklyLessonCard({
                   {titleSub}
                 </span>
               )}
+
+              {/* ⋮ — the v2 handoff's four Week destinations (Plan · Teach ·
+                  Post · Planner, V2 Framework.md:416-417). The handoff hangs
+                  them off a click on the cell itself; /weekly gives that click
+                  to the in-place expand (user-directed), so they move here.
+No compact-density guard is needed: the compact chip
+                  returns from an earlier branch and never reaches this band,
+                  so a drag ghost cannot carry a live menu trigger. */}
+              <LessonKebabMenu
+                lessonId={lesson.id}
+                lessonTitle={stripHtml(lesson.title)}
+                subjectClass={subject.cls}
+                onPlan={openLessonEditor}
+                triggerClassName={styles.bandKebab}
+              />
 
               {/* Caret — indicates expand state, positioned at bottom-right of band */}
               <span

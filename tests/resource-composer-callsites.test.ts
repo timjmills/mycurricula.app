@@ -41,6 +41,30 @@ const store = vi.hoisted(() => ({
   editLessonCalls: [] as unknown[],
 }));
 
+// 30s, matching the other mount-based suites. The click tests below drive a
+// real react-dom mount; that is a few hundred ms of honest work and breaches
+// vitest's 5s default whenever several lanes share the machine. It does not
+// mask a hang — every test here fails on an ASSERTION, never a timeout, when
+// the wiring under test is mutated out.
+vi.setConfig({ testTimeout: 30000 });
+
+// The Week card now renders <LessonKebabMenu>, which calls useRouter() for the
+// handoff's Plan / Teach / Post / Planner destinations. Without this the mount
+// throws "invariant expected app router to be mounted" and every click test in
+// this file fails for a reason that has nothing to do with the composer.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  usePathname: () => "/weekly",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("@/lib/planner-store", () => ({
   usePlanner: () => ({
     subjectById: store.subjectById,
