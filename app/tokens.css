@@ -185,14 +185,39 @@
      fills/lanes/chips) and an ink (--subj-N-ink, AA text on tint). The
      -bright variant is a more saturated accent used ONLY for chip outlines,
      icon tiles and dots in the cascade. Assign any subject to any slot; the
-     8 active subjects below map onto these. */
-  --subj-1: #dcc674;
+     8 active subjects below map onto these.
+
+     GENERATED — do not hand-edit a hex here. These 60 values are the OKLCh
+     derivation in lib/subject-color.ts; regenerate with
+     `node scripts/gen-subject-tokens.mjs` and paste, or run it with `--check`
+     to prove this block still agrees. tests/subject-color-derivation.test.ts
+     asserts the same thing, declaration by declaration.
+
+     WHY DERIVED RATHER THAN TRANSCRIBED. CLAUDE.md §4a makes the v2 handoff
+     authoritative for look, and the handoff hand-authors all 60 of these. This
+     is a DELIBERATE, USER-APPROVED OVERRIDE decided 2026-08-01, because ten of
+     the fifteen authored solids fail WCAG 1.4.11 (3:1, non-text) on --surface —
+     gold measured 1.70:1 — and subject colour carries team-wide MEANING, so a
+     stripe a teacher cannot distinguish is a functional failure. Do not revert
+     it as a handoff violation; read lib/subject-color.ts first.
+
+     ANCHORED: a handoff value that already cleared its floor is reproduced
+     BYTE-FOR-BYTE, and a failing one is moved only as far as the floor
+     requires. 41 of the 60 are the handoff's own hexes untouched; 19 moved
+     (10 solids + 9 brights). Every tint and every ink is the handoff's.
+
+     TWO-SIDED: solids and brights are deliberately NOT re-themed by tone (see
+     the data-tone="dark" block below — hue is team-wide meaning), so each one
+     clears 3:1 on BOTH --surface #ffffff and dark --surface #1e1d2c. That is a
+     band, not a minimum: #7147d1 was legible on white and NOT on night, which
+     is why two of the brights got LIGHTER rather than darker. */
+  --subj-1: #a89240;
   --subj-1-tint: #f4efdf;
   --subj-1-ink: #7a671f; /* gold */
-  --subj-2: #dca574;
+  --subj-2: #be8858;
   --subj-2-tint: #f4e9df;
   --subj-2-ink: #7a491f; /* apricot */
-  --subj-3: #dc8274;
+  --subj-3: #d57b6d;
   --subj-3-tint: #f4e2df;
   --subj-3-ink: #7a2b1f; /* coral */
   --subj-4: #cf778d;
@@ -201,7 +226,7 @@
   --subj-5: #cf77af;
   --subj-5-tint: #f2e1ec;
   --subj-5-ink: #7a1f59; /* pink */
-  --subj-6: #c77ac7;
+  --subj-6: #c578c5;
   --subj-6-tint: #f0e2f0;
   --subj-6-ink: #752475; /* magenta */
   --subj-7: #ab7ac7;
@@ -213,48 +238,68 @@
   --subj-9: #7a7fc7;
   --subj-9-tint: #e2e3f0;
   --subj-9-ink: #242975; /* periwinkle */
-  --subj-10: #7a9ec7;
+  --subj-10: #7396bf;
   --subj-10-tint: #e2e9f0;
   --subj-10-ink: #244a75; /* blue */
-  --subj-11: #7ab8c7;
+  --subj-11: #5f9cab;
   --subj-11-tint: #e2eef0;
   --subj-11-ink: #246575; /* cyan */
-  --subj-12: #7ac7b8;
+  --subj-12: #53a092;
   --subj-12-tint: #e2f0ee;
   --subj-12-ink: #247565; /* teal */
-  --subj-13: #7ac79b;
+  --subj-13: #56a278;
   --subj-13-tint: #e2f0e8;
   --subj-13-ink: #247547; /* green */
-  --subj-14: #7ac77a;
+  --subj-14: #58a459;
   --subj-14-tint: #e2f0e2;
   --subj-14-ink: #257425; /* leaf */
-  --subj-15: #9ac77a;
+  --subj-15: #749f54;
   --subj-15-tint: #e8f0e2;
   --subj-15-ink: #467524; /* lime */
 
-  /* Bright chip accents — outlines, icon tiles and dots in the cascade only */
-  --subj-1-bright: #e8bb17;
-  --subj-2-bright: #e87917;
+  /* Bright chip accents — outlines, icon tiles and dots in the cascade only.
+     Same derivation + same two-sided band as the solids above. --subj-5-bright
+     #e8179b is the Team caution glow named in CLAUDE.md §2; it passes both
+     sides untouched, so the documented literal is still the shipped one. */
+  --subj-1-bright: #b48f00;
+  --subj-2-bright: #e4750f;
   --subj-3-bright: #e83317;
   --subj-4-bright: #e8174b;
   --subj-5-bright: #e8179b;
   --subj-6-bright: #d147d1;
   --subj-7-bright: #9f47d1;
-  --subj-8-bright: #7147d1;
-  --subj-9-bright: #4751d1;
+  --subj-8-bright: #774ed8;
+  --subj-9-bright: #4f5cdc;
   --subj-10-bright: #4788d1;
-  --subj-11-bright: #47b6d1;
-  --subj-12-bright: #47d1b6;
-  --subj-13-bright: #47d183;
-  --subj-14-bright: #47d147;
-  --subj-15-bright: #81d147;
+  --subj-11-bright: #2ba0bb;
+  --subj-12-bright: #00a68e;
+  --subj-13-bright: #00a95f;
+  --subj-14-bright: #03ab15;
+  --subj-15-bright: #59a602;
 
   /* ── Subject aliases (team-wide, fixed 8) ─────────────────────────────
-     The 8 locked subjects, re-pointed onto v1.3 slots (authoritative map
-     from the design kit's data.js). `-light` = the slot tint, `-deep` = the
-     slot ink, so the existing `.cp-subj.<id>` classes keep working. These are
-     the STATIC fallback — live subject color is driven by lib/palette-data.ts
-     + the PaletteCssBridge, which overrides --c / --cl / --cd at runtime. */
+     The 8 locked subjects, re-pointed onto v1.3 slots. `-light` = the slot
+     tint, `-deep` = the slot ink, so the existing `.cp-subj.<id>` classes keep
+     working. These are the STATIC fallback — live subject color is driven by
+     lib/palette-data.ts + the PaletteCssBridge, which overrides --c / --cl /
+     --cd at runtime.
+
+     THE MAP IS THE HANDOFF'S, and it is meaning rather than styling: CLAUDE.md
+     §4 locks it team-wide, so a subject on the wrong slot makes two teachers
+     read the same stripe differently. Source of truth, in the handoff's own
+     authority order — the runnable mockup's data first:
+       Documents/Claude Design/6.24.26 design_handoff_v2_site/source/data.js:7-14
+       Documents/Claude Design/7.21.26 Design Handoff Update/source-home/data.js:7-14
+       …/6.24.26 design_handoff_v2_site/design-system/V2 Framework.md:184-193
+     All three agree, as does CLAUDE.md §4. Keep this in lockstep with
+     DEFAULT_SUBJECT_MAPPING in lib/palette-data.ts — tests/subject-slot-map.test.ts
+     pins both against the handoff, including the -light/-deep/-bright
+     companions, which is what catches a half-applied re-point.
+
+     An earlier revision of this block cited "the design kit's data.js" as the
+     authority for a DIFFERENT map (writing→2, spelling→5, ufli→3, sel→9). No
+     data.js in any handoff has ever carried those values; the citation was
+     unsupported and four subjects rendered the wrong colour because of it. */
   --math: var(--subj-1);
   --math-light: var(--subj-1-tint);
   --math-deep: var(--subj-1-ink);
@@ -265,35 +310,35 @@
   --reading-deep: var(--subj-10-ink);
   --reading-bright: var(--subj-10-bright);
 
-  --writing: var(--subj-2);
-  --writing-light: var(--subj-2-tint);
-  --writing-deep: var(--subj-2-ink);
-  --writing-bright: var(--subj-2-bright);
+  --writing: var(--subj-5);
+  --writing-light: var(--subj-5-tint);
+  --writing-deep: var(--subj-5-ink);
+  --writing-bright: var(--subj-5-bright);
 
   --grammar: var(--subj-7);
   --grammar-light: var(--subj-7-tint);
   --grammar-deep: var(--subj-7-ink);
   --grammar-bright: var(--subj-7-bright);
 
-  --spelling: var(--subj-5);
-  --spelling-light: var(--subj-5-tint);
-  --spelling-deep: var(--subj-5-ink);
-  --spelling-bright: var(--subj-5-bright);
+  --spelling: var(--subj-9);
+  --spelling-light: var(--subj-9-tint);
+  --spelling-deep: var(--subj-9-ink);
+  --spelling-bright: var(--subj-9-bright);
 
-  --ufli: var(--subj-3);
-  --ufli-light: var(--subj-3-tint);
-  --ufli-deep: var(--subj-3-ink);
-  --ufli-bright: var(--subj-3-bright);
+  --ufli: var(--subj-2);
+  --ufli-light: var(--subj-2-tint);
+  --ufli-deep: var(--subj-2-ink);
+  --ufli-bright: var(--subj-2-bright);
 
   --explorers: var(--subj-13);
   --explorers-light: var(--subj-13-tint);
   --explorers-deep: var(--subj-13-ink);
   --explorers-bright: var(--subj-13-bright);
 
-  --sel: var(--subj-9);
-  --sel-light: var(--subj-9-tint);
-  --sel-deep: var(--subj-9-ink);
-  --sel-bright: var(--subj-9-bright);
+  --sel: var(--subj-12);
+  --sel-light: var(--subj-12-tint);
+  --sel-deep: var(--subj-12-ink);
+  --sel-bright: var(--subj-12-bright);
 
   /* Grade bands — White Rose years (grade-level tagging, NOT subjects) */
   --gK: #f6c96a;

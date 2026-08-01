@@ -13,6 +13,7 @@
 // context, hook, and CSS-variable bridge live in `palette.tsx`, which
 // re-exports everything from here so `@/lib/palette` is the full surface.
 
+import { SUBJECT_SLOTS } from "./subject-color";
 import type { SubjectId } from "./types";
 
 /** Which of the two saturation variants a teacher views. */
@@ -101,26 +102,36 @@ export const PALETTE_20: readonly PaletteSwatch[] = [
 // ── The v1.3 subject scale — 15 muted slots (White Rose register) ────────
 // The active brand palette. Each slot carries the muted `solid` (normal), the
 // `bright` accent (outline/stripe/dot under Highlight), the soft `tint` fill,
-// and the `ink` text (deep). Values mirror app/tokens.css `--subj-N*` exactly.
-// These are the "15 options" a teacher can assign; the 8 locked subjects map
-// onto them by default (see DEFAULT_SUBJECT_MAPPING).
-export const SUBJECT_SWATCHES: readonly PaletteSwatch[] = [
-  { id: "subj-1",  name: "Gold",       normal: "#DCC674", bright: "#E8BB17", tint: "#F4EFDF", deep: "#7A671F", highlight: "#E8BB17" }, // prettier-ignore
-  { id: "subj-2",  name: "Apricot",    normal: "#DCA574", bright: "#E87917", tint: "#F4E9DF", deep: "#7A491F", highlight: "#E87917" }, // prettier-ignore
-  { id: "subj-3",  name: "Coral",      normal: "#DC8274", bright: "#E83317", tint: "#F4E2DF", deep: "#7A2B1F", highlight: "#E83317" }, // prettier-ignore
-  { id: "subj-4",  name: "Rose",       normal: "#CF778D", bright: "#E8174B", tint: "#F2E1E5", deep: "#7A1F36", highlight: "#E8174B" }, // prettier-ignore
-  { id: "subj-5",  name: "Pink",       normal: "#CF77AF", bright: "#E8179B", tint: "#F2E1EC", deep: "#7A1F59", highlight: "#E8179B" }, // prettier-ignore
-  { id: "subj-6",  name: "Magenta",    normal: "#C77AC7", bright: "#D147D1", tint: "#F0E2F0", deep: "#752475", highlight: "#D147D1" }, // prettier-ignore
-  { id: "subj-7",  name: "Purple",     normal: "#AB7AC7", bright: "#9F47D1", tint: "#EBE2F0", deep: "#572475", highlight: "#9F47D1" }, // prettier-ignore
-  { id: "subj-8",  name: "Violet",     normal: "#917AC7", bright: "#7147D1", tint: "#E6E2F0", deep: "#3C2475", highlight: "#7147D1" }, // prettier-ignore
-  { id: "subj-9",  name: "Periwinkle", normal: "#7A7FC7", bright: "#4751D1", tint: "#E2E3F0", deep: "#242975", highlight: "#4751D1" }, // prettier-ignore
-  { id: "subj-10", name: "Blue",       normal: "#7A9EC7", bright: "#4788D1", tint: "#E2E9F0", deep: "#244A75", highlight: "#4788D1" }, // prettier-ignore
-  { id: "subj-11", name: "Cyan",       normal: "#7AB8C7", bright: "#47B6D1", tint: "#E2EEF0", deep: "#246575", highlight: "#47B6D1" }, // prettier-ignore
-  { id: "subj-12", name: "Teal",       normal: "#7AC7B8", bright: "#47D1B6", tint: "#E2F0EE", deep: "#247565", highlight: "#47D1B6" }, // prettier-ignore
-  { id: "subj-13", name: "Green",      normal: "#7AC79B", bright: "#47D183", tint: "#E2F0E8", deep: "#247547", highlight: "#47D183" }, // prettier-ignore
-  { id: "subj-14", name: "Leaf",       normal: "#7AC77A", bright: "#47D147", tint: "#E2F0E2", deep: "#257425", highlight: "#47D147" }, // prettier-ignore
-  { id: "subj-15", name: "Lime",       normal: "#9AC77A", bright: "#81D147", tint: "#E8F0E2", deep: "#467524", highlight: "#81D147" }, // prettier-ignore
+// and the `ink` text (deep). These are the "15 options" a teacher can assign;
+// the 8 locked subjects map onto them by default (see DEFAULT_SUBJECT_MAPPING).
+//
+// The colours are IMPORTED, not transcribed. They used to be fifteen rows of
+// literal hexes with a comment promising they "mirror app/tokens.css --subj-N*
+// exactly" — a promise nothing checked, on a table the Appearance picker paints
+// AND prints the hex of (components/appearance/palette-reference.tsx:118,132).
+// A stylesheet-only edit would have left the picker showing a teacher a swatch
+// and a hex code the app no longer renders anywhere. Both now read the one
+// derivation in lib/subject-color.ts; see that file for why the values are
+// computed rather than taken from the handoff verbatim.
+const SLOT_NAMES = [
+  "Gold", "Apricot", "Coral", "Rose", "Pink", "Magenta", "Purple", "Violet",
+  "Periwinkle", "Blue", "Cyan", "Teal", "Green", "Leaf", "Lime",
 ] as const;
+
+export const SUBJECT_SWATCHES: readonly PaletteSwatch[] = SUBJECT_SLOTS.map(
+  (slot, i) => ({
+    id: `subj-${i + 1}`,
+    name: SLOT_NAMES[i],
+    normal: slot.solid,
+    bright: slot.bright,
+    tint: slot.tint,
+    deep: slot.ink,
+    // The v1.3 scale has no separate highlighter-marker variant: the bright
+    // accent IS what the Highlight palette shows. Kept as its own field because
+    // `PaletteSwatch` is shared with the legacy 20-pool, where the two differ.
+    highlight: slot.bright,
+  }),
+);
 
 /** Swatch lookup by id — both the v1.3 15-slot scale and the legacy 20-pool
  *  resolve here, so saved mappings referencing either keep working. v1.3
@@ -133,55 +144,52 @@ export const PALETTE_BY_ID: Record<string, PaletteSwatch> = Object.fromEntries(
 /** Subject → swatch id mapping. */
 export type SubjectMapping = Record<SubjectId, string>;
 
-// Default subject → swatch assignment (v1.3 — the FLAG-OFF v1 map). The 8 locked
-// subjects map onto the muted 15-slot brand scale per the design kit's data.js:
-//   math→1  reading→10  writing→2  grammar→7  spelling→5  ufli→3
-//   explorers→13  sel→9
+// Default subject → swatch assignment. The 8 locked subjects map onto the muted
+// 15-slot brand scale per the v2 design handoff:
+//   math→1  ufli→2  writing→5  grammar→7  spelling→9  reading→10
+//   sel→12  explorers→13
 //
-// This is the v1 mapping used by the context-driven `useSubjectColor` hook and
-// the global PaletteCssBridge `.cp-subj` rules. It MUST stay intact — changing
-// it would recolor flag-OFF v1. It mirrors the named-subject aliases baked into
-// app/tokens.css `:root` (--writing→subj-2, --spelling→subj-5, --ufli→subj-3,
-// --sel→subj-9, …), which are likewise the v1 static fallback.
+// This is the mapping used by the context-driven `useSubjectColor` hook and the
+// global PaletteCssBridge `.cp-subj` rules — i.e. the map every live read path
+// resolves, on both the v2 and the flag-OFF v1 paths. It mirrors the
+// named-subject aliases in app/tokens.css `:root`, which are the static
+// SSR/no-JS fallback; tests/subject-slot-map.test.ts pins the two together
+// against the handoff so they cannot drift apart again.
+//
+// HISTORY — why this changed. Four subjects (writing, spelling, ufli, sel) were
+// previously on the wrong slots, attributed in-comment to "the design kit's
+// data.js". No data.js in any handoff has ever carried those values: the
+// mockup's own source (6.24.26 …/source/data.js:7-14 and the 7.21.26 update),
+// V2 Framework.md:184-193 and CLAUDE.md §4 all specify the map above, and all
+// four agree with each other. The old comment also argued this map "MUST stay
+// intact" to avoid recolouring flag-OFF v1 — but v1's colours were wrong by the
+// same handoff, and `NEXT_PUBLIC_V2` defaults ON (lib/v2-flag.ts), so the wrong
+// map was what production actually rendered. The slot is team-wide MEANING
+// (CLAUDE.md §4), not per-path styling, so both paths carry the handoff map.
+//
+// Nothing is migrated by this change: colour is a derived slug (subjects.color
+// stores e.g. "writing"), and the Appearance page's team mapping is local
+// component state that is never persisted. No stored row pins a slot id.
 export const DEFAULT_SUBJECT_MAPPING: SubjectMapping = {
   math: "subj-1",
   reading: "subj-10",
-  writing: "subj-2",
-  grammar: "subj-7",
-  spelling: "subj-5",
-  ufli: "subj-3",
-  explorers: "subj-13",
-  sel: "subj-9",
-};
-
-// ── The v2 subject → slot map (V2 Framework §4 — locked decision D1) ──────────
-// The v2 appearance engine remaps four subjects relative to the v1 map above:
-//   writing  subj-2 → subj-5  (pink)
-//   spelling subj-5 → subj-9  (periwinkle)
-//   ufli     subj-3 → subj-2  (apricot)
-//   sel      subj-9 → subj-12 (teal)
-// math / reading / grammar / explorers are unchanged.
-//
-// STAGING NOTE — this map is DEFINED here but not yet wired to any live
-// callsite. No surface in this wave reads it: every current resolveSubjectColor
-// call resolves the v1 DEFAULT_SUBJECT_MAPPING (see palette.tsx). The map is
-// applied when a v2 subject-color read path lands in a LATER stage; that path
-// MUST resolve it through the PURE `resolveSubjectColor(subjectId, type,
-// V2_SUBJECT_SLOTS)` and assign the result to inline `--sc/--sct/--sci` on each
-// card/lane. It must NEVER be fed into PaletteContext or a second
-// PaletteProvider — doing so would re-emit global `.cp-subj` rules with the v2
-// hues and recolor flag-OFF v1. Color remains a derived slug (subjects.color
-// stores e.g. "writing"); no lesson-row data is migrated by this map.
-export const V2_SUBJECT_SLOTS: SubjectMapping = {
-  math: "subj-1",
-  ufli: "subj-2",
   writing: "subj-5",
   grammar: "subj-7",
   spelling: "subj-9",
-  reading: "subj-10",
-  sel: "subj-12",
+  ufli: "subj-2",
   explorers: "subj-13",
+  sel: "subj-12",
 };
+
+// A second map, `V2_SUBJECT_SLOTS`, used to live here — the handoff's values,
+// kept alongside the divergent default behind a staging note describing a
+// "later stage" that would wire it to v2 callsites as inline `--sc/--sct/--sci`.
+// That stage never came: it had ZERO consumers repo-wide while every surface
+// resolved the divergent default, so the corrected slots it held never reached
+// a pixel. It is deleted rather than kept in sync with the map above, because a
+// second table nobody reads is precisely how the original divergence was born.
+// tests/subject-slot-map.test.ts now pins the single live map — and the
+// tokens.css aliases — against the handoff instead.
 
 /** v1.3 brand-scale slot ids look like `subj-7`; legacy 20-pool ids are
  *  named hues (`ocean`, `coral`, …). Slots carry a matching `--subj-N-*`
@@ -191,13 +199,12 @@ const SLOT_ID = /^subj-\d+$/;
 /**
  * Resolve a subject's color tokens for a given palette type and mapping.
  * Pure — usable on the server or outside React, and it NEVER reads
- * PaletteContext: the mapping is always an explicit argument. The flag-OFF v1
- * path reaches it via the `useSubjectColor` hook in `palette.tsx`, which wraps
- * it with the active PaletteContext (the v1 `DEFAULT_SUBJECT_MAPPING`). A future
- * v2 read path will call it DIRECTLY with the v2 map —
- * `resolveSubjectColor(subjectId, type, V2_SUBJECT_SLOTS)` — and assign the
- * result to inline `--sc/--sct/--sci`, so the v2 remap never touches context
- * and cannot recolor v1. (No such callsite exists yet — see V2_SUBJECT_SLOTS.)
+ * PaletteContext: the mapping is always an explicit argument. Callers reach it
+ * via the `useSubjectColor` hook in `palette.tsx`, which wraps it with the
+ * active PaletteContext (seeded from `DEFAULT_SUBJECT_MAPPING`, which now
+ * carries the handoff map — see the note there). Passing an explicit mapping
+ * is still supported and is how a caller scopes a colour read to something
+ * other than the active context.
  *
  * The returned values are CSS color EXPRESSIONS — `var(--token)` references
  * (for v1.3 slot swatches, so the night theme's token overrides flow through)

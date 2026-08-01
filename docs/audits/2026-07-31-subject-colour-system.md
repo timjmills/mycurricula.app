@@ -22,6 +22,41 @@ migration code was written.
 > design-system CSS > plan. Where this document proposes something the handoff
 > does not contain, it says so explicitly (see §A.4 and F-03).
 
+> ## SUPERSEDED IN PART — read this before acting on anything below (2026-08-01)
+>
+> **A11Y-01 was fixed, and the "locked decision 3" this plan was written around
+> was reversed by the user.** That decision — keep the eight authored solids
+> unchanged and accept the ten 1.4.11 failures — is no longer the position. The
+> user's decision of 2026-08-01 is that subject colours are **derived in OKLCh,
+> anchored** so a handoff value that already cleared its floor is reproduced
+> byte-for-byte and a failing one is repaired by the minimum. See the memory
+> `subject-colour-derivation-decision.md` and task #44.
+>
+> **What shipped** (`lib/subject-color.ts`, `app/tokens.css`,
+> `scripts/gen-subject-tokens.mjs`, `tests/subject-color-derivation.test.ts`):
+> 41 of the 60 values are the handoff's own hexes untouched — every tint and
+> every ink among them — and 19 moved (10 solids + 9 brights). A11Y-01's ten
+> failures are closed; this document's measured table is the correct BEFORE.
+>
+> **Two places the shipped work deliberately diverges from the plan below:**
+>
+> 1. **No fourth "mark" role.** §A11Y-01 and §446 propose adding a
+>    contrast-clamped `mark` alongside an unchanged identity `solid`. With the
+>    solid itself now repaired, a fifth token per slot would be a second name
+>    for the same value. The roles remain solid / tint / ink / bright.
+> 2. **One value per token, not a per-tone recipe.** §458-468 propose separate
+>    light and dark recipes. `app/tokens.css` (the `data-tone="dark"` block)
+>    deliberately does NOT re-theme solids or brights — "hue carries team-wide
+>    subject meaning" — so the shipped derivation solves a **two-sided band**
+>    instead: ≥3:1 on `--surface` `#ffffff` AND on dark `--surface` `#1e1d2c`.
+>    That band is why two brights got *lighter*: `#7147d1` and `#4751d1` were
+>    legible on white and failed on night, which a light-tone-only rule misses.
+>    Re-theming solids by tone remains available and remains a design decision
+>    for the user, not a token cleanup.
+>
+> Everything else here — the subjects-as-data capability, the migration shape,
+> the picker — is still an unbuilt plan.
+
 ---
 
 ## A. Recommendation summary

@@ -295,8 +295,13 @@ const TILES: Tile[] = [
   {
     icon: <IconProjector />,
     vars: {
-      "--tic": "var(--writing-bright)",
-      "--tit": "var(--writing-light)",
+      // Slot tokens, not the `--writing` subject alias — this card is about
+      // Teach mode, not the Writing subject, and only borrowed that alias for
+      // its hue. `--subj-2` is what it rendered before the subject map moved to
+      // the v2 handoff. (The "Writing" curriculum card above DOES keep the
+      // subject alias, because there the colour is the subject's identity.)
+      "--tic": "var(--subj-2-bright)",
+      "--tit": "var(--subj-2-tint)",
     } as CSSProperties,
     title: "Teach mode, on the board",
     body: "Project a calm teaching board — now & next, a timer, a noise meter, today's objective — built from the plan you already made.",

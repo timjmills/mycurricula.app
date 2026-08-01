@@ -58,9 +58,12 @@ export function useSubjectColor(subjectId: SubjectId): SubjectColor {
  *
  * Dual-emits both the v1 trio (`--c/--cl/--cd`) and the v2 trio
  * (`--sc/--sct/--sci`, consumed by v2 modes.css). Both trios derive from the
- * SAME context mapping, so this global rule remains the flag-OFF v1 path; the
- * v2 subject remap (V2_SUBJECT_SLOTS) is applied only at v2 callsites as inline
- * `--sc/--sct/--sci` via the pure resolveSubjectColor, never here.
+ * SAME context mapping — which is seeded from `DEFAULT_SUBJECT_MAPPING` and now
+ * carries the handoff's subject→slot map, so this global rule is correct for
+ * both the v2 and the flag-OFF v1 path. (It previously carried a divergent map,
+ * with the handoff's map parked in a second constant awaiting per-callsite
+ * inline emission that never landed. That constant is gone and this is now the
+ * only subject→slot map, so there is no remap to apply anywhere else.)
  */
 export function PaletteCssBridge(): ReactNode {
   const { type, mapping } = useContext(PaletteContext);
@@ -79,12 +82,10 @@ export function PaletteCssBridge(): ReactNode {
       // mixing toward var(--tint-base) (white on light, dark surface on night).
       // ADDITIVE v2 emission: alongside the v1 `--c/--cl/--cd` trio, also emit
       // the v2 `--sc/--sct/--sci` trio (subject-color / subject-tint /
-      // subject-ink) that v2 modes.css consumes. v2 markup normally sets these
-      // inline per card via the pure resolveSubjectColor(_, _, V2_SUBJECT_SLOTS);
-      // this `.cp-subj` emission is a class-based fallback. It mirrors the SAME
-      // context mapping as the `--c/--cl/--cd` trio (not the v2 remap), so this
-      // global rule stays the flag-OFF path and never recolors v1 — the v2
-      // remap lives exclusively at the inline v2 callsites.
+      // subject-ink) that v2 modes.css consumes. Both trios read the SAME
+      // context mapping, so a subject is the same hue whichever trio a surface
+      // consumes — that is the property that makes this emission the whole
+      // subject-colour path rather than a fallback for some inline one.
       if (/^subj-\d+$/.test(swatch.id)) {
         const c =
           type === "highlight"

@@ -44,9 +44,19 @@ const PERSONAL_SUBJECTS: readonly ColorableSubject[] = [
 ] as const;
 
 // Starting swatches for the seeded personal subjects (v1.3 brand slots).
+//
+// Kept off the eight slots the team subjects occupy (1, 2, 5, 7, 9, 10, 12, 13
+// — DEFAULT_SUBJECT_MAPPING), so the picker never demonstrates a personal
+// subject wearing a team subject's hue: colour is team-wide MEANING here
+// (CLAUDE.md §4), and two rows sharing a swatch is exactly the confusion the
+// Appearance page exists to prevent. That leaves 3, 4, 6, 8, 11, 14 and 15 free.
+// `subj-12` was Afternoon Circle's until SEL took that slot in the handoff
+// conformance fix; Morning Meeting was on `subj-1`, which is — and always was —
+// Maths. tests/subject-slot-map.test.ts now asserts the no-overlap property so
+// the next remap cannot re-introduce a collision here silently.
 const PERSONAL_DEFAULT_MAPPING: Record<string, string> = {
-  "morning-meeting": "subj-1",
-  "afternoon-circle": "subj-12",
+  "morning-meeting": "subj-11",
+  "afternoon-circle": "subj-3",
 };
 
 // ToggleGroup options for the Team / Personal scope selector.

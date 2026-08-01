@@ -118,7 +118,26 @@ export function PaletteToggle(): ReactNode {
                     {opt.label}
                   </span>
                 </span>
-                <span aria-hidden style={{ display: "flex", gap: 3 }}>
+                {/* The preview strip sits on its own --surface plate rather
+                    than directly on the option. A SELECTED option paints
+                    `--theme-accent-soft` (#fff8e7 under Clear), and a subject
+                    solid on that cream measures 2.87:1 against the 3:1 non-text
+                    floor — measured live, and true of 12 of the 15 slots, since
+                    the derived scale clears 3:1 against `--surface` and cream is
+                    not `--surface`. The plate puts the swatches back on the
+                    surface the token contract is actually stated against, in
+                    both tones, instead of darkening fifteen team-wide subject
+                    colours to survive one selection tint. */}
+                <span
+                  aria-hidden
+                  style={{
+                    display: "flex",
+                    gap: 3,
+                    background: "var(--surface)",
+                    padding: 4,
+                    borderRadius: 7,
+                  }}
+                >
                   {opt.swatches.map((hex, i) => (
                     <span
                       key={i}

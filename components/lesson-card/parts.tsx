@@ -188,8 +188,13 @@ const RES_TINT: Record<LessonResource["type"], { bg: string; fg: string }> = {
     fg: "var(--important)",
   },
   image: {
-    bg: "color-mix(in oklch, var(--writing) 18%, white)",
-    fg: "var(--writing-deep)",
+    // Slot token, not the `--writing` subject alias. This badge colours a
+    // RESOURCE TYPE (image), which has nothing to do with the Writing subject —
+    // it only ever borrowed that alias as a convenient apricot. Pinned to the
+    // slot so re-pointing a subject cannot recolour a resource badge; `--subj-2`
+    // is the hue this rendered before the subject map moved to the v2 handoff.
+    bg: "color-mix(in oklch, var(--subj-2) 18%, white)",
+    fg: "var(--subj-2-ink)",
   },
   doc: { bg: "color-mix(in oklch, var(--fyi) 18%, white)", fg: "var(--fyi)" },
   website: {
