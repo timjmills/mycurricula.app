@@ -305,15 +305,23 @@
 }
 
 /* ── DragOverlay floating chip ──────────────────────────────────────────
-   Matches WeeklyGrid's .overlayCard: soft elevation + a 2px light-purple ring
-   + slight scale. Uses the same --writing token so the two surfaces' drag
-   chips read identically. */
+   Matches WeeklyGrid's .overlayCard: soft elevation + a 2px ring + slight
+   scale, pinned to the same token so the two surfaces' drag chips read
+   identically.
+
+   That token is a SLOT (`--subj-2`), not the `--writing` subject alias this
+   used to name: the ring is drag chrome, not subject identity, so re-pointing
+   a subject must not recolour it. `--subj-2` is exactly what it rendered
+   before the subject map moved to the v2 handoff, so this is
+   appearance-preserving. Same reasoning and the same known divergence from
+   spec §7's "purple-300" as WeeklyGrid.module.css .overlayCard — read the
+   comment there before changing either. */
 .overlayCard {
   transform: scale(1.02);
   transform-origin: top left;
   opacity: 0.95;
   box-shadow: var(--sh-lg);
-  outline: 2px solid color-mix(in oklch, var(--writing) 60%, transparent);
+  outline: 2px solid color-mix(in oklch, var(--subj-2) 60%, transparent);
   outline-offset: 0;
   border-radius: var(--r-md);
   pointer-events: none;
