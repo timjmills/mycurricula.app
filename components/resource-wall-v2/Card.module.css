@@ -137,11 +137,12 @@
 .note .thumb {
   aspect-ratio: auto;
   place-items: stretch;
-  /* A note is paper, not media — a honey wash sets it apart from a thumbnail. */
-  background: color-mix(
-    in srgb,
-    var(--honey-100) 40%,
-    var(--panel-bg, var(--surface))
+  /* A note is paper, not media — a honey wash sets it apart from a thumbnail.
+     `--wash` is the teacher's own per-card colour (lib/card-wash) and wins when
+     they have picked one; the honey stays the default. */
+  background: var(
+    --wash,
+    color-mix(in srgb, var(--honey-100) 40%, var(--panel-bg, var(--surface)))
   );
 }
 .notePreview {
@@ -169,10 +170,170 @@
   cursor: auto;
   padding: 10px;
   gap: 8px;
+  /* The teacher's chosen card colour, previewed live while composing. Falls
+     back to the note's own honey paper when no colour is picked, so the
+     composer never renders on a bare surface. */
+  background: var(
+    --wash,
+    color-mix(in srgb, var(--honey-100) 40%, var(--panel-bg, var(--surface)))
+  );
+}
+/* The handoff's own composer geometry (mockup :1844-1850): a 90px text box at
+   13px/1.5. Kept verbatim — the additions below sit AROUND it, they do not
+   reshape it. */
+.composing :global(.rte-surface),
+.composing textarea {
+  min-height: 90px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .noteActions {
   display: flex;
   justify-content: flex-end;
+}
+
+/* ── Derived title ───────────────────────────────────────────────────────── */
+.derived {
+  margin: 0;
+  font-size: var(--t-xs, 0.75rem);
+  line-height: 1.4;
+  /* --ink-700, not a lighter grey: this sits on a tinted wash, where the muted
+     ramp drops under 4.5:1. */
+  color: var(--ink-700);
+}
+.derivedName {
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+/* ── Attachment fields ───────────────────────────────────────────────────── */
+.attach {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.fieldLabel {
+  font-size: var(--t-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--ink-700);
+}
+.input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  /* RULE #1 — nothing on this surface has a sharp corner. */
+  border-radius: var(--r-sm, 10px);
+  border: 1px solid var(--hairline);
+  background: var(--panel-bg, var(--surface));
+  color: var(--ink-900);
+  font: inherit;
+  font-size: 13px;
+}
+.input::placeholder {
+  /* Placeholders carry the same 4.5:1 floor as body text — the default muted
+     grey fails it on a tinted card. */
+  color: var(--ink-600);
+}
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+.attachError {
+  margin: 0;
+  font-size: var(--t-xs, 0.75rem);
+  line-height: 1.4;
+  color: var(--danger-700, var(--ink-900));
+}
+
+/* ── Action bar ──────────────────────────────────────────────────────────── */
+.composerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  /* The handoff's action row: a hairline rule above it (mockup :1848). */
+  border-top: 1px solid var(--hairline);
+}
+.barLeft,
+.barRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Colour trigger + swatches ───────────────────────────────────────────── */
+/* DOUBLED SELECTORS THROUGHOUT. `app/tokens.css:1156`'s `.cp-root button` reset
+   is specificity (0,1,1) and out-ranks any single-class module rule on a
+   <button>, so a `.swatchTrigger` alone renders as an unstyled box — the trap
+   that has already eaten five rules in this repo. `.a.a` is (0,2,0) and wins.
+   The JSX repeats the class name to match. */
+.swatchTrigger.swatchTrigger {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--ink-300);
+  background: var(--c-surface, var(--panel-bg, var(--surface)));
+  cursor: pointer;
+}
+.swatchTrigger.swatchTrigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  padding: 8px;
+  margin-top: 2px;
+  border-radius: var(--r-md, 14px);
+  border: 1px solid var(--hairline);
+  background: var(--panel-bg, var(--surface));
+}
+.swatch.swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 28px;
+  padding: 0;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--ink-200);
+  cursor: pointer;
+}
+.swatch.swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.swatchOn.swatchOn {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+.swatchSubject.swatchSubject {
+  background: var(--c-surface);
+  border-color: var(--c);
+}
+.swatchPaper.swatchPaper {
+  background: var(--paper);
+}
+/* Touch: the ≥44px rule (CLAUDE.md §4). A coarse pointer gets a real target
+   rather than the 28px one a mouse can hit precisely. */
+@media (pointer: coarse) {
+  .swatch.swatch {
+    min-height: 44px;
+  }
+  .swatchTrigger.swatchTrigger {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 /* ── Body ───────────────────────────────────────────────────────────────── */
@@ -346,4 +507,39 @@
   .mini {
     transform: none;
   }
+}
+
+/* ── The attached link, on a committed note card ─────────────────────────── */
+.cardLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hairline);
+  background: var(--panel-bg, var(--surface));
+  color: var(--ink-800);
+  font-size: var(--t-xs, 0.75rem);
+  font-weight: 600;
+  text-decoration: none;
+}
+.cardLink:hover {
+  border-color: var(--accent);
+  color: var(--ink-900);
+}
+.cardLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cardLink svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.cardLinkText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

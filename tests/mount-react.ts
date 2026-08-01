@@ -35,6 +35,30 @@ export interface ReactHarness<P> {
   html: () => string;
   /** First element matching a CSS selector, or null. */
   query: (selector: string) => Element | null;
+  /** Every element matching a CSS selector. */
+  queryAll: (selector: string) => Element[];
+  /** Click a specific element the caller already holds, flushing effects. For
+   *  the cases where "the first button matching" is not precise enough — e.g.
+   *  the LAST of several identically-labelled controls. */
+  clickElement: (el: Element) => Promise<void>;
+  /** Double-click an element, flushing effects. */
+  dblClick: (el: Element) => Promise<void>;
+  /**
+   * Type into a controlled input/textarea, flushing effects.
+   *
+   * Not just `el.value = x`: React installs a value TRACKER on every controlled
+   * field and drops the change event when the tracked value looks unchanged, so
+   * a naive assignment updates the DOM and never reaches `onChange` — the field
+   * appears to accept input while the component's state never moves, and a test
+   * built on it asserts against a component that received nothing.
+   */
+  setValue: (el: Element, value: string) => Promise<void>;
+  /**
+   * Press Escape on the first element matching the selector, bubbling.
+   * linkedom ships no KeyboardEvent constructor, so the key is attached to a
+   * plain Event — which is all React's synthetic layer reads.
+   */
+  pressEscape: (selector: string) => Promise<void>;
   /** The mount's isolated localStorage, readable by the test. */
   storage: Map<string, string>;
   /** Unmount and restore the globals. ASYNC and must be awaited: React's
@@ -85,6 +109,7 @@ export async function mountReact<P extends object>(
     "cancelAnimationFrame",
     "IS_REACT_ACT_ENVIRONMENT",
     "navigator",
+    "getComputedStyle",
   ] as const;
   const saved = new Map<string, PropertyDescriptor | undefined>(
     GLOBAL_KEYS.map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)]),
@@ -122,6 +147,44 @@ export async function mountReact<P extends object>(
     configurable: true,
   });
 
+  // linkedom implements no layout, so it ships none of the scroll APIs. Real
+  // components call them from mount effects (components/day-v2/DayA.tsx:78
+  // scrolls the selected row into view), and without a stub that effect THROWS
+  // and the whole mount fails — which pushes the component back to a static
+  // render, i.e. back to exactly the untestable state this harness exists to
+  // fix. A no-op is FAITHFUL here, not a fudge: there is no viewport, nothing
+  // is visible, and no test can or does assert that anything scrolled.
+  //
+  // Not in the teardown snapshot, and deliberately so: this patches LINKEDOM's
+  // own Element prototype, not a node global. It is reachable only through a
+  // linkedom element, which exists only inside a mount — so unlike the globals
+  // above there is nothing here a later `renderToStaticMarkup` could run
+  // against.
+  const ElementProto = dom.Element.prototype as unknown as Record<
+    string,
+    unknown
+  >;
+  if (typeof ElementProto.scrollIntoView !== "function") {
+    ElementProto.scrollIntoView = () => {};
+  }
+
+  // linkedom has no style engine either, and components read resolved custom
+  // properties from mount effects (components/hub-v2/timeline/use-column-metrics.ts
+  // reads `--tl-col-floor` / `--tl-col-base`).
+  //
+  // This returns "" for EVERY property, on purpose. A stub handing back
+  // plausible numbers would be the worst possible shape here: a test could
+  // assert a width and pass against a value this file invented, which is the
+  // "fallback that satisfies the assertion" trap. "" parses to NaN, every
+  // caller in this repo guards with `Number.isFinite`, and so a computed-style
+  // assertion is impossible rather than merely discouraged. Geometry belongs in
+  // a browser probe (CLAUDE.md §4b), never here.
+  const emptyStyle = {
+    getPropertyValue: () => "",
+  } as unknown as CSSStyleDeclaration;
+  g.getComputedStyle = () => emptyStyle;
+  w.getComputedStyle = () => emptyStyle;
+
   const { createRoot } = await import("react-dom/client");
   const { act } = await import("react");
   const container = dom.document.getElementById("root") as unknown as HTMLElement;
@@ -147,6 +210,49 @@ export async function mountReact<P extends object>(
     },
     html: () => container.innerHTML,
     query: (selector) => container.querySelector(selector),
+    queryAll: (selector) => Array.from(container.querySelectorAll(selector)),
+    async clickElement(el) {
+      await act(async () => {
+        el.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+      });
+    },
+    async dblClick(el) {
+      await act(async () => {
+        el.dispatchEvent(new dom.window.Event("dblclick", { bubbles: true }));
+      });
+    },
+    async setValue(el, value) {
+      await act(async () => {
+        // Clear React's value tracker first — see the interface doc. The field
+        // is private API, so this is guarded rather than assumed present.
+        const tracked = el as unknown as {
+          _valueTracker?: { setValue: (v: string) => void };
+          value?: string;
+        };
+        // ORDER IS LOAD-BEARING, and the obvious order is the broken one.
+        // React tracks a controlled field by REPLACING its `value` property
+        // with a getter/setter that records every write. Priming the tracker
+        // BEFORE assigning re-syncs it through that very setter: React
+        // compares the two, finds them equal, and discards the event as a
+        // no-op. The field updates on screen and `onChange` never fires, so a
+        // test types into a component that receives nothing and asserts
+        // against its initial state. Measured on a control component, not
+        // theorised.
+        tracked.value = value;
+        el.setAttribute("value", value);
+        tracked._valueTracker?.setValue(`${value} stale`);
+        el.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      });
+    },
+    async pressEscape(selector) {
+      const target = container.querySelector(selector);
+      if (!target) throw new Error("no element matched — the harness is lying");
+      await act(async () => {
+        const ev = new dom.window.Event("keydown", { bubbles: true });
+        (ev as unknown as { key: string }).key = "Escape";
+        target.dispatchEvent(ev);
+      });
+    },
     storage: store,
     // Unmount inside `act` — cleanup effects still need the DOM globals, and
     // `act` drains the scheduler's queued macrotask work before returning. Only

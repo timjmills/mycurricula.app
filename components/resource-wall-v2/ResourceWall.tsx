@@ -39,7 +39,6 @@ import {
 } from "react";
 
 import { PlannerEmpty, Tooltip, UndoToast } from "@/components/ui";
-import { useComposerOptional } from "@/components/composer";
 import { OpenInBoardDialog } from "@/components/boards";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
@@ -304,9 +303,10 @@ export function ResourceWall({
   initialPreset = null,
 }: ResourceWallProps): ReactNode {
   const readOnly = usePhoneViewport();
-  // The shared composer, or null outside <ComposerProvider>. OPTIONAL rather
-  // than the throwing useComposer() — see `addCard`.
-  const composer = useComposerOptional();
+  // NO useComposer() here, deliberately. The wall composes notes INLINE, in its
+  // own card (see `addInlineNote`), so it neither opens nor depends on the
+  // shared modal composer — which is also what keeps this surface working on a
+  // section with no lesson behind it.
 
   // The landing preset honors whichever anchor the deep link carried (see
   // `anchoredPreset`). Without it a /post?subject=math link would open on Today
@@ -463,7 +463,40 @@ export function ResourceWall({
   // projection. `null` means "not overridden", so a preset stays LIVE — it must
   // re-project when the planner changes, which a snapshot in state would freeze.
   const [override, setOverride] = useState<WallSection[] | null>(null);
-  const sections = override ?? presetSections;
+
+  // ── The note being composed, held OUT of the wall ─────────────────────────
+  // A composing note is transient: it exists only while the editor is open, and
+  // it is rendered by merging it into the section list below — never by writing
+  // it into the wall.
+  //
+  // THE FORK IS WHAT THIS PROTECTS. `withFork` → `ensurePersonal()` copies a
+  // preset into a frozen "My Walls" wall that stops receiving later lesson
+  // updates. Inserting the placeholder card through it meant pressing "Add note"
+  // and then CANCEL left the teacher owning that frozen copy, having saved
+  // nothing — invisible, because the wall looks unchanged while it has silently
+  // stopped tracking the team's resources (§4a review, High). Deferring the fork
+  // to the commit removes the failure by construction: nothing is created until
+  // there is something to save, and Cancel has nothing to roll back.
+  //
+  // It also stops the "Copied to My Walls" toast firing before the teacher has
+  // typed a character.
+  const [pendingNote, setPendingNote] = useState<{
+    sectionId: string;
+    item: WallItem;
+  } | null>(null);
+
+  const sections = useMemo(() => {
+    const base = override ?? presetSections;
+    if (!pendingNote) return base;
+    // Rendered, not stored. The pending card is appended to its section for
+    // display only; if that section has gone (a wall switch mid-compose) the
+    // note simply does not render, which is the honest outcome.
+    return base.map((s) =>
+      s.id === pendingNote.sectionId
+        ? { ...s, items: [...s.items, pendingNote.item] }
+        : s,
+    );
+  }, [override, presetSections, pendingNote]);
 
   // RE-RESOLVE A LATE ANCHOR. `preset` seeds from `target` once, and a seed
   // runs ONCE — so over Supabase it is taken while `focusLessonId` is still
@@ -721,128 +754,94 @@ export function ResourceWall({
     [withFork],
   );
 
-  /** The bare inline note — the handoff's own add flow (resource-wall.jsx:368
-   *  seeds `{type:'note', composing:true}` and Card renders a "Type a note…"
-   *  textarea). Kept as the FALLBACK, not deleted: it is the only thing that can
-   *  work outside <ComposerProvider>, and the only thing that can work on a
-   *  hand-made section with no lesson behind it. */
+  /**
+   * Insert a note card, already open for composing — the handoff's own add flow
+   * (bundled mockup :7087, which seeds `{type:'note', composing:true}` and lets
+   * Card render the editor in place).
+   *
+   * This is now the wall's PRIMARY add path, not the fallback it used to be.
+   * The editor it opens is no longer the handoff's bare textarea: Card's note
+   * composer carries a colour picker, an attachable link, Cancel, and an
+   * empty-submit guard (the user's "this is too bare", answered). The card is
+   * inserted OPTIMISTICALLY so the composer can appear exactly where the "+"
+   * was — `discardCard` is what takes it back out if they cancel.
+   *
+   * WHERE THE NOTE LIVES, measured rather than assumed: `withFork` →
+   * `saveCustomWalls` → localStorage, with ZERO `/rest/v1/` calls on commit. A
+   * lesson-less note survives a reload on the same profile (text and `wash`
+   * both round-trip) and is INVISIBLE on another profile. That is the whole
+   * wall's contract, not this composer's — wall-state.ts says "Persisting to
+   * Supabase is out of scope for 9a" and every wall feature (forks, section
+   * backgrounds, custom walls) is device-local. Worth knowing before anyone
+   * treats a wall note as something a teammate can see.
+   */
   const addInlineNote = useCallback(
     (sectionId: string) => {
-      withFork((prev) =>
-        prev.map((s) => {
-          if (s.id !== sectionId) return s;
-          // A new note inherits the section's lesson context so "send to board"
-          // and the subject color have somewhere to point. A section with no
-          // lesson behind it (a hand-made one) yields an empty lessonId, which
-          // routes the note to the untagged board.
-          const lessonId = s.lessonIds?.[0] ?? s.items[0]?.lessonId ?? "";
-          const lessonTitle = s.items[0]?.lessonTitle ?? s.title;
-          const resource: LessonResource = { type: "notecard", label: "Note" };
-          const item: WallItem = {
-            key: `k-${newWallId()}`,
-            type: "notecard",
-            label: "Note",
-            resource,
-            subjectId: s.subjectId,
-            lessonId,
-            lessonTitle,
-            // A fresh note is authored onto the wall, not tagged in any lesson,
-            // so it has no cross-lesson refs — it routes to the untagged board.
-            lessons: lessonId ? [{ id: lessonId, title: lessonTitle }] : [],
-            composing: true,
-          };
-          return { ...s, items: [...s.items, item] };
-        }),
-      );
-    },
-    [withFork],
-  );
-
-  // A section whose commit still has to be absorbed into a CUSTOM wall's frozen
-  // layout — see `addCard`. Null when there is nothing pending.
-  const [absorbInto, setAbsorbInto] = useState<string | null>(null);
-
-  /**
-   * "Add note" — opens the SHARED composer (components/composer), the same
-   * engine seven other surfaces use, rather than the bare inline textarea.
-   *
-   * `useComposerOptional`, never the throwing `useComposer`: /post sits under
-   * app/(planner)/layout.tsx which does mount the provider, but this component
-   * is not the thing that guarantees that, and a throwing hook would take the
-   * whole wall down instead of degrading one button. No provider → the inline
-   * note, which still works.
-   *
-   * No `initialSectionId`. A wall SECTION is not a lesson section — it is a
-   * lesson group or a day column — so there is no section id to pass, and
-   * guessing one is the exact mistake 951bc1a removed from the Week card.
-   * Routing defaults to "Whole lesson" and the teacher picks in the composer.
-   */
-  const addCard = useCallback(
-    (sectionId: string) => {
       const section = sections.find((s) => s.id === sectionId);
+      // A new note inherits the section's lesson context so "send to board" and
+      // the subject color have somewhere to point. A hand-made section yields an
+      // empty lessonId, which routes the note to the untagged board — the
+      // lesson-less case, which is supported rather than blocked.
       const lessonId = section?.lessonIds?.[0] ?? section?.items[0]?.lessonId ?? "";
-      const lesson = lessonId ? lessons.find((l) => l.id === lessonId) : undefined;
-      // A hand-made section has no lesson to compose onto, and the composer
-      // requires one. Fall back rather than dead-end.
-      if (!composer || !lesson) {
-        addInlineNote(sectionId);
-        return;
-      }
-      composer.openComposer({
-        lesson,
-        // The button says "Add note", and notecard mode is the single rich note
-        // (gallery + rich body). "resource" mode — the capture-many flow the
-        // Week/Day callsites use — is one word away if that is preferred.
-        mode: "notecard",
-        // THE COMMIT LANDS ON THE LESSON, NOT ON THE WALL. A preset wall is a
-        // LIVE projection of lesson resources, so it re-renders with the new
-        // card by itself. A teacher's own wall is a frozen `override` snapshot,
-        // and would show nothing at all — the same silent no-op this surface has
-        // been paying for all week. Flag it here; the effect below merges it in
-        // once the store has actually updated.
-        onCommitted: () => setAbsorbInto(sectionId),
+      const lessonTitle = section?.items[0]?.lessonTitle ?? section?.title ?? "";
+      const resource: LessonResource = { type: "notecard", label: "Note" };
+      setPendingNote({
+        sectionId,
+        item: {
+          key: `k-${newWallId()}`,
+          type: "notecard",
+          label: "Note",
+          resource,
+          subjectId: section?.subjectId ?? "math",
+          lessonId,
+          lessonTitle,
+          lessons: lessonId ? [{ id: lessonId, title: lessonTitle }] : [],
+          composing: true,
+        },
       });
     },
-    [sections, lessons, composer, addInlineNote],
+    [sections],
   );
 
-  // Absorb a composer commit into a CUSTOM wall's frozen layout. Deferred to an
-  // effect rather than done in `onCommitted` because that callback fires inside
-  // the composer's commit handler — before this component has re-rendered, so
-  // `presetSections` there is still the pre-commit projection. Waiting for the
-  // projection to actually contain the new items is the difference between
-  // merging them and merging nothing.
-  //
-  // Items are matched by `key`, which wall-scope mints as `${lesson.id}#${i}`
-  // (lib/wall-scope itemsOf) — appending a resource yields a NEW index and
-  // leaves every existing key untouched, so "keys the override has not got yet"
-  // is exactly the set that just landed.
-  useEffect(() => {
-    if (!absorbInto) return;
-    if (override === null) {
-      setAbsorbInto(null); // live projection — it already shows the new card
-      return;
-    }
-    const fresh = presetSections.find((s) => s.id === absorbInto);
-    if (!fresh) {
-      setAbsorbInto(null);
-      return;
-    }
-    const have = new Set(
-      override.find((s) => s.id === absorbInto)?.items.map((i) => i.key) ?? [],
-    );
-    const added = fresh.items.filter((i) => !have.has(i.key));
-    if (added.length === 0) return; // not in the projection yet — try next render
-    setAbsorbInto(null);
-    setOverride((prev) =>
-      prev
-        ? prev.map((s) =>
-            s.id === absorbInto ? { ...s, items: [...s.items, ...added] } : s,
-          )
-        : prev,
-    );
-  }, [absorbInto, override, presetSections]);
-
+  /**
+   * "Add note" — opens the wall's OWN inline composer, in place, where the "+"
+   * was pressed. It does not open the shared modal composer, and that is the
+   * deliberate resolution of a contradiction this surface has carried for weeks.
+   *
+   * THE HISTORY, because it will otherwise be re-litigated a fourth time.
+   * e0eab58 wired /post to the shared composer; 1cf4816 reverted it, reading the
+   * 7.21 handoff as making the wall collection-only (ph-more.jsx:136, :169) and
+   * leaving a live probe asserting NO composer may ever appear here; 2ffbb43
+   * wired it back. Meanwhile the tooltip still told teachers resources could not
+   * be added here. Three sources of truth, all disagreeing.
+   *
+   * THE WALL IS AN AUTHORING SURFACE. `1cf4816` read the 7.21 handoff as making
+   * it collection-only (`ph-more.jsx:136`, `:169`) and that reading was
+   * defensible then; it is OVERRIDDEN now, by the user directly. They looked at
+   * this exact surface, called its note editor "too bare", pointed at a
+   * Padlet-style reference, and asked for MORE authoring on it — under a
+   * standing instruction to improve on the handoff where an audit says so. That
+   * sentence is the decision; `ph-more.jsx` is not grounds to revert it a third
+   * time without asking the user again.
+   *
+   * A note's OWNER IS THE SECTION, and a lesson is optional context rather than
+   * a precondition. That is the product model this surface replaces (a Padlet
+   * board, CLAUDE.md §1): plenty of wall content — "bring in shoeboxes
+   * Thursday" — belongs to a section and to no lesson at all, and making a
+   * teacher nominate one before they can jot is friction in front of the
+   * fastest action here.
+   *
+   * They want MORE authoring here, not less. What they do NOT
+   * want is a modal: the handoff's composer is an inline card in the section
+   * grid, and that shape is right (a note on a wall is composed where it will
+   * live). So the wall keeps the handoff's SHAPE and gains the capability —
+   * colour, an attached link, Cancel, an empty guard — in `Card`'s note editor.
+   *
+   * The shared modal composer stays exactly where it belongs: the lesson-centric
+   * surfaces (Day, Week, Year, the lesson maker) that compose ONTO a lesson.
+   * This one needs no lesson at all, which is also what makes it work on a
+   * hand-made section — the case the old fallback existed for.
+   */
   const addSection = useCallback(
     (after?: WallSection) => {
       withFork((prev) => {
@@ -865,8 +864,48 @@ export function ResourceWall({
   );
 
   /** A note card's edit committing back from the Card. */
+  /**
+   * Drop a card the teacher abandoned mid-compose.
+   *
+   * A PENDING note never entered the wall, so discarding it is pure state — no
+   * fork to undo, nothing written, no "My Walls" copy left behind. That is the
+   * whole point of holding it outside the layout; see `pendingNote`.
+   *
+   * The `withFork` branch below is for a card that IS on the wall — an existing
+   * note the teacher opened and then removed. That one legitimately edits the
+   * wall, so it forks like any other edit.
+   */
+  const discardCard = useCallback(
+    (cardKey: string) => {
+      if (pendingNote?.item.key === cardKey) {
+        setPendingNote(null);
+        return;
+      }
+      withFork((prev) =>
+        prev.map((s) => ({
+          ...s,
+          items: s.items.filter((it) => it.key !== cardKey),
+        })),
+      );
+    },
+    [withFork, pendingNote],
+  );
+
   const commitCard = useCallback(
     (item: WallItem) => {
+      // THE ONLY PLACE A NOTE BECOMES REAL, and therefore the only place the
+      // wall forks. A pending note is APPENDED to its section; an existing card
+      // (a note being re-edited) is replaced in place.
+      if (pendingNote && pendingNote.item.key === item.key) {
+        const { sectionId } = pendingNote;
+        setPendingNote(null);
+        withFork((prev) =>
+          prev.map((s) =>
+            s.id === sectionId ? { ...s, items: [...s.items, item] } : s,
+          ),
+        );
+        return;
+      }
       withFork((prev) =>
         prev.map((s) => ({
           ...s,
@@ -874,7 +913,7 @@ export function ResourceWall({
         })),
       );
     },
-    [withFork],
+    [withFork, pendingNote],
   );
 
   // ── Wall menu actions ─────────────────────────────────────────────────────
@@ -1052,9 +1091,10 @@ export function ResourceWall({
       setLight({ slides: [item], index: 0, mode: "enlarge" as const }),
     onBoard: board,
     onModal: (item: WallItem) => setLight({ slides: [item], index: 0 }),
-    onAddCard: addCard,
+    onAddCard: addInlineNote,
     onAddSection: (after: WallSection) => addSection(after),
     onCommitCard: commitCard,
+    onDiscardCard: discardCard,
     onDropCard: moveCard,
     onDropSection: moveSection,
     onDragStartSection: () => setSectionDragging(true),

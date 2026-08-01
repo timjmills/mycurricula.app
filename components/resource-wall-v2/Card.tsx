@@ -37,6 +37,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   type DragEvent as ReactDragEvent,
@@ -48,7 +49,18 @@ import { RichTextEditor } from "@/components/rich-text";
 import { Button, Tooltip } from "@/components/ui";
 import { stripHtml } from "@/lib/html-text";
 import { useSubjectColor } from "@/lib/palette";
-import { isSafeImgSrc } from "@/lib/resource-embed";
+import {
+  isSafeImgSrc,
+  isAttachableUrl,
+  linkToLessonResource,
+} from "@/lib/resource-embed";
+import {
+  CARD_WASH_TINTS,
+  CARD_WASH_NAMES,
+  cardWashValue,
+  type CardWash,
+} from "@/lib/card-wash";
+import type { LessonResource } from "@/lib/types";
 import {
   wallTypeOf,
   type WallItem,
@@ -251,7 +263,32 @@ export interface CardProps {
   onModal: (item: WallItem) => void;
   /** A note card finished composing / editing — carries the updated item. */
   onCommit: (item: WallItem) => void;
+  /**
+   * The teacher abandoned a note they were composing — remove the card.
+   *
+   * REQUIRED for Cancel to mean anything. `addInlineNote` inserts the card into
+   * the section OPTIMISTICALLY, already open, so "discard" cannot just close the
+   * editor: that would leave an empty card sitting on the wall, which is the
+   * junk the empty-submit guard exists to prevent. Only fires for a card that
+   * was still `composing`; re-editing an existing note and cancelling simply
+   * restores the saved body.
+   */
+  onDiscard: (cardKey: string) => void;
 }
+
+/**
+ * Is this string a link the composer will actually attach?
+ *
+ * Re-exported from `lib/resource-embed`, which owns the rule and enforces it at
+ * the persistence boundary too. It lives there rather than here because a UI
+ * guard protects only the callsite that has one, and this value ends up in a
+ * stored `LessonResource.url` (§4a review, Medium).
+ *
+ * Named here for the composer's tests: the controlled fields cannot be typed
+ * into under the linkedom mount harness (React's change path never fires there),
+ * so the rule is proven directly and the field that carries it is proven live.
+ */
+export { isAttachableUrl as isAttachableLink };
 
 export function Card({
   item,
@@ -266,6 +303,7 @@ export function Card({
   onBoard,
   onModal,
   onCommit,
+  onDiscard,
 }: CardProps): ReactNode {
   const kind = wallTypeOf(item.resource);
   const isNote = kind === "note";
@@ -280,29 +318,179 @@ export function Card({
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
+  // ── Composer draft state (everything below the text) ──────────────────────
+  // Seeded from the resource so RE-editing an existing note shows what it
+  // already has, rather than presenting a blank composer over saved content.
+  const [wash, setWash] = useState<CardWash>(item.resource.wash ?? null);
+  const [swatchesOpen, setSwatchesOpen] = useState(false);
+  // Seeded from the note's SAVED attachment, so re-opening the composer shows
+  // the link that is already on the card. Without this the fields came up blank
+  // over a real attachment, "Remove link" could only clear a fresh draft, and a
+  // saved link was uneditable (§4a review, Medium).
+  const savedLink = isNote ? item.resource.gallery?.[0] : undefined;
+  const [attachOpen, setAttachOpen] = useState(Boolean(savedLink));
+  const [attachName, setAttachName] = useState(savedLink?.label ?? "");
+  const [attachUrl, setAttachUrl] = useState(savedLink?.url ?? "");
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  // Stable across server and client renders — a hand-rolled id would differ
+  // between the two and break the aria-describedby link on hydration.
+  const attachErrId = `${useId()}-attach-error`;
+
+  // The card's title is DERIVED — the note's first line, truncated. Shown live
+  // in the composer (`Saves as …`) because a teacher who cannot see the derived
+  // title only discovers it after committing, when the card is already on the
+  // wall under a name they did not choose.
+  const derivedTitle = stripHtml(draft).trim().split("\n")[0]?.slice(0, 60) ?? "";
+  // Empty means EMPTY — a note with only markup (`<p></p>`) is not content.
+  const hasText = stripHtml(draft).trim().length > 0;
+  const attachUrlTrimmed = attachUrl.trim();
+  const hasAttachment = attachUrlTrimmed.length > 0;
+  // A link is only usable if the shared URL gate accepts it. Checked BEFORE
+  // commit so the teacher is told, rather than committing a card whose link
+  // silently renders as plain text later.
+  const attachInvalid = hasAttachment && !isAttachableUrl(attachUrlTrimmed);
+  // The empty-submit guard. Before this, Done on an untouched composer created
+  // a card literally labelled "Note".
+  const canSave = (hasText || (hasAttachment && !attachInvalid)) && !attachInvalid;
+
   // A phone that inherits an editing card (e.g. a tablet session resized down)
   // must fall back to view-only rather than strand the teacher in an editor.
+  //
+  // AND IT MUST TAKE THE CARD WITH IT when the card was still being composed.
+  // `addInlineNote` inserts the note optimistically, so a card that never
+  // committed exists ONLY as the composer's placeholder; closing the editor and
+  // leaving it behind puts an empty card titled "Note" on a shared wall that a
+  // phone can then neither edit nor delete (phones are view-only). Seen live at
+  // 375px: resizing mid-compose left exactly that.
   useEffect(() => {
-    if (readOnly) setEditing(false);
-  }, [readOnly]);
+    if (!readOnly) return;
+    setEditing(false);
+    if (item.composing) onDiscard(item.key);
+  }, [readOnly, item.composing, item.key, onDiscard]);
 
   const commit = useCallback((): void => {
     setEditing(false);
+    setSwatchesOpen(false);
     const body = draftRef.current;
+    const url = attachUrl.trim();
+    // `linkToLessonResource` validates and returns null for anything that is not
+    // a storable http(s) URL, so this cannot persist a `javascript:` row even if
+    // the guard above were bypassed.
+    const attachment: LessonResource | null = url
+      ? linkToLessonResource(url, attachName)
+      : null;
+    const washChanged = (item.resource.wash ?? null) !== wash;
     // Nothing changed and nothing was pending — don't churn the wall (an
     // auto-forking preset would fork on a no-op edit).
-    if (body === (item.resource.body ?? "") && !item.composing) return;
+    if (
+      body === (item.resource.body ?? "") &&
+      !attachment &&
+      !washChanged &&
+      !item.composing
+    ) {
+      return;
+    }
+    const label = isNote
+      ? stripHtml(body).trim().slice(0, 60) ||
+        // A note with no text but a real attachment is named for what it
+        // carries. Only a note with NEITHER falls back to "Note", and the
+        // empty-submit guard means that can no longer be committed at all.
+        attachment?.label ||
+        "Note"
+      : item.label;
     onCommit({
       ...item,
       composing: false,
       // The label follows the note's first line, the way the artboard does it,
       // so a note is findable by search without a separate title field.
-      label: isNote
-        ? stripHtml(body).trim().slice(0, 60) || "Note"
-        : item.label,
-      resource: { ...item.resource, body },
+      label,
+      resource: {
+        ...item.resource,
+        body,
+        ...(wash === null ? { wash: undefined } : { wash }),
+        // `wash` is the model's EXISTING per-card colour field (lib/types.ts,
+        // 6.12.26 §0) — not a new one. Cleared to undefined rather than null so
+        // the row matches an untouched card exactly.
+        // The composer manages ONE link per note — one name + one URL — so the
+        // commit REPLACES rather than appends. Appending meant "Remove link"
+        // could never actually remove anything, and editing a link left the old
+        // one behind beside the new (§4a review, Medium). A note with no link
+        // stores no gallery at all, so it matches a note that never had one.
+        gallery: attachment ? [attachment] : undefined,
+      },
     });
-  }, [item, isNote, onCommit]);
+  }, [item, isNote, onCommit, attachUrl, attachName, wash]);
+
+  /**
+   * Leave without saving. A card that was still `composing` is REMOVED (it only
+   * existed because the teacher pressed "+"); an existing note being re-edited
+   * just reverts to its saved body.
+   */
+  const discard = useCallback((): void => {
+    setSwatchesOpen(false);
+    setEditing(false);
+    if (item.composing) {
+      onDiscard(item.key);
+      return;
+    }
+    setDraft(item.resource.body ?? "");
+    setWash(item.resource.wash ?? null);
+    setAttachOpen(false);
+    setAttachName("");
+    setAttachUrl("");
+  }, [item, onDiscard]);
+
+  /**
+   * Escape. It CONFIRMS when there is something to lose and discards only when
+   * there is not.
+   *
+   * The handoff's composer has no discard at all — both exits commit — and the
+   * naive fix (Escape always discards) is worse than the bug it replaces: a
+   * teacher who has typed a paragraph and taps Escape expecting "close" would
+   * lose the paragraph with no undo. So Escape saves a note with content and
+   * bins only an empty one, where there is nothing to regret.
+   *
+   * `stopPropagation` because /post's own key handlers close the wall's
+   * overlays on Escape — innermost-first, the rule the lesson editor follows.
+   */
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>): void => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      if (swatchesOpen) {
+        setSwatchesOpen(false);
+        return;
+      }
+      // THE DISCARD DECISION IS ABOUT CONTENT, NOT VALIDITY (§4a review, High).
+      // Keying it on `canSave` meant a teacher who wrote a paragraph and then
+      // pasted a bad URL lost the paragraph to a single Escape: the invalid
+      // link made `canSave` false, and false meant discard. Three outcomes now,
+      // and only the empty one throws anything away:
+      //   • nothing typed, nothing attached → discard (nothing to lose)
+      //   • content, and saveable           → commit
+      //   • content, but not saveable yet   → stay open, so it can be fixed
+      if (!hasText && !hasAttachment) {
+        discard();
+        return;
+      }
+      if (canSave) commit();
+    },
+    [swatchesOpen, canSave, hasText, hasAttachment, commit, discard],
+  );
+
+  // Close the swatch popover on an outside press. mousedown, not click, so a
+  // press that starts inside and drags out is not read as a dismissal — the
+  // same rule the Week lesson menu follows.
+  useEffect(() => {
+    if (!swatchesOpen) return;
+    const onDown = (e: globalThis.MouseEvent): void => {
+      const t = e.target;
+      if (t instanceof Node && composerRef.current?.contains(t)) return;
+      setSwatchesOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [swatchesOpen]);
 
   // ── Drag ──────────────────────────────────────────────────────────────────
   const dragProps = readOnly
@@ -364,12 +552,22 @@ export function Card({
   if (isNote && editing) {
     return (
       <div
+        ref={composerRef}
         className={`${styles.card} ${styles.note} ${styles.composing}`}
         data-view={view}
         data-kind={kind}
-        style={{ "--sc": subject.c } as React.CSSProperties}
+        style={
+          {
+            "--sc": subject.c,
+            // Live preview: the card wears the chosen colour WHILE composing,
+            // so the swatch is a decision the teacher can see rather than one
+            // they discover after saving.
+            ...(cardWashValue(wash) ? { "--wash": cardWashValue(wash) } : null),
+          } as React.CSSProperties
+        }
         // Swallow clicks so the wall's card-click doesn't fire while typing.
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
       >
         <RichTextEditor
           value={draft}
@@ -378,11 +576,168 @@ export function Card({
           ariaLabel={`Note: ${item.label}`}
           autoFocus
         />
-        <div className={styles.noteActions}>
-          <Button variant="secondary" size="sm" onClick={commit}>
-            Done
-          </Button>
+
+        {/* The derived card title, shown before it is committed rather than
+            after. `aria-live` so a screen-reader user hears it settle too. */}
+        <p className={styles.derived} aria-live="polite">
+          {derivedTitle ? (
+            <>
+              Saves as <span className={styles.derivedName}>{derivedTitle}</span>
+            </>
+          ) : (
+            "Type a note — its first line becomes the card's title."
+          )}
+        </p>
+
+        {attachOpen && (
+          <div className={styles.attach}>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Resource name</span>
+              <input
+                className={styles.input}
+                value={attachName}
+                onChange={(e) => setAttachName(e.target.value)}
+                placeholder="What is it called?"
+              />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Paste link (optional)</span>
+              <input
+                className={styles.input}
+                value={attachUrl}
+                onChange={(e) => setAttachUrl(e.target.value)}
+                placeholder="https://…"
+                inputMode="url"
+                aria-invalid={attachInvalid || undefined}
+                aria-describedby={attachInvalid ? attachErrId : undefined}
+              />
+            </label>
+            {attachInvalid && (
+              <p className={styles.attachError} id={attachErrId} role="alert">
+                That doesn’t look like a web address — it needs to start with
+                http:// or https://
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className={styles.composerBar}>
+          <div className={styles.barLeft}>
+            {/* Colour trigger. A bare <button>, like the section's own add
+                affordance beside it — the CSS is doubled (`.swatchTrigger
+                .swatchTrigger`) because `.cp-root button` in tokens.css:1156
+                out-specifies any single-class module rule on a <button>. */}
+            <Tooltip
+              content="Give this card its own colour, so it stands out on the wall"
+              tooltipId="wall-note-colour"
+            >
+              <button
+                type="button"
+                className={`${styles.swatchTrigger} ${styles.swatchTrigger}`}
+                aria-haspopup="true"
+                aria-expanded={swatchesOpen}
+                aria-label="Card colour"
+                style={
+                  cardWashValue(wash)
+                    ? ({ background: cardWashValue(wash) } as React.CSSProperties)
+                    : undefined
+                }
+                onClick={() => setSwatchesOpen((v) => !v)}
+              />
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={attachOpen}
+              // CLEARS THE FIELDS, not just the disclosure (§4a review, High).
+              // Hiding the row while keeping `attachUrl` in state meant a
+              // teacher who pressed "Remove link" and then Done still got the
+              // link attached — the control did the opposite of its label.
+              onClick={() => {
+                setAttachOpen((open) => {
+                  if (open) {
+                    setAttachName("");
+                    setAttachUrl("");
+                  }
+                  return !open;
+                });
+              }}
+              tooltip="Attach a link to this note — a video, a doc, a website"
+            >
+              {attachOpen ? "Remove link" : "Add link"}
+            </Button>
+          </div>
+          <div className={styles.barRight}>
+            <Button variant="ghost" size="sm" onClick={discard}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!canSave}
+              onClick={commit}
+              // The disabled reason, per §4: a control that is off must say why.
+              tooltip={
+                canSave
+                  ? undefined
+                  : "Write something, or add a link, before saving this card"
+              }
+            >
+              Done
+            </Button>
+          </div>
         </div>
+
+        {swatchesOpen && (
+          <div
+            className={styles.swatches}
+            role="group"
+            aria-label="Card colour"
+          >
+            {/* Same values, same order as the lesson resource card's picker —
+                both read lib/card-wash so they cannot drift. */}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={wash === null}
+              aria-label="Subject colour (default)"
+              title="Subject colour (default)"
+              className={`${styles.swatch} ${styles.swatch} ${
+                styles.swatchSubject
+              } ${wash === null ? styles.swatchOn : ""}`}
+              onClick={() => setWash(null)}
+            />
+            <button
+              type="button"
+              role="radio"
+              aria-checked={wash === "paper"}
+              aria-label="White"
+              title="White"
+              className={`${styles.swatch} ${styles.swatch} ${
+                styles.swatchPaper
+              } ${wash === "paper" ? styles.swatchOn : ""}`}
+              onClick={() => setWash("paper")}
+            />
+            {CARD_WASH_TINTS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={wash === n}
+                aria-label={`Card colour ${CARD_WASH_NAMES[n] ?? n}`}
+                title={`Card colour ${CARD_WASH_NAMES[n] ?? n}`}
+                className={`${styles.swatch} ${styles.swatch} ${
+                  wash === n ? styles.swatchOn : ""
+                }`}
+                style={{
+                  background: `var(--subj-${n}-tint)`,
+                  borderColor: `var(--subj-${n})`,
+                }}
+                onClick={() => setWash(n)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -401,7 +756,17 @@ export function Card({
         .join(" ")}
       data-view={view}
       data-kind={kind}
-      style={{ "--sc": subject.c } as React.CSSProperties}
+      style={
+        {
+          "--sc": subject.c,
+          // The committed per-card colour. Without this the picker would be a
+          // control whose effect vanished the moment the teacher saved — the
+          // field was already in the model, but this surface never read it.
+          ...(cardWashValue(item.resource.wash ?? null)
+            ? { "--wash": cardWashValue(item.resource.wash ?? null) }
+            : null),
+        } as React.CSSProperties
+      }
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       {...dragProps}
@@ -432,6 +797,30 @@ export function Card({
 
       <div className={styles.body}>
         <div className={styles.title}>{item.label}</div>
+        {/* THE ATTACHED LINK, on the card. Without this a teacher could add a
+            link and never see it again — the feature would end at the composer
+            (§4a review, Medium). `isSafeImgSrc` is the image gate; for a
+            navigable href the rule is the same http(s) one the composer
+            enforces, so an unstorable value renders as plain text rather than a
+            live link. `stopPropagation` keeps the card's own click (which opens
+            the modal) from swallowing it. */}
+        {isNote && savedLink?.url && (
+          isAttachableUrl(savedLink.url) ? (
+            <a
+              className={styles.cardLink}
+              href={savedLink.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={savedLink.url}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <IconOpen />
+              <span className={styles.cardLinkText}>{savedLink.label}</span>
+            </a>
+          ) : (
+            <span className={styles.cardLink}>{savedLink.label}</span>
+          )
+        )}
         {view !== "icon" && (
           <div className={styles.meta}>
             <span className={styles.kind}>{KIND_WORD[kind]}</span>

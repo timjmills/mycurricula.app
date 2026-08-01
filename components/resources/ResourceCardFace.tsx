@@ -52,6 +52,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { CARD_WASH_TINTS } from "@/lib/card-wash";
 import type { LessonResource } from "@/lib/types";
 import { hasNotes, isNotecard, notecardPoster } from "@/lib/notecards";
 import { sanitizeHtml } from "@/lib/sanitize-html";
@@ -601,7 +602,10 @@ function mimeSuffix(mime: string): string {
 
 // ── Kebab menu — 216px popover, Esc / outside-click close ──────────────────
 
-const MENU_TINTS = [1, 2, 5, 7, 10, 11, 12, 13, 9];
+// The palette moved to lib/card-wash so the Resource Wall's note composer offers
+// the SAME swatches. Two pickers with different colours is a bug, not a
+// preference — see that file's header.
+const MENU_TINTS = CARD_WASH_TINTS;
 
 function CardMenu({
   subjectId,

@@ -1,42 +1,53 @@
 // scripts/probe-b46-post-composer.mjs — §4b live gate for the /post Resource
-// Wall's add affordance (B4.6).
+// Wall's note composer.
 //
-// WHAT THIS PROBE IS FOR, AND WHY IT CHANGED SHAPE.
+// ── THIS FILE HAS ASSERTED BOTH SIDES OF THE SAME QUESTION. READ THIS FIRST.
 //
-// An earlier revision of this file asserted that the wall's per-section Add
-// opened the shared resource composer. That wiring was built, gated, and then
-// REVERTED: the 7.21 design handoff specifies the wall as a COLLECTION surface
-// — resources are authored in a lesson's editor and collect onto the wall
-// (`ph-more.jsx:136`, `:169`), and the handoff lists no composer callsite on
-// this surface. So the composer assertions are gone, and what remains is the
-// thing that IS specified:
+// It was written to guard `1cf4816`, which REVERTED the composer from /post on
+// the reading that the 7.21 handoff makes the wall collection-only
+// (`ph-more.jsx:136`, `:169`). Its central assertion was "NO composer is
+// reachable from this surface — zero `.cmp-modal` / `.cmp-scrim`, EVER".
 //
-//   1. The wall's per-section Add is note-only, and its label says so.
-//   2. Its tooltip does not promise resource-authoring the surface cannot do.
-//   3. Adding a note still works end-to-end (the pre-existing wall-local path).
-//   4. NO composer is reachable from this surface — zero `.cmp-modal` /
-//      `.cmp-scrim`, ever. This is the regression guard for the revert.
-//   5. The browser console stays clean, and 375 / 768 / 1440 do not
-//      horizontally scroll.
+// That reading is now OVERRIDDEN, by the user directly: they looked at this
+// surface, called its note editor "too bare", and asked for MORE authoring on
+// it. The wall is an AUTHORING surface. See the long note at `addInlineNote` in
+// components/resource-wall-v2/ResourceWall.tsx for the full history.
 //
-// OWNERSHIP OF THE /post GATE, and why this probe MUTATES.
+// ── A GATE NOBODY RUNS IS WORSE THAN NO GATE ──────────────────────────────
+// `2ffbb43` re-added composing to the wall on 2026-08-01 and did not touch this
+// file. Its assertions were false from that moment. They were not "run and
+// ignored": the probe's own output directory (docs/screenshots/b46-post-wall)
+// was last written 2026-07-25, seven days EARLIER. Nobody ran it. It sat in the
+// tree reading as coverage while asserting the inverse of the requirement.
 //
-// `scripts/probe-4b-consolidated.mjs` no longer delegates here — it hand-rolls a
-// READ-ONLY 4.7 (its own comment explains why: it must not click anything that
-// writes). That is the right split, so this file is no longer load-bearing for
-// that probe and the two do not duplicate: the consolidated pass owns the
-// read-only seam check, and THIS probe owns the write path.
+// ── WHAT IT GUARDS NOW ────────────────────────────────────────────────────
+// The composer is INLINE — a card composed in place in the section grid, which
+// is the handoff's own shape (bundled mockup :7087). So the "no modal" check
+// SURVIVES, for the opposite reason: the wall must not open the shared modal
+// composer, because it has its own.
 //
-// It IS a write: clicking "Add note" runs `addCard` → `withFork` →
-// `ensurePersonal()`, which FORKS a preset into a "My …" wall. The blast radius
-// is one browser profile — `components/resource-wall-v2/wall-state.ts` persists
-// to localStorage only, with zero server calls ("Persisting to Supabase is out
-// of scope for 9a"), and Playwright's context is ephemeral. So it cannot touch a
-// school's data. It WOULD leave a forked wall behind in a real profile, so:
-// run this against a LOCAL dev server, never against production.
+//   1. The wall's Add note opens an INLINE composer, not the modal one.
+//   2. It works on a LESSON-LESS section — the case that used to dead-end.
+//   3. EMPTY SUBMIT is refused (the handoff's version commits a card literally
+//      labelled "Note").
+//   4. INVALID INPUT is named and blocks the save.
+//   5. CANCEL withdraws the optimistically-inserted card.
+//   6. The console stays clean and 375 / 768 / 1440 do not scroll sideways.
+//
+// 3-5 are here rather than in the unit suite because they are the three paths
+// the handoff's composer has NONE of, and because two of them require TYPING —
+// which the linkedom mount harness cannot do (React drops the change event for
+// controlled fields; see tests/wall-note-composer.test.ts's header). A real
+// browser is the only place they can be checked at all.
+//
+// It IS a write: composing forks a preset into a "My …" wall. The blast radius
+// is one ephemeral browser profile — wall state is localStorage-only
+// (components/resource-wall-v2/wall-state.ts, "Persisting to Supabase is out of
+// scope for 9a"), with zero REST calls on commit (measured). Run against a LOCAL
+// dev server, never production.
 //
 // Usage: CLAUDE_BYPASS_TOKEN=… node scripts/probe-b46-post-composer.mjs
-//        PROBE_BASE defaults to http://localhost:3099
+//        PROBE_BASE defaults to http://localhost:3014
 
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
@@ -48,7 +59,7 @@ import path from "node:path";
 import { bypassLogin, requireToken } from "./lib/auth.mjs";
 
 requireToken({ repoRoot: process.cwd() });
-const BASE = process.env.PROBE_BASE ?? "http://localhost:3099";
+const BASE = process.env.PROBE_BASE ?? "http://localhost:3014";
 const OUT = path.resolve("docs/screenshots/b46-post-wall");
 await mkdir(OUT, { recursive: true });
 
@@ -238,9 +249,14 @@ const tipWarnsAboutFork =
 const tipPromisesAuthoring =
   typeof tip === "string" &&
   /(add|attach|create|upload|new)[^.]{0,24}resource/i.test(tip);
+// REVERSED WITH THE RULING. This used to require the tooltip to DENY that
+// resources can be added here — copy that is now false on screen, because the
+// composer attaches links. What the tooltip must still do is describe the
+// surface truthfully, so the check is now that it does NOT carry the stale
+// denial (`tipSaysNotHere` is kept, inverted, as the regression guard).
 check(
-  "add tooltip states resources are NOT authored here",
-  tipBtnExists && tipSaysNotHere && !tipPromisesAuthoring,
+  "add tooltip no longer denies that anything can be attached here",
+  tipBtnExists && !tipSaysNotHere,
   tipBtnExists ? `title=${JSON.stringify(tip)}` : "add-note button not present",
 );
 check(
@@ -269,63 +285,218 @@ check(
 );
 await page.screenshot({ path: path.join(OUT, "02-note-added-1440.png") }).catch(() => {});
 
-// ── 4. REGRESSION GUARD — no composer is reachable from this surface ───────
+// ── 4. THE COMPOSER IS INLINE, AND IT IS NOT THE MODAL ONE ────────────────
 //
-// TWO assertions, because "nothing is mounted right now" is far too weak on its
-// own (§4a Medium): re-adding a Resource button beside Add-note would still
-// leave zero modals mounted until someone pressed it, so that check alone would
-// happily pass the very regression it exists to catch. First assert no
-// resource-AUTHORING trigger exists inside the section grid at all; only then
-// assert nothing is mounted.
-//
-// `guard.triggers` deliberately excludes the wall TOOLBAR (which legitimately
-// has its own "Add" for sections / new walls) by scoping to <section>, and
-// excludes the card action row's "Send to a teaching board" — that is board
-// placement of an EXISTING resource, not authoring.
-//
-// ONE evaluate for the gate AND both observations, so the "page isn't blank"
-// check can never be read from a stale sample taken seconds earlier.
-const guard = await safeEval(() => {
-  const triggers = [];
-  for (const sec of document.querySelectorAll("section")) {
-    for (const b of sec.querySelectorAll("button")) {
-      const text = (b.textContent || "").trim();
-      const label = `${text} ${b.getAttribute("aria-label") ?? ""} ${b.getAttribute("title") ?? ""}`;
-      // TWO shapes, because the regression this guards against was labelled
-      // exactly "Resource" — a verb-then-noun regex alone would have missed the
-      // very button it exists to catch (§4a Medium). "Add note" and the card's
-      // board-send ("Send X to a teaching board") must NOT match either shape.
-      const bareResource = /^resources?$/i.test(text);
-      const authoringVerb =
-        /(add|new|attach|upload|create)[^.]{0,24}resource/i.test(label);
-      if (bareResource || authoringVerb) triggers.push(text || label.trim().slice(0, 60));
-    }
-  }
+// The "no modal" assertion SURVIVES the reversal, for the opposite reason: the
+// wall composes in place, so opening the shared modal composer here would now be
+// the regression. What is GONE is the old sibling assertion that no
+// resource-authoring trigger may exist in the section grid — the composer's
+// "Add link" is exactly such a trigger, and it is the point.
+const inline = await safeEval(() => {
+  const btn = (t) =>
+    Array.from(document.querySelectorAll("button")).find(
+      (b) => (b.textContent || "").trim() === t,
+    );
+  const done = btn("Done");
   return {
     sections: document.querySelectorAll("section").length,
-    triggers,
     modal: document.querySelectorAll(".cmp-modal").length,
     scrim: document.querySelectorAll(".cmp-scrim").length,
+    hasDone: Boolean(done),
+    hasCancel: Boolean(btn("Cancel")),
+    hasAddLink: Boolean(btn("Add link")),
+    // The empty-submit guard: an untouched composer must not be saveable.
+    doneDisabledWhenEmpty: done ? done.disabled : null,
+    swatchTrigger: document.querySelectorAll('button[aria-label="Card colour"]').length,
   };
-}, { sections: 0, triggers: [], modal: 0, scrim: 0 });
-const rendered = guard.sections > 0;
+}, { sections: 0, modal: 0, scrim: 0, hasDone: false, hasCancel: false, hasAddLink: false, doneDisabledWhenEmpty: null, swatchTrigger: 0 });
+const rendered = inline.sections > 0;
 const BLANK = "INCONCLUSIVE — no sections rendered";
+
 check(
-  "no resource-authoring trigger exists in the wall's section grid",
-  rendered && guard.triggers.length === 0,
-  rendered ? guard.triggers.join(" | ") || "(none)" : BLANK,
+  "the wall's Add note opens an INLINE composer, not the modal one",
+  rendered && inline.hasDone && inline.hasCancel && inline.modal === 0,
+  rendered
+    ? `done=${inline.hasDone} cancel=${inline.hasCancel} modal=${inline.modal}`
+    : BLANK,
 );
 check(
-  "no composer modal on the wall (collection-only surface)",
-  rendered && guard.modal === 0,
-  rendered ? `modal=${guard.modal}` : BLANK,
+  "no composer scrim on the wall — it composes in place, not over the page",
+  rendered && inline.scrim === 0,
+  rendered ? `scrim=${inline.scrim}` : BLANK,
 );
 check(
-  // Gated like its sibling (§4a Medium): ungated, this passed on a blank page,
-  // a bounced login, or a 500 — the three states it most needs to catch.
-  "no composer scrim on the wall",
-  rendered && guard.scrim === 0,
-  rendered ? `scrim=${guard.scrim}` : BLANK,
+  "the composer offers a link and a card colour",
+  rendered && inline.hasAddLink && inline.swatchTrigger > 0,
+  rendered ? `addLink=${inline.hasAddLink} colour=${inline.swatchTrigger}` : BLANK,
+);
+check(
+  "EMPTY SUBMIT is refused — Done is disabled on an untouched composer",
+  rendered && inline.doneDisabledWhenEmpty === true,
+  rendered ? `disabled=${inline.doneDisabledWhenEmpty}` : BLANK,
+);
+
+// ── 4b. INVALID INPUT is named, and blocks the save ───────────────────────
+// Requires TYPING, which is why it lives in a browser probe and not the unit
+// suite (React drops the change event for controlled fields under linkedom).
+const TYPED = "Bring in shoeboxes Thursday";
+// WAIT for the editor, do not assume it. `RichTextEditor` is loaded through
+// next/dynamic, so the contenteditable appears a beat AFTER the composer's
+// buttons do — locating it immediately found nothing and every keystroke went
+// to the document, which is why the control below exists.
+await page
+  .waitForSelector('[contenteditable="true"]', { timeout: 25000 })
+  .catch(() => {});
+const editable = page.locator('[contenteditable="true"]').first();
+if (await editable.count()) {
+  await editable.click({ force: true }).catch(() => {});
+  await page.waitForTimeout(300);
+  await page.keyboard.type(TYPED).catch(() => {});
+  await page.waitForTimeout(400);
+}
+// POSITIVE CONTROL. Every assertion below is about what happens to typed text,
+// so if the typing never landed they are all statements about an EMPTY note —
+// and "the composer stayed open" would pass for the wrong reason. A probe that
+// cannot type must say so, not quietly grade a different scenario.
+const typedLanded = await safeEval(
+  (t) => document.body.innerText.includes(t),
+  false,
+  TYPED,
+);
+check(
+  "the probe can type into the composer (control for the two checks below)",
+  typedLanded,
+  typedLanded ? "text present" : "TYPING DID NOT LAND — checks below are inconclusive",
+);
+const addLinkBtn = page.locator("button").filter({ hasText: /^Add link$/ }).first();
+if (await addLinkBtn.count()) await addLinkBtn.click({ force: true }).catch(() => {});
+const urlField = page.locator('input[inputmode="url"]').first();
+if (await urlField.count()) await urlField.fill("not-a-url").catch(() => {});
+await page.waitForTimeout(600);
+const invalid = await safeEval(() => {
+  const done = Array.from(document.querySelectorAll("button")).find(
+    (b) => (b.textContent || "").trim() === "Done",
+  );
+  return {
+    named: /doesn.t look like a web address/.test(document.body.innerText),
+    blocked: done ? done.disabled : null,
+    textKept: /Bring in shoeboxes Thursday/.test(document.body.innerText),
+  };
+}, { named: false, blocked: null, textKept: false });
+check(
+  "INVALID INPUT is named to the teacher, and blocks the save",
+  invalid.named && invalid.blocked === true,
+  `named=${invalid.named} doneDisabled=${invalid.blocked}`,
+);
+// ESCAPE MUST NOT BIN TYPED CONTENT. The rule is about content, not validity:
+// a paragraph plus a bad URL is exactly the state where a naive
+// "Escape discards" loses work with no undo.
+await page.keyboard.press("Escape").catch(() => {});
+await page.waitForTimeout(700);
+const afterEsc = await safeEval(() => ({
+  stillOpen: Array.from(document.querySelectorAll("button")).some(
+    (b) => (b.textContent || "").trim() === "Done",
+  ),
+  textKept: /Bring in shoeboxes Thursday/.test(document.body.innerText),
+}), { stillOpen: false, textKept: false });
+check(
+  "Escape with unsaveable content keeps the composer open, and the typing",
+  // Gated on the control: with no text typed this is not the scenario at all.
+  typedLanded && afterEsc.stillOpen && afterEsc.textKept,
+  typedLanded
+    ? `open=${afterEsc.stillOpen} textKept=${afterEsc.textKept}`
+    : "INCONCLUSIVE — typing did not land",
+);
+
+// ── 4b-2. A VALID URL saves, and lands on the note's gallery ──────────────
+//
+// THE PRIMARY USER-SUPPLIED-URL PATH, asserted where it can actually be driven.
+// The unit suite tests `isAttachableLink` / `linkToLessonResource` directly but
+// cannot type into the composer's controlled fields (React drops the change
+// event under linkedom — re-checked after the harness's setValue ordering fix,
+// still unreachable), so the field → state → commit → storage chain is proven
+// HERE and nowhere else. Asserting the persisted record, not the pixels: a link
+// that renders but does not save is the failure this is for.
+await urlField.fill("https://www.youtube.com/watch?v=abc12345678").catch(() => {});
+await page.waitForTimeout(500);
+const doneEnabled = await safeEval(() => {
+  const d = Array.from(document.querySelectorAll("button")).find(
+    (b) => (b.textContent || "").trim() === "Done",
+  );
+  return d ? !d.disabled : false;
+}, false);
+check("a VALID url re-enables Done", doneEnabled, `enabled=${doneEnabled}`);
+if (doneEnabled) {
+  await page.locator("button").filter({ hasText: /^Done$/ }).first().click({ force: true }).catch(() => {});
+  await page.waitForTimeout(2000);
+}
+const saved = await safeEval(() => {
+  const raw = localStorage.getItem("cc_customwalls") || "[]";
+  let walls = [];
+  try { walls = JSON.parse(raw); } catch { return { parsed: false }; }
+  const items = walls.flatMap((w) => (w.layout || []).flatMap((s) => s.items || []));
+  const note = items.find((i) => (i.label || "").includes("shoeboxes"));
+  const g = note && note.resource && note.resource.gallery;
+  return {
+    parsed: true,
+    noteSaved: Boolean(note),
+    galleryLen: Array.isArray(g) ? g.length : 0,
+    galleryUrl: Array.isArray(g) && g[0] ? g[0].url : null,
+    galleryType: Array.isArray(g) && g[0] ? g[0].type : null,
+    galleryLabel: Array.isArray(g) && g[0] ? g[0].label : null,
+  };
+}, { parsed: false });
+check(
+  "the note SAVED, with its link on the gallery and the type detected",
+  saved.parsed &&
+    saved.noteSaved &&
+    saved.galleryLen === 1 &&
+    saved.galleryType === "youtube" &&
+    typeof saved.galleryUrl === "string" &&
+    saved.galleryUrl.includes("abc12345678"),
+  JSON.stringify(saved),
+);
+// And it is VISIBLE on the committed card, not only in storage.
+const linkOnCard = await safeEval(
+  () => Boolean(document.querySelector('a[href*="abc12345678"]')),
+  false,
+);
+check("the saved link is reachable ON the card, not just in storage", linkOnCard, `anchor=${linkOnCard}`);
+await page.screenshot({ path: path.join(OUT, "05-saved-link-1440.png") }).catch(() => {});
+
+// ── 4c. CANCEL withdraws the optimistically-inserted card ─────────────────
+// The card is inserted the instant "+" is pressed so the editor can open where
+// it was — so Cancel has to take it back out, or the wall keeps a card the
+// teacher explicitly rejected.
+// A fresh compose — the one above was committed, so re-open before cancelling.
+await addBtns.first().click({ force: true }).catch(() => {});
+await page.waitForTimeout(1500);
+const cardsBeforeCancel = await page.locator(CARD).count();
+const cancelBtn = page.locator("button").filter({ hasText: /^Cancel$/ }).first();
+if (await cancelBtn.count()) await cancelBtn.click({ force: true }).catch(() => {});
+await page.waitForTimeout(1200);
+const cardsAfterCancel = await page.locator(CARD).count();
+check(
+  "CANCEL withdraws the card the + inserted",
+  cardsAfterCancel === cardsAfterCancel && cardsAfterCancel < cardsBeforeCancel,
+  `cards ${cardsBeforeCancel} -> ${cardsAfterCancel}`,
+);
+await page.screenshot({ path: path.join(OUT, "04-after-cancel-1440.png") }).catch(() => {});
+
+// CANCEL MUST NOT LEAVE A FORK. The card disappearing is the assertion that
+// passes while the fork survives — a frozen "My Walls" copy that silently stops
+// receiving later lesson updates (§4a review, High). Counted here, live.
+const forksAfterCancel = await safeEval(() => {
+  try {
+    return JSON.parse(localStorage.getItem("cc_customwalls") || "[]").length;
+  } catch {
+    return -1;
+  }
+}, -1);
+check(
+  "cancelling leaves no NEW fork behind (only the one the saved note created)",
+  forksAfterCancel === 1,
+  `walls=${forksAfterCancel} (1 = the saved note's, and no more)`,
 );
 
 // ── 5. Responsive ──────────────────────────────────────────────────────────

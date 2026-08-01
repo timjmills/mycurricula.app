@@ -61,6 +61,74 @@ const SAFE_SCHEME = /^https?:\/\//i;
 
 // ── Main ──────────────────────────────────────────────────────────────────
 
+/**
+ * A pasted URL → a real `LessonResource`, with the provider, thumbnail and
+ * display name `parseResourceUrl` already worked out.
+ *
+ * LIVES HERE because this module owns the URL taxonomy: the provider→type
+ * mapping below is a restatement of what `parseResourceUrl` detected, and a copy
+ * of it in a component drifts the moment a provider is added. The Resource
+ * Wall's note composer attaches links through this.
+ *
+ * (`components/daily/ResourceComposer.linkToCapturedItem` performs the same
+ * mapping into the composer's own transient `CapturedItem` shape. Not folded in
+ * here: that one carries capture-only fields — `File` handles, blob URLs, an
+ * `isFile` flag — which have no meaning on a persisted resource row. The
+ * PROVIDER MAPPING is the part that must not diverge; if a provider is added,
+ * change both.)
+ */
+export function linkToLessonResource(
+  raw: string,
+  label?: string,
+): LessonResource | null {
+  // VALIDATED HERE, not just at the callsite (§4a review, Medium). This
+  // function's job is to produce a row that gets PERSISTED, so a `javascript:`
+  // or `mailto:` value must not be storable in `LessonResource.url` no matter
+  // who calls it — a UI guard protects only the callsite that has one.
+  if (!isAttachableUrl(raw)) return null;
+  const parsed = parseResourceUrl(raw);
+  const type: LessonResource["type"] =
+    parsed.provider === "youtube" ||
+    parsed.provider === "vimeo" ||
+    parsed.provider === "video"
+      ? "youtube"
+      : parsed.provider === "gslides"
+        ? "slides"
+        : parsed.provider === "gdocs" || parsed.provider === "gsheets"
+          ? "doc"
+          : parsed.provider === "gdrive" || parsed.provider === "pdf"
+            ? "pdf"
+            : parsed.provider === "image"
+              ? "image"
+              : "link";
+  return {
+    type,
+    // The teacher's own name wins; the parsed display name is the fallback, so
+    // an attachment is never labelled with a bare URL.
+    label: label?.trim() || parsed.displayName,
+    url: raw,
+    provider: parsed.provider,
+    ...(parsed.thumbnailUrl ? { thumbnailUrl: parsed.thumbnailUrl } : {}),
+    displayMode: "thumbnail",
+  };
+}
+
+/**
+ * Is this a real, storable http(s) URL?
+ *
+ * `new URL`, not a scheme regex: a prefix test accepts a bare "https://" with no
+ * host, and "https://%" — both of which would persist a resource row whose link
+ * cannot work. The constructor is the only cheap thing that actually knows.
+ */
+export function isAttachableUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw.trim());
+    return (u.protocol === "http:" || u.protocol === "https:") && u.host !== "";
+  } catch {
+    return false;
+  }
+}
+
 export function parseResourceUrl(raw: string): ParsedResource {
   const trimmed = raw.trim();
   if (!SAFE_SCHEME.test(trimmed)) {

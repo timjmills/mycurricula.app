@@ -209,6 +209,9 @@ export interface SectionProps {
   onAddCard: (sectionId: string) => void;
   onAddSection: (after: WallSection) => void;
   onCommitCard: (item: WallItem) => void;
+  /** The teacher cancelled a note they were composing — drop the placeholder
+   *  card the "+" inserted. See Card's `onDiscard`. */
+  onDiscardCard: (cardKey: string) => void;
   onDropCard: (cardKey: string, sectionId: string, beforeKey?: string) => void;
   onDropSection: (fromId: string, toId: string) => void;
   onDragStartSection: (id: string) => void;
@@ -242,6 +245,7 @@ export function Section({
   onAddCard,
   onAddSection,
   onCommitCard,
+  onDiscardCard,
   onDropCard,
   onDropSection,
   onDragStartSection,
@@ -378,37 +382,34 @@ export function Section({
               onBoard={onBoard}
               onModal={onModal}
               onCommit={onCommitCard}
+              onDiscard={onDiscardCard}
             />
           ))}
           {!readOnly && (
-            // COPY, corrected (B4.6): this button only ever made a note, but it
-            // promised "a resource or a note". Resources are not authored here
-            // BY DESIGN — the wall is a COLLECTION surface. The 7.21 handoff
-            // states the direction twice (ph-more.jsx:136 "Collected
-            // automatically from every {lesson} … attach more from any
-            // {lesson}'s editor", and :169 "attach resources from any
-            // {lesson}'s editor and they collect on this wall"). Authoring
-            // flows lesson → wall, never wall → lesson, and the handoff lists
-            // no composer callsite on this surface. So the honest fix is the
-            // label, not a new capability.
-            // The visibility half is QUALIFIED on purpose (§4a): "they collect
-            // onto this wall automatically" would be false twice over — a saved
-            // wall renders its own frozen `override` layout and never picks up
-            // later lesson edits, and even a live preset only shows lessons
-            // inside its own scope. Copy that sends a teacher looking for a card
-            // that cannot appear is the same class of lie as the promise this
-            // change is fixing.
-            // THE SECOND SENTENCE EXISTS BECAUSE THE BUTTON CONTRADICTS THE
-            // FIRST. `onAddCard` → `withFork` → `ensurePersonal()`: on a preset,
-            // pressing this FORKS the wall into "My …" and sets `override` — the
-            // frozen layout that never picks up later lesson edits. So a teacher
-            // could read "they appear on the preset walls", add a note, attach a
-            // resource in the lesson editor, and never see it on the wall in
-            // front of them. The "Copied to My Walls" toast is the only signal
-            // and doesn't connect the two. Saying so here is the whole point of
-            // this change — the last clause that wasn't honest yet.
+            // COPY. This button's promise has been rewritten twice, in opposite
+            // directions, and this is the version that matches what the code
+            // now does.
+            //
+            // It said "a resource or a note" while only making a note (wrong),
+            // then "Resources aren't added here" after B4.6's revert (right at
+            // the time, wrong now). The note composer this opens can attach a
+            // link, so the flat denial has to go — but the SECOND sentence
+            // stays, because the thing it warns about is unchanged and is still
+            // the surprise on this surface: `onAddCard` → `withFork` →
+            // `ensurePersonal()` forks a preset into "My …" and freezes its
+            // layout, so a wall the teacher adds to stops picking up later
+            // lesson edits. The "Copied to My Walls" toast never connects those
+            // two facts; this sentence is the only place a teacher is told.
+            //
+            // AND the device-locality clause, for the same reason. Wall state is
+            // localStorage only (wall-state.ts, "Persisting to Supabase is out
+            // of scope for 9a") — measured: a saved note round-trips on the same
+            // profile with zero /rest/v1/ calls, and is invisible on another.
+            // On a surface called a TEAM wall that is a promise the app does not
+            // keep unless it is said out loud: if a teacher knows, it is a
+            // limitation; if they do not, it is a broken promise.
             <Tooltip
-              content="Write a note on this wall. Resources aren't added here — attach them in a lesson's editor and they appear on the preset walls covering that lesson. Adding a note also saves this wall to My Walls, and a saved wall stops picking up later lesson changes."
+              content="Write a note on this wall — pick its colour, and attach a link if you want one. Notes stay on this device and aren't shared with your team. Saving one also copies this wall to My Walls, and a saved wall stops picking up later lesson changes."
               tooltipId="rw-add-card"
               side="top"
             >
