@@ -71,6 +71,11 @@ import type { TeachDataSource } from "./queries";
 import { SANDBOX_LESSON_ID } from "./constants";
 import { makeUnwrap, sb, type ServerClient } from "../supabase/helpers";
 import { slugToUuid } from "../planner/id-bridge";
+import {
+  pagedSelect,
+  type PageRequest,
+  type PageResult,
+} from "../planner/paged-read";
 
 // ── Supabase client helpers (shared, see lib/supabase/helpers.ts) ────────────
 
@@ -362,8 +367,57 @@ function rowToTemplate(row: BoardTemplateRow): BoardTemplate {
 
 // ── Shared DB helpers ─────────────────────────────────────────────────────────
 
+// ── Row-ceiling safety (task #51) ────────────────────────────────────────────
+// PostgREST caps every response at this project's `db-max-rows` (1000)
+// SILENTLY: HTTP 200, a partial body, a `content-range` header nothing reads.
+// Two reads in this file are multi-row and unbounded, and their failure modes
+// differ in severity:
+//
+//   • `fetchWidgetsByBoard` — truncation does NOT drop boards, it drops WIDGETS
+//     OFF boards. A board past the cut renders EMPTY. That alone is bad; the
+//     part that loses work is `commitPages`, whose widget-table sync is a full
+//     delete-then-insert of page 0. A FLAT board (no `pages` jsonb) has its
+//     page 0 synthesised from the widget rows this function returned, so any
+//     mutation after a truncated read — addPage, upsertWidgetOnPage, deletePage
+//     — writes the truncated set back and PERMANENTLY DELETES the remainder.
+//     A read bug becomes a write bug.
+//
+//   • the `findWidget` page-scan — an unfiltered board read bounded only by RLS.
+//
+// Both now page by their table's PRIMARY KEY, which is unique unconditionally
+// and therefore stays a valid cursor no matter how the surrounding filters
+// change. Row ORDER is not load-bearing for either: `rowToBoard` re-sorts
+// widgets by `display_order_within_board` in memory, and the scan builds a
+// lookup. (Neither read carried an `.order()` before, so their previous
+// ordering was arbitrary anyway.)
+
+/** Board ids per `.in()` request. Bounds request-URL length; the row count
+ *  within a chunk is bounded by `pagedSelect`, not by this. */
+const BOARD_ID_CHUNK = 200;
+
+function chunkIds(ids: string[], size: number): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+
+/** `{ count: "exact" }` on the first page only. */
+function countOpt(page: PageRequest): { count: "exact" } | undefined {
+  return page.withCount ? { count: "exact" } : undefined;
+}
+
 /** Fetch the widget rows for a set of board ids, grouped by board id. Returns an
- *  empty array for any board with no widgets. */
+ *  empty array for any board with no widgets.
+ *
+ *  CEILING-SAFE (task #51). Chunked by board id AND cursor-paged within each
+ *  chunk. Both halves are load-bearing and neither substitutes for the other:
+ *  chunking alone would not help, because widgets-per-board is UNBOUNDED
+ *  (`lib/teach/limits.ts` caps boards at 50 per teacher and defines no widget
+ *  cap), so even a single board id can exceed the ceiling on its own. Paging
+ *  alone would leave the request URL to grow with the board count.
+ *
+ *  Cursor is `widgets.id`, the table's PRIMARY KEY — unique regardless of the
+ *  `board_id` filter, so widening that filter later cannot break pagination. */
 async function fetchWidgetsByBoard(
   client: ServerClient,
   boardIds: string[],
@@ -371,15 +425,26 @@ async function fetchWidgetsByBoard(
   const byBoard = new Map<string, WidgetRow[]>();
   for (const id of boardIds) byBoard.set(id, []);
   if (boardIds.length === 0) return byBoard;
-  const res = await client
-    .from("widgets")
-    .select(WIDGET_COLS)
-    .in("board_id", boardIds);
-  const rows = unwrap(res, "fetch widgets") as WidgetRow[];
-  for (const row of rows) {
-    const list = byBoard.get(row.board_id);
-    if (list) list.push(row);
-    else byBoard.set(row.board_id, [row]);
+  for (const batch of chunkIds(boardIds, BOARD_ID_CHUNK)) {
+    const rows = await pagedSelect<WidgetRow>(
+      "teach fetch widgets",
+      (row) => row.id,
+      (page) => {
+        let q = client
+          .from("widgets")
+          .select(WIDGET_COLS, countOpt(page))
+          .in("board_id", batch);
+        if (page.after != null) q = q.gt("id", page.after);
+        return q
+          .order("id", { ascending: true })
+          .limit(page.limit) as unknown as PromiseLike<PageResult<WidgetRow>>;
+      },
+    );
+    for (const row of rows) {
+      const list = byBoard.get(row.board_id);
+      if (list) list.push(row);
+      else byBoard.set(row.board_id, [row]);
+    }
   }
   return byBoard;
 }
@@ -697,16 +762,36 @@ async function findWidget(
   // the caller's personal boards + readable team boards) and confirm the widget
   // in memory. Multi-page boards are the only ones with non-page-0 widgets, so
   // the filter `pages != null` keeps the scan tight.
-  const scan = await client
-    .from("boards")
-    .select(BOARD_COLS)
-    .not("pages", "is", null);
-  if (scan.error) {
-    throw new Error(
-      `Teach repository widget page-scan failed: ${scan.error.message}`,
-    );
-  }
-  const rows = (scan.data as BoardRow[]) ?? [];
+  //
+  // CEILING-SAFE (task #51). This read carries NO owner, scope, grade or lesson
+  // filter — it is bounded only by RLS, and team boards are per-lesson while a
+  // grade-year holds ~1254 lessons, so the multi-page subset alone crosses 1000
+  // once team boards are common. Truncation here would make `findWidget` throw
+  // "Widget not found" for a widget that exists, which reads as a missing
+  // widget rather than as a failed read. Cursor is `boards.id` (PRIMARY KEY),
+  // unique irrespective of the `pages` filter.
+  const rows = await pagedSelect<BoardRow>(
+    "teach widget page-scan",
+    (row) => row.id,
+    (page) => {
+      let q = client
+        .from("boards")
+        .select(BOARD_COLS, countOpt(page))
+        .not("pages", "is", null);
+      if (page.after != null) q = q.gt("id", page.after);
+      return q
+        .order("id", { ascending: true })
+        .limit(page.limit) as unknown as PromiseLike<PageResult<BoardRow>>;
+    },
+  );
+  // DELIBERATELY still one widget read per board, inside the loop, so the scan
+  // STOPS at the board that holds the widget. Batching all of them up front (as
+  // `hydrateBoards` does) removes the N+1 but is strictly worse here: widgets
+  // are uncapped, so it would page every widget of every RLS-visible multi-page
+  // board on every lookup — turning a hit on the first board into the most
+  // expensive possible read, and putting a large-but-legitimate team within
+  // reach of `pagedSelect`'s hard page stop. The N+1 is a known cost of this
+  // fallback path; making the scan complete must not make its common case worse.
   for (const row of rows) {
     const widgetRows = await fetchWidgetsByBoard(client, [row.id]);
     const board = rowToBoard(row, widgetRows.get(row.id) ?? []);
