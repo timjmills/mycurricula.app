@@ -95,10 +95,31 @@
    prev/next/today nav that follows) to the FAR RIGHT of the week row, leaving
    the "Week N" title + catch-up chip on the left. The toggle lives here, not
    per-canvas, so it stays visible in every mode (the schedule timeline has no
-   navigator of its own). */
+   navigator of its own).
+
+   WRAPS, for the same reason `.navbar` above does — and it is a SEPARATE fix,
+   because `.navbar`'s wrap cannot help here. This is one flex ITEM of that row:
+   the parent can drop it onto its own line (which is why the prev/next arrows
+   sit below at phone width) but it cannot reflow what is INSIDE it. Left at
+   nowrap the slot laid out at its 332px max-content against a 299px content box
+   at 375px and simply overhung — measured 33px past the navbar's content box
+   and 19px past #main-content's padding box, where `overflow-x: auto` clipped
+   it. Note what that does NOT trip: the document never scrolls sideways
+   (scrollWidth 375 = clientWidth 375) and the tray's right edge, 369.6, is
+   still inside the 375px viewport. A document-level overflow assertion reads
+   clean while the Grid|List pill is visibly cut — the control has to be
+   measured against its own scroll container.
+
+   Hiding a control here was the alternative and is the wrong one: it removes a
+   capability rather than fitting it. Wrapping only engages when the row cannot
+   fit, so desktop — where the slot is shrink-to-fit with no free space — is
+   untouched, and `flex-end` keeps a wrapped line on the trailing edge the base
+   rule above describes rather than stranding it under the week title. */
 .navActions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   margin-left: auto;
 }

@@ -173,17 +173,22 @@ const IconPrint = (p: SVGProps<SVGSVGElement>) => (
 
 
 // ── Narrow-viewport breakpoint ────────────────────────────────────────────
-// The Weekly grid has a hard min-width (~1082px) that forces document-level
-// horizontal scroll on any viewport narrower than that. To keep the
-// document scroll-free at Tablet/Phone tiers (CLAUDE.md §4 responsive
-// hard rule), we detect narrow viewports via matchMedia and fall back to
-// the List layout regardless of the user's saved viewMode.
+// TWO different questions are asked about viewport width on this surface, and
+// they have DIFFERENT answers. Keeping them apart is the whole point of this
+// comment — one threshold answering both is exactly the bug that was here.
 //
-// The query is 900px — wide enough to guarantee the grid always fits on
-// true desktop, tight enough to catch all tablet/phone sizes.
+//   Q1 "can the SCHEDULE TIMELINE be used here?" → NARROW_MQ, 900px, below.
+//      A 5-column period×day timeline is unusable across the whole 360–900px
+//      band, and `/schedule` is the dedicated phone/tablet entry for it, so
+//      the in-place timeline is withheld for the entire tablet tier too.
+//      `isNarrow` also travels into <WeeklyViewControls> so the Schedule
+//      option disappears from the toggle rather than becoming a dead choice.
 //
-// The user's viewMode is LEFT UNCHANGED so returning to a ≥901px viewport
-// restores Grid automatically without any preference mutation.
+//   Q2 "can a multi-day WEEK CANVAS be used here?" → PHONE_MQ (600px), via
+//      usePhoneViewport() — NOT this query. See renderGridPanel.
+//
+// The user's viewMode is LEFT UNCHANGED by either gate, so widening the
+// viewport restores their chosen canvas with no preference mutation.
 
 const NARROW_MQ = "(max-width: 900px)";
 
@@ -312,6 +317,10 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // phones; this render-layer guard forces the view canvas so a persisted Week
   // edit flag (Week edit persists across nav, unlike Day) can't strand a phone
   // user in the board with no toggle to leave.
+  // `isPhoneViewport` (< 600px, the tablet-tier floor) has a SECOND job in
+  // renderGridPanel: it is the gate that forces the List canvas on phones.
+  // It is deliberately NOT the 900px `isNarrow` query below — see the two-
+  // question note at NARROW_MQ.
   const { isEdit: rawIsEdit } = useViewEditMode("Week");
   const isPhoneViewport = usePhoneViewport();
   const isEdit = rawIsEdit && !isPhoneViewport;
@@ -589,25 +598,57 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   function renderGridPanel(): ReactNode {
     // Render selection, in precedence order:
     //   0. isEdit (Week EDIT mode) → WeekEditBoard. Edit WINS over every other
-    //      branch, INCLUDING the ≤900px narrow-forced-List gate below: the
-    //      board scrolls internally and stays usable at phone widths, so the
-    //      teacher keeps a single editing surface at every tier (decision
-    //      locked by the orchestrator, W3.8c). The board owns its own
-    //      `data-pane="grid"` wrapper, so it is returned directly.
-    //   1. isNarrow (≤900px) → WeeklyList. The narrow-viewport gate WINS
-    //      over schedule mode because a 5-column timeline at 360–900px is
-    //      unusable; the dedicated /schedule route is the phone/tablet
-    //      entry. Forcing List in the shell at narrow widths keeps the
-    //      Weekly canvas usable.
-    //   2. Schedule pill ON (and not narrow) → ScheduleTimeline (week
-    //      scope), driven by the inline pill in the Weekly chrome.
-    //   3. viewMode === "list" → WeeklyList. Same as before.
-    //   4. Default → the frame-picked Week VIEW canvas: paper → WeekColumns,
+    //      branch below. It cannot collide with the phone-forced List: `isEdit`
+    //      is itself `rawIsEdit && !isPhoneViewport` (see above), so on a phone
+    //      this branch is already false and the List gate is what runs. On a
+    //      tablet the board scrolls internally and stays usable, so the teacher
+    //      keeps a single editing surface from 600px up (decision locked by the
+    //      orchestrator, W3.8c). The board owns its own `data-pane="grid"`
+    //      wrapper, so it is returned directly.
+    //   1. Schedule pill ON, and NOT narrow (≤900px) → ScheduleTimeline (week
+    //      scope), driven by the inline pill in the Weekly chrome. This is the
+    //      one branch still gated at 900px: a 5-column timeline is unusable
+    //      across the whole 360–900px band and /schedule is the phone/tablet
+    //      entry for it.
+    //   2. Phone (< 600px), OR viewMode === "list" at any width → WeeklyList.
+    //   3. Default → the frame-picked Week VIEW canvas: paper → WeekColumns,
     //      glass → WeekA, color → WeekC (all self-contained, no props).
     //
-    // Every branch now gets the FULL body width — there is no rail to share
-    // it with, so the splitter/rail track math these comments used to carry
-    // is gone rather than merely satisfied.
+    // ── The List force is a PHONE gate, not a narrow gate ─────────────────
+    // `showList = isPhoneViewport || viewMode === "list"`. Two thresholds, two
+    // questions (see the NARROW_MQ block at the top of this file):
+    //
+    //   < 600px  — List is FORCED. A multi-day grid genuinely does not fit: at
+    //              375px the header controls ("Expand all", the Grid|List
+    //              toggle) run off the right edge and Monday clips, which
+    //              CLAUDE.md §4 forbids outright — every primary control must be
+    //              reachable with no document-level horizontal scroll. List is
+    //              a complete surface here, not a dead end: it carries its own
+    //              per-day add affordance.
+    //   600–900  — the teacher's CHOSEN canvas renders. This is the tablet tier
+    //              and the part that was wrong before: `showList = isNarrow ||
+    //              viewMode === "list"` unmounted the three Week canvases — it
+    //              did not restyle them — for every tablet as well as every
+    //              phone, silently overriding a teacher who had picked Grid.
+    //              It also diverged from the handoff, whose only
+    //              `@media (max-width: 900px)` rule on the view surfaces
+    //              (bundled mockup :1253-1258, `7.21.26 …/source-home/views.css`
+    //              :615-620) names `.vb-day`, `.vc-day` and `.teach` — the DAY
+    //              and TEACH layouts — and no week class at all. The week grids
+    //              carry an explicit `min-width` instead (`.vb-week` 920px at
+    //              :884, `.vc-week` 760px at :945) with no responsive rule: they
+    //              keep their lanes and scroll INSIDE their own container, which
+    //              §4 permits — internal element scroll is fine, the DOCUMENT
+    //              must not scroll sideways.
+    //   > 900px  — unchanged.
+    //
+    // viewMode is never written by this gate, so a phone user who rotates or
+    // resizes past 600px gets their chosen canvas back with no preference
+    // mutation, exactly as before.
+    //
+    // Every branch gets the FULL body width — there is no rail to share it
+    // with, so the splitter/rail track math these comments used to carry is
+    // gone rather than merely satisfied.
     if (isEdit) {
       // Loading/error honesty for the Week EDIT board — the same 3-state gate
       // the VIEW canvases get below. With the Supabase flag ON a teacher can
@@ -637,7 +678,7 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
       // and it places nothing when there is no grip to place.
       return <WeekEditBoard />;
     }
-    const showList = isNarrow || viewMode === "list";
+    const showList = isPhoneViewport || viewMode === "list";
     const showSchedule = !isNarrow && scheduleMode;
     return (
       <div className={styles.columnWithGrip} data-pane="grid">
@@ -670,8 +711,10 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           /* W3.6 — Frame B (paper) reads the week as DAY COLUMNS (the
              bundle's "WeekB"). Same planner data, same rich card (so the
              material register + forking cue carry over), different
-             traversal. Narrow/schedule/list precedence above is untouched:
-             ≤900px still falls to WeeklyList regardless of frame. */
+             traversal. This renders from the tablet tier up (600px) — the
+             ≤900px fall-through to WeeklyList is gone; below 600px the phone
+             gate takes the List branch above. See the note above the
+             precedence list. */
           <WeekColumns />
         ) : frame === "glass" ? (
           /* W5 — Frame A (glass): the read-only period×day grid. */
