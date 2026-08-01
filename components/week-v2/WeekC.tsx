@@ -248,10 +248,16 @@ export function WeekC(): ReactNode {
         .map((l) => l.id),
     [byCell],
   );
+  // TWO effects, not one with a cleanup — see the long note on the same pair in
+  // WeekA.tsx. A cleanup that published `[]` re-ran the sequence `[] → ids` on
+  // every identity change of `visibleLessonIds`, and each half committed state,
+  // so a caller whose store value is not memoized drove an endless
+  // clear → publish → render loop. Publishing alone cannot: an unchanged id list
+  // returns the same array and React bails.
   useEffect(() => {
     publishVisible(visibleLessonIds);
-    return () => publishVisible([]);
   }, [visibleLessonIds, publishVisible]);
+  useEffect(() => () => publishVisible([]), [publishVisible]);
 
   // ── Selection / expansion / open ──────────────────────────────────────────
   // A click now EXPANDS THE TILE IN PLACE. It used to only select, because

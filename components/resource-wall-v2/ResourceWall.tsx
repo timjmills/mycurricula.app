@@ -312,16 +312,29 @@ export function ResourceWall({
   // `anchoredPreset`). Without it a /post?subject=math link would open on Today
   // and silently ignore the anchor.
   //
-  // `anchored` is recomputed EVERY render and is NOT a constant: PostClient
+  // `inferred` is recomputed EVERY render and is NOT a constant: PostClient
   // resolves `?lesson=` against the planner store, which is empty for the whole
   // 11–16s Supabase hydrate, so a deep-linked lesson arrives here as `null` and
   // turns real seconds later. The re-resolve effect below is what catches that.
-  const anchored = anchoredPreset({ focusLessonId, focusSubject, focusUnit });
-  // An explicit `?preset=` wins over the anchor inference for the INITIAL
-  // value only — it seeds state and never re-applies, so the teacher's own
-  // later choice of wall is never fought (the "never fight the teacher" rule
-  // the re-resolve effect below already follows).
-  const [preset, setPreset] = useState<WallPreset>(initialPreset ?? anchored);
+  const inferred = anchoredPreset({ focusLessonId, focusSubject, focusUnit });
+  // THE WALL THE URL IS ASKING FOR. An explicit `?preset=` outranks the anchor
+  // inference — it is a wall stated outright, where the anchors are a wall
+  // deduced — and it has to outrank it EVERYWHERE, not only in the seed.
+  //
+  // It used to seed `useState` and nothing else, which quietly discarded it: the
+  // re-resolve effect below compared the seeded wall against `inferred`, and a
+  // bare /post?preset=week-mixed carries no anchors at all, so `inferred` is
+  // "today". The moment the planner settled the effect "corrected" the asked-for
+  // wall back to Today — on the FIRST load, not just on a second navigation
+  // (Codex gate, reported as Medium; tests/resource-wall-preset-link.test.ts
+  // pins both). Feeding the effect the same value the seed uses is what makes
+  // the two agree.
+  //
+  // This does NOT re-assert the link over the teacher: `shouldFollowAnchor`'s
+  // teacherChoseWall / wallMode tests are unchanged and still stand the effect
+  // down the moment they pick a wall by hand.
+  const target = initialPreset ?? inferred;
+  const [preset, setPreset] = useState<WallPreset>(target);
   const [wallMode, setWallMode] = useState<WallMode>("preset");
   const [activeCustom, setActiveCustom] = useState<CustomWall | null>(null);
   const [customWalls, setCustomWalls] = useState<CustomWall[]>([]);
@@ -452,7 +465,7 @@ export function ResourceWall({
   const [override, setOverride] = useState<WallSection[] | null>(null);
   const sections = override ?? presetSections;
 
-  // RE-RESOLVE A LATE ANCHOR. `preset` seeds from `anchored` once, and a seed
+  // RE-RESOLVE A LATE ANCHOR. `preset` seeds from `target` once, and a seed
   // runs ONCE — so over Supabase it is taken while `focusLessonId` is still
   // null, the wall lands on "today", and the deep link is dropped FOREVER: no
   // error, no retry, and nothing on screen to tell the teacher the link they
@@ -490,9 +503,12 @@ export function ResourceWall({
     // this is the conservative half of the trade, and nothing in the app links
     // to /post with an anchor today. Revisit when the first such link ships.
     if (wallMode === "custom") teacherChoseWall.current = true;
+    // `target`, not `inferred`: an explicit `?preset=` is the wall the URL asked
+    // for, and comparing the seeded wall against an inference that never knew
+    // about it is what silently corrected it away. See `target`'s note above.
     if (
       !shouldFollowAnchor({
-        anchored,
+        anchored: target,
         preset,
         wallMode,
         teacherChoseWall: teacherChoseWall.current,
@@ -501,8 +517,8 @@ export function ResourceWall({
     ) {
       return;
     }
-    setPreset(anchored);
-  }, [anchorKey, anchored, preset, wallMode, settled]);
+    setPreset(target);
+  }, [anchorKey, target, preset, wallMode, settled]);
 
   // localStorage reads are deferred to an effect: the server render and the
   // first client paint must agree (app SSR contract).
@@ -570,13 +586,17 @@ export function ResourceWall({
   // never reopened, so the work reads as lost.
   //
   // GATED ON `settled`, which is what keeps this from fighting the anchor
-  // follow above. Until the store settles, `anchored` is still moving (a
+  // follow above. Until the store settles, `target` is still moving (a
   // deep-linked lesson resolves late), and opening the fork of a wall the URL
   // never asked for would be sticky: `wallMode === "custom"` latches
   // `teacherChoseWall`, and the real anchor would then arrive to find the
-  // follow disarmed. Once settled, `anchored` is final for this URL — the only
+  // follow disarmed. Once settled, `target` is final for this URL — the only
   // thing that moves it after that is a genuine navigation, which re-arms via
   // `anchorKey` and re-runs this rule for the new preset.
+  //
+  // `target`, so an explicit `?preset=` gets the same personal-first treatment
+  // as an anchor: a teacher who forked "This Week · Mixed" must get their fork
+  // back when /weekly's Resources button sends them to it.
   //
   // It never forks and never writes: `openCustom` loads an EXISTING wall's
   // stored layout. And it only ever moves a teacher OFF the shared preset onto
@@ -584,10 +604,10 @@ export function ResourceWall({
   // preset is the team's.
   useEffect(() => {
     if (!settled || teacherChoseWall.current || wallMode !== "preset") return;
-    const mine = personalWallFor(anchored, customWalls);
+    const mine = personalWallFor(target, customWalls);
     if (!mine) return; // no fork (or it was deleted) → stay on the preset
     openCustom(mine);
-  }, [settled, anchored, customWalls, wallMode, openCustom]);
+  }, [settled, target, customWalls, wallMode, openCustom]);
 
   // ── Auto-fork ─────────────────────────────────────────────────────────────
 

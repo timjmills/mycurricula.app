@@ -254,10 +254,24 @@ export function WeekA(): ReactNode {
     () => byDay.flat().map((l) => l.id),
     [byDay],
   );
+  //
+  // TWO effects, not one with a cleanup — and the split is load-bearing, not
+  // tidiness. A single effect whose cleanup published `[]` made the pair
+  // `[] → ids` run on EVERY re-run, and the re-run condition is the identity of
+  // `visibleLessonIds`, not its contents. Any render that hands this canvas a
+  // fresh `filters`/`subjects` array (a store whose value is not memoized —
+  // which is exactly what a test double is) therefore span: clear → publish →
+  // render → clear → publish, forever. It hung the mount test for eight
+  // attempts and read as "a leaked timer".
+  //
+  // Publishing alone cannot loop: publishVisible returns the SAME array when the
+  // contents match, so React bails and no render follows. The unmount clear is
+  // the same guarantee it always was — `publishVisible` is referentially stable,
+  // so this second effect runs its cleanup only when the canvas really goes away.
   useEffect(() => {
     publishVisible(visibleLessonIds);
-    return () => publishVisible([]);
   }, [visibleLessonIds, publishVisible]);
+  useEffect(() => () => publishVisible([]), [publishVisible]);
 
   // ── Cell placement: `${day}:${periodKey}` → lessons[] (+ unscheduled) ─────
   // Same assignment the edit board uses. Real data is NOT one-lesson-per-period

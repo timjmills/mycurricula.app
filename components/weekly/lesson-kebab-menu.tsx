@@ -25,6 +25,11 @@
 // outside-mousedown AND Escape (mockup :10716-10722), and the .14s
 // open keyframe (source/views.css:600-601).
 //
+// ONE ROW DIVERGES, and only in its wording: the fourth. The handoff carries the
+// lesson into a library overlay; this app's equivalent surface (/planner) takes
+// no lesson, so the row is labelled for the place it actually goes. The reason
+// sits at the row itself, next to the code it explains.
+//
 // ── Positioning ────────────────────────────────────────────────────────────
 // position:fixed and anchored to the TRIGGER's rect, not to the cursor. The
 // mockup anchors to the click point because its trigger is the whole cell;
@@ -296,18 +301,28 @@ export function LessonKebabMenu({
             <IconPost />
             Post
           </button>
-          {/* The mockup's fourth row opens its lesson LIBRARY overlay
-              (`setLibOpen(true)`). This app has no such overlay; /planner —
-              the Planner Hub — is the surface that answers the same question
-              ("where does this sit in the plan?"), so the row keeps the
-              handoff's label and position and routes to the real equivalent
-              rather than being dropped. */}
+          {/* The mockup's fourth row carries the lesson INTO its library
+              overlay — `setLesson(menu.lesson); setLibOpen(true)` (mockup
+              :10843) — so in the handoff all four rows are lesson-scoped.
+              Ours cannot be: /planner takes no query params anywhere in the
+              app (app/(planner)/planner/page.tsx renders <PlannerHub/> with no
+              props, and PlannerHub reads no URL), so there is no lesson-scoped
+              route to link to. Inventing one is a feature, not a menu fix.
+
+              So the row says what it does. It keeps the handoff's icon and
+              position, and takes the app's own name for the destination
+              ("Planner hub" — ViewTitle.tsx:41, CLAUDE.md §8's route map), which
+              reads as a place rather than as something done to this lesson. The
+              title spells out the scope for the teacher who expects the header's
+              lesson to travel with them (Codex gate, Medium). When /planner
+              grows a lesson deep link, this becomes a one-line change back. */}
           <button
             type="button"
+            title="Open the Planner hub — browse the whole plan. It does not open this lesson."
             onClick={() => go(() => router.push("/planner"))}
           >
             <IconPlanner />
-            Planner
+            Planner hub
           </button>
         </div>
       )}
