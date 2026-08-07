@@ -74,15 +74,25 @@ export const V2: boolean = process.env.NEXT_PUBLIC_V2 !== "0";
  *   • `app/(planner)/year/page.tsx`     → V2 ? <YearShell>      : <TimelineYear>
  *   • `app/(planner)/home/page.tsx`     → V2 ? <HomeConsole>    : <HomeV1>
  *   • `app/(planner)/catch-up/page.tsx` → V2 ? <CatchUpRouteV2> : <CatchupScreen>
+ *   • `app/onboarding/page.tsx`         → gated (added to this roster 2026-08-07;
+ *                                         it was gated in code but missing here)
  * where the `*V1` shells are verbatim copies of master's live-on-prod views.
  * KEEP THIS ROSTER CURRENT — it is the readable record of what the router half
  * covers. If you v2-swap another route's mount, gate it and add it here.
  *
- * KNOWN, INTENTIONAL EXCEPTION: `app/(planner)/planner/page.tsx` (the v2 Hub) is
- * NOT gated and must not be — `/planner` does not exist on master, so there is no
- * live-on-prod v1 behaviour to restore. Wave-13's flag-OFF regression should
- * treat it as a known deviation, not a miss. (`app/(planner)/layout.tsx` already
- * documents the related immersive-chrome residual.)
+ * KNOWN, INTENTIONAL EXCEPTIONS — routes that are NOT gated, and why. Audited
+ * 2026-08-07; this list was previously silent on all but the first, which made
+ * the roster read as complete when it was not:
+ *   • `app/(planner)/planner/page.tsx` (the v2 Hub) — must NOT be gated:
+ *     `/planner` does not exist on master, so there is no live-on-prod v1
+ *     behaviour to restore. (`app/(planner)/layout.tsx` documents the related
+ *     immersive-chrome residual.)
+ *   • `app/(planner)/post/page.tsx` (the Resource Wall) — same reason: v2-only.
+ *   • `app/(planner)/boards/page.tsx` — v2-only.
+ *   • `app/(planner)/schedule/page.tsx` — one shell serves both sides.
+ *   • `app/settings/page.tsx` — the unified hub is shared, not forked.
+ * Wave-13's flag-OFF regression should treat every entry above as a known
+ * deviation, not a miss. If you add a route, add it to one of these two lists.
  *
  * With BOTH halves gated, `NEXT_PUBLIC_V2=0` is now a genuine v1 rollback: v1
  * chrome AND the v1 route canvases (no v2 `.stage`/`.theme-tint`). This is what

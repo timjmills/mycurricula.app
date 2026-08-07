@@ -168,10 +168,31 @@ Documents/      Planning docs + design handoff — NOT part of the app, never im
 
 ## 4. Design system rules
 
-> The canonical visual reference for v2 is the **v2 mockup + `V2 Framework.md`**
-> (under `Documents/Claude Design/.../design-system/`), not `/weekly`. The handoff
+> The canonical visual reference for v2 is the v2 handoff, not `/weekly`. The handoff
 > **wins for look and behavior** — when code and the handoff disagree, fix the code.
 > Recreate it faithfully in idiomatic React; cite the handoff as the origin.
+>
+> **THE HANDOFF IS THREE BUNDLES DEEP — corrected 2026-08-07.** This file used to
+> name only the 6.24 bundle, and agents consequently built against a superseded
+> spec. The real chain, newest first:
+>
+> 1. `Documents/Claude Design/7.21.26 Design Handoff Update/` — **delta**
+> 2. `Documents/Claude Design/7.2.26 Design Handoff Updated Surfaces/` — **delta**
+> 3. `Documents/Claude Design/6.24.26 design_handoff_v2_site/` — **baseline**
+>
+> Each later README states the foundations are unchanged and **wins only on its own
+> deltas**; for everything else the baseline governs. Check the newest bundle first
+> and work backwards, or you will implement a retired recipe.
+>
+> ⚠ **The "bundled mockup wins" rule (§4a) has a known exception.** The 7.21
+> bundle's `New v2 Site Design.bundled.html` is a **stale artifact** — it predates
+> that cycle's Pastel frame entirely (zero hits for `PASTEL frame`, `data-version="C"`
+> or `Source Sans`) and it still contains the `accentcycle` animation the modular CSS
+> deleted, without the note explaining why. Where a 7.21 bundled mockup and a 7.21
+> modular stylesheet disagree, the **modular file is newer** — it gained text the
+> bundle lacks rather than losing text the bundle has. Verify which is actually newer
+> before applying the authority chain mechanically; mtimes are identical and do not
+> disambiguate.
 
 ### The v2 appearance engine — attribute vocabulary
 
@@ -184,10 +205,16 @@ theme) that forces derived `data-tone="dark"`; dark rendering branches on `data-
 never the theme.
 
 - `data-frame` ∈ `glass | paper | color` — layout character + material + emphasis.
-  Defaults to **`glass`** (Frame A · Calm Glass). The working build also carries the
-  equivalent `data-version ∈ A|B|C` on the app root (A=Glass, B=Bright/paper,
-  C=Color-forward) — **treat them as the same axis.** A frame changes layout/material,
+  Defaults to **`glass`** (Frame A · Calm Glass). A frame changes layout/material,
   never the global tone.
+  **`data-version` does NOT exist — corrected 2026-08-07.** This section used to say
+  the build "also carries the equivalent `data-version ∈ A|B|C`" and to treat the two
+  as one axis. It does not: `lib/theme.tsx` sets `root.dataset.frame` and nothing
+  else, and a grep of `app/`, `lib/` and `components/` finds no `data-version`
+  emitter in any `.ts`/`.tsx`. The remaining occurrences are all **comments** in CSS
+  citing the handoff mockup, plus selectors keyed on it that therefore never match.
+  Branch on `data-frame`. If you see a rule written against `[data-version]`, it is
+  dead — that is a large part of why Frame C rendered almost identically to Frame A.
 - `data-glass` ∈ `dark | light` — the two frosted **registers** of Frame A (dark
   frosted = translucent dark panels + white text; white frosted = translucent white
   panels + dark ink). Surface-only — it flips a panel's fill **and** its text together;
@@ -219,7 +246,15 @@ the `--accent`/glow; subject + status colors never move):
 
 Theme washes are smoothed multi-stop gradients (no hard band); the accent glow lives in
 the **background wash**, not as a per-card halo. Themes (and washes) drift slowly by
-default; Motion = Still / reduced-motion stops them. **Glass is the signature material**
+default; **`prefers-reduced-motion` stops them.** (**Corrected 2026-08-07:** this line
+promised a user-facing "Motion = Still" setting. **There is no such setting** — no
+motion axis exists in `lib/theme-values.ts` and no Motion control ships in
+`components/appearance/`. The handoff's equivalent is `photoMotion`, never ported,
+which is why the CSS that gates on `data-zoom` is dormant. A teacher who finds the
+drift distracting but does not want to change an OS-wide accessibility setting
+currently has no recourse; a real Motion axis is deferred to the next cycle because it
+needs the five-surface allowlist lockstep plus a `CHECK` migration.) **Glass is the
+signature material**
 — frosted over photo, Liquid v5 over wash, in a dark or white register; see §6 of
 `V2 Framework.md`.
 

@@ -15,14 +15,23 @@
 //
 // ── POLARITY: DEFAULT OFF — the INVERSE of NEXT_PUBLIC_V2 ──────────────────
 // `RAW === "1"`. Multi-workspace is OFF unless EXACTLY "1" turns it on. This is
-// the opposite default from V2 (which is on unless exactly "0"), and it is
-// deliberate: the backing migration (20260724120000_multi_workspace.sql) is
-// authored + vetted but NOT YET APPLIED to prod. Until it is applied AND this
-// flag is flipped on in a build, the seam must behave byte-identically to today —
-// the notebook-state OFF path renders the mock workspace exactly as before, and
-// the server actions short-circuit to friendly/empty responses. A typo'd value
+// the opposite default from V2 (which is on unless exactly "0"). A typo'd value
 // (`"true"`, `"on"`, `"yes"`) therefore reads as OFF (fail-safe), never as a
-// premature ON against an un-migrated database.
+// premature ON against a database that lacks the tables.
+//
+// ⚠ HISTORY CORRECTED 2026-08-07. This block used to say the backing migration
+// (20260724120000_multi_workspace.sql) was "authored + vetted but NOT YET APPLIED
+// to prod". That has been false since 2026-07-24. Verified read-only against the
+// live project (xuukfpvonsbvvbspsrsl): `20260724120000 multi_workspace` is in the
+// applied list, and three later migrations build on top of it (workspace_roster,
+// rename_workspace, track_b_workspace_fields) — none of which could have applied
+// otherwise. The prod cutover was executed; rollback is flipping the repo variable
+// and redeploying, NOT reverting a migration.
+//
+// The fail-safe default is retained anyway: it still protects local and preview
+// environments pointed at a project without these tables, and a flag flip remains
+// redeploy-gated. Do not read this default as evidence about prod state — read the
+// applied-migration list.
 //
 // Inlined by `next build` (NEXT_PUBLIC_*) and frozen into the artifact — a
 // runtime env change has NO effect; a flip is redeploy-gated.
