@@ -271,7 +271,7 @@ function findOffenders(): Map<string, string[]> {
 // exact-equality assertion below fails if you don't.
 //
 // ── THE ONE TIME IT GREW, 2026-08-01, and why ──────────────────────────────
-// `components/day-v2/Day{A,B,C}.tsx` are back on this list. They were deleted
+// `components/day-v2/Day{A,B,C}.tsx` were back on this list. They were deleted
 // when /daily consolidated to a single Day view, which shrank the list for
 // free — the mock imports did not get fixed, the files just stopped existing.
 // The user then asked for the three views back ("keep all three of the views
@@ -281,10 +281,16 @@ function findOffenders(): Map<string, string[]> {
 // That is a restoration to the pre-deletion baseline, not new debt: no line
 // here is a surface that did not already carry it. It is recorded rather than
 // quietly re-added because a ratchet that moves backwards without an
-// explanation is not a ratchet. The three are scheduled for deletion — when the
-// user decides what to merge or drop, these lines go with the files (see
-// components/day-v2/DayViewV2.tsx). Nothing else may use this precedent: a NEW
+// explanation is not a ratchet. Nothing else may use this precedent: a NEW
 // surface reading fixtures still fails, which is the whole point.
+//
+// ── AND THE FIRST OF THEM TO GO BACK, 2026-08-07 ───────────────────────────
+// `components/day-v2/DayC.tsx` is deleted and its line is gone with it, which
+// is exactly the procedure the paragraph above prescribed ("when the user
+// decides what to merge or drop, these lines go with the files"). DayC was the
+// shipping focus card's own parent, so `?dayview=c` compared /daily against a
+// diverged copy of itself; the alias now falls through to the default. DayA and
+// DayB are genuinely different layouts and stay, lines and all.
 const ALLOWLIST: readonly string[] = [
   "app/(planner)/post/PostClient.tsx",
   "app/(planner)/weekly/print/WeeklyPrintSheet.tsx",

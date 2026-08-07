@@ -707,18 +707,20 @@ describe("a double-click opens the editor, not the lightbox over it", () => {
     }
   });
 
-  it("shuts a lightbox that a SLOW double-click already opened", async () => {
-    // The window is a heuristic and cannot be anything else — the platform's
-    // own double-click interval is ~500ms and is not readable from JS. So a
-    // teacher who clicks slowly gets the preview first, and the composer would
-    // mount underneath it exactly as before. Correctness comes from the card
-    // being able to shut the preview, not from the number (§4a gate, task #9).
+  it("shuts a preview that is already open, when the double-click reaches the card", async () => {
+    // ⚠ READ THE SCOPE BEFORE TRUSTING THIS TEST. It covers the PRE-PAINT band
+    // only: the timer has fired but the lightbox has not painted, so the second
+    // click still reaches the card. It does NOT prove the general slow
+    // double-click works, and cannot — there is no real lightbox in this mount,
+    // so nothing here does hit-testing. In a browser, once the scrim paints it
+    // swallows click #2 and this component never runs at all. That case is
+    // measured in the live §4b probe and documented as a residual on
+    // DOUBLE_CLICK_WINDOW_MS; it is not fixed by what this test asserts.
     const h = await openSaved();
     try {
       await clickWithDetail(shell(h), 1);
       await waitPastWindow();
-      // The slow half: the lightbox is already open when the second click
-      // lands. Control — assert that, rather than assuming the wait worked.
+      // Control: the preview really is open when the second click lands.
       expect(modals).toHaveLength(1);
       expect(closes).toHaveLength(0);
 
@@ -726,6 +728,28 @@ describe("a double-click opens the editor, not the lightbox over it", () => {
       await h.dblClick(shell(h));
       expect(closes).toHaveLength(1); // the preview was put away …
       expect(h.queryAll("input")).toHaveLength(2); // … and the composer is up
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("drops the queued lightbox even when the nested control stops propagation", async () => {
+    // The card's own attached link calls `stopPropagation` so that following it
+    // does not also open the modal — which means the card's BUBBLING click
+    // handler never sees it, and a cancel that lived there was silently skipped.
+    // The queued preview then opened on top of the new tab the teacher had just
+    // opened (§4a review round 2, Medium). The cancel is on the capture phase
+    // for exactly this reason.
+    const h = await openSaved();
+    try {
+      await clickWithDetail(shell(h), 1);
+      expect(modals).toHaveLength(0); // control: queued, not yet fired
+      const link = h.query('a[href="https://example.test/applet"]');
+      expect(link).toBeTruthy(); // control: the propagation-stopping control is there
+      await h.clickElement(link as Element);
+
+      await waitPastWindow();
+      expect(modals).toHaveLength(0);
     } finally {
       await h.unmount();
     }

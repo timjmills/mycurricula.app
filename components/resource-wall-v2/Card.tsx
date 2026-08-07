@@ -94,15 +94,34 @@ export const WALL_CARD_DND_TYPE = "text/card";
  * exists to prevent. `cancelPendingClick()` cannot help there; by then there is
  * no pending timer left to cancel.
  *
- * So the window is only an OPTIMISATION — it means a normal, quick double-click
- * never flashes a lightbox at all. Correctness comes from `onCloseModal`, which
- * `handleDoubleClick` calls unconditionally: whatever the timing, a
- * double-click ends with the preview shut and the composer up. Raising this to
- * 500ms was rejected (it makes every single click on a note feel sluggish to
- * buy the tail); dropping it to zero was rejected too (the preview would then
- * flash open and shut on every single note edit, which is the more visible of
- * the two costs). The third path in — the hover bar's explicit Edit button —
- * depends on no timing at all.
+ * `onCloseModal` (called unconditionally from `handleDoubleClick`) narrows the
+ * gap but DOES NOT CLOSE IT, and it must not be read as if it did: once the
+ * timer has painted the lightbox, its scrim covers the viewport, so the second
+ * physical click lands on the scrim and this card never receives click #2 or
+ * `dblclick` at all. Nothing here runs, so nothing here can rescue it. What
+ * `onCloseModal` genuinely covers is the narrow band where the second click
+ * arrives after the timer fired but before the modal has painted.
+ *
+ * MEASURED in real Chrome rather than reasoned about, because the two §4a
+ * passes disagreed about the mechanism. Clicking once, waiting 400ms, then
+ * clicking again:
+ *
+ *   @+400ms  .rw-lb-scrim count = 1, and `elementFromPoint` at the click
+ *            coordinates returns DIV.Lightbox_media — the preview, not the card
+ *   outcome  scrims = 1, composer present = false
+ *
+ * So the failure is "the preview opens and the edit gesture is silently lost",
+ * NOT "the composer is stranded under a modal" — the composer is never created
+ * at all. That distinction matters: there is nothing underneath to rescue.
+ *
+ * THE HONEST SUMMARY: a quick double-click (the overwhelming majority) opens the
+ * editor cleanly and never flashes a preview. A slow one opens the preview
+ * instead; the teacher dismisses it and tries again, or uses the hover bar's
+ * Edit button — which depends on no timing at all, and is the reason this
+ * residual is tolerable rather than blocking. Raising the window to 500ms was
+ * rejected (every single click on a note would feel sluggish, to buy the tail);
+ * dropping it to zero was rejected too (the preview would flash open and shut
+ * on every note edit).
  */
 const DOUBLE_CLICK_WINDOW_MS = 250;
 
@@ -667,17 +686,32 @@ export function Card({
     setEditing(true);
   }, [cancelPendingClick, readOnly, isNote, item.resource]);
 
+  /**
+   * A click on anything interactive INSIDE the card supersedes a lightbox this
+   * card queued a moment ago: click the note body, then reach for Play /
+   * Enlarge / Send-to-board within the window, and the preview used to pop open
+   * on top of the thing the teacher had just asked for (§4a review, Medium).
+   *
+   * ON THE CAPTURE PHASE, deliberately. The bubbling handler below never sees a
+   * click from a descendant that calls `stopPropagation` — and one does: the
+   * card's own attached link stops it so opening the link doesn't also open the
+   * modal (see `.cardLink` in the render). Cancelling there meant the queued
+   * preview survived the very click that should have cancelled it, and popped
+   * open over the new tab the teacher had just opened (§4a review round 2,
+   * Medium). Capture runs before the target's own handler, so nothing
+   * downstream can suppress it.
+   */
+  const handleClickCapture = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>): void => {
+      if (fromInteractive(e)) cancelPendingClick();
+    },
+    [cancelPendingClick],
+  );
+
   const handleClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>): void => {
-      if (fromInteractive(e)) {
-        // AND CANCEL, not just return (§4a review, Medium). A click on a nested
-        // action supersedes a lightbox this card queued a moment ago: click the
-        // note body, then reach for Play / Enlarge / Send-to-board within the
-        // window, and the preview used to pop open on top of the slideshow or
-        // the board the teacher had just asked for.
-        cancelPendingClick();
-        return;
-      }
+      // The cancel for this case lives in `handleClickCapture` — see there.
+      if (fromInteractive(e)) return;
       if (editing) return;
       // `detail` is the click count: 0 is a keyboard / assistive-technology
       // activation, which can never be the first half of a double-click and so
@@ -704,16 +738,14 @@ export function Card({
       // turns out to mean, the lightbox the first click queued is not it.
       cancelPendingClick();
       if (readOnly || !isNote || editing || fromInteractive(e)) return;
-      // AND CLOSE ONE THAT ALREADY OPENED. The window above is a heuristic and
-      // cannot be anything else — the platform's own double-click interval is
-      // ~500ms on Windows and macOS and is not readable from JS — so a teacher
-      // who clicks slowly gets the lightbox at 250ms and then this handler,
-      // which would mount the composer UNDER the modal all over again.
-      // Cancelling cannot help there: by then there is no timer left. So the
-      // card asks the wall to put the preview away, which is the only fix that
-      // does not depend on guessing a threshold (§4a gate, Medium; task #9).
-      // A no-op when nothing is open — `setLight(null)` over `null` is a
-      // bail-out, not a render.
+      // AND CLOSE ONE THAT ALREADY OPENED. If the timer fired but the modal has
+      // not painted yet, this double-click still reaches the card — and without
+      // this it would mount the composer under a preview that was about to
+      // appear. Reaching this line at all means the scrim did NOT intercept the
+      // click, so this is the pre-paint band and nothing else; see the note on
+      // DOUBLE_CLICK_WINDOW_MS for what is and is not covered. A no-op when
+      // nothing is open — `setLight(null)` over `null` bails out rather than
+      // rendering.
       onCloseModal();
       enterEdit();
     },
@@ -939,6 +971,7 @@ export function Card({
             : null),
         } as React.CSSProperties
       }
+      onClickCapture={handleClickCapture}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       {...dragProps}
