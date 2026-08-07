@@ -376,7 +376,8 @@ export function linkEdited(
     ? linkToLessonResource(saved.url.trim(), saved.label)
     : null;
   return (
-    (before?.url ?? null) !== (next?.url ?? null)
+    (before?.url ?? null) !== (next?.url ?? null) ||
+    (before?.label ?? null) !== (next?.label ?? null)
   );
 }
 

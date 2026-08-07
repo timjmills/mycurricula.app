@@ -3,6 +3,7 @@ import { createElement, type ReactNode } from "react";
 
 import { mountReact } from "./mount-react";
 import type { WallItem } from "@/lib/wall-scope";
+import type { LessonResource } from "@/lib/types";
 import { CARD_WASH_TINTS, CARD_WASH_NAMES } from "@/lib/card-wash";
 
 // The Resource Wall's inline note composer — the surface the user called "too
@@ -515,11 +516,11 @@ describe("Remove link actually removes the link", () => {
   // proven directly on the function, and the field that feeds it is proven in
   // the live §4b pass.
   describe("linkEdited — did the teacher change the link?", () => {
-    const SAVED = {
+    const SAVED: LessonResource = {
       type: "link",
       label: "Number line applet",
       url: "https://example.test/applet",
-    } as never;
+    };
     const build = (url: string, label?: string) =>
       linkToLessonResource(url, label);
 
@@ -549,7 +550,7 @@ describe("Remove link actually removes the link", () => {
       // edit, and forks a preset wall on a no-op Done. Worse, if the display
       // name derivation ever changes, that shape would commit EVERY note with
       // a link the next time it was opened.
-      const BLANK = { ...SAVED, label: "" } as never;
+      const BLANK: LessonResource = { ...SAVED, label: "" };
       const rebuilt = build("https://example.test/applet", "");
       expect(rebuilt?.label).toBeTruthy(); // control: it really does normalise
       expect(linkEdited(BLANK, rebuilt)).toBe(false);
