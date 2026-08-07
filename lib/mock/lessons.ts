@@ -452,7 +452,36 @@ export const LESSONS: Lesson[] = [
       { type: "image", label: "Rotation chart" },
       { type: "doc", label: "Conferring tracker" },
     ],
-    standards: ["RL.5.3", "L.5.1.D", "W.5.3"],
+    // THE ONE FIXTURE THAT OVERFLOWS THE STANDARDS CHIP GROUP.
+    // ────────────────────────────────────────────────────────────────────────
+    // The Day focus card collapses past four standards into a "+N more" chip
+    // (day-v2/util `splitStandardChips`: STANDARD_CHIP_LIMIT = 3, but
+    // one-past-the-limit is SHOWN rather than collapsed, so the collapse needs
+    // FIVE unique codes to appear at all). Every one of the ~50 `standards`
+    // arrays in this file carried three or fewer, so the shipped collapse had
+    // no fixture that could reach it: it was covered by
+    // tests/day-card-content.test.ts and unreachable by anyone opening the app.
+    //
+    // This lesson is where the extra codes BELONG rather than where they were
+    // convenient. It is a 90-minute three-station rotation whose own tasks are
+    // already tagged RL.5.3 / L.5.1.D / W.5.3 / W.5.3.B — four between them,
+    // and the lesson row listed three of those four, which was independently
+    // wrong: a teacher looking at the block could not see the standard one of
+    // its three stations is actually working on. Adding the missing station
+    // code plus the two the format itself carries (evidence-based inference at
+    // the reading station, collaborative discussion in a rotation) gives six —
+    // a realistic tag set for a 90-minute integrated block, not padding.
+    //
+    // Live-checkable at `/daily?lesson=r-12-litcenters` (the deep link the
+    // route already resolves server-side, app/(planner)/daily/page.tsx:35).
+    standards: [
+      "RL.5.1",
+      "RL.5.3",
+      "L.5.1.D",
+      "W.5.3",
+      "W.5.3.B",
+      "SL.5.1",
+    ],
     tasks: [
       {
         id: "litc-read",

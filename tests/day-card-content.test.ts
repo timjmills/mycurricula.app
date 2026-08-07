@@ -47,7 +47,29 @@ const store = vi.hoisted(() => ({
   units: [] as unknown[],
   sections: {} as Record<string, LessonSectionContent[]>,
   standards: {} as Record<string, string>,
+  /** Forces `deriveDayStatus` for the footer tests below. `null` = passthrough,
+   *  so every other test in this file sees the real derivation. */
+  forcedStatus: null as string | null,
 }));
+
+// THE DERIVED STATUS IS FORCED, NOT ARRANGED. `deriveDayStatus` reads the wall
+// clock through `useNowMin()` and the lesson's timetable band, so "now" and
+// "upcoming" cannot be produced by a fixture — a test that tried would pass or
+// fail depending on the hour it ran. What the footer tests assert is the
+// mapping FROM a DayStatus TO what the card prints, which is this file's
+// business; how the status is derived is lib/day-status's, and it has its own
+// tests. Everything else in the module (notably `currentAndNext`, which
+// `pickFocus` calls) is passed through untouched.
+vi.mock("@/lib/day-status", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/day-status")>();
+  return {
+    ...actual,
+    deriveDayStatus: (...args: Parameters<typeof actual.deriveDayStatus>) =>
+      (store.forcedStatus as ReturnType<typeof actual.deriveDayStatus>) ??
+      actual.deriveDayStatus(...args),
+  };
+});
 
 vi.mock("@/lib/planner-store", () => ({
   usePlanner: () => ({
@@ -171,6 +193,66 @@ beforeEach(() => {
   store.units = [];
   store.sections = {};
   store.standards = {};
+  store.forcedStatus = null;
+});
+
+// ── The footer says the status ONCE ─────────────────────────────────────────
+// The card carried two status labels, side by side and always both: a `.dchip`
+// from `statusLine(status)` and, 8px later, the `<FinishPill>` — which prints
+// its own word (planner-v2 `STATUS_WORD`, plus a "Done" branch). The pairs the
+// audit's #4 named, and the two it did not:
+//
+//   done      "Complete"    +  "Done"      two words, one fact
+//   idle      "Planned"     +  "Planned"   the SAME string, twice
+//   upcoming  "Planned"     +  "Up next"   the pill says more
+//   now       "In progress" +  "Finish"    a state and an ACTION — both earn it
+//
+// So these assert a rule, not a special case: the chip speaks only where the
+// pill does not. `idle` is pinned as hard as `done` because it was the worse
+// of the two and no one had written it down.
+
+describe("focus card — the status is stated once", () => {
+  /** Occurrences of a word in the rendered markup, attribute text included —
+   *  deliberately, since a `title=` that repeats the visible word is the same
+   *  redundancy in a different place. */
+  const count = (html: string, word: string): number =>
+    html.split(word).length - 1;
+
+  it("drops the status chip when the lesson is done — the pill already says so", () => {
+    store.forcedStatus = "done";
+    const html = render(DayFocus, lesson({ status: "done" }));
+
+    // The pill is the survivor: it is the label AND the control.
+    expect(html).toContain("Done");
+    // …and the chip's word for the same fact is gone entirely.
+    expect(count(html, "Complete")).toBe(0);
+  });
+
+  it("never prints 'Planned' twice for an idle lesson", () => {
+    store.forcedStatus = "idle";
+    const html = render(DayFocus, lesson());
+
+    // Exactly one — the pill's. Before the fix this was two, 8px apart.
+    expect(count(html, "Planned")).toBe(1);
+  });
+
+  it("lets the pill's 'Up next' stand alone rather than adding a vaguer chip", () => {
+    store.forcedStatus = "upcoming";
+    const html = render(DayFocus, lesson());
+
+    expect(html).toContain("Up next");
+    expect(count(html, "Planned")).toBe(0);
+  });
+
+  it("KEEPS the chip while a lesson is running — 'Finish' is an action, not a status", () => {
+    store.forcedStatus = "now";
+    const html = render(DayFocus, lesson());
+
+    // This is the one pair that is not redundant, and it must survive a fix
+    // aimed at the ones that are.
+    expect(count(html, "In progress")).toBe(1);
+    expect(html).toContain("Finish");
+  });
 });
 
 // ── The lesson flow ─────────────────────────────────────────────────────────

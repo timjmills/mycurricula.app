@@ -83,10 +83,37 @@ import { DayHeader } from "./DayHeader";
 import type { DayViewV2Props } from "./DayViewV2";
 import styles from "./day-v2.module.css";
 
-function statusLine(status: DayStatus): string {
-  if (status === "done") return "Complete";
-  if (status === "now") return "In progress";
-  return "Planned";
+/**
+ * The footer's status chip — or `null` when the Finish pill beside it already
+ * says the same thing.
+ *
+ * THE CARD USED TO STATE ITS STATUS TWICE, SIDE BY SIDE. This returned a word
+ * for every status and the chip rendered unconditionally, immediately before
+ * `<FinishPill>` — which carries its own status word (atoms.tsx `STATUS_WORD`
+ * + the "Done" branch). The pairs were:
+ *
+ *   done      chip "Complete"    · pill "Done"      → same fact, two words
+ *   idle      chip "Planned"     · pill "Planned"   → the IDENTICAL string,
+ *                                                     twice, 8px apart
+ *   upcoming  chip "Planned"     · pill "Up next"   → the pill is strictly
+ *                                                     more informative
+ *   now       chip "In progress" · pill "Finish"    → state + ACTION; these
+ *                                                     are different jobs
+ *
+ * So the rule is not "hide it when done" (the audit only caught that pair);
+ * it is: THE CHIP SPEAKS ONLY WHEN THE PILL DOES NOT. The pill wins because it
+ * is both the label and the control — a teacher reads the status off the thing
+ * that changes it — and because the handoff has no Finish pill at all and puts
+ * status in a single chip (7.21 source-home/views-c.jsx:52, byte-identical in
+ * the 7.2 and 6.24 bundles). Dropping the duplicate is a RETURN to the
+ * handoff's one-status-statement footer, not a divergence from it.
+ *
+ * `now` is the one state where both earn their place: the pill has stopped
+ * reporting and started asking ("Finish"), so nothing else on the card would
+ * say the lesson is under way.
+ */
+function statusLine(status: DayStatus): string | null {
+  return status === "now" ? "In progress" : null;
 }
 
 /** Pick the focused lesson: global selection when in this day, else the
@@ -216,9 +243,34 @@ export function DayFocus(props: DayViewV2Props): ReactNode {
         </div>
 
         {sel ? (
+          // PALETTE CLASS = `Subject.cls`, NEVER `lesson.subject`. The agenda
+          // row above has always painted `cp-subj ${subject.cls}`; this card
+          // painted `cp-subj ${lesson.subject}`, and one surface reading a
+          // subject's colour two different ways is a bug waiting for the day
+          // the two stop agreeing.
+          //
+          // THEY AGREE TODAY, and that is the whole point of fixing it now
+          // rather than later: `Subject.cls` is documented as "equals `id`"
+          // (lib/types.ts:20) and every producer honours that — the fixtures
+          // (lib/mock/subjects.ts), the backend mapper (planner/supabase-source
+          // :1898 `cls: id`) and the roster hook's team branch
+          // (use-visible-subjects:148 `cls: s.id`). So this change is invisible
+          // in the render and cannot be caught by a screenshot.
+          //
+          // It stops being invisible for PERSONAL subjects. Those carry a
+          // `p-…` slug id and BORROW a locked palette slot
+          // (use-visible-subjects:163 `cls: p.swatch`, "ALWAYS one of the 8
+          // locked SubjectIds… never any other color source"). The moment a
+          // lesson can hold one, `cp-subj p-abc123` matches no rule in the
+          // palette cascade and the card loses `var(--c)` — i.e. loses the
+          // subject gradient this card is built out of — while the rail beside
+          // it stays correctly coloured. `cls` is the field that is defined to
+          // be a palette class; `lesson.subject` is an identifier that happens
+          // to look like one.
           <FocusCard
             lesson={sel}
             subjectName={subjectById[sel.subject].name}
+            subjectCls={subjectById[sel.subject].cls}
             status={deriveDayStatus(sel, nowMin, isToday)}
             onPlan={onPlan}
             onTeach={(id) => router.push(`/teach?lesson=${id}`)}
@@ -270,6 +322,7 @@ export function DayFocus(props: DayViewV2Props): ReactNode {
 function FocusCard({
   lesson,
   subjectName,
+  subjectCls,
   status,
   onPlan,
   onTeach,
@@ -277,6 +330,10 @@ function FocusCard({
 }: {
   lesson: Lesson;
   subjectName: string;
+  /** The `.cp-subj.<cls>` palette class — `Subject.cls`, NOT `lesson.subject`.
+   *  See the note at the callsite; the two are equal today and the difference
+   *  is the whole reason this is a prop rather than an inline read. */
+  subjectCls: string;
   status: DayStatus;
   onPlan: (id: string) => void;
   onTeach: (id: string) => void;
@@ -284,6 +341,7 @@ function FocusCard({
 }): ReactNode {
   const { setLessonStatus, units, getSections, describeStandard } = usePlanner();
   const isDone = lesson.status === "done";
+  const statusChip = statusLine(status);
   const unitName = unitDisplayName(units, lesson.subject, lesson.unit);
   const sections = getSections(lesson.id);
   const flow = lessonFlowSteps(sections);
@@ -293,7 +351,7 @@ function FocusCard({
   const resourceCount = lessonResourceCount(sections);
   return (
     <div
-      className={`cp-subj ${lesson.subject} ${styles.vcDetail} ${
+      className={`cp-subj ${subjectCls} ${styles.vcDetail} ${
         lesson.modified ? styles.vcDetailModified : ""
       }`}
     >
@@ -359,6 +417,39 @@ function FocusCard({
             </span>
           ))
         ) : (
+          // ── IS THIS REACHABLE? NOT TODAY — AND IT STAYS ANYWAY ────────────
+          // Traced for the 8.01 audit's "unreachable shipped state" item. Every
+          // path that can put sections in front of this card produces at least
+          // one:
+          //   • flag OFF — `seedSections` / `ensureSections` call
+          //     `buildInitialSections` (planner-store:629), which instantiates
+          //     the `gradual-release` template (5 phases) or, if the registry
+          //     were ever empty, ONE blank section. Never zero.
+          //   • flag ON  — `getSectionsBatch` OMITS a lesson with no persisted
+          //     rows (`if (resolved.length > 0)`, supabase-source:1970) and
+          //     `fillSyntheticSections` (planner-store:692) then seeds it from
+          //     the same builder. An empty array is not a value the batch can
+          //     return.
+          //   • editing  — `removeSection` refuses the last one
+          //     (planner-store:1238 `if (current.length <= 1) return doc`) and
+          //     the editor hides the control to match
+          //     (lesson-flow.tsx:1087 `canRemove={sections.length > 1}`).
+          // So NO fixture can produce this state, and one was deliberately NOT
+          // invented for it: a fixture the product cannot generate would make
+          // the mock data lie about what the app can do, which is the same
+          // defect class as the placeholder flow this card was built to remove.
+          //
+          // It is NOT dead code to delete. The alternative to this paragraph is
+          // an empty `.dcFlow` div — the card would silently show a lesson with
+          // no phases and no explanation, which is precisely the failure the
+          // three-invariant chain above is all that prevents. Any one of those
+          // invariants relaxing (a template with no sections, a backend read
+          // that returns an empty list rather than omitting the key, a future
+          // "clear all phases") lands here, and it should land on a sentence
+          // rather than on a hole. Four lines to keep an unreachable state
+          // honest is the right price; `tests/day-card-content.test.ts` is
+          // where it is exercised, because a test can express what the product
+          // cannot.
           <p className={styles.dcFlowEmpty}>
             No lesson flow yet — open Plan to add the phases you&rsquo;ll teach.
           </p>
@@ -420,7 +511,7 @@ function FocusCard({
             {resourceCount} resource{resourceCount === 1 ? "" : "s"}
           </span>
         )}
-        <span className={styles.dchip}>{statusLine(status)}</span>
+        {statusChip && <span className={styles.dchip}>{statusChip}</span>}
         <FinishPill
           status={status}
           isDone={isDone}
@@ -429,7 +520,27 @@ function FocusCard({
           }
           className={styles.dfootFinish}
         />
-        <Tooltip content="Open this lesson's planning page" side="top">
+        {/* ── The action row's tooltips are DISMISSIBLE (CLAUDE.md §4) ────────
+            All three already explained themselves; what they lacked was a
+            `tooltipId`, so a teacher who had learned the row could never turn
+            the bubbles off and the "shown ONCE, then dismissible" contract was
+            only half met.
+
+            Each carries its OWN id rather than one shared "day action" id,
+            because each teaches a DIFFERENT surface — dismissing "what Post
+            is" should not also silence "what Teach is".
+
+            All three earn a tooltip under §4's self-evident-label carve-out.
+            "Plan" and "Post" are bare nouns that name destinations a
+            first-time teacher has never seen (Post is the Resource Wall, which
+            the word "Post" does not say), and "Open in Teach" names a surface
+            rather than what it does with the lesson. None of them restates its
+            label. None is destructive or team-wide, so none is `required`. */}
+        <Tooltip
+          content="Open this lesson's planning page"
+          tooltipId="day-v2-focus-plan"
+          side="top"
+        >
           <button
             type="button"
             className={`${styles.vbBtn} ${styles.dfootPlan}`}
@@ -440,7 +551,11 @@ function FocusCard({
         </Tooltip>
         {/* Handoff order is Plan · Post · Teach — 7.21
             source-home/views-c.jsx:53-55. */}
-        <Tooltip content="Open this lesson's resources on the wall" side="top">
+        <Tooltip
+          content="Open this lesson's resources on the wall"
+          tooltipId="day-v2-focus-post"
+          side="top"
+        >
           <button
             type="button"
             className={styles.vbBtn}
@@ -449,7 +564,11 @@ function FocusCard({
             Post
           </button>
         </Tooltip>
-        <Tooltip content="Open this lesson on the teaching board" side="top">
+        <Tooltip
+          content="Open this lesson on the teaching board"
+          tooltipId="day-v2-focus-teach"
+          side="top"
+        >
           <button
             type="button"
             className={`${styles.vbBtn} ${styles.vbBtnPri}`}

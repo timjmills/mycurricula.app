@@ -816,13 +816,53 @@
   border-radius: var(--r-lg);
   padding: 16px 18px;
 }
+/* NO `opacity` HERE — the fade is what put this element below AA, and it is
+   also the element that buys the least from one.
+   ────────────────────────────────────────────────────────────────────────────
+   MEASURED, Frame A (glass), 1280px, all 8 subjects × 4 backdrops, with the
+   element's own opacity composited into the foreground and the backdrop
+   sampled from the pixels the glyphs actually sit on
+   (docs/screenshots/f2-day/contrast-before.json / -after.json):
+
+     backdrop        at 0.82 (was)        at 1.0 (ships)
+     wash            3.68 – 4.07  FAIL    4.61 – 5.17  pass
+     photo-bright    3.73 – 4.13  FAIL    4.62 – 5.25  pass
+     photo-dim       4.60 – 5.11  pass    5.93 – 6.69  pass
+     night           5.02 – 5.57  pass    6.54 – 7.37  pass
+
+   The two light backdrops fail on EVERY subject at 0.82, worst on `sel` and
+   `explorers`. An opacity ladder on the same render (same element, same
+   pixels) gives 0.78→3.49, 0.82→3.68, 0.86→3.88, 0.90→4.08, 0.94→4.28,
+   1.0→4.61 for the worst case, so **no fade clears the 4.5 floor** — 0.94 is
+   still 0.95× of it. Removing it is not one option among several; it is the
+   only value on that ladder that passes.
+
+   THE HIERARCHY DOES NOT DEPEND ON THE FADE. This is 11px/800 UPPERCASE at
+   0.14em tracking against a 14–17px/600 sentence-case objective — four
+   independent axes of differentiation before opacity is considered. The fade
+   was spending the contrast budget on a distinction the type had already made.
+
+   THE BINDING CONSTRAINT HAS MOVED, AND IT IS WORTH KNOWING WHERE TO.
+   The `.vcDetail` note above names this eyebrow as the element that binds the
+   card, and at 0.82 it was. At 1.0 it clears by 1.02× (4.61 on `sel` in wash)
+   and the new floor of the card is `.dobj` — the learning-target text itself —
+   at 4.50 and 4.51 in wash and photo-bright, i.e. EXACTLY the AA threshold
+   with no margin at all. That is not this rule's to fix and it was not
+   touched here: `.dobj` is already at 0.98, so there is no fade left to
+   remove, and the remaining ~1.25× that the two light backdrops cost comes
+   from the FRAME — Frame A renders this card at 0.86/0.80 alpha, so a light
+   backdrop shows through and lifts the surface the white text sits on. On the
+   opaque colour-forward card the same elements measure 5.9–7.4. Raising the
+   glass alpha is the change that would restore real headroom to all seven text
+   elements at once; it is a deliberate material decision about the app's
+   signature surface, not a contrast tweak, and it is recorded here rather than
+   made in passing. */
 .dcTl {
   display: block;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  opacity: 0.82;
   margin-bottom: 6px;
 }
 .dobj {
@@ -871,14 +911,41 @@
   white-space: nowrap;
 }
 /* "· 15 min" is the phase's planned length. Quieter than the name it follows —
-   the pacing is context, the phase is the content. 0.78 of the chip's own white
-   on the same rgba(255,255,255,.14) fill the AA note above measures; it is a
-   12px/600 run, one step up from the 11px/800 `.dcTl` that binds the card. */
+   the pacing is context, the phase is the content.
+   ────────────────────────────────────────────────────────────────────────────
+   IT USED TO BUY THAT QUIET WITH `opacity: .78`, AND IT WAS THE WORST-MEASURING
+   TEXT ON THE CARD. Same sweep as `.dcTl` above:
+
+     backdrop        at 0.78 (was)             at 1.0 (ships)
+     wash            3.56 – 3.94  FAIL         4.70 – 5.31  pass
+     photo-bright    3.61 – 4.00  FAIL         4.72 – 5.41  pass
+     photo-dim       4.45 – 5.05  FAIL on 2    6.11 – 6.94  pass
+     night           4.85 – 5.39  pass         6.75 – 7.65  pass
+
+   Note photo-dim: a DARK backdrop, and it still failed on two subjects. The
+   fade was not merely thinning a margin in the bright modes, it was consuming
+   one that existed nowhere.
+
+   WHY THE QUIET IS NOW WEIGHT, NOT OPACITY. At full opacity this run and the
+   phase name beside it are 12px vs 12.5px at the same weight — a half-pixel
+   apart, which is no hierarchy at all. `font-weight` is the lever that costs
+   nothing under WCAG (the maths is per-pixel colour; it does not read stroke
+   width) while doing visibly more than 0.5px ever did. 500 against the label's
+   600, plus the `·` separator and the fixed reading order, is a clearer
+   subordination than the fade gave — and unlike the fade it survives being
+   looked at on a bright photograph.
+
+   THE MINUTES ARE THE PHONE'S ONLY VISIBLE COPY OF THE PACING BELOW 480px —
+   no. They are the opposite: ≤480px hides this run VISUALLY (see the
+   `.dcStepMin` rule in the phone block below, which uses the visually-hidden
+   recipe rather than `display:none` so a screen reader still announces it).
+   That is exactly why a contrast sweep has to run ABOVE 480px: below it, this
+   element paints no glyphs, a probe finds no coverage, and "not measurable"
+   reads as "passing" in any summary that counts failures. */
 .dcStepMin {
   flex: 0 0 auto;
   font-size: 12px;
-  font-weight: 600;
-  opacity: 0.78;
+  font-weight: 500;
 }
 .dcStepMin::before {
   content: "· ";

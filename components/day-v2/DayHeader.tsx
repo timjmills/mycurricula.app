@@ -27,7 +27,18 @@ export function DayHeader({
   return (
     <div className={styles.vhead}>
       <div className={styles.wknav}>
-        <Tooltip content="Go to the previous school day" side="top">
+        {/* DISMISSIBLE (CLAUDE.md §4). Both arrows share ONE id on purpose —
+            the tooltip teaches one thing ("these move you a school day at a
+            time, and the app knows which days your school runs"), so a teacher
+            who has learned it should not have to dismiss it twice. Not
+            `required`: nothing here is destructive or team-wide. Icon-only, so
+            it is squarely inside the "every icon-only control" scope; the
+            native `title` stays as the touch long-press carrier. */}
+        <Tooltip
+          content="Go to the previous school day"
+          tooltipId="day-v2-day-nav"
+          side="top"
+        >
           <button
             type="button"
             className={styles.wkarrow}
@@ -49,7 +60,11 @@ export function DayHeader({
           </button>
         </Tooltip>
         <h2 className={styles.vheadTitle}>{dayLabel}</h2>
-        <Tooltip content="Go to the next school day" side="top">
+        <Tooltip
+          content="Go to the next school day"
+          tooltipId="day-v2-day-nav"
+          side="top"
+        >
           <button
             type="button"
             className={styles.wkarrow}
