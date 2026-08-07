@@ -21,6 +21,7 @@ import { RouteTransitionPulse } from "@/lib/view-transition";
 import { DEFAULT_STAGE_PHOTO } from "@/lib/stage-photo";
 import { LabelsProvider } from "@/lib/labels";
 import { InstanceLabelsProvider } from "@/lib/instance-labels";
+import { DenseRouteFlag } from "@/components/stage";
 
 // ── v1.3 brand type system (Curricula Design System) ──────────────────────
 // Display + H1 use Poppins (geometric, friendly); smaller headings, card
@@ -155,6 +156,18 @@ export default async function RootLayout({
             everything, so it cannot affect v1 surfaces. (The CSS-MODULE-scoped
             `.stage` in notecards/Gallery is a different, unrelated class.) */}
         <div className="stage" aria-hidden="true" />
+        {/* Sets <html data-dense="1"> on every route EXCEPT /home, which is what
+            `app/themes.css`'s `:root[data-dense="1"] .stage::before` reads to
+            stop the backdrop drifting. The .stage above sits behind every
+            backdrop-filter glass surface in the app, so on a dense view its
+            40–54s scale drift makes each of those re-blur every frame — the
+            exact cost the 7.21 handoff answered with `data-dense`
+            (source-home/home.css:65-72). Render-null client leaf, mounted HERE
+            rather than in ChromeShell because ChromeShell is not mounted on
+            /teach (app/(teach)/layout.tsx mounts providers only) and Teach is
+            one of the densest surfaces; the root covers it and every future
+            route group. See components/stage/DenseRouteFlag.tsx. */}
+        <DenseRouteFlag />
         {/* The whole-app theme-tint wash (app/themes.css `.theme-tint`): a
             z-index:90, mix-blend-mode:soft-light overlay whose per-theme opacity
             + gradient are keyed on `:root[data-theme="…"] .theme-tint`. The recipe

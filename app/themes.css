@@ -34,8 +34,15 @@
  * keeps falling back to the tokens.css Paper/Clear values.
  *
  * REDUCED MOTION: every ambient/drift/grade animation is suppressed under
- * prefers-reduced-motion (the stage drift, the photo grade-drift, the
- * light-drift, and the Clear-over-Photo accent cycle).
+ * prefers-reduced-motion (the stage drift, the photo grade-drift, and the
+ * light-drift). The Clear-over-Photo ACCENT CYCLE no longer exists at all —
+ * see the deletion note at §0; its reduced-motion guard is kept as vestigial.
+ *
+ * MOTION BUDGET (`data-dense`): outside /home, <html> carries data-dense="1"
+ * (components/stage/DenseRouteFlag.tsx) and the stage stops drifting. The
+ * stage sits behind every backdrop-filter surface in the app, so its drift is
+ * charged to all of them. Home keeps the full cinematics; every data view is
+ * still. Ported from the 7.21 handoff (source-home/home.css:65-72).
  */
 
 @media screen {
@@ -149,11 +156,51 @@
     --accent-light: color-mix(in oklab, var(--accent) 72%, #ffffff);
   }
 
-  /* Clear + Photo: cycle slowly through the four LIGHT theme hues (sky-blue
-     lightness) instead of the dark default blue. Animating the registered
-     --accent updates the grade, glass tint, outlines and text together.
-     The Photo path uses .home as the host (the home center panel) per the
-     handoff. */
+  /* Clear + Photo: the light sky-blue accent (instead of the dark default
+     blue), so the accent reads over a photographed classroom.
+     ────────────────────────────────────────────────────────────────────────
+     ⚠ THE ACCENT NO LONGER CYCLES, AND THAT IS DELIBERATE. `--accent` used to
+     carry `animation: accentcycle 52s ease-in-out infinite` here, walking the
+     four light theme hues. `--accent` is a REGISTERED custom property with
+     `inherits: true` (below), and this rule's host is `:root` — so animating
+     it re-resolved the inherited custom-property cascade for the whole
+     document on every frame. 45 declarations read `var(--accent)` directly and
+     61 read the accent family — counted, not estimated:
+       grep -roE "var\(--accent[a-z0-9-]*\)" app components \
+         --include="*.css" --include="*.tsx" --include="*.ts" | wc -l
+     — and `--accent-deep`/`--accent-light` are `color-mix()`-derived from it at
+     `:root` just above, so those re-evaluated every frame too. This is the
+     DEFAULT appearance — `DEFAULT_THEME="clear"` + `DEFAULT_BG="photo"`
+     (lib/theme-values.ts), stamped by app/layout.tsx — so every teacher paid
+     for it on every route, forever.
+
+     MEASURED, on /weekly at 1440×900 in the default appearance, toggling the
+     declaration at runtime inside ONE page load with interleaved 8s windows
+     (scripts/tmp/perf-accent-storm.mjs):
+       without the animation   0 style recalcs   ~200ms main-thread task/8s   60.2fps
+       with the animation    277 style recalcs   ~8180ms task/8s (~98%)       34.0fps
+     277 recalcs ≈ 272 rendered frames: one full-document style recalculation
+     per frame, ~27ms each, on a page with only 401 nodes.
+
+     SOURCE OF THE DELETION: the 7.21 handoff deleted exactly this line.
+     `Documents/Claude Design/7.21.26 Design Handoff Update/source-home/
+     themes.css:26-38` keeps the @property registration and the @keyframes,
+     strips only the `animation:` declaration, leaves the accent static, and
+     carries a NOTE saying the cycle "saturated the main thread the moment a
+     dense view (Day/Teach/Post) mounted".
+
+     ⚠ AUTHORITY DEVIATION — DO NOT "FIX" THIS BACK. The 7.21 *bundled mockup*
+     still contains the animation and lacks that NOTE, so it contradicts the
+     modular design-system CSS. CLAUDE.md §4a's authority chain normally puts
+     the bundled mockup first. It does not apply here: the bundle is a
+     demonstrably STALE artifact — it is MISSING text the modular file GAINED,
+     not carrying text the modular file lost. We follow the modular file. A
+     future fidelity diff against the bundle will flag this line as divergent;
+     that flag is expected and must be dismissed, not actioned.
+
+     The @property registration and the @keyframes are KEPT, matching the
+     handoff, so a future deliberate accent transition (or the deferred Motion
+     axis) has the recipe to hand. Nothing references `accentcycle` today. */
   @property --accent {
     syntax: "<color>";
     inherits: true;
@@ -177,8 +224,12 @@
   :root[data-theme="clear"][data-bg="photo"],
   .home[data-theme="clear"][data-bg="photo"] {
     --accent: #5ba8ff;
-    animation: accentcycle 52s ease-in-out infinite;
   }
+  /* Vestigial since the `animation:` above was deleted — there is no longer an
+     animation here to suppress. KEPT because the 7.21 handoff keeps it verbatim
+     (source-home/themes.css:38) and because it is the guard that would catch a
+     future re-introduction; removing it would make the next fidelity diff read
+     as a second, unexplained divergence on top of the deliberate one. */
   @media (prefers-reduced-motion: reduce) {
     :root[data-theme="clear"][data-bg="photo"],
     .home[data-theme="clear"][data-bg="photo"] {
@@ -356,6 +407,42 @@
     to {
       transform: translate3d(-2.2%, 1.6%, 0) scale(1.08);
     }
+  }
+
+  /* DENSE VIEWS — still the backdrop everywhere except home.
+     ────────────────────────────────────────────────────────────────────────
+     Ported from the 7.21 handoff's `data-dense` rule:
+     `Documents/Claude Design/7.21.26 Design Handoff Update/source-home/
+     home.css:65-72` — "Dense views (anything but home): still the backdrop.
+     Continuous photo zoom + long cross-fades force per-frame re-rendering
+     beneath the views' large backdrop-filter surfaces — enough to saturate
+     the main thread (blank screen). Home keeps the full cinematics; views get
+     a calm quick fade instead."
+
+     OUR EQUIVALENT IS `.stage::before`. It is a fixed, full-viewport layer
+     carrying the cover photo, four soft-light radial blooms and a saturate()
+     filter, drifting scale(1.02)→scale(1.08) over 40s (Photo, :262) / 54s
+     (Wash, :284) — and it sits BEHIND every backdrop-filter glass surface in
+     the app, so its drift forces each of those to re-blur every frame. The
+     handoff's `.photo`/`.ambient`/`.scrim.min`/`.frame::before` hosts are the
+     home surface's own layers; the `.stage` is the app-wide engine that
+     replaced them, so it is the one host this rule needs.
+
+     `data-dense` is emitted on <html> by <DenseRouteFlag> (components/stage),
+     mounted in app/layout.tsx beside the .stage div — NOT in ChromeShell,
+     which is not mounted on /teach (app/(teach)/layout.tsx mounts providers
+     only) and Teach is one of the densest surfaces. It is a ROUTE-derived
+     flag, not an appearance axis, so it is deliberately NOT part of the
+     CLAUDE.md §4 five-surface allowlist lockstep.
+
+     PRECEDENCE (verified in-browser, not assumed):
+       • `[data-bg="photo"] .stage::before`     → (0,2,1)
+       • `:root[data-dense="1"] .stage::before` → (0,3,1)  ← wins, and is later
+         in source order anyway.
+       • the reduced-motion block at §7 uses `!important`, which still wins
+         over this rule — reduced motion stays the strongest suppressor. */
+  :root[data-dense="1"] .stage::before {
+    animation: none;
   }
 
   /* ════════════════════════════════════════════════════════════════════════
@@ -1394,6 +1481,15 @@
   .home[data-theme="off"] .frame::before {
     opacity: 0;
   }
+  /* DORMANT: unreachable in this app — kept as a ported handoff recipe, not
+     dead weight. The host needs BOTH a global `.home` class (the v1 home
+     renders a CSS-MODULE-hashed `home.home`, components/home/HomeV1.tsx:31 —
+     never the global) AND `data-zoom="1"` (the only producer of data-zoom is
+     components/hub-v2/timeline/PlanTimeline.tsx:628, on a timeline CARD, with
+     values compact|cozy|roomy). So this never matches and costs nothing.
+     Do NOT delete: `data-zoom` is the handoff's photo-motion switch and this
+     is the recipe the deferred Motion axis (Still / Drift) will re-host onto
+     `.stage`. Deleting it only makes the next fidelity diff harder. */
   .home[data-bg="photo"][data-zoom="1"] .frame::before {
     animation: gradedrift 34s ease-in-out infinite;
   }
@@ -1460,6 +1556,10 @@
         rgba(10, 8, 18, 0.3) 100%
       );
   }
+  /* DORMANT: same unreachable host as `gradedrift` above — no global `.home`
+     class is ever rendered, and `data-zoom` is only ever emitted on a
+     hub-v2 timeline card (compact|cozy|roomy), never "1". Kept, not deleted:
+     it is a ported handoff recipe awaiting the deferred Motion axis. */
   .home[data-bg="photo"][data-zoom="1"] .scrim.min {
     animation: lightdrift 30s ease-in-out infinite;
   }
