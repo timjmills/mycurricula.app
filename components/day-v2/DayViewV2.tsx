@@ -12,7 +12,7 @@
 // that on 2026-08-01: the appearance axes drive material and colour, never
 // layout.
 //
-// ── WHY DayA / DayB / DayC ARE STILL HERE ──────────────────────────────────
+// ── WHY DayA / DayB ARE STILL HERE ─────────────────────────────────────────
 // They were deleted, and the user asked for them back the same day: "keep all
 // three of the views until later and then I will get rid of or merge some of
 // the views." So they are RETAINED, not rendered by default, and reachable on
@@ -20,14 +20,24 @@
 //
 //     /daily?dayview=a      the glass vertical timeline (legacy)
 //     /daily?dayview=b      the paper rail + white focus panel (legacy)
-//     /daily?dayview=c      the colour agenda + tinted hero (DayFocus's parent)
 //     /daily                <DayFocus> — the default, and the only one a
 //                           teacher sees without typing a URL
 //
-// This exists so the three can be COMPARED before the merge/delete decision.
-// It is not a preference, is not persisted, and appears in no UI. When that
-// decision lands, delete the files, this switch, and the three re-export lines
-// held open for them in ./atoms and ./util.
+// This exists so they can be COMPARED against the default before the
+// merge/delete decision. It is not a preference, is not persisted, and appears
+// in no UI. When that decision lands, delete the files, this switch, and the
+// re-export lines held open for them in ./atoms and ./util.
+//
+// ── `?dayview=c` IS GONE, AND IT NEVER SHOWED ANYTHING NEW ─────────────────
+// DayC was the colour agenda + tinted hero that DayFocus was PROMOTED FROM, so
+// `c` and the default rendered the same information architecture from two
+// copies of the same JSX. The comparison it existed to serve could not be made
+// with it, and the copies had already diverged — the shipping card counts the
+// lesson's resources and DayC's hero never did, so `?dayview=c` was quietly
+// showing a WORSE card than /daily rather than a different one. The value now
+// falls through to <DayFocus> with every other unrecognised string; the URL
+// still resolves, it just resolves to the Day view. DayA and DayB are genuinely
+// different layouts and stay.
 //
 // Two deliberate mechanics:
 //   * The param is read from `window.location` in a mount effect, NOT via
@@ -64,11 +74,10 @@ import type { Lesson } from "@/lib/types";
 import { DayFocus } from "./DayFocus";
 import { DayA } from "./DayA";
 import { DayB } from "./DayB";
-import { DayC } from "./DayC";
 
 /** The retained legacy frames, by `?dayview=` value. Anything else — absent,
- *  empty, misspelled, hostile — falls through to <DayFocus>. */
-const LEGACY = { a: DayA, b: DayB, c: DayC } as const;
+ *  empty, misspelled, the retired `c`, hostile — falls through to <DayFocus>. */
+const LEGACY = { a: DayA, b: DayB } as const;
 
 type LegacyKey = keyof typeof LEGACY;
 
@@ -126,7 +135,7 @@ export interface DayViewV2Props {
  */
 export function readDayViewParam(search: string): LegacyKey | null {
   const raw = new URLSearchParams(search).get("dayview");
-  return raw === "a" || raw === "b" || raw === "c" ? raw : null;
+  return raw === "a" || raw === "b" ? raw : null;
 }
 
 export function DayViewV2(props: DayViewV2Props): ReactNode {

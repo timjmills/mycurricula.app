@@ -76,6 +76,38 @@ import styles from "./Card.module.css";
  */
 export const WALL_CARD_DND_TYPE = "text/card";
 
+/**
+ * How long a single click on an EDITABLE note waits to see whether a second
+ * one is coming before it opens the preview lightbox.
+ *
+ * Click #1 of a double-click reaches `onClick` before `dblclick` is dispatched,
+ * so opening the preview lightbox there put a modal ON TOP of the composer the
+ * double-click was opening — the teacher saw a preview and no editor, and the
+ * only edit affordance on the card looked broken (live QA 2026-08-02, bug 2).
+ * 250ms stays under the ~300ms at which a delay starts to feel like lag.
+ *
+ * ⚠ KNOWN RESIDUAL (§4a gate, 2026-08-07, Medium — accepted, not fixed).
+ * 250ms is a heuristic, and it is NOT the platform's threshold: Windows and
+ * macOS both default their double-click interval to ~500ms, so a teacher who
+ * clicks slowly can have this timer fire first (lightbox opens), then land the
+ * second click and re-create the exact defect the window exists to prevent —
+ * the editor mounting UNDER the lightbox. `cancelPendingClick()` cannot help
+ * there: by then there is no pending timer left to cancel.
+ *
+ * Why accepted rather than tuned: raising the window to 500ms would make every
+ * single click on a note feel sluggish to buy an edge case, and the correct fix
+ * is structural, not numeric — this Card cannot CLOSE the lightbox it asked
+ * for. The lightbox is the parent's state (`setLight`, ResourceWall.tsx:1093)
+ * reached through `onModal`, with Section.tsx in between; closing it on a late
+ * double-click needs that capability threaded through.
+ *
+ * What makes the residual tolerable NOW: the double-click is no longer the only
+ * way in. This same wave added an explicit Edit control to the note's hover bar
+ * — the non-modal primary path — so a teacher who loses the race still has a
+ * visible, timing-independent way to edit. Filed for the structural fix.
+ */
+const DOUBLE_CLICK_WINDOW_MS = 250;
+
 // ── Type-keyed glyphs ───────────────────────────────────────────────────────
 //
 // Keyed by the WallType FAMILY (lib/wall-scope's `wallTypeOf`), not the raw
@@ -204,6 +236,20 @@ const IconEnlarge = (): ReactNode => (
     <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
   </svg>
 );
+const IconPencil = (): ReactNode => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+  </svg>
+);
 const IconBoard = (): ReactNode => (
   <svg
     viewBox="0 0 24 24"
@@ -261,6 +307,17 @@ export interface CardProps {
   onBoard: (item: WallItem, fromLessonId?: string) => void;
   /** Open the card's detail modal. */
   onModal: (item: WallItem) => void;
+  /**
+   * Close whatever the lightbox is currently showing.
+   *
+   * REQUIRED for the double-click gesture to be safe. The single-click preview
+   * is deferred by `DOUBLE_CLICK_WINDOW_MS` so it does not fire under a
+   * double-click — but that window is a guess, and a slow double-click beats
+   * it. Without a way to put the preview away, the composer mounts underneath
+   * it and the teacher sees a modal where their editor should be (§4a gate,
+   * Medium; task #9).
+   */
+  onCloseModal: () => void;
   /** A note card finished composing / editing — carries the updated item. */
   onCommit: (item: WallItem) => void;
   /**
@@ -289,6 +346,42 @@ export interface CardProps {
  * so the rule is proven directly and the field that carries it is proven live.
  */
 export { isAttachableUrl as isAttachableLink };
+
+/**
+ * Did the teacher change the note's link?
+ *
+ * A BEFORE/AFTER COMPARISON, not a presence test. `next === null` reads
+ * identically for "the teacher removed the saved link" and "this note never had
+ * one", so a guard that only asked whether there is something to attach
+ * discarded every removal — the composer closed as though it had saved and the
+ * link was still there after a reload, with no error (live QA 2026-08-02, bug
+ * 1). The label is half of the comparison because renaming a link is an edit.
+ *
+ * BOTH SIDES GO THROUGH `linkToLessonResource`, which is the part that is easy
+ * to get wrong: the composer seeds its name field from the stored label and
+ * rebuilds the row on commit, so anything the builder NORMALISES (a blank label
+ * becoming the parsed display name) would otherwise register as an edit on a
+ * composer nobody touched. That would fork a preset wall on a no-op Done — and,
+ * far worse, a future change to the display-name derivation would commit every
+ * note with a link the next time it was opened (§4a review, Medium).
+ *
+ * Exported for the composer's tests: the linkedom mount harness cannot type
+ * into a controlled field (see the header of tests/wall-note-composer.test.ts),
+ * so the rename case is proven directly on this function, and the field that
+ * carries it is proven live.
+ */
+export function linkEdited(
+  saved: LessonResource | undefined,
+  next: LessonResource | null,
+): boolean {
+  const before = saved?.url
+    ? linkToLessonResource(saved.url.trim(), saved.label)
+    : null;
+  return (
+    (before?.url ?? null) !== (next?.url ?? null) ||
+    (before?.label ?? null) !== (next?.label ?? null)
+  );
+}
 
 export function Card({
   item,
@@ -380,11 +473,20 @@ export function Card({
       ? linkToLessonResource(url, attachName)
       : null;
     const washChanged = (item.resource.wash ?? null) !== wash;
+    // A BEFORE/AFTER COMPARISON, not a presence test — see `linkEdited` above
+    // for why `!attachment` silently discarded every removal, and why both
+    // sides have to go through the same builder. Comparing rather than testing
+    // also makes the guard STRICTER in the other direction, which is what it is
+    // for: re-opening a note that has a link and pressing Done without touching
+    // anything used to satisfy `!attachment === false` and commit — forking an
+    // auto-forking preset on a no-op, and truncating a legacy multi-entry
+    // gallery to its first row on the way past.
+    const linkChanged = linkEdited(item.resource.gallery?.[0], attachment);
     // Nothing changed and nothing was pending — don't churn the wall (an
     // auto-forking preset would fork on a no-op edit).
     if (
       body === (item.resource.body ?? "") &&
-      !attachment &&
+      !linkChanged &&
       !washChanged &&
       !item.composing
     ) {
@@ -531,21 +633,92 @@ export function Card({
   // ALSO open the modal, and dblclick fires even when both clicks landed on a
   // button (its stopPropagation only stops the click events) — the trap
   // planner-v2 documents.
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPendingClick = useCallback((): void => {
+    if (clickTimer.current === null) return;
+    clearTimeout(clickTimer.current);
+    clickTimer.current = null;
+  }, []);
+  // A pending timer that fires into an unmounted card would open the lightbox
+  // on a wall the teacher has already left.
+  useEffect(() => cancelPendingClick, [cancelPendingClick]);
+
+  /**
+   * Open the composer on a saved note — the one enter-edit path, shared by
+   * double-click and the hover bar's Edit button.
+   *
+   * RE-SEEDS EVERY COMPOSER FIELD, not just the body. The `useState`
+   * initialisers below run once per MOUNT, and the card stays mounted across
+   * open → Cancel → open: `discard` cleared the attachment fields, so the
+   * reopened composer showed an empty link row over a note that still had a
+   * link, and the next save would have deleted it (QA 2026-08-02, minor 4).
+   * Seeding here rather than in an effect on `editing` keeps it in the same
+   * state batch as `setEditing`, so the composer's FIRST paint is already
+   * correct — an effect would paint the stale row for a frame first.
+   */
+  const enterEdit = useCallback((): void => {
+    cancelPendingClick();
+    if (readOnly || !isNote) return;
+    const link = item.resource.gallery?.[0];
+    setDraft(item.resource.body ?? "");
+    setWash(item.resource.wash ?? null);
+    setAttachOpen(Boolean(link));
+    setAttachName(link?.label ?? "");
+    setAttachUrl(link?.url ?? "");
+    setEditing(true);
+  }, [cancelPendingClick, readOnly, isNote, item.resource]);
+
   const handleClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>): void => {
-      if (editing || fromInteractive(e)) return;
-      onModal(item);
+      if (fromInteractive(e)) {
+        // AND CANCEL, not just return (§4a review, Medium). A click on a nested
+        // action supersedes a lightbox this card queued a moment ago: click the
+        // note body, then reach for Play / Enlarge / Send-to-board within the
+        // window, and the preview used to pop open on top of the slideshow or
+        // the board the teacher had just asked for.
+        cancelPendingClick();
+        return;
+      }
+      if (editing) return;
+      // `detail` is the click count: 0 is a keyboard / assistive-technology
+      // activation, which can never be the first half of a double-click and so
+      // opens with no delay at all; ≥2 is the tail of one, already handled by
+      // `handleDoubleClick`. Only a card that CAN be double-clicked into an
+      // editor pays the wait — every other card opens immediately, as before.
+      if (e.detail === 0 || readOnly || !isNote) {
+        onModal(item);
+        return;
+      }
+      if (e.detail > 1) return;
+      cancelPendingClick();
+      clickTimer.current = setTimeout(() => {
+        clickTimer.current = null;
+        onModal(item);
+      }, DOUBLE_CLICK_WINDOW_MS);
     },
-    [editing, item, onModal],
+    [editing, item, onModal, readOnly, isNote, cancelPendingClick],
   );
 
   const handleDoubleClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>): void => {
+      // Unconditionally, and BEFORE the guards: whatever this double-click
+      // turns out to mean, the lightbox the first click queued is not it.
+      cancelPendingClick();
       if (readOnly || !isNote || editing || fromInteractive(e)) return;
-      setDraft(item.resource.body ?? "");
-      setEditing(true);
+      // AND CLOSE ONE THAT ALREADY OPENED. The window above is a heuristic and
+      // cannot be anything else — the platform's own double-click interval is
+      // ~500ms on Windows and macOS and is not readable from JS — so a teacher
+      // who clicks slowly gets the lightbox at 250ms and then this handler,
+      // which would mount the composer UNDER the modal all over again.
+      // Cancelling cannot help there: by then there is no timer left. So the
+      // card asks the wall to put the preview away, which is the only fix that
+      // does not depend on guessing a threshold (§4a gate, Medium; task #9).
+      // A no-op when nothing is open — `setLight(null)` over `null` is a
+      // bail-out, not a render.
+      onCloseModal();
+      enterEdit();
     },
-    [readOnly, isNote, editing, item.resource.body],
+    [readOnly, isNote, editing, cancelPendingClick, enterEdit, onCloseModal],
   );
 
   // ── Note editor ───────────────────────────────────────────────────────────
@@ -834,6 +1007,29 @@ export function Card({
           keyboard users with no way to open a card. They are the keyboard path
           to this card (the card body's click is a pointer affordance). */}
       <div className={styles.actions}>
+        {/* EDIT, and only on a note (nothing else here has an editor). Before
+            this, double-click was the sole way back into a saved note — an
+            invisible affordance, and a broken one: its first click opened the
+            preview lightbox over the composer (QA 2026-08-02, bug 2). The
+            timing half of that is fixed above; this is the half that lets a
+            teacher find the editor at all. */}
+        {isNote && !readOnly && (
+          <Tooltip
+            content="Edit this note — its text, its colour, and the link it carries"
+            tooltipId="rw-card-edit"
+            side="top"
+          >
+            <Button
+              variant="icon"
+              size="sm"
+              className={styles.act}
+              iconAriaLabel={`Edit ${item.label}`}
+              onClick={enterEdit}
+            >
+              <IconPencil />
+            </Button>
+          </Tooltip>
+        )}
         <Tooltip
           content="Open this resource full-screen"
           tooltipId="rw-card-open"

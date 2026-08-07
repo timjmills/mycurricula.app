@@ -14,9 +14,9 @@
 //
 // It is no longer ONLY a shim: the focus-card content derivations below live
 // here because they are day-v2's own, pure, and shared by the shipping focus
-// card (DayFocus) and the retained legacy frames (DayC's hero, DayB's meta
-// row). Being pure is what lets tests/day-card-content.test.ts pin them
-// directly as well as through the rendered card.
+// card (DayFocus) and the retained legacy frame DayB (its meta row). Being pure
+// is what lets tests/day-card-content.test.ts pin them directly as well as
+// through the rendered card.
 
 import { stripHtml } from "@/lib/html-text";
 import type { LessonSectionContent } from "@/lib/lesson-flow";

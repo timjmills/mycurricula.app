@@ -58,7 +58,7 @@ import { useAppState } from "@/lib/app-state";
 import { usePlanner, usePlannerDataState } from "@/lib/planner-store";
 import { Skeleton } from "@/components/ui";
 import { useTheme } from "@/lib/theme";
-import type { ThemeSetting, ThemeStyle, ThemePalette } from "@/lib/theme";
+import type { ThemeSetting } from "@/lib/theme";
 import styles from "./command-palette.module.css";
 
 // ── Result shape ───────────────────────────────────────────────────────────────
@@ -129,14 +129,14 @@ const VIEW_RESULTS: ViewResultDef[] = [
   },
 ];
 
-// ── Appearance options (theme + card style) ─────────────────────────────────
+// ── Appearance options (theme) ───────────────────────────────────────────────
 //
-// Every app-wide theme and card style is reachable from the palette, so a
-// teacher can re-skin the app without leaving the keyboard. Labels mirror
-// Settings → Appearance; keywords let intent-based searches ("dark", "vibrant")
-// land on the right option. The id maps 1:1 to a ThemeSetting / ThemeStyle the
-// action passes to setTheme / setStyle. `selected` is computed at render time
-// from live useTheme() state — these static rows only carry the keywords.
+// Every app-wide theme is reachable from the palette, so a teacher can
+// re-skin the app without leaving the keyboard. Labels mirror Settings →
+// Appearance; keywords let intent-based searches ("dark", "vibrant") land on
+// the right option. The id maps 1:1 to a ThemeSetting the action passes to
+// setTheme. `selected` is computed at render time from live useTheme() state —
+// these static rows only carry the keywords.
 
 interface ThemeActionDef {
   theme: ThemeSetting;
@@ -176,50 +176,14 @@ const THEME_ACTIONS: readonly ThemeActionDef[] = [
   },
 ];
 
-interface StyleActionDef {
-  cardStyle: ThemeStyle;
-  label: string;
-  keywords: string[];
-}
-
-const STYLE_ACTIONS: readonly StyleActionDef[] = [
-  {
-    cardStyle: "quiet",
-    label: "Card style: Quiet",
-    keywords: ["minimal", "white", "stripe"],
-  },
-  {
-    cardStyle: "calm",
-    label: "Card style: Mid-Calm",
-    keywords: ["monogram", "medium"],
-  },
-  {
-    cardStyle: "vivid",
-    label: "Card style: Mid-Vivid",
-    keywords: ["vibrant", "tint", "color", "colour"],
-  },
-];
-
-interface PaletteAxisActionDef {
-  palette: ThemePalette;
-  label: string;
-  keywords: string[];
-}
-
-// The third appearance axis — without these, "highlight"/"saturation"
-// searches dead-ended even though theme + card style were reachable.
-const PALETTE_AXIS_ACTIONS: readonly PaletteAxisActionDef[] = [
-  {
-    palette: "normal",
-    label: "Color intensity: Normal",
-    keywords: ["saturation", "muted", "workbook"],
-  },
-  {
-    palette: "highlight",
-    label: "Color intensity: Highlight",
-    keywords: ["saturation", "bright", "highlighter", "electric"],
-  },
-];
+// The v1 "Card style" and "Color intensity" command groups were REMOVED
+// 2026-08-07 with the data-palette retirement: `data-style` never reached the
+// v2 DOM (those commands changed nothing a teacher could see since the
+// cutover), and the subject-colour emission no longer branches on the palette
+// type (lib/palette.tsx). A command that reports success and changes no
+// pixels is the false-success class this repo has a standing ruling against.
+// The setters live on in lib/theme.tsx for the flag-OFF v1 path until that
+// path is deleted.
 
 // ── Text helpers ───────────────────────────────────────────────────────────────
 
@@ -346,7 +310,7 @@ export function CommandPaletteBody({
   // whatever the store has produced so far, and this only decides what to say
   // when it has produced nothing.
   const dataState = usePlannerDataState();
-  const { theme, style, palette, setTheme, setStyle, setPalette } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   // ── Build the full results list from the current query ───────────────────
 
@@ -404,36 +368,6 @@ export function CommandPaletteBody({
       },
     }));
 
-    const styleResults: PaletteResult[] = STYLE_ACTIONS.filter(
-      (s) => !q || matchesAny(s.label, s.keywords, q),
-    ).map((s) => ({
-      id: `style-${s.cardStyle}`,
-      kind: "appearance" as const,
-      label: s.label,
-      meta: "Card style",
-      keywords: s.keywords,
-      selected: style === s.cardStyle,
-      action: () => {
-        setStyle(s.cardStyle);
-        onClose();
-      },
-    }));
-
-    const paletteAxisResults: PaletteResult[] = PALETTE_AXIS_ACTIONS.filter(
-      (p) => !q || matchesAny(p.label, p.keywords, q),
-    ).map((p) => ({
-      id: `palette-${p.palette}`,
-      kind: "appearance" as const,
-      label: p.label,
-      meta: "Palette",
-      keywords: p.keywords,
-      selected: palette === p.palette,
-      action: () => {
-        setPalette(p.palette);
-        onClose();
-      },
-    }));
-
     // Lesson results — match by plain-text title; cap at 12 so the list
     // stays digestible (most useful when the query is specific).
     const lessonResults: PaletteResult[] = lessons
@@ -455,14 +389,7 @@ export function CommandPaletteBody({
         },
       }));
 
-    return [
-      ...views,
-      ...subjectViews,
-      ...themeResults,
-      ...styleResults,
-      ...paletteAxisResults,
-      ...lessonResults,
-    ];
+    return [...views, ...subjectViews, ...themeResults, ...lessonResults];
   }, [
     query,
     lessons,
@@ -472,11 +399,7 @@ export function CommandPaletteBody({
     setSearch,
     onClose,
     theme,
-    style,
-    palette,
     setTheme,
-    setStyle,
-    setPalette,
   ]);
 
   // Reset selection whenever the results list changes.

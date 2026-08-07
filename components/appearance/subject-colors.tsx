@@ -72,10 +72,15 @@ interface SubjectColorsProps {
   onChange: (subjectId: string, swatchId: string) => void;
 }
 
-/** Resolve a swatch's display color for the active palette type. */
+/** Resolve a swatch's display color. Always the BASE solid: the data-palette
+ *  axis is retired (2026-08-07) and the app renders `var(--subj-N)` — a
+ *  preview that branched on the old type would show hexes the app no longer
+ *  paints. (`type` stays in the signature so callsites threading the
+ *  deprecated axis keep compiling until it is deleted with the v1 path.) */
 function swatchColor(swatchId: string, type: ThemePalette): string {
+  void type;
   const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID["subj-1"];
-  return type === "highlight" ? swatch.highlight : swatch.normal;
+  return swatch.normal;
 }
 
 export function SubjectColors({

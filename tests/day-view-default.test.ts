@@ -13,8 +13,11 @@ import type { Lesson, Subject } from "@/lib/types";
 vi.setConfig({ testTimeout: 30000 });
 
 // /daily renders ONE Day view — DayFocus — for every appearance frame and every
-// theme. DayA / DayB / DayC are retained but unreachable without an explicit
+// theme. DayA / DayB are retained but unreachable without an explicit
 // `?dayview=`; see components/day-v2/DayViewV2.tsx for why they are still here.
+// DayC was deleted in Wave-F0 and `?dayview=c` now falls through to the
+// default — the alias mounted the focus card's own parent, so it compared the
+// Day view against a diverged copy of itself.
 //
 // ── WHAT WOULD GO WRONG WITHOUT THIS FILE ──────────────────────────────────
 // The consolidation's whole point is that the appearance axes stop moving the
@@ -66,10 +69,19 @@ vi.mock("@/lib/planner-store", () => ({
     // The component deliberately has no `getSections ?? (() => [])` fallback,
     // so a store that stops supplying this fails loudly instead of rendering an
     // empty flow that looks like a lesson nobody planned.
-    // `resources: []` is not padding — the card counts resources off the
-    // sections (lib/lesson-resources.ts), so a section without the field throws.
+    // `resources` is not padding — the card counts resources off the sections
+    // (lib/lesson-resources.ts), so a section without the field throws. It
+    // carries ONE here so the count renders: "1 resource" is the marker that
+    // separates DayFocus from every retained frame (neither DayA nor DayB
+    // counts resources), which is what the `?dayview=c` case below needs.
     getSections: () => [
-      { id: "s-1", heading: FOCUS_FLOW, minutes: 10, body: "", resources: [] },
+      {
+        id: "s-1",
+        heading: FOCUS_FLOW,
+        minutes: 10,
+        body: "",
+        resources: [{ id: "r-1", type: "link", label: "Task" }],
+      },
     ],
     describeStandard: (code: string) => code,
   }),
@@ -140,6 +152,14 @@ const BASE_PROPS = {
 const FOCUS_TARGET = "Learning target";
 /** The first of the focus card's numbered flow chips. */
 const FOCUS_FLOW = store.flowHeading;
+/** The resource count. DayFocus is the ONLY Day view that renders it — DayA and
+ *  DayB carry the Post button without ever counting what it opens. This is the
+ *  marker that says "the DEFAULT view rendered", not merely "a view that has a
+ *  focus panel rendered", which is what `?dayview=c` needs now that the alias
+ *  falls through instead of mounting DayC. It is also the assertion that would
+ *  have caught the divergence the alias was hiding: DayC's hero never counted
+ *  resources, so `?dayview=c` served a card missing this line. */
+const FOCUS_ONLY = "1 resource<";
 
 beforeEach(() => {
   store.subjectById = { math: SUBJECT };
@@ -161,11 +181,15 @@ describe("readDayViewParam — only a|b|c reach a legacy frame", () => {
     ["an unknown frame", "?dayview=d", null],
     ["the wrong case", "?dayview=A", null],
     ["a path-ish value", "?dayview=../DayA", null],
+    // The retired alias. `c` used to mount DayC — the focus card's own parent,
+    // i.e. the same information architecture from a second copy that had
+    // already diverged. It now falls through with every other unrecognised
+    // value; the URL still resolves, it resolves to the Day view.
+    ["the retired colour alias", "?dayview=c", null],
     // POSITIVE CONTROLS — without these every row above passes against a
     // function that returns null unconditionally.
     ["the glass frame", "?dayview=a", "a"],
     ["the paper frame", "?dayview=b", "b"],
-    ["the colour frame", "?dayview=c", "c"],
     ["a legacy key after another param", "?lesson=m-12-0&dayview=b", "b"],
   ];
 
@@ -197,7 +221,34 @@ describe("DayViewV2 renders the focus + rail Day view", () => {
       await h.render(BASE_PROPS as never);
       expect(h.html()).toContain(FOCUS_TARGET);
       expect(h.html()).toContain(FOCUS_FLOW);
+      expect(h.html()).toContain(FOCUS_ONLY);
     } finally {
+      await h.unmount();
+    }
+  });
+
+  it("falls through to DayFocus for the retired ?dayview=c", async () => {
+    // The alias used to mount DayC. Asserting the focus card's furniture alone
+    // would NOT prove the fall-through — DayC rendered the same learning-target
+    // box and the same flow strip, so those two markers passed for both, which
+    // is precisely why the alias compared nothing. `FOCUS_ONLY` is the
+    // discriminator: DayC's hero never counted resources.
+    //
+    // Its positive control is the ?dayview=b test below, in this same run: if
+    // the switch had stopped mounting legacy frames altogether, this test would
+    // pass for the wrong reason and that one would fail.
+    const h = await mountReact(DayViewV2 as never);
+    const loc = (
+      globalThis as unknown as { window: { location: { search?: string } } }
+    ).window.location;
+    try {
+      loc.search = "?dayview=c";
+      await h.render(BASE_PROPS as never);
+      expect(h.html()).toContain(FOCUS_TARGET);
+      expect(h.html()).toContain(FOCUS_FLOW);
+      expect(h.html()).toContain(FOCUS_ONLY);
+    } finally {
+      loc.search = "";
       await h.unmount();
     }
   });

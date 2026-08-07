@@ -19,7 +19,7 @@
 //                        a worse bug than the one being fixed.
 //
 // `hasLessons` is a REQUIRED argument rather than something inferred from the
-// caller's own branch. DayB/DayC render their empty slot when `pickFocus()`
+// caller's own branch. DayFocus and DayB render their empty slot when `pickFocus()`
 // returns undefined, which today happens if and only if the day has no lessons
 // (`pickFocus` early-returns on `length === 0` and otherwise falls back to
 // `dayLessons[0]`). That invariant holds — but it is TRANSITIVE, and this whole

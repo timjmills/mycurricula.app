@@ -24,8 +24,6 @@ import { SettingsCard } from "./settings-card";
 // treatments, not just plain cards.
 const PREVIEW_LESSON_IDS = ["m-12-1", "r-12-1", "w-12-1"] as const;
 
-const STYLE_LABEL = { quiet: "Quiet", calm: "Mid-Calm", vivid: "Mid-Vivid" };
-const PALETTE_LABEL = { normal: "Normal", highlight: "Highlight" };
 // v2 theme set (lockstep with lib/theme.tsx APP_THEMES). The full picker
 // rewrite (per-theme copy for honey/off) is a later Wave-2 stage; this label
 // map only needs to cover the resolved v2 themes so the caption compiles.
@@ -45,7 +43,11 @@ interface LivePreviewProps {
 }
 
 export function LivePreview({ mapping }: LivePreviewProps): ReactNode {
-  const { style, palette, resolvedTheme } = useTheme();
+  // style/palette are no longer read: data-style never reached the v2 DOM and
+  // the data-palette axis is retired (2026-08-07), so the meta line describes
+  // the one axis that still moves (theme) and the preview's real subject —
+  // the swatch mapping being tried below.
+  const { palette, resolvedTheme } = useTheme();
   const lessons = PREVIEW_LESSON_IDS.map((id) => LESSON_BY_ID[id]);
 
   return (
@@ -53,7 +55,7 @@ export function LivePreview({ mapping }: LivePreviewProps): ReactNode {
       eyebrow="Live preview"
       title={
         <Tooltip
-          content="Sample lesson cards rendered with your current style + palette choices. Re-themes the instant you change either picker above so you can preview before committing."
+          content="Sample lesson cards rendered with your current theme and subject-colour choices. Re-themes the instant you change a swatch below so you can preview before committing."
           side="bottom"
         >
           <span>How your cards look right now</span>
@@ -64,20 +66,16 @@ export function LivePreview({ mapping }: LivePreviewProps): ReactNode {
           Theme:{" "}
           <strong style={{ color: "var(--ink-900)" }}>
             {THEME_LABEL[resolvedTheme]}
-          </strong>{" "}
-          · Style:{" "}
-          <strong style={{ color: "var(--ink-900)" }}>
-            {STYLE_LABEL[style]}
-          </strong>{" "}
-          · Palette:{" "}
-          <strong style={{ color: "var(--ink-900)" }}>
-            {PALETTE_LABEL[palette]}
           </strong>
         </div>
       }
     >
       {/* A nested PaletteProvider scopes the chosen mapping to the preview
-          even before it has been saved to the app-wide Core mapping. */}
+          even before it has been saved to the app-wide Core mapping.
+          ⚠ Known scoping caveat: the bridge's rules are UNSCOPED class
+          selectors, so while a candidate mapping is being tried here it wins
+          app-wide (later <style> at equal specificity), not just on these
+          three cards. Pre-existing; harmless while preview == committed. */}
       <PaletteProvider type={palette} mapping={mapping}>
         <div
           style={{

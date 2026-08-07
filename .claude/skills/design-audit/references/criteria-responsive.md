@@ -3,6 +3,13 @@
 Use the viewport set in `evidence-protocol.md` §7. Findings here require rendered
 evidence; responsive failures are almost never visible in source.
 
+**Read `evidence-protocol.md` §2A before instrumenting anything here.** Three of
+its traps fire on this criterion specifically, and each one manufactures or hides
+a responsive finding: pre-hydration samples read the *desktop* branch at every
+width; `document.scrollingElement.scrollWidth` is blind to an app that scrolls an
+inner container; and a narrow desktop window is not a phone, so coarse-pointer and
+phone-only rules never fire.
+
 ## What to look for at each width
 
 - Broken or overlapping layout

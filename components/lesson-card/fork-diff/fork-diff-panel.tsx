@@ -15,10 +15,20 @@
 //     fields (objective, lesson-flow sections).
 //   • Per-field revert is hover-revealed (the Weekly-card pattern), ≥44px
 //     effective target, with a `required` tooltip (destructive).
-//   • Footer: "Revert to Team version" (whole lesson) and "Propose to Team"
-//     (switches editMode to "master" — the EXISTING flashing-then-persistent
-//     banner is the safety mechanism; no confirm dialog, and Master is
-//     never written directly from here).
+//   • Footer: "Revert to Team version" (whole lesson) and — the spec calls it
+//     "Propose to Team" — a button that switches editMode to "master". The
+//     EXISTING two-pulse-then-persistent pink caution glow (CLAUDE.md §2) is
+//     the safety mechanism; no confirm dialog, and Master is never written
+//     directly from here.
+//
+//     SHIPPED LABEL: "Edit the Team version". The spec's name describes a
+//     merge-back feature that does not exist — nothing is sent, queued or
+//     saved, and no one is notified. All the button does is put the app into
+//     Team-Curriculum editing so the teacher can make the change themselves,
+//     under the caution glow. "Propose" promised a workflow the code never
+//     had, which is how a teacher ends up believing their change reached the
+//     team. Merge-back is still unbuilt (docs/6.12.26 Webreview and
+//     Improvment.md); when it lands it needs its own button, not this one.
 //
 // Store wiring & undo semantics:
 //   • PERSONAL-MODE ONLY (M1): the panel renders nothing in Team-Curriculum
@@ -197,12 +207,15 @@ export function ForkDiffPanel({ lesson, onClose }: ForkDiffPanelProps) {
     onClose();
   }
 
-  // ── Propose to Team ──────────────────────────────────────────────────────
-  // Switches the app into Team-Curriculum (master) editing — the EXISTING
-  // flashing-then-persistent red banner is the deliberate safety mechanism
-  // (CLAUDE.md §2: no confirm dialogs). Nothing is written to Master here;
-  // the teacher edits the master copy explicitly under the banner.
-  function proposeToTeam(): void {
+  // ── Edit the Team version ────────────────────────────────────────────────
+  // A MODE SWITCH, and nothing else. It moves the app into Team-Curriculum
+  // (master) editing and closes the panel; the EXISTING flashing-then-persistent
+  // pink caution glow is the deliberate safety mechanism (CLAUDE.md §2: no
+  // confirm dialogs). Nothing is written to Master here, nothing is sent to
+  // anyone, and no proposal is recorded — the teacher edits the master copy
+  // explicitly, afterwards, under the glow. The label says exactly that; see the
+  // header note on why the spec's "Propose to Team" was not shipped.
+  function editTeamVersion(): void {
     // Defensive guard (L8): the personal-mode gate above means this panel —
     // and therefore this button — never renders in master mode, so the
     // check is unreachable today; it stays so a future host that bypasses
@@ -343,8 +356,8 @@ export function ForkDiffPanel({ lesson, onClose }: ForkDiffPanelProps) {
       {/* ── Footer actions ──────────────────────────────────────────────── */}
       <div className={styles.footer}>
         <p className={styles.footNote}>
-          Proposing opens Team Curriculum editing — the team-wide banner applies
-          before anything changes for others.
+          Editing the team version switches you into Team Curriculum mode, where
+          every change affects the whole team. Nothing is sent from here.
         </p>
         <Tooltip
           required
@@ -354,12 +367,22 @@ export function ForkDiffPanel({ lesson, onClose }: ForkDiffPanelProps) {
             Revert to Team version
           </Button>
         </Tooltip>
+        {/* `required` (CLAUDE.md §4 always-on list): this is the entry to
+            team-wide editing, so the explanation must survive both the global
+            tooltip off-switch and any per-id dismissal.
+
+            No aria-label. The visible label IS the accessible name, and the
+            explanation reaches screen readers through the Tooltip's
+            aria-describedby. An aria-label reading "Edit the team's version of
+            this lesson…" would have broken WCAG 2.5.3 (Label in Name): the
+            accessible name would no longer contain the visible string, so
+            "click Edit the Team version" stops working for voice control. */}
         <Tooltip
           required
-          content="Switch to editing the team's curriculum so you can bring your changes to everyone — the red banner flow applies (changes there affect the whole team)"
+          content="Switches to editing the team's curriculum, where your changes affect everyone. Nothing is sent or saved by this button — it opens the team's copy of this lesson so you can make the change yourself, with the team-wide caution glow showing."
         >
-          <Button variant="primary" size="md" onClick={proposeToTeam}>
-            Propose to Team
+          <Button variant="primary" size="md" onClick={editTeamVersion}>
+            Edit the Team version
           </Button>
         </Tooltip>
       </div>

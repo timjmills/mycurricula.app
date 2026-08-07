@@ -32,6 +32,7 @@ import { todayIsInConfiguredYear } from "@/lib/now-anchor";
 import { useSchoolWeek, type Weekday } from "@/lib/use-school-week";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
+import { unownedSlotVar } from "@/lib/card-wash";
 import { Tooltip } from "@/components/ui";
 import { subjectClassName } from "./roadTones";
 import { StatusGlyph } from "./StatusGlyph";
@@ -405,7 +406,21 @@ export function ProgressionView({
   );
 }
 
-// Small inline icon helpers for the legend — colors from canonical tokens.
+// Small inline icon helpers for the CHECKPOINTS & MILESTONES legend — colors
+// from canonical tokens.
+//
+// DECORATIVE, so unowned slots only. These three glyphs distinguish a unit
+// checkpoint from a mid-unit checkpoint from a major milestone: a progression
+// property that has nothing to do with which subject the row is. They borrowed
+// subject hues as a convenient three-colour set, which put a green star in the
+// legend of a chart whose Explorers rows are green — the reader has no way to
+// know the two greens mean different things. `unownedSlotVar` takes the seven
+// slots no team subject owns (lib/card-wash), and its parameter type makes
+// naming a subject's slot here a compile error rather than a review catch.
+//
+// Each glyph keeps the tone and value it had (apricot→Coral, purple→Violet,
+// green→Leaf); the strict rule re-palettes deliberately, so this is a small
+// intended shift in hue, not a preserved appearance.
 function FlagIcon({ secondary }: { secondary?: boolean }) {
   return (
     <svg
@@ -413,13 +428,7 @@ function FlagIcon({ secondary }: { secondary?: boolean }) {
       height="12"
       viewBox="0 0 24 24"
       fill="none"
-      /* Slot tokens, not subject aliases: this legend flag distinguishes a
-         primary from a secondary marker, which is not subject identity — it
-         only borrowed two subject aliases as a two-hue palette.
-         `--subj-2`/`--subj-7` are what these rendered before the subject map
-         moved to the v2 handoff, so pinning them is appearance-preserving and
-         immune to a future re-point. */
-      stroke={secondary ? "var(--subj-7)" : "var(--subj-2)"}
+      stroke={secondary ? unownedSlotVar(8) : unownedSlotVar(3)}
       strokeWidth="1.7"
       aria-hidden="true"
     >
@@ -435,7 +444,10 @@ function StarIcon() {
       height="12"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="var(--explorers)"
+      // Was `var(--explorers)` — a subject ALIAS, so this legend key repainted
+      // itself whenever the team remapped Explorers, and read as "the Explorers
+      // colour" to anyone who had learned the stripe vocabulary.
+      stroke={unownedSlotVar(14)}
       strokeWidth="1.7"
       aria-hidden="true"
     >

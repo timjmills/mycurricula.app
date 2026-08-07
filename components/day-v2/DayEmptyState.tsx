@@ -48,7 +48,7 @@ export interface DayEmptyStateProps {
    */
   hasLessons: boolean;
   /** Skeleton bars while the hydrate is in flight. DayA stands in for a day
-   *  LIST; DayB/DayC for a single focus/hero panel, which wants fewer. */
+   *  LIST; DayFocus/DayB for a single focus panel, which wants fewer. */
   skeletonLines?: number;
 }
 
@@ -68,7 +68,7 @@ export function DayEmptyState({
     // Wrapped in `.emptyDay` so the loading state occupies the SAME slot the
     // message would (24px block, max-width 860px, centered) in all three of the
     // containers this renders into — DayA's `.vaDay`, DayB's `.focusEmpty`,
-    // DayC's `.heroEmpty`. A bare full-bleed Skeleton would land differently in
+    // DayFocus's `.heroEmpty`. A bare full-bleed Skeleton would land differently in
     // each. Worth being deliberate about: this branch cannot be seen on the mock
     // path (hydration is pinned "ready"), so it ships without a screenshot.
     return (

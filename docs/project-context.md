@@ -108,26 +108,36 @@ determined are marked **UNKNOWN** and collected at the bottom.
 
 ## Targets
 
-- **Browser support:** **UNKNOWN — no `.browserslistrc`, no `browserslist` key
-  in `package.json`, and no support statement in the repo. Which browsers and
-  minimum versions must be supported?**
+- **Browser support:** **evergreen, last 2 versions** of Chrome, Edge, Safari,
+  and Firefox (owner-stated 2026-08-07; still no `.browserslistrc` in the repo,
+  so this doc is the only record). Reference hardware is **school-managed
+  mid-tier** machines and tablets, not developer laptops — judge performance and
+  interaction cost against that, not against the machine you are testing on.
 - **Accessibility target:** WCAG **2.2 AA** — AA contrast minimum, full keyboard
   navigation, **≥44px touch targets** on primary actions (`CLAUDE.md` §4).
-- **Performance budget:** **UNKNOWN — none declared. Bundle work has been
-  measured ad-hoc (e.g. "/catch-up first-load 405→239 kB"). Is there a target
-  (LCP/CLS/INP, or a first-load KB ceiling)?**
+- **Performance budget:** **~250 kB first-load JS per route**, and **interactive
+  in under ~3 s** on the school-managed mid-tier hardware above (owner-stated
+  2026-08-07). Prior bundle work was measured ad-hoc against no target (e.g.
+  "/catch-up first-load 405→239 kB"); that number is now gradeable.
 - **Viewports that matter most:** phone **360–480**, tablet **600–900**, desktop
   **1024–1920**; audited at **375 / 768 / 1440**. Hard rule: **no
   document-level horizontal scroll at any tier**; internal element scroll is
   fine. Sticky chrome must not eat >~30% of phone viewport height.
-- **RTL required:** **not supported today**, and the target market includes
-  Arabic-medium schools — see criterion 6. Treat as greenfield, not partial.
+- **RTL required:** **aspirational, not a near-term commitment** (owner-stated
+  2026-08-07). The target market includes Arabic-medium schools, so it is a
+  later programme rather than a dropped idea — see criterion 6. Practical rule:
+  **new CSS should prefer logical properties where they cost nothing**
+  (`margin-inline-start` over `margin-left`), but do **not** raise RTL findings
+  above Low, and do not propose a migration wave unless asked. Treat as
+  greenfield, not partial.
 - **Print or PDF output:** **print yes** — dedicated routes
   `app/(planner)/weekly/print` (subject×day matrix, semantic `<table>`) and
   `app/(planner)/year/print` (month-stack with page breaks), driven by
   `[data-print-view]` shell suppression in `app/globals.css`; 11 files carry
-  `@media print`. **`@react-pdf/renderer` is NOT installed** — programmatic PDF
-  export is an aspiration in the planning doc, not a code path.
+  `@media print`. **`@react-pdf/renderer` is NOT installed, and browser print is
+  the current answer** (owner-stated 2026-08-07) — audit the print routes and
+  their stylesheets; do not report against a programmatic PDF path that does not
+  exist.
 - **Offline behaviour:** none — no service worker found.
 - **Localisation:** none. English only; no i18n library, no `Intl` usage.
 
@@ -164,8 +174,12 @@ npm test                         # vitest run — node env, tests/**/*.test.ts, 
 - **Known technical debt to work around rather than fix:**
   - `data-veil` and `data-zoom` exist **only** as CSS selectors in
     `app/themes.css` and are written by no TypeScript — dead-but-landed.
-  - `V2_SUBJECT_SLOTS` is defined but `lib/palette.tsx` still emits the v1
-    mapping through the `.cp-subj.<id>` bridge.
+  - ~~`V2_SUBJECT_SLOTS` is defined but `lib/palette.tsx` still emits the v1
+    mapping through the `.cp-subj.<id>` bridge.~~ Resolved 2026-08-01 (task
+    #50): the constant had zero consumers, so the v1 map rendered everywhere.
+    `DEFAULT_SUBJECT_MAPPING` now carries the handoff map and the twin is
+    deleted — there is one subject→slot map, pinned by
+    `tests/subject-slot-map.test.ts`.
   - ~180 loose QA `.png` files sit in the repo root.
 - **Areas permanently out of scope:** student/parent/admin surfaces, gradebook,
   attendance, marketplace, LMS/SIS integration, multi-language UI, and AI
@@ -272,47 +286,136 @@ node ${CLAUDE_SKILL_DIR}/scripts/capture-screens.mjs \
   another session may own.
 - Pass `--widths 375 768 1440` — the defaults (`360 768 1280 1920`) do not match
   this project's audited tiers.
-- **Its narrow shots are not true phone emulation**: it sets
-  `deviceScaleFactor: 1` and never sets `isMobile`, so phone-only layout and
-  coarse-pointer rules will not fire. Use the `chrome-devtools` MCP `emulate`
-  path (`375x812x3,mobile,touch`) for real phone checks.
-- Output goes to `.audit/screens` (gitignored), deliberately separate from the
-  curated `docs/screenshots/<wave>/` convention (150 existing folders).
+- **The script enforces the 0/1/2 exit contract** (hardened 2026-08-07): `0`
+  fully verified · `1` real failures · `2` the instrument was blind. It exits `2`
+  — never `0` — when nothing was captured, when every route was redirected off
+  its requested path, when `--axe` ran no on-route scan, or when a requested
+  variant never applied. **Trust the exit code; do not read the ✓ lines alone.**
+- **Narrow widths are now true phone emulation** (`isMobile`, `hasTouch`,
+  `deviceScaleFactor: 3` at ≤480px), and viewports use real device heights
+  (375→740 tall, not the old width×0.72 letterbox). Each capture prints an
+  `[emulated: phone|desktop-window]` tag. The `chrome-devtools` MCP `emulate`
+  path (`375x812x3,mobile,touch`) remains the better tool for *interactive*
+  phone checks.
+- **axe now runs at whichever requested width is nearest 1280** — under this
+  project's `--widths 375 768 1440` it scans at 1440. It was previously gated on
+  `width === 1280`, so at our documented widths **it silently ran no scan at
+  all** and printed nothing. axe `incomplete` results are reported separately as
+  "needs manual check" and never folded into a pass; frosted glass makes contrast
+  unresolvable for axe, so expect them and judge those by eye.
+- **`--dark` alone will not put this app in dark mode.** It emulates
+  `prefers-color-scheme`, which this app ignores — dark comes from
+  `data-theme="night"` (deriving `data-tone="dark"`). Pass
+  `--dark --dark-attrs data-theme=night`; the script stamps the attribute, reads
+  it back after load, and exits 2 with `dark: NOT APPLIED` rather than let a
+  light capture be graded as dark.
+- Output goes to `.audit/screens` (gitignored) for throwaway runs. **Captures
+  worth keeping go to `docs/screenshots/<wave>/`** — the curated convention (150
+  existing folders), which is the project's answer for anything cited in a report.
 - Authentication: local dev needs `PROVISIONING_MODE=individual` in `.env.local`;
   sign in via the `?claude=<CLAUDE_BYPASS_TOKEN>` bypass
   (`docs/5.24.26 claude-access.md`). The onboarding gate will redirect a fresh
-  session to `/onboarding`.
+  session to `/onboarding`. **Verified 2026-08-07:** an unauthenticated run
+  against `:3014` bounced `/weekly` and `/daily` to `/login?next=…`, producing
+  six green captures and a "0 violations" axe report *about the login page* —
+  the /weekly and /daily 768px PNGs were byte-identical. The script now detects
+  this and exits 2. Authenticate before capturing, or the run is a portrait of
+  the sign-in screen.
+- **Windows/Git Bash foot-gun:** MSYS path conversion rewrites a leading-slash
+  route argument, turning `--routes /weekly` into
+  `C:/Program Files/Git/weekly`. Run the script from **PowerShell**, or prefix
+  with `MSYS_NO_PATHCONV=1`.
 
 ## Current design debt
 
 Screens known to need work, so an audit does not spend its finding budget
-re-reporting them.
+re-reporting them. **Do not re-report these as new findings** — if you confirm one
+is fixed, say so; if you find it is worse or has a cause the ledger missed, that
+is worth reporting.
 
-*To be filled in by the project owner.*
+Sources: the 2026-08-02 QA ledger (`docs/qa/2026-08-02-{day,week,post}.md`) and
+the 2026-08-01 day-consolidation audit (`docs/audits/2026-08-01-day-consolidation.md`).
+**Severity uses the project's own scale — critical / major / minor** (`CLAUDE.md`
+§4b), not the Critical/High/Medium/Low of the §4a Codex gate; severity is quoted
+from the source docs.
 
-| Screen / area | Known issue | Deliberate for now? |
-|---|---|---|
+**Status is cross-referenced, not quoted.** The source docs leave every finding
+*unassigned* — "fix in flight" and "F2 scheduled" are this file's mapping onto
+the live F0/F1/F2 work lanes as of **2026-08-07**, and the lanes are the thing to
+verify, not the ledger. Several rows also carry the source doc's own caveat that
+a finding is documentation-only, unconfirmed, or deliberate; read the Status cell
+before treating a row as a defect. Verify against code before treating any row as
+still open.
+
+| Screen / area | Known issue | Severity | Status |
+|---|---|---|---|
+| Day — focus card | The action row (Done/Plan/Post/Teach) is clipped below the pane at 1280×800 and 1440×900, covered by the floating clock card, and reachable only via a hidden inner scroll (C1) | critical | fix in flight (F0) |
+| Day — focus card @375 | The card cannot shrink to its container, so `Open in Teach` is clipped off the right edge (M2) | major | fix in flight (F0) |
+| Day — frames | `data-frame` applies, but only Frame B is distinguishable; A and C render byte-identical on every surface (M0) | major | F2 scheduled (frame respec) |
+| Day — flow chips | Flow chips fail WCAG AA on the focus card in 4 of 6 measured runs (8-01 #2) | major | F2 scheduled |
+| Day — hero | The hero gradient is far darker than the handoff's (Math reads deep olive-brown, not bright gold) and the footer drops a chip, 2 of 3 (8-01 #11) | major | F2 scheduled — **the darkening is a deliberate AA-contrast tradeoff per a code comment**; the audit asks for a decision, not a code fix |
+| Day — Frame C | Frame C's focus card has no border, so it is 2px shorter than A and B (m4) | minor | F2 scheduled (frame respec); ledger unsure whether intentional |
+| Day @375 | The Day pane gets only 269px of an 812px viewport (m3) | minor | open, unassigned |
+| Day — agenda rail | Rail titles are 31px tall at phone and tablet widths, under the 44px target (m5) | minor | open, unassigned |
+| Week — view switch | Below 600px the Grid radio reads as selected while List renders, and pressing it silently does nothing (MAJOR 1) | major | fix in flight (F0) |
+| Week — chrome | Touch targets below 44px at phone and tablet (MINOR 1) | minor | open, unassigned |
+| Year (`/year`) | Commit `5d0b9a2`'s message claims Year inherited the `AddLessonMenu` portal fix, but `/year` has zero callsites (MINOR 2) | minor | **documentation only — the ledger records no code defect**; do not fix code |
+| Week — add menu | A canvas re-mount between opening the add menu and pressing Escape strands focus on `<body>` (MINOR 3) | minor | open; ledger calls it low-probability and **not a defect in the Escape path itself** |
+| Week — console | Intermittent (2 of ~15 sessions) `TypeError: Failed to fetch` from `@supabase/auth-js` token refresh on `/weekly` (MINOR 4) | minor | informational — ledger attributes it to the network, not app code |
+| Week — quick-add | Silent no-ops in `WeeklyList`'s quick-add (MINOR 5) | minor | open, unassigned |
+| Post — composer | "Remove link" then Done does not remove the link (#1) | major | fix in flight (F0) |
+| Post — composer | Double-clicking a note opens the preview lightbox *over* the composer (#2) | major | fix in flight (F0) |
+| App-wide — colour | Every subject colour changes shade seconds after the page is usable (#3, pre-existing) | minor | fix in flight (F1, colour truth) |
+| Post — composer | After Cancel, re-opening the composer loses the saved link (code-identified, never exercised live) (#4) | minor | open, unassigned |
+| Post / lesson card | The same card-colour picker is hue-named on the wall and numbered on the lesson card (#5) | minor | open, unassigned |
+| Year — Progression | `ProgressionView.tsx:438` `StarIcon` still on the `var(--explorers)` alias — missed by the same `a9b3909` that fixed `FlagIcon` 16 lines above (#6) | minor | open, unassigned |
+
+**Known coverage gaps, not defects.** The Day ledger records three things it
+could not reach, so an audit should not read their silence as a pass: the "+N"
+standards overflow (U1) and the honest empty-flow state (U2) are **unreachable
+from local data**, and 7 of the 12 tone combinations were captured but never
+pixel-reviewed (U3). See also the standing note that localhost carries zero
+lessons, which makes "empty" the expected local state on every lesson-scoped
+surface.
 
 ---
 
 ## UNKNOWN — open questions for the project owner
 
-1. **Browser support matrix** — no `.browserslistrc` and no `browserslist` key.
-   Which browsers and minimum versions are supported?
-2. **Performance budget** — none declared. Is there a target (LCP / CLS / INP,
-   or a first-load KB ceiling)?
+1. ~~**Browser support matrix** — no `.browserslistrc` and no `browserslist`
+   key. Which browsers and minimum versions are supported?~~
+   **Answered 2026-08-07:** evergreen **last 2 versions** of Chrome, Edge,
+   Safari, Firefox. Reference hardware is **school-managed mid-tier** machines
+   and tablets. No `.browserslistrc` was added, so this doc is the record.
+2. ~~**Performance budget** — none declared. Is there a target (LCP / CLS / INP,
+   or a first-load KB ceiling)?~~
+   **Answered 2026-08-07:** **~250 kB first-load JS per route**, **interactive
+   in under ~3 s** on the mid-tier hardware above.
 3. **Offline behaviour** — no service worker exists. Is offline use expected?
 4. **`data-veil` / `data-zoom`** — dead CSS to delete, planned-but-unwired axes,
    or set by something outside the repo?
-5. **`V2_SUBJECT_SLOTS`** — `lib/palette-data.ts:200` says no callsite exists
-   yet. Is that comment still true, or is the v2 subject remap live?
+5. ~~**`V2_SUBJECT_SLOTS`** — `lib/palette-data.ts:200` says no callsite exists
+   yet. Is that comment still true, or is the v2 subject remap live?~~
+   **Answered 2026-08-01 (task #50):** the comment was true — zero consumers
+   repo-wide — so the remap was never live and the v1 map rendered on every
+   surface. The live map now carries the handoff values and the constant is
+   deleted.
 6. **Keyboard-DnD coverage** — should the audit live-verify rails
    (`RailsDndProvider`), phase reorder (`lesson-flow`), and `teach/*`, given the
    documented `sortableKeyboardCoordinates` no-op on bare droppables?
-7. **RTL scope** — is RTL a committed near-term requirement or aspirational?
-   This changes the severity of every RTL finding.
-8. **PDF export** — is `@react-pdf/renderer` still the intended path, or is
-   browser print the permanent answer?
-9. **Screenshot destination** — is `.audit/screens` (gitignored) right, or
-   should audit captures live in `docs/screenshots/<audit-name>/` with the rest?
-10. **`/post` (Resource Wall)** — confirm it is in scope for design audits.
+7. ~~**RTL scope** — is RTL a committed near-term requirement or aspirational?
+   This changes the severity of every RTL finding.~~
+   **Answered 2026-08-07: aspirational** — a later programme, not near-term.
+   New CSS prefers logical properties where they are free; RTL findings stay
+   **Low** and no migration wave is proposed unless asked.
+8. ~~**PDF export** — is `@react-pdf/renderer` still the intended path, or is
+   browser print the permanent answer?~~
+   **Answered 2026-08-07: browser print is the current answer.**
+   `@react-pdf/renderer` is not installed; do not audit against it.
+9. ~~**Screenshot destination** — is `.audit/screens` (gitignored) right, or
+   should audit captures live in `docs/screenshots/<audit-name>/` with the
+   rest?~~
+   **Answered 2026-08-07:** keepers go to **`docs/screenshots/<wave>/`**, the
+   curated convention. `.audit/screens` stays for throwaway runs.
+10. ~~**`/post` (Resource Wall)** — confirm it is in scope for design audits.~~
+    **Answered 2026-08-07: yes, `/post` is in scope.**

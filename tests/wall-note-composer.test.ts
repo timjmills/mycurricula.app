@@ -83,6 +83,13 @@ const { Card, isAttachableLink } = await import(
   "@/components/resource-wall-v2/Card"
 );
 const { linkToLessonResource } = await import("@/lib/resource-embed");
+// The REAL persistence module, not a stand-in: the removal cases below have to
+// prove the link is gone from storage, and `saveCustomWalls` writes through
+// `JSON.stringify`, where the difference between `gallery: undefined` and
+// `gallery: null` decides whether a removed link comes back on the next load.
+const { saveCustomWalls, loadCustomWalls } = await import(
+  "@/components/resource-wall-v2/wall-state"
+);
 
 const NOTE: WallItem = {
   key: "k-1",
@@ -96,9 +103,32 @@ const NOTE: WallItem = {
   composing: true,
 } as unknown as WallItem;
 
+/** A saved note that already carries a link — the subject of every re-edit case
+ *  below (removing the link, reopening after Cancel, the double-click race). */
+const WITH_LINK = {
+  ...NOTE,
+  key: "k-2",
+  composing: false,
+  label: "Fractions note",
+  resource: {
+    type: "notecard",
+    label: "Fractions note",
+    body: "Fractions note",
+    gallery: [
+      {
+        type: "link",
+        label: "Number line applet",
+        url: "https://example.test/applet",
+      },
+    ],
+  },
+} as unknown as WallItem;
+
 /** Every commit and discard the composer emitted, in order. */
 const committed: WallItem[] = [];
 const discarded: string[] = [];
+/** Every card the surface asked to open in the preview lightbox. */
+const modals: WallItem[] = [];
 
 function Harness({ readOnly = false }: { readOnly?: boolean }): ReactNode {
   return createElement(Card, {
@@ -131,10 +161,68 @@ function cardProps(item: WallItem) {
     onOpen: () => {},
     onEnlarge: () => {},
     onBoard: () => {},
-    onModal: () => {},
+    onModal: (it: WallItem) => void modals.push(it),
     onCommit: (it: WallItem) => void committed.push(it),
     onDiscard: (k: string) => void discarded.push(k),
   };
+}
+
+/** The saved-note card, re-renderable with a different `readOnly`. */
+function LinkHarness({ readOnly = false }: { readOnly?: boolean }): ReactNode {
+  return createElement(Card, { ...cardProps(WITH_LINK), readOnly } as never);
+}
+
+/** Mount the saved note and clear the recorders. */
+async function openSaved() {
+  committed.length = 0;
+  discarded.length = 0;
+  modals.length = 0;
+  nextText = "";
+  const h = await mountReact(LinkHarness);
+  await h.render({ readOnly: false });
+  return h;
+}
+
+/** The card shell — the element carrying the click/dblclick handlers. */
+function shell(h: { query: (selector: string) => Element | null }): Element {
+  const el = h.query("[data-kind]");
+  if (!el) throw new Error("no card rendered — the harness is lying");
+  return el;
+}
+
+/**
+ * Click with an explicit `detail` (the browser's click COUNT), which the
+ * harness's own click helper cannot set — the lightbox deferral branches on it,
+ * so a test that cannot set it cannot reach the keyboard path at all.
+ *
+ * The assignment is checked rather than assumed: linkedom's Event is not the
+ * platform's, and a `detail` that silently failed to attach would make every
+ * assertion below a test of the default branch wearing another branch's name.
+ */
+async function clickWithDetail(el: Element, detail: number): Promise<void> {
+  const { act } = await import("react");
+  const w = globalThis as unknown as { window: { Event: typeof Event } };
+  const ev = new w.window.Event("click", { bubbles: true });
+  (ev as unknown as { detail: number }).detail = detail;
+  if ((ev as unknown as { detail: number }).detail !== detail) {
+    throw new Error("could not set event.detail — the instrument is lying");
+  }
+  await act(async () => {
+    el.dispatchEvent(ev);
+  });
+}
+
+/** Wait past the double-click window, on REAL timers.
+ *
+ *  Not `vi.useFakeTimers()`: React's scheduler drains this harness's work
+ *  through macrotasks (mount-react's own note), and freezing them risks
+ *  `act()` never returning — a hang, which reads as a flaky suite rather than
+ *  as the wrong instrument. The wait is one-directional either way: the
+ *  cancelled-timer assertions can only go redder if the machine stalls, never
+ *  greener. */
+const PAST_THE_WINDOW = 400;
+function waitPastWindow(): Promise<void> {
+  return new Promise((r) => setTimeout(r, PAST_THE_WINDOW));
 }
 
 const byText =
@@ -160,6 +248,7 @@ async function type(h: Awaited<ReturnType<typeof open>>, text: string) {
 beforeEach(() => {
   committed.length = 0;
   discarded.length = 0;
+  modals.length = 0;
 });
 
 describe("the wall's note composer does not manufacture junk", () => {
@@ -305,25 +394,6 @@ describe("the wall's note composer sets the card's own colour", () => {
 });
 
 describe("a saved link stays visible, editable and removable", () => {
-  const WITH_LINK = {
-    ...NOTE,
-    key: "k-2",
-    composing: false,
-    label: "Fractions note",
-    resource: {
-      type: "notecard",
-      label: "Fractions note",
-      body: "Fractions note",
-      gallery: [
-        {
-          type: "link",
-          label: "Number line applet",
-          url: "https://example.test/applet",
-        },
-      ],
-    },
-  } as unknown as WallItem;
-
   it("shows the attached link on the committed card, as a real link", async () => {
     // Without this the feature ends at the composer: a teacher adds a link,
     // saves, and can never see or open it again (§4a review, Medium).
@@ -355,6 +425,268 @@ describe("a saved link stays visible, editable and removable", () => {
       expect(inputs).toHaveLength(2);
       expect(inputs[0].getAttribute("value")).toBe("Number line applet");
       expect(inputs[1].getAttribute("value")).toBe("https://example.test/applet");
+    } finally {
+      await h.unmount();
+    }
+  });
+});
+
+describe("Remove link actually removes the link", () => {
+  // The defect this replaces: the composer's no-op guard asked whether there
+  // was something to ATTACH, and `null` reads the same for "the teacher just
+  // removed the link" as for "this note never had one". So Done on a removal
+  // returned before `onCommit`, the composer closed as though it had saved, and
+  // the link was still on the card after a reload — silently (live QA
+  // 2026-08-02, bug 1). Every case here goes through the real Remove-link
+  // button, not a simulated state change.
+
+  it("commits the removal, and a saved wall loses the gallery entry", async () => {
+    const h = await openSaved();
+    try {
+      await h.dblClick(shell(h));
+      // POSITIVE CONTROLS, both halves of what the live probe had to establish:
+      // the composer is open, and it is seeded with the link that is about to
+      // be removed. Without these, "the commit had no gallery" would also be
+      // true of a composer that never saw one.
+      expect(h.queryAll("input")).toHaveLength(2);
+      expect(h.queryAll("input")[1].getAttribute("value")).toBe(
+        "https://example.test/applet",
+      );
+
+      await h.click(byText("Remove link"));
+      // The removal registered in the composer — the live pass's G2.
+      expect(h.queryAll("input")).toHaveLength(0);
+      expect(h.html()).toContain("Add link");
+
+      await h.click(byText("Done"));
+      expect(committed).toHaveLength(1);
+      expect(committed[0]?.resource.gallery).toBeUndefined();
+      // The rest of the note survived the removal — this is a link being
+      // deleted, not a card being blanked.
+      expect(committed[0]?.resource.body).toBe("Fractions note");
+
+      // AND IT SURVIVES PERSISTENCE. `saveCustomWalls` JSON-stringifies the
+      // wall, so an `undefined` gallery disappears while a `null` one would be
+      // restored as a present-but-empty field. Real module, real (per-mount)
+      // localStorage.
+      saveCustomWalls([
+        {
+          id: "w-1",
+          name: "This Week",
+          anchor: "forked",
+          layout: [
+            {
+              id: "s-1",
+              title: "Math",
+              meta: "",
+              subjectId: "math",
+              items: [committed[0] as WallItem],
+            },
+          ],
+          view: "med",
+          created: 1,
+        },
+      ]);
+      const back = loadCustomWalls();
+      // Control: the card itself round-tripped, so an absent gallery is the
+      // gallery being gone and not the whole item being dropped by the
+      // validator.
+      expect(back[0]?.layout[0]?.items).toHaveLength(1);
+      expect(back[0]?.layout[0]?.items[0]?.label).toBe("Fractions note");
+      expect(back[0]?.layout[0]?.items[0]?.resource.gallery).toBeUndefined();
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("commits when only the attachment's LABEL differs from what is stored", async () => {
+    // The guard compares label as well as URL, so a note whose stored link has
+    // no name gets one the moment it is re-saved, rather than being read as
+    // "nothing changed".
+    //
+    // WHAT THIS DOES AND DOES NOT PROVE. It proves the LABEL term of the guard
+    // is live — the URL is identical on both sides, so nothing else can carry
+    // this commit. It is not a teacher typing a new name: this harness cannot
+    // drive a controlled field (see the file header), so the label difference
+    // comes from `linkToLessonResource`'s own fallback filling a blank one. A
+    // typed rename is the same comparison with `attachName` as its source, and
+    // is covered in the live §4b pass.
+    const BLANK_LABEL = {
+      ...WITH_LINK,
+      key: "k-3",
+      resource: {
+        ...WITH_LINK.resource,
+        gallery: [
+          { type: "link", label: "", url: "https://example.test/applet" },
+        ],
+      },
+    } as unknown as WallItem;
+
+    const h = await mountReact(() =>
+      createElement(Card, { ...cardProps(BLANK_LABEL) } as never),
+    );
+    try {
+      await h.render({ readOnly: false });
+      await h.dblClick(shell(h));
+      expect(h.queryAll("input")).toHaveLength(2); // control: composer open
+      await h.click(byText("Done"));
+
+      expect(committed).toHaveLength(1);
+      const saved = committed[0]?.resource.gallery?.[0];
+      // Same URL, a real name — the link was kept, not dropped.
+      expect(saved?.url).toBe("https://example.test/applet");
+      expect(saved?.label).toBeTruthy();
+      expect(saved?.label).not.toBe("");
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("still refuses to churn the wall when nothing changed at all", async () => {
+    // The other direction, and the reason the guard exists: opening a note with
+    // a link and pressing Done must NOT commit, because a commit on a preset
+    // wall forks it (CLAUDE.md §2). The old shape failed this — a seeded
+    // attachment made `!attachment` false and every no-op reopen committed.
+    const h = await openSaved();
+    try {
+      await h.dblClick(shell(h));
+      expect(h.queryAll("input")).toHaveLength(2); // control: composer open
+      await h.click(byText("Done"));
+      expect(committed).toHaveLength(0);
+    } finally {
+      await h.unmount();
+    }
+  });
+});
+
+describe("re-opening a saved note shows what is still saved", () => {
+  it("Cancel then re-open seeds from the gallery entry that is still there", async () => {
+    // `attachOpen` / `attachName` / `attachUrl` were seeded by `useState`
+    // initialisers, which run once per MOUNT — and the card stays mounted
+    // across open → Cancel → open. So the second composer came up blank over a
+    // note that still had a link, and the next save would have deleted it
+    // (QA 2026-08-02, minor 4 — filed from the code, never exercised live).
+    const h = await openSaved();
+    try {
+      await h.dblClick(shell(h));
+      expect(h.queryAll("input")).toHaveLength(2); // control: seeded first time
+      await h.click(byText("Cancel"));
+      expect(h.queryAll("input")).toHaveLength(0); // control: really closed
+      expect(committed).toHaveLength(0);
+      expect(discarded).toHaveLength(0); // a saved note is not withdrawn
+
+      await h.dblClick(shell(h));
+      const inputs = h.queryAll("input");
+      expect(inputs).toHaveLength(2);
+      expect(inputs[0].getAttribute("value")).toBe("Number line applet");
+      expect(inputs[1].getAttribute("value")).toBe(
+        "https://example.test/applet",
+      );
+
+      // THE CONSEQUENCE, which is what makes this a bug and not a cosmetic
+      // one: saving from the re-opened composer leaves the link alone. With
+      // empty fields here, Done would have read as "the link was removed" and
+      // committed the deletion.
+      await h.click(byText("Done"));
+      expect(committed).toHaveLength(0);
+    } finally {
+      await h.unmount();
+    }
+  });
+});
+
+describe("a saved note can be reached without knowing about double-click", () => {
+  it("offers an Edit button in the hover bar that opens the composer", async () => {
+    // Double-click was the ONLY way back into a saved note, and an undiscovered
+    // one: the hover bar offered open / play / expand / present and no pencil,
+    // so a first encounter reads as "notes can't be edited" (QA 2026-08-02).
+    const h = await openSaved();
+    try {
+      const edit = h.query('[aria-label="Edit Fractions note"]');
+      expect(edit).toBeTruthy();
+      await h.clickElement(edit as Element);
+
+      expect(h.html()).toContain("Done"); // the composer, not the lightbox
+      expect(h.queryAll("input")).toHaveLength(2); // seeded from the saved link
+      expect(modals).toHaveLength(0); // and no preview opened over it
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("withholds it where there is no editor — a phone is view-only", async () => {
+    const h = await openSaved();
+    try {
+      expect(h.query('[aria-label="Edit Fractions note"]')).toBeTruthy();
+      await h.render({ readOnly: true });
+      expect(h.query('[aria-label="Edit Fractions note"]')).toBeNull();
+      // Control: the rest of the bar is still there, so this is Edit being
+      // withheld rather than the whole card failing to render.
+      expect(h.query('[aria-label="Open Fractions note"]')).toBeTruthy();
+    } finally {
+      await h.unmount();
+    }
+  });
+});
+
+describe("a double-click opens the editor, not the lightbox over it", () => {
+  it("holds the single-click lightbox until the double-click window passes", async () => {
+    const h = await openSaved();
+    try {
+      await clickWithDetail(shell(h), 1);
+      // THE FIX. Before it this was already 1, and the dblclick that followed
+      // opened the composer UNDERNEATH the modal.
+      expect(modals).toHaveLength(0);
+
+      await waitPastWindow();
+      // POSITIVE CONTROL, and the one that matters most here: a plain single
+      // click still opens the lightbox. A "fix" that simply swallowed card
+      // clicks would pass every other assertion in this block.
+      expect(modals).toHaveLength(1);
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("cancels it when the second click arrives", async () => {
+    const h = await openSaved();
+    try {
+      // The exact sequence a browser sends for a double-click.
+      await clickWithDetail(shell(h), 1);
+      await clickWithDetail(shell(h), 2);
+      await h.dblClick(shell(h));
+
+      // The composer is open, seeded …
+      expect(h.html()).toContain("Done");
+      expect(h.queryAll("input")).toHaveLength(2);
+      // … and alone. Then, and after the window has fully passed.
+      expect(modals).toHaveLength(0);
+      await waitPastWindow();
+      expect(modals).toHaveLength(0);
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("opens immediately for a keyboard / assistive-technology activation", async () => {
+    // `detail === 0` is what a non-pointer activation carries. It can never be
+    // the first half of a double-click, so it must not pay the delay — no
+    // wait before this assertion, deliberately.
+    const h = await openSaved();
+    try {
+      await clickWithDetail(shell(h), 0);
+      expect(modals).toHaveLength(1);
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("ignores the trailing click of a double-click", async () => {
+    const h = await openSaved();
+    try {
+      await clickWithDetail(shell(h), 2);
+      await waitPastWindow();
+      expect(modals).toHaveLength(0);
     } finally {
       await h.unmount();
     }

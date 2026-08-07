@@ -91,6 +91,7 @@ import type { Lesson, LessonDifferentiation } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
 import { dedupeLessonResources } from "@/lib/resources-dedup";
+import { unownedSlotVar } from "@/lib/card-wash";
 // The shared composer seam (B4.0). OPTIONAL accessor — see the `composer`
 // const in the component body for why this must not be the throwing hook.
 import { useComposerOptional } from "@/components/composer";
@@ -124,20 +125,37 @@ const BUNDLED_DESCRIPTIONS = bundledDescriptions();
 
 /** Per-tool label (sentence case per the design system) + `--pc` accent.
  *
- *  The four coloured tools are pinned to SLOT tokens, not to the `--writing` /
- *  `--grammar` / `--reading` / `--explorers` subject aliases they used to name.
- *  A planning tool is not a subject — these only ever borrowed a subject alias
- *  as a convenient hue, and CLAUDE.md §4 is explicit that subject colour always
- *  means subject, so re-pointing a subject must not repaint the tool rail. The
- *  slots below are the exact hues these rendered before the subject map moved
- *  to the v2 handoff, so this is appearance-preserving. */
-const TOOL_META: Record<PlanningToolKey, { label: string; color: string }> = {
+ *  THESE ARE DECORATIVE, NOT SUBJECT IDENTITY — and the tab strip itself proves
+ *  it. All six tabs sit on ONE lesson, and a lesson has exactly one subject, so
+ *  six different colours on one strip cannot be encoding which subject this is;
+ *  they are wayfinding, telling Notes from Differentiation at a glance. The
+ *  colours only ever borrowed subject hues as a convenient distinct set (they
+ *  named the `--writing` / `--grammar` / `--reading` / `--explorers` aliases,
+ *  then their slots).
+ *
+ *  Being decorative, they fall under the strict rule: only the seven slots no
+ *  team subject owns (lib/card-wash UNOWNED_SLOTS). Borrowing a subject's hue
+ *  made the Resources tab green on a lesson whose own stripe was Explorers
+ *  green — one screen, one colour, two meanings. Each tool takes the nearest
+ *  unowned neighbour of the hue it had (apricot→Coral, purple→Violet,
+ *  blue→Cyan, green→Leaf), so the rail keeps its tone and value while none of
+ *  it can be read as a subject.
+ *
+ *  Objective and Standards are unchanged: `--brand-500` and `--done` are
+ *  app-semantic tokens, not slots on the subject scale.
+ *
+ *  EXPORTED for tests/decorative-slots.test.ts, which asserts every `--subj-*`
+ *  this table names is an unowned slot. */
+export const TOOL_META: Record<
+  PlanningToolKey,
+  { label: string; color: string }
+> = {
   objective: { label: "Objective", color: "var(--brand-500)" },
   standards: { label: "Standards", color: "var(--done)" },
-  notes: { label: "Lesson notes", color: "var(--subj-2-bright)" },
-  diff: { label: "Differentiation", color: "var(--subj-7-bright)" },
-  chat: { label: "Chat", color: "var(--subj-10-bright)" },
-  resources: { label: "Resources", color: "var(--subj-13-bright)" },
+  notes: { label: "Lesson notes", color: unownedSlotVar(3, "-bright") },
+  diff: { label: "Differentiation", color: unownedSlotVar(8, "-bright") },
+  chat: { label: "Chat", color: unownedSlotVar(11, "-bright") },
+  resources: { label: "Resources", color: unownedSlotVar(14, "-bright") },
 };
 
 /** Strip the app-wide plain-text "I can " objective prefix for editing.

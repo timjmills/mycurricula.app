@@ -3,9 +3,7 @@
 // Settings → Appearance — recreates artboard A2 (ABSettingsAppearance).
 //
 // Composition, top to bottom:
-//   • Style picker + Palette toggle  — side-by-side, wire to useTheme().
-//   • Live preview                   — sample cards in the chosen
-//                                      style × palette × mapping.
+//   • Live preview                   — sample cards in the chosen mapping.
 //   • Subject colors                 — per-subject swatch picker with the
 //                                      Core (team) / Personal scope split.
 //   • Palette reference              — the full 20-swatch table (A3).
@@ -15,9 +13,16 @@
 //                                      lib/labels (LabelsProvider).
 //
 // The Core subject → swatch mapping is held here so the live preview and
-// the subject picker share one source of truth. The style/palette axes
-// come from the app-wide ThemeProvider (lib/theme.tsx), so changing them
-// re-themes the whole app, not just this page.
+// the subject picker share one source of truth.
+//
+// The v1 Style picker + Palette toggle were REMOVED 2026-08-07: `data-style`
+// was never stamped on the v2 DOM path (the picker had been a live no-op
+// since the cutover), and the data-palette axis is retired — the subject
+// emission no longer branches on it (lib/palette.tsx), so the toggle changed
+// nothing a teacher can see. Same precedent as W3.4's Home-panel removal
+// below: never ship a control whose effect does not exist. The components
+// stay in components/appearance/ for the flag-OFF v1 path until that path is
+// deleted.
 
 import { useEffect, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
@@ -35,8 +40,6 @@ import {
 } from "@/lib/tooltip-dismissal";
 import { AppearanceControls } from "@/components/appearance/appearance-controls";
 import { ThemePicker } from "@/components/appearance/theme-picker";
-import { StylePicker } from "@/components/appearance/style-picker";
-import { PaletteToggle } from "@/components/appearance/palette-toggle";
 import { LivePreview } from "@/components/appearance/live-preview";
 import { SubjectColors } from "@/components/appearance/subject-colors";
 import { PaletteReference } from "@/components/appearance/palette-reference";
@@ -92,20 +95,9 @@ export default function AppearancePage(): ReactNode {
 
         {/* App color theme — the canvas/ink/accent surface behind every
             view. Full-width and first so it reads as the top-level look
-            choice; the style + palette axes refine it below. */}
+            choice. (The v1 Style/Palette pickers that used to refine it here
+            were removed — see the header comment.) */}
         <ThemePicker />
-
-        {/* Style + palette pickers */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: 16,
-          }}
-        >
-          <StylePicker />
-          <PaletteToggle />
-        </div>
 
         {/* Live preview, subject picker, palette reference */}
         <LivePreview mapping={mapping} />

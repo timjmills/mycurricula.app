@@ -41,12 +41,45 @@
  */
 
 /* ── View body + shared header ──────────────────────────────────────────── */
+/* THIS IS THE DAY'S SCROLL CONTAINER, and `#main-content` is not — measured on
+   /daily at 1440x900, `#main-content` scrollHeight == clientHeight while this
+   pane held 798px of content in 450px. A teacher who scrolls the page therefore
+   gets nothing, and until this rule the pane gave no sign it had more to show:
+   `offsetWidth - clientWidth` was 0, i.e. Chrome's OVERLAY scrollbar, which
+   paints only while it is already being dragged. That is how the focus card's
+   whole action row stayed invisible for a wave (QA 2026-08-02, C1).
+
+   `scrollbar-gutter: stable` IS THE LINE THAT DOES THE WORK, and it was not the
+   obvious one. Measured on this tree, in Chrome, on this pane:
+
+       as shipped before (nothing)            gutter = 0px
+       + scrollbar-width: thin + colour       gutter = 0px   ← still invisible
+       + scrollbar-gutter: stable             gutter = 10px  ← a real scrollbar
+
+   So neither `scrollbar-width` nor `scrollbar-color` opts this scrollport out of
+   Chrome's overlay style, and neither does `::-webkit-scrollbar` sizing —
+   app/tokens.css:1416 was already in force here (this element is inside
+   `.cp-root`) and the gutter was still 0. Reserving the gutter is what forces
+   the classic, painted, space-taking bar. It costs 10px of pane width at every
+   tier, which the card absorbs now that it can shrink (`.vcDetail`'s
+   `min-width`), and it buys back the absence of a layout jump when the scrollbar
+   appears. `scrollbar-width`/`-color` stay: they are what make the resulting bar
+   thin and drawn from the app's own ink rather than an OS bar, and both tokens
+   invert with the DERIVED tone, so there is no theme branch here and there must
+   not be one (CLAUDE.md §4).
+
+   A NOTE FOR WHOEVER VERIFIES THIS NEXT: assert `offsetWidth - clientWidth > 0`.
+   Asserting that `getComputedStyle(pane).scrollbarWidth === "thin"` proves only
+   that this declaration parsed — it was true throughout the 0px runs above. */
 .viewbody {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding: 2px;
   animation: vfade 0.35s ease;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--ink) 32%, transparent) transparent;
 }
 @keyframes vfade {
   from {
@@ -228,7 +261,7 @@
    add-menu / .selectTitle now live in components/planner-v2/atoms.module.css
    (lifted in Wave 5 so the Week frames reuse the exact same atoms). Only the
    FRAME-CONTEXTUAL overrides of those atoms remain in this module — see the
-   DayC `.dcTopHead` moved-arrow + `.dfootFinish` recolours below, which
+   focus card's `.dcTopHead` moved-arrow + `.dfootFinish` recolours below, which
    re-anchor on this module's own container class + a stable structural/ARIA
    hook (the atom base class is no longer in THIS module to compound against). */
 
@@ -342,6 +375,10 @@
   flex-direction: column;
   gap: 4px;
   position: relative;
+  /* Grid item: without this its automatic minimum is min-content, so a long
+     lesson title could push the column wider than the grid. Same defect the
+     focus card had — see the note on `.vcDetail`'s `min-width`. */
+  min-width: 0;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: var(--r-xl);
@@ -428,16 +465,30 @@
   color: var(--cd);
 }
 
+/* `overflow` MUST stay `visible`. `hidden` would make this card a scroll
+   container, and a scroll container is what `position:sticky` measures against
+   — the action row below sticks to the PANE, so an overflow here that is not
+   `visible` silently turns the sticky footer back into a static one and
+   restores the clipping defect with no other symptom. */
 .vcDetail {
+  --dc-pad: clamp(18px, 2.2vw, 30px);
   border-radius: var(--r-2xl);
   overflow: visible;
   display: flex;
   flex-direction: column;
   gap: clamp(10px, 1.4vw, 16px);
-  padding: clamp(18px, 2.2vw, 30px);
+  padding: var(--dc-pad);
   box-shadow: var(--sh-lg);
   position: relative;
   min-height: 0;
+  /* THE 375px OVERFLOW (QA 2026-08-02, M2) WAS THIS ONE LINE MISSING.
+     A grid item's automatic minimum size is its MIN-CONTENT, so the `1fr`
+     column resolved to 366.6px inside a 323px grid and took the whole Day pane
+     sideways with it (42px of horizontal scroll; "Open in Teach" ended 23px
+     past the container). The chips' own `min-width:0` and the label's ellipsis
+     were already correct and could not help — nothing below a grid item can
+     shrink a track the item itself refuses to shrink. */
+  min-width: 0;
   /* SUBJECT COLOUR IS THE HERO — a deep, SATURATED panel.
      ──────────────────────────────────────────────────────────────────────────
      The handoff is `linear-gradient(150deg, C, color-mix(in oklab, C 70%,
@@ -507,7 +558,28 @@
   --dc-solid-ink: oklch(from var(--c) min(l, 0.3) c h);
   --dc-edge: rgba(255, 255, 255, 0.22);
   --dc-edge-strong: rgba(255, 255, 255, 0.3);
+  /* The sticky action tray's fill — an EIGHTH card variable, added for the same
+     reason as the other seven: so a frame restyles the tray by setting one
+     value rather than by rewriting the rule.
+
+     Its value is the card's OWN gradient bottom stop, so the tray is the colour
+     the card already is where the tray sits, and reads as a deepening rather
+     than a second surface. Stated in `color-mix` here and upgraded to the
+     relative-colour form in the `@supports` below — NOT as two flat
+     declarations. A custom property accepts any token stream, so the second of
+     two would win even where relative colour is unsupported, and
+     `background: var(--dc-foot)` would then be invalid at computed-value time
+     and paint NOTHING — a transparent sticky bar with the day's content
+     scrolling through it. `@supports` is the only form that actually falls
+     back. (`--dc-solid` above still carries the two-declaration shape; it is
+     pre-existing and out of scope here, but do not copy it.) */
+  --dc-foot: color-mix(in oklab, var(--c) 40%, black);
   color: var(--dc-ink);
+}
+@supports (color: oklch(from red l c h)) {
+  .vcDetail {
+    --dc-foot: oklch(from var(--c) min(l, 0.3) c h);
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -594,6 +666,21 @@
   box-shadow:
     var(--sh-lg),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  /* `--dc-foot` IS DELIBERATELY NOT OVERRIDDEN HERE — the sticky action tray
+     stays fully opaque in the frosted frame, and the first attempt did not.
+     It shipped at 0.92 (this card's own bottom stop is 0.80, so 0.92 looked
+     like the frame-faithful choice) and the flow chips read straight through
+     it: `docs/screenshots/f0-day-clip/diag-tray-bleed-1280.png` has
+     "Collaborative Practice — You Do Together" legible ACROSS the action row.
+     A photograph at 20% is texture; WHITE TEXT ON A DARK FILL at 8% is still
+     text, and the tray's whole job is to be the floor content disappears under.
+     (Checked before changing it: `elementFromPoint` returned the tray at 510 of
+     512 points inside its box — the two exceptions are its own rounded corners
+     — so this was alpha, not paint order, and opacity was the right lever.)
+     The card stays frosted; one bar inside it does not. `backdrop-filter` is
+     not the answer either: this file already measured a blur on a chip in this
+     card costing 1.8 contrast points and dropping white-on-chip to 3.74 in Wash
+     (see `.dchip`), and a blur smears text without covering it. */
 }
 
 /* ── FRAME B · PAPER — a bright opaque card, crisp edge, soft shadow ──────── */
@@ -619,6 +706,10 @@
   --dc-solid-ink: #fff;
   --dc-edge: color-mix(in srgb, var(--c) 30%, transparent);
   --dc-edge-strong: color-mix(in srgb, var(--c) 48%, transparent);
+  /* Paper's gradient ends AT `--surface`, so the tray is that same value —
+     opaque, and it inverts with the tone exactly as the card does. No
+     `@supports` pair here: there is no relative-colour form to upgrade to. */
+  --dc-foot: var(--surface);
   background: linear-gradient(
     150deg,
     color-mix(in srgb, var(--c) 14%, var(--surface)),
@@ -658,7 +749,7 @@
   justify-content: space-between;
   gap: 12px;
 }
-/* DayC hero ForkCues recolour. The atom base classes (.forkCues / .movedArrow)
+/* Focus-card ForkCues recolour. The atom base classes (.forkCues / .movedArrow)
    moved to planner-v2/atoms.module.css, so these overrides can no longer
    compound against them from THIS module. They re-anchor on the day-v2-owned
    `.dcTopHead` container plus a stable structural / ARIA hook instead:
@@ -745,6 +836,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  /* Every link in the chain from the grid track down to the label needs this,
+     or the one that keeps `auto` sets the floor for all of them. `.vcDetail`
+     (the grid item) is the one that was missing; this and the chip below
+     already had it, which is why the ellipsis looked correct and the card
+     overflowed anyway. */
+  min-width: 0;
 }
 /* `max-width` + the ellipsis on `.dcStepLabel` below are load-bearing, not
    polish. The chips used to hold four short mockup words; they now hold the
@@ -830,6 +927,29 @@
   font-size: 11px;
   font-weight: 800;
 }
+/* ── The action row — the only place the day's lessons can be acted on ──────
+   Finish · Plan · Post · Open in Teach. DayFocus.tsx says it in those words,
+   and until this rule the row was UNREACHABLE ON ARRIVAL at the two most common
+   laptop heights. Measured at 1280x800: the pane ends at y=635, the row renders
+   at y=710-755, and `document.elementFromPoint` at each button's centre returned
+   `div.overlay` or `div.clock glass` — a real click never touched the buttons.
+   The row was not stranded (scrolling `.viewbody` reached it) but the only way
+   there was an inner pane with a 0px scrollbar gutter and no fade, which is not
+   an affordance. Height, not width, decides: 1440x1080 and 1920x1080 were fine
+   all along, which is why it survived review.
+
+   IT STICKS TO THE PANE, NOT TO THE CARD. `position:sticky` resolves against
+   the nearest SCROLL container, and that is `.viewbody` — so the row rides the
+   bottom of the visible pane however tall the card grows, and lands back in its
+   own place when the card is scrolled to its end. The card must keep
+   `overflow: visible` for this to hold (see the note there).
+
+   PHONE KEEPS THE ROW IN FLOW, DELIBERATELY. At 375 the pane is ~340px tall and
+   this row wraps to three lines (~166px): sticking it would spend half the Day
+   view on a band that never scrolls, to fix a defect the phone tier does not
+   have — there the card is visibly a strip in a strip and the scrollbar above
+   is the cue. 601px is the boundary because it is where the row stops wrapping
+   past two lines. */
 .dfoot {
   margin-top: auto;
   padding-top: 4px;
@@ -837,6 +957,37 @@
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+@media (min-width: 601px) {
+  .dfoot {
+    position: sticky;
+    bottom: 0;
+    /* Sticky already paints above in-flow siblings; stated so a future
+       positioned sibling in this card cannot quietly rise above the one row
+       that has to stay clickable. */
+    z-index: 1;
+    padding: 10px 12px;
+    /* RULE #1 — no sharp corners. A tray inside the card's padding, not a
+       full-bleed bar: the card's own `--r-2xl` bottom corners then stay intact
+       behind it instead of being covered by a square edge. */
+    border-radius: var(--r-lg);
+    background: var(--dc-foot);
+  }
+  /* The "there is more above this" cue. Same fill as the tray, so the card's
+     content dissolves into it rather than meeting a seam, and full-bleed to the
+     card's padding edges so the dissolve spans the card and not just the tray.
+     Inert to the pointer — it sits over scrollable content. */
+  .dfoot::before {
+    content: "";
+    position: absolute;
+    left: calc(-1 * var(--dc-pad));
+    right: calc(-1 * var(--dc-pad));
+    bottom: 100%;
+    height: 18px;
+    pointer-events: none;
+    background: linear-gradient(to top, var(--dc-foot), transparent);
+  }
 }
 /* THE HANDOFF'S `backdrop-filter: blur(6px)` (views.css:306) IS DELIBERATELY
    NOT HERE. It was restored, measured, and reverted. The rail's objection does
@@ -999,6 +1150,39 @@
     width: auto;
     text-align: left;
     margin-inline-end: auto;
+  }
+  /* The phase's planned length moves out of the chip and into its `title`.
+     `min-width:0` on `.vcDetail` is what actually stops the card overflowing
+     (see the note there); this is the readability half of the same fix — with
+     ~291px of card, "· 15 min" costs a real phase name about 55px of the only
+     line it gets, and the names at this tier are "Collaborative Practice — You
+     Do Together".
+
+     ⚠ VISUALLY HIDDEN, NOT `display: none`. The first version of this rule used
+     `display: none` and leaned on the chip's `title` to carry the minutes on
+     phones. That loses them for real: a native `title` is not reliably
+     surfaced by long-press on mobile browsers and is not a dependable
+     accessible name, so a phone screen-reader user would have had no way to
+     reach the pacing at all — the tier that needs it most. The recipe below is
+     the repo's standard visually-hidden one (components/ui/Skeleton.module.css
+     `.srOnly`): the minutes leave the LAYOUT, which was the whole point, and
+     stay in the ACCESSIBILITY TREE, which was never ours to remove. */
+  .dcStepMin {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* The visible "·" separator goes with the visible minutes — an absolutely
+     positioned child still renders its ::before in flow otherwise. */
+  .dcStepMin::before {
+    content: none;
   }
 }
 

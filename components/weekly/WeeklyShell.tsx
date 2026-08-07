@@ -181,14 +181,22 @@ const IconPrint = (p: SVGProps<SVGSVGElement>) => (
 //      A 5-column period×day timeline is unusable across the whole 360–900px
 //      band, and `/schedule` is the dedicated phone/tablet entry for it, so
 //      the in-place timeline is withheld for the entire tablet tier too.
-//      `isNarrow` also travels into <WeeklyViewControls> so the Schedule
-//      option disappears from the toggle rather than becoming a dead choice.
 //
 //   Q2 "can a multi-day WEEK CANVAS be used here?" → PHONE_MQ (600px), via
 //      usePhoneViewport() — NOT this query. See renderGridPanel.
 //
-// The user's viewMode is LEFT UNCHANGED by either gate, so widening the
-// viewport restores their chosen canvas with no preference mutation.
+// BOTH answers travel into <WeeklyViewControls>, and for the same reason: a
+// canvas this shell withholds must also lose its segment in the header toggle,
+// or the control claims a mode the body never shows. Passing only `isNarrow`
+// was the bug — the Schedule option was correctly dropped below 900px while the
+// Grid option stayed lit above a forced List below 600px, reporting
+// aria-checked="true" for a canvas that was not on screen and doing nothing when
+// pressed (docs/qa/2026-08-02-week.md, MAJOR 1). One prop per question, sent to
+// one control, so the two can never drift apart again.
+//
+// The user's viewMode is LEFT UNCHANGED by either gate — in the canvas branch
+// AND in the controls — so widening the viewport restores their chosen canvas
+// with no preference mutation.
 
 const NARROW_MQ = "(max-width: 900px)";
 
@@ -806,7 +814,11 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
                   Print
                 </Link>
               </Tooltip>
-              <WeeklyViewControls isNarrow={isNarrow} />
+              {/* Both width gates, one control — see the NARROW_MQ block. */}
+              <WeeklyViewControls
+                isNarrow={isNarrow}
+                isPhoneViewport={isPhoneViewport}
+              />
             </>
           }
         />

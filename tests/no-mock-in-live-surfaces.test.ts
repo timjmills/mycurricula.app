@@ -301,7 +301,6 @@ const ALLOWLIST: readonly string[] = [
   "components/daily/Shoutbox.tsx",
   "components/day-v2/DayA.tsx",
   "components/day-v2/DayB.tsx",
-  "components/day-v2/DayC.tsx",
   "components/day-v2/DayFocus.tsx",
   "components/home/rows.tsx",
   "components/list/DailyList.tsx",

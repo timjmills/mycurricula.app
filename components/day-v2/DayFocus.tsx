@@ -22,10 +22,13 @@
 // with it, and the difference matters if anyone later re-reads the handoff to
 // settle a question about this view.
 //
-// DayA/DayB/DayC are still in the folder, at the user's request, until they
+// DayA and DayB are still in the folder, at the user's request, until they
 // decide what to merge or delete ("keep all three of the views until later").
-// They render only for an explicit `?dayview=a|b|c`; see DayViewV2. Nothing in
-// THIS file should grow a branch for them.
+// They render only for an explicit `?dayview=a|b`; see DayViewV2. Nothing in
+// THIS file should grow a branch for them. DayC itself is GONE — it was this
+// card's parent and rendered the same information architecture from a second,
+// already-diverged copy, so `?dayview=c` compared nothing and showed a card
+// missing the resource count.
 //
 // ── "ONE LAYOUT" IS NOT "ONE APPEARANCE" ───────────────────────────────────
 // Frame, theme and tone still drive MATERIAL and COLOUR — they just no longer
@@ -322,16 +325,29 @@ function FocusCard({
       <div className={styles.dcFlow}>
         {flow.length > 0 ? (
           flow.map((step) => (
-            // `title` carries the full phase name plus whatever the teacher has
-            // written into that phase — the only recovery for the label's
-            // ellipsis on a narrow card, and the phase's actual content on a
-            // wide one. A chip is a leaf <span>, so this is a plain native
-            // tooltip, not an onboarding one (CLAUDE.md §4 scopes those to
-            // controls and named panels).
+            // `title` carries the full phase name, its planned length, and
+            // whatever the teacher has written into that phase — the only
+            // recovery for the label's ellipsis on a narrow card, and the
+            // phase's actual content on a wide one. A chip is a leaf <span>, so
+            // this is a plain native tooltip, not an onboarding one (CLAUDE.md
+            // §4 scopes those to controls and named panels).
+            //
+            // The minutes are repeated in here so a desktop hover gets the
+            // whole phase in one place. They are NOT the phone's only copy:
+            // ≤480px hides the visible minutes VISUALLY (day-v2.module.css
+            // `.dcStepMin` uses the repo's visually-hidden recipe, not
+            // `display: none`), so the text stays in the accessibility tree and
+            // a screen reader still announces the pacing. A native `title` is
+            // not a dependable accessible name on touch — it must never be the
+            // only carrier of information a teacher needs.
             <span
               key={step.key}
               className={styles.dcStep}
-              title={step.detail ? `${step.label} — ${step.detail}` : step.label}
+              title={[
+                step.label,
+                step.minutes !== null ? ` · ${step.minutes} min` : "",
+                step.detail ? ` — ${step.detail}` : "",
+              ].join("")}
             >
               <b>{step.n}</b>
               <span className={styles.dcStepLabel}>{step.label}</span>

@@ -76,7 +76,6 @@ vi.mock("@/components/unit-chip", () => ({
 
 const { DayFocus } = await import("@/components/day-v2/DayFocus");
 const { DayB } = await import("@/components/day-v2/DayB");
-const { DayC } = await import("@/components/day-v2/DayC");
 const { lessonFlowSteps, splitStandardChips, STANDARD_CHIP_LIMIT } =
   await import("@/components/day-v2/util");
 
@@ -200,9 +199,20 @@ describe("focus card — the lesson flow is the lesson's own", () => {
     };
     const html = render(DayFocus, lesson());
 
-    expect(html).toContain("10 min");
-    // Exactly one phase carries a time, so exactly one "min" run may appear.
-    expect(html.match(/\d+ min/g)).toEqual(["10 min"]);
+    // VISIBLE minutes. `>10 min<` is a text node, so it cannot match the
+    // `title="…"` copy below — which is the whole reason this is not a bare
+    // `/\d+ min/g` over the document any more. It used to be, and it went red
+    // the moment the minutes were ALSO written into the chip's title (Wave-F0,
+    // because ≤480px hides the visible run). The assertion's intent never
+    // changed: exactly one phase carries a time, so exactly one phase shows one.
+    expect(html.match(/>10 min</g)).toEqual([">10 min<"]);
+    expect(html.match(/>\d+ min</g)).toHaveLength(1);
+
+    // TITLE minutes — the phone tier's only copy, so it is pinned as hard as
+    // the visible one. The phase WITHOUT minutes must carry a bare label: no
+    // dangling separator, no invented time (lib/lesson-flow, 6.11.26 §7).
+    expect(html).toContain('title="Launch · 10 min"');
+    expect(html).toContain('title="Explore"');
   });
 
   it("puts the phase's own written body on the chip, so it is reachable", () => {
@@ -316,31 +326,21 @@ describe("focus card — resources are counted off the lesson's sections", () =>
   });
 });
 
-// ── The retained legacy frames ──────────────────────────────────────────────
-// DayC is the focus card's parent and carries the same hero; DayB's handoff
-// panel has meta cells and NO flow strip, so only its standards cell is in
-// scope here. Both are reachable at /daily?dayview=b|c and are kept until the
-// user decides what to merge or delete — a frame still on the tree that still
-// lies is still a lie.
+// ── The retained legacy frame ───────────────────────────────────────────────
+// DayB's handoff panel has meta cells and NO flow strip, so only its standards
+// cell is in scope here. It is reachable at /daily?dayview=b and is kept until
+// the user decides what to merge or delete — a frame still on the tree that
+// still lies is still a lie.
+//
+// DayC's two cases used to live here and went with the file (Wave-F0). It was
+// the focus card's parent carrying a second copy of the same hero, so
+// `?dayview=c` compared the default against itself; the copies had already
+// diverged (only the shipping card counts resources), which made the alias a
+// way to see a WORSE card rather than a different one. Its coverage is not
+// lost — every assertion it made about the flow strip and the standards group
+// is made above against DayFocus, which is the code that ships.
 
 describe("legacy frames", () => {
-  it("DayC's hero shows the real flow and every standard", () => {
-    store.sections = { [LESSON_ID]: REAL_FLOW };
-    const html = render(DayC, lesson({ standards: ["5.NF.B.3", "5.NF.B.4"] }));
-
-    expect(html).toContain("Focus Lesson — I Do");
-    for (const fake of PLACEHOLDER_STEPS) expect(html).not.toContain(fake);
-    expect(html).toContain(">5.NF.B.3</span>");
-    expect(html).toContain(">5.NF.B.4</span>");
-  });
-
-  it("DayC says the flow is empty rather than filling it in", () => {
-    store.sections = { [LESSON_ID]: [] };
-    const html = render(DayC, lesson());
-    expect(html).toContain("No lesson flow yet");
-    expect(html).not.toContain("<b>1</b>");
-  });
-
   it("DayB's meta cell lists every standard and pluralises its label", () => {
     const html = render(DayB, lesson({ standards: ["5.NF.B.3", "5.NF.B.4"] }));
     expect(html).toContain("Standards</span>");

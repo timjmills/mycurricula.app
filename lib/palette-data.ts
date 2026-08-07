@@ -217,14 +217,20 @@ export function resolveSubjectColor(
   type: PaletteType,
   mapping: SubjectMapping = DEFAULT_SUBJECT_MAPPING,
 ): SubjectColor {
+  // `type` is accepted but NO LONGER read — the data-palette axis is retired
+  // (2026-08-07, decision 4). The v2 handoff wires the shared subject colour
+  // to the BASE solid (`--sc: var(--subj-N)`, 7.2 modes.css:19); `-bright` is
+  // its own token tier for dots/outlines, consumed explicitly by the surfaces
+  // that want it. The parameter stays so the many `usePalette()`-threaded
+  // callsites keep compiling until the axis state is deleted with the v1 path.
+  void type;
   const swatchId = mapping[subjectId] ?? DEFAULT_SUBJECT_MAPPING[subjectId];
   const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID["subj-1"];
 
   // v1.3 cascade recipe: a SOFT TINT is always the fill (--ct / --cl); the
-  // bright/solid accent lives only on the outline, stripe, dot and icon tile
+  // solid accent lives only on the outline, stripe, dot and icon tile
   // (--c). Text stays dark `ink` (--cd) for legibility — color never moves
-  // into the words. The Highlight palette uses the brighter accent; Normal
-  // uses the muted solid.
+  // into the words.
   //
   // For v1.3 slots we emit token REFERENCES (`var(--subj-N-*)`) rather than the
   // literal hexes, so the night theme's per-slot overrides in tokens.css cascade
@@ -233,10 +239,7 @@ export function resolveSubjectColor(
   // themes, a dark surface on night) instead of a hard-coded `#fff`.
   if (SLOT_ID.test(swatch.id)) {
     const tint = `var(--${swatch.id}-tint)`;
-    const accent =
-      type === "highlight"
-        ? `var(--${swatch.id}-bright)`
-        : `var(--${swatch.id})`;
+    const accent = `var(--${swatch.id})`;
     const ink = `var(--${swatch.id}-ink)`;
     const gradient = `linear-gradient(180deg, ${tint} 0%, color-mix(in oklch, ${tint} 55%, var(--tint-base)) 100%)`;
     return {
@@ -255,8 +258,7 @@ export function resolveSubjectColor(
   // Legacy 20-pool swatch: `tint` is absent, so mix a soft fill from `normal`.
   const tint =
     swatch.tint ?? `color-mix(in oklch, ${swatch.normal} 18%, var(--tint-base))`;
-  const accent =
-    type === "highlight" ? (swatch.bright ?? swatch.highlight) : swatch.normal;
+  const accent = swatch.normal;
 
   // Card background — a soft vertical wash of the tint so fills never read flat.
   const gradient = `linear-gradient(180deg, ${tint} 0%, color-mix(in oklch, ${tint} 55%, var(--tint-base)) 100%)`;

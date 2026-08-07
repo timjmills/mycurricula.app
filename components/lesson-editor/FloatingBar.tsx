@@ -70,6 +70,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Button, Tooltip } from "@/components/ui";
+import { slotSwatches } from "@/lib/card-wash";
 import {
   RICH_TEXT_TOOLBAR_ATTR,
   useRichTextCommandBus,
@@ -205,14 +206,21 @@ interface ColorSwatch {
 // Text colors — 6 picks from rich-text-editor.tsx's TEXT_COLORS ramp: the
 // strong ink plus five well-separated hues. Slot-pinned and hue-labelled, for
 // the reason set out in that file — a text-colour label must not be something a
-// subject remap can falsify.
-const TEXT_SWATCHES: ColorSwatch[] = [
+// subject remap can falsify, and a text colour must not be a subject's colour
+// at all (CLAUDE.md §4; lib/card-wash UNOWNED_SLOTS).
+//
+// FIVE, not the full seven: this bar is one row floating beside a dozen other
+// controls, and it already wraps to two rows on a phone. The subset skips Rose
+// (adjacent to Coral) and Lime (adjacent to Leaf) — the two pairs a teacher is
+// least likely to tell apart at swatch size, so the short row loses the least
+// distinguishable choices rather than an arbitrary two. `slotSwatches` throws
+// on an owned slot, so shortening this list can never quietly reintroduce one.
+//
+// EXPORTED for tests/decorative-slots.test.ts — see the note on the house
+// editor's TEXT_COLORS for why the test asserts the array rather than the file.
+export const TEXT_SWATCHES: ColorSwatch[] = [
   { label: "Ink dark", variable: "--ink-900" },
-  { label: "Gold", variable: "--subj-1" },
-  { label: "Blue", variable: "--subj-10" },
-  { label: "Pink", variable: "--subj-5" },
-  { label: "Apricot", variable: "--subj-2" },
-  { label: "Periwinkle", variable: "--subj-9" },
+  ...slotSwatches([3, 6, 8, 11, 14]),
 ];
 
 // Highlights — the remove-chip plus 5 picks spanning the HIGHLIGHTERS ramp

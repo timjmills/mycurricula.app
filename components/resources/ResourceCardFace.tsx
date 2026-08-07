@@ -52,7 +52,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import { CARD_WASH_TINTS } from "@/lib/card-wash";
+import { CARD_WASH_TINTS, CARD_WASH_NAMES } from "@/lib/card-wash";
 import type { LessonResource } from "@/lib/types";
 import { hasNotes, isNotecard, notecardPoster } from "@/lib/notecards";
 import { sanitizeHtml } from "@/lib/sanitize-html";
@@ -87,7 +87,7 @@ export interface ResourceCardFaceProps {
   onDuplicate?: () => void;
   /** Menu: "Duplicate to…". */
   onDuplicateTo?: () => void;
-  /** Menu: "Card color" swatches. `null` = back to the subject default. */
+  /** Menu: "Card colour" swatches. `null` = back to the subject default. */
   onWashChange?: (wash: "paper" | number | null) => void;
   /** Menu: "Remove from lesson" (danger, last, after a separator). */
   onRemove?: () => void;
@@ -843,20 +843,29 @@ function CardMenu({
           {/* Visual label only — a bare text <div> is not a permitted child
               of role="menu"; the group's aria-label carries the name. */}
           <div className={styles.menuLabel} aria-hidden="true">
-            Card color
+            Card colour
           </div>
           {/* Swatches conform to the menu content model as a group of
               menuitemradios (one selection, aria-checked on the current
-              wash). The arrow-key roving above includes them. */}
-          <div className={styles.swatches} role="group" aria-label="Card color">
-            <Tooltip content="Subject color (default)">
+              wash). The arrow-key roving above includes them.
+
+              WORDING IS DELIBERATELY THE WALL'S. This picker and the Resource
+              Wall's (components/resource-wall-v2/Card.tsx) offer the same seven
+              slots from lib/card-wash and set the same stored field — they are
+              one feature reached two ways. They spelled it two ways
+              ("Card color" here, "Card colour" there), which splits the control
+              for anyone searching by name: a screen-reader user who learned
+              "Card colour" on the wall found nothing here, and it read as two
+              unrelated settings rather than one. */}
+          <div className={styles.swatches} role="group" aria-label="Card colour">
+            <Tooltip content="Subject colour (default)">
               <button
                 type="button"
                 role="menuitemradio"
                 className={`${styles.swatch} ${styles.swatchSubject} ${
                   wash === undefined ? styles.swatchOn : ""
                 }`}
-                aria-label="Subject color (default)"
+                aria-label="Subject colour (default)"
                 aria-checked={wash === undefined}
                 onClick={() => onWashChange(null)}
               />
@@ -873,15 +882,21 @@ function CardMenu({
                 onClick={() => onWashChange("paper")}
               />
             </Tooltip>
+            {/* Named by HUE, not by slot number. "Card color 14" is the slot's
+                internal index: it tells a screen-reader user nothing about what
+                they are choosing, and the seven swatches shared ONE tooltip
+                ("Set card color"), so hovering could not tell them apart either.
+                CARD_WASH_NAMES is keyed by slot in lib/card-wash beside the list
+                itself, so a slot cannot leave the picker and strand its name. */}
             {MENU_TINTS.map((n) => (
-              <Tooltip key={n} content="Set card color">
+              <Tooltip key={n} content={`Card colour ${CARD_WASH_NAMES[n] ?? n}`}>
                 <button
                   type="button"
                   role="menuitemradio"
                   className={`${styles.swatch} ${
                     wash === n ? styles.swatchOn : ""
                   }`}
-                  aria-label={`Card color ${n}`}
+                  aria-label={`Card colour ${CARD_WASH_NAMES[n] ?? n}`}
                   aria-checked={wash === n}
                   style={{
                     background: `var(--subj-${n}-tint)`,

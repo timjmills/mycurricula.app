@@ -54,6 +54,7 @@ import {
 import { createPortal } from "react-dom";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { parseResourceUrl } from "@/lib/resource-embed";
+import { slotSwatches } from "@/lib/card-wash";
 import {
   notifyRichTextStateChanged,
   useRichTextCommandTarget,
@@ -152,28 +153,35 @@ interface ColorSwatch {
   variable: string;
 }
 
-// A HUE PICKER, pinned to slots and labelled by hue — deliberately no subject
-// in either the token or the label.
+// A HUE PICKER over the slots NO TEAM SUBJECT OWNS — deliberately no subject in
+// either the token or the label.
 //
 // It used to read `{ label: "Math blue", variable: "--math" }`, and the tell was
 // that "Spelling pink" was CORRECT until the subject→slot map was brought back
 // to the v2 handoff, and wrong the moment it moved. A label that a subject remap
 // can falsify was never really about the subject: colouring a word pink is not
 // tagging it as Writing, so the coupling bought nothing and cost accuracy.
-// Pinned to `--subj-N` (the hues these resolved to, so nothing repaints) with
-// the slot's own name, no future subject move can make a label lie.
-const TEXT_COLORS: ColorSwatch[] = [
+//
+// Pinning to `--subj-N` fixed the LABEL but left the COLOURS: the eight slots it
+// then offered were exactly the eight the team subjects sit on, so every colour
+// a teacher could pick for a word was a subject's colour. Colour is team-wide
+// meaning (CLAUDE.md §4) — a sentence turned pink in a note reads as Writing to
+// everyone who opens it. The ramp now comes from lib/card-wash's UNOWNED_SLOTS,
+// the same seven the card-wash pickers offer, so a teacher finds one palette
+// across the app and none of it can be mistaken for subject identity.
+//
+// This DOES repaint existing pickers (the old row was appearance-preserving; the
+// strict rule is not). Text already coloured is unaffected: execCommand wrote a
+// concrete colour into the stored HTML, so it keeps whatever hue it was given.
+//
+// EXPORTED for tests/decorative-slots.test.ts. A test that reads the source text
+// can only prove the file does not CONTAIN an owned slot; asserting on the array
+// itself proves what the picker actually offers.
+export const TEXT_COLORS: ColorSwatch[] = [
   { label: "Ink dark", variable: "--ink-900" },
   { label: "Ink mid", variable: "--ink-700" },
   { label: "Ink light", variable: "--ink-500" },
-  { label: "Gold", variable: "--subj-1" },
-  { label: "Apricot", variable: "--subj-2" },
-  { label: "Pink", variable: "--subj-5" },
-  { label: "Purple", variable: "--subj-7" },
-  { label: "Periwinkle", variable: "--subj-9" },
-  { label: "Blue", variable: "--subj-10" },
-  { label: "Teal", variable: "--subj-12" },
-  { label: "Green", variable: "--subj-13" },
+  ...slotSwatches(),
 ];
 
 // Highlight offers the same swatches as the text-color picker, so any

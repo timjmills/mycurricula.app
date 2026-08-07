@@ -46,10 +46,12 @@ Stating the mode saves a round trip. If you don't, it will pick one and tell you
 
 ## What changed from v3
 
-**Structure.** One 1,882-line prompt became a 176-line router plus reference
-files loaded on demand. A typical session now loads ~450–600 lines — the router,
-one mode, and two or three criteria files — instead of everything at once,
-including the four modes that don't apply.
+**Structure.** One 1,882-line prompt became a 185-line router plus reference
+files loaded on demand. A typical session loads ~750–950 lines — the router, the
+evidence protocol, one mode, and two or three criteria files — instead of
+everything at once, including the four modes that don't apply. (The evidence
+protocol is the single largest reference at 329 lines, and deliberately so: it
+carries the measurement traps that decide whether the rest is worth reading.)
 
 **Deduplication.** Accessibility, responsive, and performance criteria appeared
 three times each; the advanced-techniques argument appeared four times. Each now
@@ -91,7 +93,12 @@ state protection, and design-token drift as a first-class code concern.
 
 **Capture script (new).** `scripts/capture-screens.mjs` batches screenshots
 across the standard viewport set with optional dark, RTL, and reduced-motion
-variants, and runs axe-core per route.
+variants, and runs axe-core per route. It enforces an exit-code contract —
+**0** verified, **1** real failures, **2** the instrument was blind — so a run
+that captured nothing, got bounced to a login page, or never reached axe cannot
+be mistaken for a pass. Narrow widths are true phone emulations (`isMobile`,
+touch, DSF 3), viewports use real device heights, and axe `incomplete` results
+are reported separately as "needs manual check" rather than folded into pass.
 
 ## Files
 

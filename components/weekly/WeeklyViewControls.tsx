@@ -21,6 +21,11 @@
 //
 // The /schedule route still exists and is reachable from the left rail — this
 // control intentionally does NOT route there.
+//
+// Both viewport gates arrive as PROPS from WeeklyShell (`isNarrow`,
+// `isPhoneViewport`) and are read-only here: they decide which options the
+// toggle offers and which value it reports, and never write the teacher's
+// stored preference. See the note above `mainValue`.
 
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
@@ -64,17 +69,27 @@ type MainMode = "grid" | "list" | "schedule";
 
 interface WeeklyViewControlsProps {
   /**
-   * True on the narrow tier (≤900px), where WeeklyShell forces the WeeklyList
-   * canvas and refuses to render the in-place ScheduleTimeline (`showSchedule =
-   * !isNarrow && scheduleMode`). Passed down from WeeklyShell — the single
-   * source of truth for the breakpoint — rather than re-derived here, so the
-   * control and the canvas can never disagree about whether Schedule renders.
+   * True on the narrow tier (≤900px), where WeeklyShell refuses to render the
+   * in-place ScheduleTimeline (`showSchedule = !isNarrow && scheduleMode`).
+   * Passed down from WeeklyShell — the single source of truth for the
+   * breakpoint — rather than re-derived here, so the control and the canvas can
+   * never disagree about whether Schedule renders.
    */
   isNarrow?: boolean;
+  /**
+   * True on the phone tier (<600px), where WeeklyShell forces the WeeklyList
+   * canvas whatever the stored viewMode says (`showList = isPhoneViewport ||
+   * viewMode === "list"`). Passed down for the same reason as `isNarrow`, and
+   * deliberately a SECOND prop: the two gates answer different questions at
+   * different widths (WeeklyShell's NARROW_MQ block), so one boolean cannot
+   * stand for both.
+   */
+  isPhoneViewport?: boolean;
 }
 
 export function WeeklyViewControls({
   isNarrow = false,
+  isPhoneViewport = false,
 }: WeeklyViewControlsProps): ReactNode {
   const { viewMode, setViewMode, selectedLessonId, setSelectedLessonId } =
     useAppState();
@@ -107,19 +122,57 @@ export function WeeklyViewControls({
     if (shutTheSelected) setSelectedLessonId(null);
   };
 
-  // Offering "Schedule" on the narrow tier would let the control claim a mode
-  // the body never shows — the header would flip to Schedule + reveal the scope
-  // toggle while the canvas stayed a lesson list. So on narrow we drop the
-  // Schedule option entirely (the dedicated /schedule route is the phone/tablet
-  // entry, still reachable from the left rail) and report the value as the
-  // grid/list mode regardless of any persisted schedule preference carried over
-  // from a wider viewport.
-  const scheduleActive = scheduleMode && !isNarrow;
+  // ── The control may never claim a mode the body does not show ────────────
+  // ONE rule, applied at BOTH breakpoints. WeeklyShell withholds two different
+  // canvases at two different widths, and each withholding takes an option with
+  // it — otherwise the header advertises a mode the canvas below is not in.
+  //
+  //   Schedule, ≤900px — the header would flip to Schedule and reveal the scope
+  //     toggle while the canvas stayed a lesson list. The dedicated /schedule
+  //     route is the phone/tablet entry, still reachable from the left rail.
+  //   Grid, <600px — WeeklyShell forces WeeklyList there
+  //     (`showList = isPhoneViewport || viewMode === "list"`), so a stored Grid
+  //     preference carried in from a wider viewport lit the Grid segment above a
+  //     list, and pressing it did nothing: ToggleGroup never fires onChange for
+  //     the option that is already active, so the press was a silent no-op. A
+  //     screen reader heard "Grid, checked" while List rendered. Same defect as
+  //     Schedule, found live at 375px (docs/qa/2026-08-02-week.md, MAJOR 1); the
+  //     reasoning below simply had not been carried across when the phone gate
+  //     landed.
+  //
+  // In both cases the option is DROPPED rather than disabled — ToggleGroup's
+  // `disabled` is group-wide, and a segment that renders greyed is still a
+  // segment claiming to be part of the choice. On a phone that leaves a
+  // single-option group: a "List" chip that reports the canvas honestly and
+  // cannot be changed. That is deliberate — it is the accessible name for what
+  // is on screen, it keeps the ≥44px hit area the tray already inflates
+  // (ToggleGroup.module.css `any-pointer: coarse`), and its tooltip is where the
+  // teacher is told WHY there is no Grid here. Hiding the group outright was the
+  // alternative considered and rejected: it removes the state as well as the
+  // choice, and the canvas is then announced by nothing at all.
+  //
+  // NEITHER GATE WRITES `viewMode`. Both are read-side only, so a teacher whose
+  // stored choice is Grid gets the grid back the moment the viewport widens past
+  // 600px — the property `68e2f5f` deliberately preserves. Report the override;
+  // never persist it.
+  //
+  // The phone arm of `scheduleAvailable` is not redundant with the narrow one,
+  // even though every phone width is inside NARROW_MQ today. That containment is
+  // a fact about two constants in ANOTHER file; if NARROW_MQ ever narrows, a
+  // phone would start offering a Schedule segment for a timeline WeeklyShell
+  // still refuses to render. Stating both keeps this control correct on its own
+  // terms rather than on the caller's arithmetic.
+  const scheduleAvailable = !isNarrow && !isPhoneViewport;
+  const scheduleActive = scheduleMode && scheduleAvailable;
 
-  // The main toggle reflects schedule-vs-content state: when schedule is
-  // active (and renderable) the value is "schedule", otherwise it tracks the
-  // grid/list view mode.
-  const mainValue: MainMode = scheduleActive ? "schedule" : viewMode;
+  // The main toggle reflects what the canvas is ACTUALLY showing: forced List on
+  // a phone, else Schedule when schedule mode is active and renderable, else the
+  // stored grid/list view mode.
+  const mainValue: MainMode = isPhoneViewport
+    ? "list"
+    : scheduleActive
+      ? "schedule"
+      : viewMode;
 
   return (
     <div className={styles.controls}>
@@ -190,29 +243,47 @@ export function WeeklyViewControls({
           setViewMode(v);
         }}
         options={[
-          {
-            value: "grid",
-            label: "Grid",
-            title: "See the week as a subject-by-day grid",
-            tooltipId: "weekly-view-grid",
-          },
+          // Grid is omitted on a phone, Schedule on the whole narrow tier — see
+          // the "may never claim a mode the body does not show" note above.
+          ...(isPhoneViewport
+            ? []
+            : [
+                {
+                  value: "grid" as const,
+                  label: "Grid",
+                  title: "See the week as a subject-by-day grid",
+                  tooltipId: "weekly-view-grid",
+                },
+              ]),
           {
             value: "list",
             label: "List",
-            title: "See the week as a scrollable list of lessons",
-            tooltipId: "weekly-view-list",
+            // On a phone this is the only option, so the tooltip answers the
+            // question the missing Grid segment raises — where it went, and that
+            // the teacher's own choice is intact — rather than describing a
+            // switch they cannot make. `required` is NOT set: this is ordinary
+            // orientation, not a high-consequence control (CLAUDE.md §4).
+            title: isPhoneViewport
+              ? "This screen is too narrow for the day-by-day grid, so the week shows as a list. Your Grid or List choice is remembered — turn to landscape or open the week on a tablet to get it back."
+              : "See the week as a scrollable list of lessons",
+            // A SEPARATE dismissal id for the phone copy. The two say different
+            // things, and sharing one id would let a teacher who turned off the
+            // ordinary List tip on a desktop lose the phone-only explanation of
+            // where the Grid option went — the one message they have not seen.
+            tooltipId: isPhoneViewport
+              ? "weekly-view-list-phone"
+              : "weekly-view-list",
           },
-          // Schedule is omitted on the narrow tier (see scheduleActive note).
-          ...(isNarrow
-            ? []
-            : [
+          ...(scheduleAvailable
+            ? [
                 {
                   value: "schedule" as const,
                   label: "Schedule",
                   title: "Show the week as a time-blocked schedule",
                   tooltipId: "weekly-schedule-toggle",
                 },
-              ]),
+              ]
+            : []),
         ]}
       />
       {/* Scope toggle — only meaningful when Schedule is actually rendering, so

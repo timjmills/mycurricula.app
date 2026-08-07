@@ -1,7 +1,6 @@
 ---
 name: design-audit
 description: Plan, build, improve, audit, and review the visual design, UI, UX, accessibility, responsive behaviour, and front-end quality of a website or web application. Use this skill whenever the user asks to audit a UI, review a design, critique a screen or page, improve how something looks or feels, plan an unbuilt feature or work wave, review a new feature or pull request for visual and UX quality, check accessibility or responsive behaviour, or asks questions like "does this look right", "how can I make this better", "review my new page", or "what should this screen look like". Use it even when the request is phrased casually or as a small styling question, because the skill supplies the evidence protocol and severity discipline that keep the answer grounded rather than speculative.
-allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/capture-screens.mjs *)
 ---
 
 # Design, UX & Front-End Audit
@@ -36,6 +35,11 @@ Confirm the mode in one line before starting. If genuinely ambiguous, ask.
 
 Disambiguation: existing product, broad review → **C**. Completed or in-progress
 change set → **D**. Nothing built yet, inside an established product → **E**.
+
+Modes A and B change code; C, D, and E do not. A **report-only QA gate** — such
+as this repo's `CLAUDE.md` §4b live audit — must therefore run as **C or D,
+never A or B**, and never fixes anything in the same pass. Triage the report
+afterwards; fixing while auditing destroys the record of what was found.
 
 Read only the one mode file you need. Each mode file names the criteria files it
 requires; read those too, and nothing else.
@@ -91,6 +95,10 @@ Give every finding a stable ID so later sessions can resolve it:
 | **Enhancement** | Optional improvement; no existing failure |
 
 Severity describes impact on the user, not how much the code offends you.
+
+If the project defines its own severity scale (e.g. a `CLAUDE.md` QA gate using
+critical / major / minor), **report in the project's scale** and note the mapping
+once, at the top of the report.
 
 ### Scope discipline
 

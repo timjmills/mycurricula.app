@@ -5,15 +5,16 @@ guessing exercise into an inspection.
 
 ## Contents
 
-1. Why this exists
-2. Evidence tiers
-3. Getting visual evidence
-4. Getting accessibility evidence
-5. Getting performance evidence
-6. Getting correctness evidence
-7. Standard viewport set
-8. State matrix
-9. When you cannot render
+- **1.** Why this exists
+- **2.** Evidence tiers
+- **2A.** Measurement traps that manufacture findings ← *read before instrumenting*
+- **3.** Getting visual evidence
+- **4.** Getting accessibility evidence
+- **5.** Getting performance evidence
+- **6.** Getting correctness evidence
+- **7.** Standard viewport set
+- **8.** State matrix
+- **9.** When you cannot render
 
 ---
 
@@ -47,6 +48,132 @@ explicitly so someone else can run it.
 
 Report the mix at the top of every audit, e.g. "9 findings: 6 observed, 2
 inferred, 1 unverified." This tells the reader how much weight the audit carries.
+
+## 2A. Measurement traps that manufacture findings
+
+Every trap below has produced a confident, well-formatted finding that was not
+true. They share a failure direction: each one fails **open** — the instrument
+reports success it did not earn, so nothing looks wrong. Budget scepticism for
+the instrument, not only for the code.
+
+(Lettered rather than numbered so the §7 viewport-set and §8 state-matrix
+cross-references elsewhere in the skill keep pointing at the right sections.)
+
+### Hydration — gate on a client-only signal, never a fixed wait
+
+**Why:** server-rendered HTML is the **desktop** branch at every width, because
+viewport hooks default to `false` on the server. A sample taken at 375px before
+hydration therefore reads a desktop canvas and manufactures a false critical.
+
+Never `waitForTimeout(n)` and call the page settled. Gate every responsive or
+behavioural read on a signal only the client can produce:
+
+- an element that a client-side media query **removes or adds** — poll for it; or
+- the operation itself, retried until it takes effect (act → assert → retry).
+
+Record the observed convergence time in the report. Dev servers under load
+hydrate in **5–30 s**, so a fixed wait that worked yesterday is a coin flip today.
+
+### Measure the real scroll container
+
+**Why:** many app shells scroll an inner element rather than the document — this
+repo scrolls `#main-content` and the document **never** scrolls — so a
+`document.scrollingElement.scrollWidth` check passes green while controls are
+visibly clipped.
+
+1. Identify the actual scroll container first: the ancestor whose `scrollHeight >
+   clientHeight` (or `scrollWidth > clientWidth`).
+2. Measure overflow against **its** padding box, not the viewport's.
+3. **Name the container in the report.** "No horizontal scroll" says nothing
+   unless it says what was measured.
+4. Before calling a control clipped, resolve it against its nearest scrollable
+   ancestor. Internal element scroll may be explicitly permitted by the project's
+   responsive contract, in which case it is not a finding at all.
+
+### The precondition block
+
+**Why:** a browser renders the working tree, not a commit, so a live result
+carries no information about what shipped unless the report says which tree it
+measured.
+
+Open every live report with:
+
+```bash
+git rev-parse --short HEAD               # the sha you are making claims about
+git diff HEAD --stat -- <source dirs>    # must be empty, or say plainly that it isn't
+```
+
+followed by one of these two sentences:
+
+> The browser was showing exactly `<sha>`.
+
+> Working tree, **dirty** — this is not evidence about any commit.
+
+A pass over a dirty tree is still useful; it simply cannot be reported as
+evidence about a commit. Never stop, revert, or overwrite another lane's work on
+the strength of a live report alone — confirm against `HEAD` first.
+
+### Contrast
+
+**Why:** each of these four independently turns a real failure into a pass.
+
+- **Composite translucent surfaces over what is actually beneath them.** An
+  element's own `background-color` is not what the eye sees; frosted glass,
+  overlays, and ambient washes stack. Resolve the composite before the maths.
+- **When a probe verdict and the rendered pixels disagree, the pixels win.**
+  Screenshot it and judge the image. A number contradicting what you can plainly
+  see is a broken instrument, not a finding.
+- **Sample after the palette settles.** Apps that apply stored preferences flip
+  tokens *after* first paint. Sample twice, ≥1 s apart, and require the two
+  readings to agree before grading.
+- **Parse colour spaces correctly.** `color(srgb 0.1 0.2 0.3)` carries 0–1
+  floats; `rgb(26 51 77)` carries 0–255. Scraping both with one parser conflates
+  them and inflates every ratio it touches.
+
+### Appearance seeding can silently lose
+
+**Why:** synced server-side preferences can override a locally seeded cookie or
+localStorage value — this repo's `teacher_preferences` does — so a run labelled
+"dark mode" may have measured light.
+
+Read the axis back off the root element after load and confirm it applied
+**before** grading anything under it. If it did not apply, record the condition
+as **ABSENT / unmeasured**. Grading the wrong condition is worse than skipping
+it, because it still looks like coverage.
+
+### Absence assertions need a positive control
+
+**Why:** "the bug never appeared" and "the page never loaded" produce identical
+observations.
+
+Before any *not-present* or *not-changed* assertion, prove the page is alive with
+a control that MUST be present, read in the **same** observation. Without it the
+assertion fails open — a blank page passes every absence test ever written.
+
+### Probe exit-code contract
+
+**Why:** an instrument that exits 0 having measured nothing reports the app
+healthy on the strength of being blind.
+
+| Code | Meaning |
+|---|---|
+| **0** | fully verified — the intended coverage ran, and passed |
+| **1** | real failures — the app is broken |
+| **2** | incomplete coverage — the *instrument* is blind |
+
+`0 / 0 assertions` exits **2**, never 0. Declare intended coverage up front and
+reconcile against it at the end. And never let a fallback value be one that
+satisfies the assertion: a default that passes is a check that cannot fail.
+
+### An emulated phone is not a narrow window
+
+**Why:** coarse-pointer, hover-capability, and phone-only layout rules do not
+fire in a merely-narrow desktop window, so real phone bugs stay invisible.
+
+A phone check needs `isMobile: true`, touch, and a real `deviceScaleFactor`
+(2–3). Anything narrow-but-not-emulated must be **labelled as such** in the
+report — "375 px desktop window, not phone-emulated" — so a later reader does
+not mistake it for phone coverage.
 
 ## 3. Getting visual evidence
 
