@@ -1738,6 +1738,21 @@
     --border-cool: #323852;
     --hairline: #282737;
 
+    /* The active segmented chip is `background: var(--surface); color:
+       var(--chrome-accent-deep)` (components/ui/ToggleGroup.module.css) — a
+       recipe written for a chip sitting on PAPER. --surface flips with tone,
+       but the deep accent was only ever lightened inside the NIGHT THEME tier
+       below, never for dark TONE. So a LIGHT theme in dark tone painted its
+       deep accent onto the dark chip: Mint gave #166534 on #1e1d2c, measured
+       2.38:1 — the "which view am I on" indicator effectively invisible, while
+       the INACTIVE chips beside it read fine at 6.5:1. Reachable today by any
+       teacher on Cloud/Mint/Sky/Blossom with Photo-Dim or Photo-Normal.
+       Derived from the theme's own --accent rather than enumerated per theme,
+       so a theme added later flips with the rest instead of silently keeping a
+       dark-on-dark chip. Night is unaffected: its own tier declares this token
+       at (0,3,0) and outranks this block. */
+    --chrome-accent-deep: color-mix(in oklch, var(--accent) 62%, white);
+
     /* --idle / --idle-tint dark recipe. v1 mixed --idle-tint toward --surface
        (kept below in the status group). The v2 dark --idle-tint anchor is
        #2a2940 (modes.css) — the v2 path can adopt it directly; the v1 mix is

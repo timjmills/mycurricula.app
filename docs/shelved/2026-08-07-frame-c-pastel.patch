@@ -1,0 +1,3411 @@
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 2c5bfd5..53fa119 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -7,6 +7,7 @@ import {
+   DM_Sans,
+   Quicksand,
+   Caveat,
++  Source_Sans_3,
+ } from "next/font/google";
+ import "./globals.css";
+ import { cookies } from "next/headers";
+@@ -67,6 +68,33 @@ const caveat = Caveat({
+   display: "swap",
+ });
+ 
++// Source Sans 3 — the single face of Frame C · Pastel (the 7.21 handoff's
++// "Common Planner" skin). app/tokens.css's `:root[data-frame="color"]` tier
++// points ALL FOUR type channels at it (--font-sans / --font-display /
++// --font-display-sm / --head-font): the handoff has no role separation under
++// Pastel, which is the whole point of the look.
++//
++// The four weights are the handoff's own, verbatim — its stylesheet link is
++// `family=Source+Sans+3:wght@400;600;800;900` (source-home/New v2 Site
++// Design.html:26). They are FOUR STATIC INSTANCES, not a variable axis: listing
++// `weight` explicitly opts out of next/font's variable-font default, which is
++// what the handoff's static `wght@…` list describes.
++//
++// ⚠ ACCEPTED COST: next/font self-hosts, so this face is emitted into the build
++// and preloaded for EVERY teacher regardless of their frame — a Glass user
++// downloads it too. That is inherent to next/font's build-time model and is the
++// same deal the other five faces already strike. Do NOT work around it with a
++// hand-rolled, frame-gated @font-face: that forfeits next/font's self-hosting,
++// size-adjust fallback metrics and preload, and reintroduces the layout shift
++// the whole system exists to avoid. No package.json change — next/font/google
++// ships inside `next`.
++const sourceSans = Source_Sans_3({
++  subsets: ["latin"],
++  weight: ["400", "600", "800", "900"],
++  variable: "--font-source-sans",
++  display: "swap",
++});
++
+ export const metadata: Metadata = {
+   // Root metadata is rendered server-side and cannot read per-team
+   // curriculumLabel state. Keep it generic; surface the team's label inside
+@@ -107,7 +135,19 @@ export default async function RootLayout({
+   // data-tone is DERIVED server-side with the SAME derivation the boot script
+   // replicates and the provider applies (theme-values.ts deriveTone, autoTone
+   // null — the async luminance upgrade reconciles post-mount).
+-  const ssrTone = deriveTone(ssrTheme, axes.glass, axes.bg, axes.dim, null);
++  // `axes.frame` is rule 0 of the derivation — Frame C · Pastel always derives
++  // "light" (it locks a light cool-gray canvas and ships no dark register). The
++  // SSR attribute, the boot script (lib/theme-init.tsx) and the provider
++  // (lib/theme.tsx) are three copies of one rule; they MUST agree or first paint
++  // flashes. tests/theme-tone-lockstep.test.ts pins all three.
++  const ssrTone = deriveTone(
++    ssrTheme,
++    axes.glass,
++    axes.bg,
++    axes.dim,
++    null,
++    axes.frame,
++  );
+   // (LOCKSTEP surface #4 — the attributes below carry theme-values.ts members
+   // only. The boot script still overwrites them pre-paint from localStorage;
+   // ThemeProvider owns subsequent changes.)
+@@ -141,7 +181,7 @@ export default async function RootLayout({
+       style={
+         { ["--stage-photo"]: `url(${DEFAULT_STAGE_PHOTO})` } as React.CSSProperties
+       }
+-      className={`${GeistSans.variable} ${GeistMono.variable} ${poppins.variable} ${dmSans.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} h-full antialiased`}
++      className={`${GeistSans.variable} ${GeistMono.variable} ${poppins.variable} ${dmSans.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} ${sourceSans.variable} h-full antialiased`}
+     >
+       <body
+         suppressHydrationWarning
+diff --git a/app/themes.css b/app/themes.css
+index d1372c0..db8238a 100644
+--- a/app/themes.css
++++ b/app/themes.css
+@@ -1267,7 +1267,25 @@
+     box-shadow: var(--sh-xs);
+   }
+ 
+-  /* ═══════════════════  FRAME C · COLOR-FORWARD (color)  ═══════════════════ */
++  /* ═══════════════════════  FRAME C · PASTEL (color)  ═══════════════════════
++     Frame C was "Color-forward" until the 7.21 handoff renamed and re-skinned it
++     as PASTEL — the "Common Planner" look. The axis VALUE is unchanged (`color`),
++     so no ALLOWLIST LOCKSTEP surface needs a value edit; only the skin, the
++     picker label, and the derived tone changed. See the Pastel section at the end
++     of this frame block (and the token tier at the end of app/tokens.css) for the
++     port, its source, and the authority-chain deviation it rests on.
++
++     ⚠ THE RULES IMMEDIATELY BELOW ARE LARGELY DEAD, AND ARE KEPT DELIBERATELY.
++     `.fr-chrome`, `.fr-title`, `.fr-eyebrow`, `.lane`, `.chip`, `.badge`, `.bar`
++     and `.metapill` have ZERO consumers in the app — they are the frame-GALLERY
++     demo vocabulary (counted, not estimated: `grep -rn 'className="[^"]*\blane\b'
++     --include=*.tsx app components` → 0, and likewise for each). Only `.card`
++     (3 callsites) and `.stage::after` are live. That is the root cause of the
++     live-QA finding that Frame C "renders near-identically to Glass": the frame
++     was not merely thin, it was substantially INERT. They are NOT deleted here
++     because that would balloon a visual diff into a dead-code sweep; they are
++     handed to the v1-deletion wave, which is already doing reachability
++     analysis. Do not build on them. */
+   [data-frame="color"] {
+     color: var(--ink);
+   }
+@@ -1364,6 +1382,201 @@
+     color: var(--sci);
+   }
+ 
++  /* ══════════════════════════════════════════════════════════════════════════
++     FRAME C · PASTEL — the skin (7.21 handoff, source-home/pastel-frame.css)
++     ──────────────────────────────────────────────────────────────────────────
++     The palette + type live in app/tokens.css's `:root[data-frame="color"]
++     [data-frame]` tier (which also carries the full SOURCE + AUTHORITY-DEVIATION
++     note — read it first). THIS block is the material half: the canvas, the
++     neutralised theme wash, the ghosted photo, and the handful of live surfaces
++     whose recipe is structural rather than tokenised.
++
++     WHY THE --accent FAMILY IS HERE AND NOT IN tokens.css
++     ──────────────────────────────────────────────────────────────────────────
++     globals.css imports tokens.css BEFORE themes.css, and §0 of this file sets
++     --accent at `:root[data-theme="clear"][data-bg="photo"]` — specificity
++     (0,3,0). A tokens.css rule would lose on BOTH specificity and file order, so
++     the teal lock had to land here, after that rule, at (0,3,0)+.
++
++     ⚠ SPECIFICITY IS LOAD-BEARING THROUGHOUT — computed, not guessed:
++       ·  :root[data-theme="clear"][data-bg="photo"]            (0,3,0)  §0 :224
++          :root[data-frame="color"][data-frame]                 (0,3,0)  ← equal,
++          and LATER in this file → wins on source order. This mirrors exactly how
++          the handoff wins the same fight (`.home[data-version="C"][data-version]`,
++          pastel-frame.css:7). `!important` is added on --accent as well, because
++          source-order wins are one reorder away from silent death and this repo
++          has a documented history of exactly that failure.
++       ·  :root[data-bg="photo"][data-theme="honey"] .theme-tint (0,4,0)  §1c :722
++          :root[data-frame="color"][data-frame] .theme-tint      (0,4,0)  ← equal
++          + later + `!important` → wins three ways.
++       ·  [data-frame="color"] .card                             (0,2,0)  :1298
++          :root[data-frame="color"][data-frame] .card            (0,4,0)  ← wins
++          on specificity alone.
++     DO NOT "tidy up" the doubled attribute selectors or the !importants. They
++     are the mechanism, not noise.
++
++     Pastel is SELF-COLOURED: theme washes are ignored (pastel-frame.css:6). The
++     7-theme picker is REPLACED by a locked-note under this frame
++     (settings.jsx:185-187 → components/appearance/appearance-controls.tsx), so
++     the wash neutralisation below is belt-and-braces for a persisted theme, not
++     a live axis.
++     ══════════════════════════════════════════════════════════════════════════ */
++
++  /* ── The teal accent lock (pastel-frame.css:7) ────────────────────────────
++     One teal owns every primary CTA; subject colour still owns lesson meaning.
++     The handoff also kills the accent-cycle animation here — ours was already
++     deleted for performance reasons (see §0), so there is nothing to suppress;
++     `animation: none` is kept anyway to match the handoff verbatim and to guard
++     a future re-introduction, exactly as §0's vestigial rule does. */
++  :root[data-frame="color"][data-frame],
++  :root[data-frame="color"][data-frame][data-theme],
++  :root[data-frame="color"][data-frame][data-bg] {
++    --accent: var(--pastel-accent) !important;
++    --accent-600: var(--pastel-accent-600) !important;
++    --accent-50: var(--pastel-accent-50) !important;
++    --accent-soft: var(--pastel-accent-50) !important;
++    --accent-ink: var(--pastel-accent-600) !important;
++    /* the chrome accent tier follows the teal so nav/chips do not stay indigo */
++    --chrome-accent: var(--pastel-accent);
++    --chrome-accent-strong: var(--pastel-accent-600);
++    --chrome-accent-soft: var(--pastel-accent-50);
++    --chrome-accent-soft-edge: var(--pastel-hairline);
++    --chrome-accent-deep: var(--pastel-accent-600);
++    --chrome-accent-mid: var(--pastel-accent);
++    --theme-accent: var(--pastel-accent);
++    --theme-accent-soft: var(--pastel-accent-50);
++    animation: none !important;
++  }
++
++  /* ── Canvas (pastel-frame.css:17-23) ──────────────────────────────────────
++     The handoff paints `.ambient`; our app-wide equivalent is `.stage` (see the
++     §1 note at :427 — `.photo`/`.ambient` were the home surface's own layers,
++     `.stage` is the engine that replaced them). Calm slate with four faint
++     pastel corners, over BOTH backgrounds: Pastel's canvas is the story, so it
++     does not defer to data-bg the way the other frames do. */
++  :root[data-frame="color"][data-frame] .stage {
++    background-color: var(--pastel-canvas) !important;
++    background-image:
++      radial-gradient(
++        50% 54% at 10% 8%,
++        var(--pastel-corner-ice),
++        transparent 62%
++      ),
++      radial-gradient(
++        48% 52% at 90% 10%,
++        var(--pastel-corner-cream),
++        transparent 62%
++      ),
++      radial-gradient(
++        46% 50% at 86% 92%,
++        var(--pastel-corner-mint),
++        transparent 62%
++      ),
++      radial-gradient(
++        44% 48% at 12% 92%,
++        var(--pastel-corner-blush),
++        transparent 62%
++      ),
++      linear-gradient(160deg, var(--pastel-canvas), var(--pastel-canvas-2)) !important;
++    filter: none !important;
++  }
++  /* The photo ghosts to a pale backdrop so the gray canvas stays the story
++     (pastel-frame.css:25-26). `.stage::before` is our photo host. */
++  :root[data-frame="color"][data-frame] .stage::before {
++    filter: saturate(0.35) brightness(1.28) contrast(0.92) !important;
++    opacity: 0.38;
++  }
++  /* No tone scrim over a light canvas — the scrim exists to hold white text on
++     a photo, and Pastel has neither. */
++  :root[data-frame="color"][data-frame] .stage::after {
++    background: transparent !important;
++  }
++  /* Theme wash OFF (pastel-frame.css:24). Beats the (0,4,0) per-theme rules. */
++  :root[data-frame="color"][data-frame] .theme-tint {
++    opacity: 0 !important;
++  }
++
++  /* ── Cards: white on gray, hairline border, feather shadow (:28) ──────────
++     ⚠ CURRENTLY INERT, AND KEPT ON PURPOSE. `.card` was assumed to be the one
++     live class in the legacy block above; it is not. Measured in the browser
++     (scripts/probe-f2-pastel.mjs sibling diagnostic), `document.querySelectorAll
++     (".card")` returns 0 across 3 frames × 4 routes (/weekly /daily /year
++     /post) — as do .lane/.chip/.badge/.bar/.metapill/.tabs/.fr-*. The earlier
++     grep that suggested 3 consumers was matching `cp-card-menuitem`,
++     `cp-card-check` and `cp-card-reslink`, which are different classes.
++
++     It is kept rather than dropped so that the frame-gallery vocabulary, IF the
++     v1-deletion wave's reachability analysis revives rather than removes it,
++     carries the Pastel recipe instead of the retired Color-forward one. It is
++     NOT load-bearing today and must not be cited as evidence that Pastel styles
++     cards — the real card surfaces are the CSS modules
++     (components/week-v2/WeekC.module.css et al). */
++  :root[data-frame="color"][data-frame] .card {
++    background: var(--pastel-surface);
++    border: 1px solid var(--pastel-hairline);
++    box-shadow: var(--sh-sm);
++    color: var(--pastel-ink);
++  }
++
++  /* ── Subject glyphs soften to tints of their locked hue (:36) ─────────────
++     Pastel NEVER invents a subject colour: it mixes the locked hue toward white
++     for the fill and keeps the hue for the ink. The team-wide subject→slot map
++     is untouched. `.cp-subj` is our live subject-identity class (tokens.css
++     :1208); `--c` is the hue the palette bridge injects (lib/palette.tsx),
++     standing in for the handoff's `--sc`. */
++  :root[data-frame="color"][data-frame] .cp-subj {
++    --cl: color-mix(in oklab, var(--c) 22%, white);
++    --cd: color-mix(in oklab, var(--c) 80%, var(--pastel-ink));
++  }
++
++  /* ── Buttons: pills, teal primary (pastel-frame.css:45-47) ───────────────
++     RULE #1 — no sharp corners. `--r-pill` rather than the handoff's literal
++     9999px; the current Frame C block strips no radii, so nothing is lost. */
++  :root[data-frame="color"][data-frame] .btn {
++    border-radius: var(--r-pill);
++    font-weight: 600;
++  }
++  :root[data-frame="color"][data-frame] .btn-primary {
++    background: var(--accent);
++    box-shadow: 0 8px 18px -10px rgba(0, 117, 149, 0.55);
++  }
++
++  /* ── Whole-app chrome (pastel-frame.css:51-54) ───────────────────────────
++     The handoff's `.cbar`/`.cb-menu`/`.toolspop`/`.set-panel`/`.homecog-pop`
++     map onto our chrome material `.glass` plus the popover classes. app/chrome.css
++     carries ZERO `data-frame` selectors — the frame axis is owned entirely by
++     this file — so the Pastel chrome overrides live here rather than there, and
++     app/chrome.css is left untouched.
++
++     NOTE on the dual-emit convention: app/chrome.css pairs every tone rule as
++     `:root[data-tone=…]` + `.home[data-tone=…]`. That does NOT apply to the
++     frame axis — `data-frame` is emitted ONLY on <html> (app/layout.tsx:125);
++     no `.home[data-frame]` selector exists anywhere in the repo, and one would
++     never match. `:root` alone is correct here. */
++  :root[data-frame="color"][data-frame] .glass,
++  :root[data-frame="color"][data-frame] .toolspop,
++  :root[data-frame="color"][data-frame] .vt-menu,
++  :root[data-frame="color"][data-frame] .chrome-menu {
++    background: rgba(255, 255, 255, 0.92);
++    border-color: var(--pastel-hairline);
++    color: var(--pastel-ink);
++    -webkit-backdrop-filter: blur(10px);
++    backdrop-filter: blur(10px);
++  }
++  /* The chrome text channels flip to ink together with the surface — the
++     legibility contract in one rule (cf. compact-bar.css:6-10, which does the
++     same flip for the handoff's own bar). */
++  :root[data-frame="color"][data-frame] :is(.eyebrow, .greeting, .brand .wm) {
++    color: var(--pastel-ink);
++  }
++  :root[data-frame="color"][data-frame] .views.console .view {
++    color: var(--pastel-muted);
++  }
++  :root[data-frame="color"][data-frame] .views.console .view.active {
++    background: var(--accent);
++    color: #fff;
++  }
++
+   /* ════════════════════════════════════════════════════════════════════════
+      3 · NIGHT TONE (data-tone="dark") — frame identity persists
+      ────────────────────────────────────────────────────────────────────────
+@@ -1378,9 +1591,11 @@
+   [data-tone="dark"][data-bg="photo"][data-frame="paper"] .stage::after {
+     background: rgba(20, 19, 31, 0.86);
+   }
+-  [data-tone="dark"][data-bg="photo"][data-frame="color"] .stage::after {
+-    background: rgba(20, 19, 31, 0.55);
+-  }
++  /* NOTE — there is deliberately NO [data-frame="color"] arm here any more.
++     Pastel has no dark register: lib/theme-values.ts deriveTone() returns
++     "light" for frame==="color" before any other rule is evaluated, so
++     [data-tone="dark"][data-frame="color"] is UNREACHABLE. See the Frame C ·
++     Pastel dark-tone note further down this section. */
+ 
+   /* glass · Night → dark frosted panels */
+   [data-tone="dark"][data-frame="glass"][data-bg="wash"] .card,
+@@ -1428,23 +1643,34 @@
+     color: var(--muted);
+   }
+ 
+-  /* color · Night → tints darken, hue preserved */
+-  [data-tone="dark"][data-frame="color"] .card {
+-    background: linear-gradient(
+-      135deg,
+-      color-mix(in srgb, var(--sc) 40%, #1e1d2c) 0%,
+-      color-mix(in srgb, var(--sc) 22%, #14131f) 100%
+-    );
+-    border: 1px solid color-mix(in srgb, var(--sc) 30%, #1e1d2c);
+-    color: #fff;
+-  }
+-  [data-tone="dark"][data-frame="color"] .lane {
+-    background: rgba(40, 40, 58, 0.7);
+-    border-color: rgba(255, 255, 255, 0.12);
+-  }
+-  [data-tone="dark"][data-frame="color"] .lane .nm .t {
+-    color: var(--ink);
+-  }
++  /* ── color · Night → DELETED. Frame C · Pastel has no dark register. ──────
++     Three rules lived here (`.card`, `.lane`, `.lane .nm .t`) painting the old
++     Color-forward frame on a dark canvas. They are removed rather than annotated
++     in place because they were an active HAZARD, not merely dead:
++
++     The 7.21 handoff's Pastel locks its own palette, so the theme picker is
++     replaced by a locked-note under this frame and Night is unreachable FROM the
++     picker — but a teacher who had already persisted data-theme="night" and then
++     chose Pastel would still have carried `data-theme="night"` on <html>. These
++     rules would then have matched and painted near-black `#14131f`/`#1e1d2c`
++     panels underneath the Pastel token tier's near-black `--ink` (#09090b),
++     i.e. black ink on a black card. That is the precise illegibility the
++     CLAUDE.md §4 legibility contract forbids.
++
++     THE FIX IS UPSTREAM, and these rules are unreachable BECAUSE of it:
++     lib/theme-values.ts `deriveTone()` now returns "light" for frame==="color"
++     as its FIRST rule, ahead of the night check — so `[data-tone="dark"]` and
++     `[data-frame="color"]` can no longer co-occur. Every surface in the app
++     branches on data-tone rather than the theme (the §4 contract), so that one
++     derivation change correctly neutralises all 119 dark-tone rules across the
++     19 stylesheets that carry them, including the ~57 in component modules that
++     could not have been re-pointed one at a time.
++
++     Belt and braces: app/tokens.css's Pastel tier ALSO re-declares the whole
++     neutral ramp at (0,3,0), beating `:root[data-tone="dark"]` (0,2,0) on
++     specificity. So even if the derivation regressed, ink stays #09090b on a
++     white surface — legible — rather than inverting. Restoring the deleted
++     rules would defeat that backstop. Do not restore them. */
+ 
+   /* ════════════════════════════════════════════════════════════════════════
+      4 · PHOTO MODE — premium theme grading (lives ONLY in themes.css)
+diff --git a/app/tokens.css b/app/tokens.css
+index bf9a0f3..3259968 100644
+--- a/app/tokens.css
++++ b/app/tokens.css
+@@ -1504,6 +1504,35 @@
+        + the engine forcing data-tone="dark".
+    ════════════════════════════════════════════════════════════════════════ */
+ @media screen {
++  /* ══════════════════════════════════════════════════════════════════════════
++     EVERY THEME TIER IN THIS FILE IS SCOPED :not([data-frame="color"]).
++     ──────────────────────────────────────────────────────────────────────────
++     Frame C · Pastel LOCKS its own palette (7.21 handoff; the 7-theme picker is
++     REPLACED by an explanatory note under this frame, not merely disabled). But
++     the picker only stops a teacher CHOOSING a theme here — it does not clear
++     one already persisted, and lib/theme.tsx still paints data-theme onto
++     <html> under every frame. So `data-theme="<anything>" + data-frame="color"`
++     is a REACHABLE state, and without this qualifier each tier below kept
++     applying underneath the Pastel skin.
++
++     For Night that was a legibility break (see the long note at the dark-tone
++     block). For the light themes the residue is smaller but the same defect:
++     each declares ~15 tokens Pastel does not — the --logo-* lockup, --amb-*,
++     --duo-* and --mesh-* — so a teacher on Pastel with Mint persisted got a
++     mint-tinted wordmark on a frame whose whole claim is a fixed cool-gray
++     canvas with teal accents. Unqualified, they resolve to the :root brand
++     defaults, which is what "locks its own palette" means.
++
++     Uniform on purpose: a per-theme carve-out would leave the invariant
++     unstateable and the next tier added here would bleed silently. The
++     invariant is now flat — NO [data-theme] tier in this file may apply under
++     Pastel — and tests/pastel-theme-tier-isolation.test.ts fails if one does.
++     (app/themes.css's per-theme tiers are NOT qualified and do not need to be:
++     what they declare beyond Pastel's own set is --amb-* and --duo-*, read by
++     `.theme-tint`, which the Pastel section zeroes with `opacity: 0 !important`;
++     its Night accent trio loses to the same section's `!important` accents.)
++     ══════════════════════════════════════════════════════════════════════════ */
++
+   /* ── Cloud — cool neutral paper (the "greyscale" light theme) ──────────── */
+   :root[data-theme="cloud"] {
+     --canvas: #fdfdfe;
+@@ -1702,9 +1731,46 @@
+ 
+      LEGACY COMPAT: :root[data-theme="night"] below ALSO applies these via the
+      selector list, so a flag-OFF v1 DOM that still emits only data-theme="night"
+-     (without data-tone) stays fully dark. */
++     (without data-tone) stays fully dark.
++
++     …AND THAT COMPAT ARM IS WHY THIS RULE CARRIES :not([data-frame="color"]).
++     ──────────────────────────────────────────────────────────────────────────
++     Frame C · Pastel is light-only: deriveTone() rule 0 forces tone="light"
++     whenever frame === "color", which disarms the FIRST arm of this selector
++     list. It does nothing to the second. `data-theme` is NOT forced — a teacher
++     with night persisted who then picks Pastel still gets <html data-theme=
++     "night" data-frame="color" data-tone="light">, so the theme-keyed arm kept
++     matching and this rule kept applying under Pastel's LIGHT surfaces.
++
++     The Pastel tier (:1987) redeclares the neutral ramp, so the damage was not
++     total — but it declares 62 tokens against this block's 117, and the ~82 it
++     does not cover bled through. The ones that matter are the ink halves:
++     --subj-N-ink and --tag-*-fg are written here as
++     `color-mix(in oklch, var(--subj-N) 62%, white)` — correct on a #1e1d2c
++     surface, near-invisible on Pastel's #ffffff card, and they sit on tints
++     that self-corrected to white via var(--surface). Pale ink on pale fill,
++     on every subject chip and tag pill: a WCAG-AA break, not a cosmetic one.
++     --brand-50/100/200 and --honey-50/100 mix toward the dark #1e1d2c base and
++     painted dark navy chip SURFACES on the white canvas; --grad-* were dark
++     literals outright.
++
++     WHY THE QUALIFIER AND NOT 82 MORE DECLARATIONS IN THE PASTEL TIER: the
++     enumeration would have to be repeated for every token added here later,
++     and the next one added would bleed silently — the same class of defect,
++     re-armed. Scoping the arm removes the mechanism instead of patching its
++     output.
++
++     SPECIFICITY: :not() contributes its argument's specificity, so this arm
++     goes (0,2,0) → (0,3,0), tying the Pastel tier. That tie is harmless BY
++     CONSTRUCTION and not the usual source-order hazard: the two selectors are
++     now mutually exclusive — [data-frame="color"] and
++     :not([data-frame="color"]) can never match the same element — so there is
++     no cascade fight left to lose. The first arm stays (0,2,0) and unqualified;
++     tone="dark" is already unreachable under Pastel.
++     NOT a regression for the v1 flag-OFF DOM this compat arm serves: that DOM
++     emits no data-frame at all, and :not() matches an ABSENT attribute. */
+   :root[data-tone="dark"],
+-  :root[data-theme="night"] {
++  :root[data-theme="night"]:not([data-frame="color"]) {
+     color-scheme: dark;
+ 
+     /* Inverted ink ramp — 900 is the lightest, 50 the darkest (= canvas). */
+@@ -1738,6 +1804,19 @@
+     --border-cool: #323852;
+     --hairline: #282737;
+ 
++    /* The active segmented chip is `background: var(--surface); color:
++       var(--chrome-accent-deep)` (components/ui/ToggleGroup.module.css) — a
++       recipe written for a chip that sits on PAPER. --surface flips with tone,
++       but the deep accent was only ever lightened inside the NIGHT theme tier,
++       so any LIGHT theme in dark tone painted its deep accent on the dark chip:
++       Mint gave #166534 on #1e1d2c, measured 2.38:1, which makes the "which
++       view am I on" indicator effectively invisible.
++       Derived from the theme's own --accent rather than enumerated per theme,
++       so a theme added later flips with the rest instead of silently keeping a
++       dark-on-dark chip. Night keeps its own value: its tier carries
++       :not([data-frame="color"]) and so outranks this block at (0,3,0). */
++    --chrome-accent-deep: color-mix(in oklch, var(--accent) 62%, white);
++
+     /* --idle / --idle-tint dark recipe. v1 mixed --idle-tint toward --surface
+        (kept below in the status group). The v2 dark --idle-tint anchor is
+        #2a2940 (modes.css) — the v2 path can adopt it directly; the v1 mix is
+@@ -1905,8 +1984,15 @@
+      accent-bearing tokens live here: the logo lockup, picker theme-accent, the
+      chrome-accent tier, and the v2 --accent contract. Night's accent is its
+      signature violet. (rail-bg/panel-bg are chrome SURFACES that step off the
+-     dark canvas → they belong with the accent furniture, kept here.) */
+-  :root[data-theme="night"] {
++     dark canvas → they belong with the accent furniture, kept here.)
++     :not([data-frame="color"]) for the same reason as the neutral block above —
++     Pastel locks its own palette, and this tier's --logo-book-b (#221d4a),
++     --rail-bg/--panel-bg/--panel-header-bg (near-black chrome surfaces) and
++     --chrome-accent-deep (mixed toward white) are all wrong on a white canvas.
++     The --accent trio here is separately overridden by themes.css's Pastel
++     section with !important; the qualifier makes that belt-and-braces rather
++     than the only thing standing between Pastel and Night's violet. */
++  :root[data-theme="night"]:not([data-frame="color"]) {
+     /* Logo + picker accent */
+     --logo-tile-grad: linear-gradient(135deg, #8b7fc0 0%, #564d99 100%);
+     --logo-tile-shadow: 0 12px 26px -10px rgba(139, 127, 192, 0.45);
+@@ -1932,4 +2018,199 @@
+     --accent-soft: rgba(143, 168, 255, 0.16);
+     --accent-ink: #ffffff;
+   }
++
++  /* ══════════════════════════════════════════════════════════════════════════
++     FRAME C · PASTEL — the "Common Planner" skin (7.21 handoff)
++     ──────────────────────────────────────────────────────────────────────────
++     SOURCE + AUTHORITY DEVIATION (read before "fixing" this against the bundle)
++     ──────────────────────────────────────────────────────────────────────────
++     Ported from `Documents/Claude Design/7.21.26 Design Handoff Update/
++     source-home/pastel-frame.css` (62 lines — the complete recipe), which the
++     handoff README:146 introduces as "a third frame beside Glass and Bright".
++
++     CLAUDE.md §4a's authority chain normally puts the BUNDLED mockup first.
++     IT CANNOT APPLY HERE, and this is deliberate:
++       grep -c 'data-version="C"' "source-home/New v2 Site Design.bundled.html" → 0
++       grep -c 'PASTEL frame'     "source-home/New v2 Site Design.bundled.html" → 0
++       grep -ci 'Source Sans'     "source-home/New v2 Site Design.bundled.html" → 0
++     The bundle contains NO Pastel frame at all — its single "pastel" hit is an
++     adjective inside an unrelated Bright rule. It is a STALE artifact that
++     predates the frame, exactly like the accent-cycle deviation documented in
++     app/themes.css §0. The effective chain for Pastel is:
++       pastel-frame.css (verbatim values) > settings.jsx / settings.css
++       > README.md:146 > the 7.2 V2 Framework.md (now partly contradicted).
++     A future fidelity diff against the bundle WILL flag this tier as divergent.
++     That flag is expected and must be dismissed, not actioned.
++
++     WHY A TOKEN TIER RATHER THAN A 62-LINE SKIN
++     ──────────────────────────────────────────────────────────────────────────
++     The handoff's skin targets ITS OWN markup (.vc-agenda, .vc-wcell, .cbar…).
++     Our port of Frame C targeted the frame-GALLERY demo classes, which have
++     ZERO consumers in the app (.fr-chrome/.fr-title/.fr-eyebrow/.lane/.chip/
++     .badge/.bar/.metapill → 0 tsx callsites each) — which is why Frame C
++     rendered near-identically to Glass. The real leverage is the semantic
++     token tier the app actually reads: --surface (644 uses), --border (603),
++     --muted (442), --ink (384), --ink-soft (228). Re-pointing those repaints
++     every real surface, and satisfies CLAUDE.md §4's "never hard-code a hex in
++     a component" — the handoff hexes live HERE, as tokens, and the rules
++     downstream reference var(--pastel-*). Same approved precedent as the
++     subject-colour derivation decision.
++
++     ⚠ SPECIFICITY IS LOAD-BEARING — DO NOT "TIDY" THE DOUBLED SELECTOR.
++     `:root[data-tone="dark"], :root[data-theme="night"]:not([data-frame=
++     "color"])` (the dark-tone block above) declares the SAME neutrals; its
++     tone arm is (0,2,0). A plain `:root[data-frame="color"]` is also (0,2,0)
++     and would win only on source order — one reorder away from silent death,
++     and this repo has a documented history of exactly that. The doubled
++     `[data-frame]` makes this (0,3,0) so it wins on SPECIFICITY, unconditionally.
++     Mirrors the handoff's own `.home[data-version="C"][data-version]` trick.
++
++     THE DOUBLING IS STILL NEEDED AFTER THE :not() SCOPING, and for a different
++     reason than before. The night arm can no longer match here at all, so the
++     55 neutrals it shares with this tier are no longer contested — but the
++     TONE arm is unqualified by design, and while deriveTone() rule 0 makes
++     data-tone="dark" unreachable under Pastel, this tier's whole job is to be
++     correct even when a stale attribute survives for a frame (see the
++     color-scheme note below). Beating (0,2,0) on specificity is what makes
++     that true without relying on the derivation holding.
++
++     NOTE: the --accent family is NOT set here. themes.css imports AFTER this
++     file (globals.css:14-26) and declares --accent at
++     `:root[data-theme="clear"][data-bg="photo"]` (0,3,0) — a tokens.css rule
++     could not win. Pastel's teal accent therefore lives in app/themes.css's
++     Pastel section, later in that file. Keep the two halves together in spirit.
++     ══════════════════════════════════════════════════════════════════════════ */
++  :root[data-frame="color"][data-frame] {
++    /* Pastel ALWAYS renders light. The frame has no dark register — the theme
++       picker is replaced by a locked-note under Pastel (settings.jsx:185-187),
++       so Night is unreachable from here, and lib/theme-values.ts deriveTone()
++       forces tone="light" whenever frame==="color". This declaration is the CSS
++       half of that contract: it makes the tier correct even if a stale
++       data-tone="dark" survives on <html> for one frame before the boot script
++       repaints. */
++    color-scheme: light;
++
++    /* ── The handoff's literal palette (pastel-frame.css) ──────────────────
++       Every value below is copied verbatim from the source; the line each came
++       from is noted so a fidelity diff can be run mechanically. These are the
++       ONLY hard-coded colours in the Pastel port — everything else references
++       them. The greys are Tailwind's zinc ramp and #314158 is slate-700, which
++       is what the handoff was authored against. */
++    --pastel-canvas: #f1f5f9; /* :18,:23 — the calm slate canvas */
++    --pastel-canvas-2: #eef3f8; /* :23   — canvas gradient's far stop */
++    --pastel-surface: #ffffff; /* :28   — cards, panels */
++    --pastel-surface-2: #fafafa; /* :38   — the detail panel's soft second stop */
++    --pastel-hairline: #e4e4e7; /* :28   — the one border colour, everywhere */
++    --pastel-ink: #09090b; /* :29   — near-black primary text */
++    --pastel-muted: #52525c; /* :30   — secondary text */
++    --pastel-dim: #9f9fa9; /* :34   — tertiary / timestamps */
++    --pastel-slate: #314158; /* :31   — column heads, chips-on-tint */
++    --pastel-accent: #007595; /* :7    — the single teal primary */
++    --pastel-accent-600: #005f7a; /* :7    — hover/pressed */
++    --pastel-accent-50: #d2eff4; /* :7    — teal-ice tint */
++    /* the four faint canvas-corner blooms (:19-22) */
++    --pastel-corner-ice: rgba(210, 239, 244, 0.95);
++    --pastel-corner-cream: rgba(255, 237, 217, 0.9);
++    --pastel-corner-mint: rgba(210, 242, 226, 0.9);
++    --pastel-corner-blush: rgba(252, 211, 226, 0.75);
++
++    /* ── Neutral ink ramp, re-oriented LIGHT ───────────────────────────────
++       INTERPOLATED, not handoff-literal: the handoff names only four greys
++       (#09090b/#52525c/#9f9fa9/#e4e4e7 = zinc-950/600/400/200) plus #fafafa
++       (zinc-50). The ramp is completed with the rest of Tailwind zinc, which is
++       demonstrably the scale it was authored against. This block MUST exist:
++       :1706's dark tier INVERTS this ramp (900 lightest), and a teacher landing
++       on Pastel with a persisted Night would otherwise get an inverted ramp
++       under a white surface. */
++    --ink-900: #09090b;
++    --ink-800: #18181b;
++    --ink-700: #27272a;
++    --ink-600: #3f3f46;
++    --ink-500: #52525c;
++    --ink-400: #52525c; /* = --muted; kept at zinc-600 so AA holds on #fff */
++    --ink-300: #9f9fa9; /* = --faint */
++    --ink-200: #d4d4d8;
++    --ink-150: #e4e4e7; /* = --border */
++    --ink-100: #f4f4f5; /* = --hairline surface */
++    --ink-50: #f1f5f9; /* = --canvas */
++
++    /* ── Surfaces + semantic neutral aliases ───────────────────────────────
++       These five carry the port: 2301 combined var() references across the app
++       (surface 644 · border 603 · muted 442 · ink 384 · ink-soft 228). */
++    --canvas: var(--pastel-canvas);
++    --surface: var(--pastel-surface);
++    --paper: var(--pastel-surface);
++    --surface-warm: var(--pastel-surface-2);
++    --ink: var(--pastel-ink);
++    --ink-soft: var(--pastel-slate); /* :31 .vc-wh — column heads read slate */
++    --body: var(--pastel-muted);
++    --muted: var(--pastel-muted);
++    --faint: var(--pastel-dim);
++    --border: var(--pastel-hairline);
++    --border-cool: var(--pastel-hairline);
++    --hairline: var(--pastel-hairline);
++
++    /* Chrome surfaces step to plain white (:52-54 — .cbar/.toolspop/.set-panel
++       are all rgba(255,255,255,.88-.96) over the gray canvas). */
++    --rail-bg: var(--pastel-surface);
++    --panel-bg: var(--pastel-surface);
++    --panel-header-bg: var(--pastel-surface-2);
++
++    /* Tints mix toward white again (the dark tier mixes toward #1e1d2c). This
++       is what turns every subject fill pastel WITHOUT touching the locked
++       subject→slot map — cf. :36's color-mix(in oklab, var(--sc) 22%, white). */
++    --tint-base: var(--pastel-surface);
++
++    /* Selection + scrims — light-tone values, teal-tinted selection. */
++    --selection-bg: var(--pastel-accent-50);
++    --selection-fg: var(--pastel-ink);
++    --scrim: rgba(24, 24, 27, 0.4);
++    --scrim-soft: rgba(24, 24, 27, 0.3);
++    --scrim-strong: rgba(9, 9, 11, 0.68);
++    --scrim-lightbox: rgba(9, 9, 11, 0.8);
++
++    /* ── Feather shadows (:28,:57,:60-61) ──────────────────────────────────
++       Pastel's whole elevation story is two near-flat layers. The handoff uses
++       exactly three recipes; the -md/-lg steps extend them proportionally for
++       the overlay tiers the handoff's markup has no equivalent of. */
++    --sh-xs: 0 1px 3px rgba(0, 0, 0, 0.06);
++    --sh-sm:
++      0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
++    --sh-md: 0 4px 12px -4px rgba(0, 0, 0, 0.1);
++    --sh-lg: 0 12px 30px -12px rgba(0, 0, 0, 0.14);
++    --shadow-card:
++      0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
++    --shadow-card-hover:
++      0 2px 6px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
++    --shadow-popover:
++      0 2px 4px rgba(0, 0, 0, 0.06), 0 10px 28px rgba(0, 0, 0, 0.12);
++    --shadow-drag: 0 12px 28px rgba(0, 0, 0, 0.16);
++    --shadow-drag-soft: 0 4px 14px rgba(0, 0, 0, 0.1);
++
++    /* ── Type: Source Sans 3 across ALL FOUR channels ──────────────────────
++       pastel-frame.css:8-11 sets --font-sans / --font-display /
++       --font-display-sm / --head-font to the same stack — the handoff has NO
++       role separation under Pastel, which is the "Common Planner" read. The
++       face is loaded by next/font in app/layout.tsx (--font-source-sans).
++
++       --head-font is otherwise NEVER DEFINED anywhere in the app: its 13
++       consumers (app/chrome.css ×7, year-v2/YearC, year/YearConstellation,
++       day-v2 ×4) all sit on `var(--head-font, var(--font-display…))` fallbacks.
++       Pastel is the first frame to give it a value, matching the handoff, which
++       drives it per-frame via an inline style on the frame root (app.jsx:546).
++       --font-logo is deliberately LEFT ALONE: the wordmark is brand identity,
++       not a frame-skinnable type channel. */
++    --font-sans:
++      var(--font-source-sans), "Source Sans 3", ui-sans-serif, system-ui,
++      -apple-system, sans-serif;
++    --font-display:
++      var(--font-source-sans), "Source Sans 3", ui-sans-serif, system-ui,
++      sans-serif;
++    --font-display-sm:
++      var(--font-source-sans), "Source Sans 3", ui-sans-serif, system-ui,
++      sans-serif;
++    --head-font:
++      var(--font-source-sans), "Source Sans 3", ui-sans-serif, system-ui,
++      sans-serif;
++  }
+ }
+diff --git a/components/appearance/appearance-controls.tsx b/components/appearance/appearance-controls.tsx
+index 7d2785e..652a9db 100644
+--- a/components/appearance/appearance-controls.tsx
++++ b/components/appearance/appearance-controls.tsx
+@@ -44,6 +44,8 @@ import { Tooltip } from "@/components/ui";
+ import { SettingsCard, RadioDot } from "./settings-card";
+ import { useRovingRadio } from "./use-roving-radio";
+ import { ThemeChip } from "./theme-picker";
++import { PastelThemeLock } from "./pastel-theme-lock";
++import { FrameChip } from "./frame-chip";
+ import cardStyles from "./settings-card.module.css";
+ 
+ // ── Axis identifiers ─────────────────────────────────────────────────────────
+@@ -96,9 +98,14 @@ interface OptionMeta {
+   tooltip: string;
+ }
+ 
+-// Frame — settings.jsx FramePicker: Calm Glass (A→glass) · Bright (B→paper) ·
+-// Color (C→color), with the note line under each ("Frosted · floating" / "White
+-// paper" / "Subject-led").
++// Frame — settings.jsx FramePicker (7.21 handoff, source-home/settings.jsx:76-81):
++//   { k:'A', label:'Calm Glass', note:'Frosted · floating' }
++//   { k:'B', label:'Bright',     note:'White paper · subject color' }
++//   { k:'C', label:'Pastel',     note:'Soft tints · Common Planner' }
++// Frame C was labelled "Color" / "Subject-led" until the 7.21 handoff renamed
++// and re-skinned it as PASTEL. The axis VALUE is unchanged (`color`), so no
++// ALLOWLIST LOCKSTEP surface needed a value edit — only this copy, the skin
++// (app/themes.css + app/tokens.css) and the derived tone.
+ const FRAME_META: Record<ThemeFrame, OptionMeta> = {
+   glass: {
+     label: "Calm Glass",
+@@ -108,15 +115,15 @@ const FRAME_META: Record<ThemeFrame, OptionMeta> = {
+   },
+   paper: {
+     label: "Bright",
+-    desc: "White paper",
++    desc: "White paper · subject color",
+     tooltip:
+       "Switch the whole app to the Bright look — clean white paper surfaces. Only changes how the app looks for you.",
+   },
+   color: {
+-    label: "Color",
+-    desc: "Subject-led",
++    label: "Pastel",
++    desc: "Soft tints · Common Planner",
+     tooltip:
+-      "Switch the whole app to the Color look — subject color leads the surfaces. Only changes how the app looks for you.",
++      "Switch the whole app to the Pastel look — a calm gray canvas, white cards and soft subject tints, like a printed planner. Pastel brings its own locked palette, so the Theme choice turns off while it is on. Only changes how the app looks for you.",
+   },
+ };
+ 
+@@ -430,12 +437,16 @@ export function AppearanceControls({
+             key="frame"
+             eyebrow="Frame"
+             hint="The app's layout character and material."
+-            titleTooltip="Pick the app's overall look and material — Calm Glass, Bright, or Color. Changes layout and material, never which theme is active. Personal preference."
++            titleTooltip="Pick the app's overall look and material — Calm Glass, Bright, or Pastel. Changes layout and material, never which theme is active — except Pastel, which brings its own locked palette. Personal preference."
+             values={FRAME_VALUES}
+             meta={FRAME_META}
+             selected={frame}
+             onSelect={setFrame}
+             idPrefix="appearance-frame"
++            // The handoff's FramePicker has always shown a mini-preview of each
++            // frame's character (settings.jsx:84-87); ours had none, so the
++            // frames were bare text. See frame-chip.module.css.
++            renderPreview={(id) => <FrameChip id={id} />}
+             compact={compact}
+             savedTick={0}
+           />
+@@ -491,6 +502,31 @@ export function AppearanceControls({
+           />
+         );
+       case "theme":
++        // Frame C · Pastel locks its own palette (7.21 handoff): the 7-theme
++        // grid is REPLACED by an explanatory note rather than disabled, so a
++        // teacher is told the cause AND the remedy instead of being handed a
++        // greyed-out grid. Same treatment in theme-picker.tsx, which is the
++        // other theme chooser (/settings/appearance mounts BOTH); the note
++        // itself lives in one place so the two cannot drift.
++        if (frame === "color") {
++          return (
++            <SettingsCard
++              key="theme"
++              eyebrow="Theme"
++              title={
++                <Tooltip
++                  content="Pastel supplies its own locked palette, so the app-wide theme choice does not apply on this frame. Switch Frame to Calm Glass or Bright to choose a theme again."
++                  side="bottom"
++                >
++                  <span>Theme</span>
++                </Tooltip>
++              }
++              hint="Pastel supplies its own palette — themes are unavailable on this frame."
++            >
++              <PastelThemeLock />
++            </SettingsCard>
++          );
++        }
+         return (
+           <RadioGroup<AppTheme>
+             key="theme"
+diff --git a/components/appearance/frame-chip.module.css b/components/appearance/frame-chip.module.css
+new file mode 100644
+index 0000000..ec7044d
+--- /dev/null
++++ b/components/appearance/frame-chip.module.css
+@@ -0,0 +1,113 @@
++/* frame-chip.module.css — the three frame mini-previews.
++ *
++ * Ported from the 7.21 handoff's FramePicker swatches
++ * (source-home/settings.css:93-117). The handoff renders a small 1.5:1 tile per
++ * frame containing two stacked "cards", each frame styling them to advertise its
++ * own material:
++ *
++ *   .set-frame-pv{position:relative;width:100%;aspect-ratio:1.5/1;border-radius:11px;
++ *     overflow:hidden;display:flex;flex-direction:column;justify-content:center;
++ *     gap:5px;padding:11px 12px;background:linear-gradient(135deg,#5b6b8c,#2d3550)}
++ *   .set-frame-pv .pv-card{height:9px;border-radius:4px}
++ *   .pv-card.a{width:80%}  .pv-card.b{width:55%}
++ *
++ * Our picker is a compact radio row rather than the handoff's card grid, so the
++ * tile is scaled down to sit beside a RadioDot in the same slot ThemeChip
++ * occupies. The RECIPES are the handoff's; only the box size changes.
++ *
++ * Why this file exists at all: our frame picker had NO preview of any kind —
++ * `renderPreview` was passed only by the theme group, so the three frame options
++ * were bare text. The handoff has always specified swatches here.
++ */
++
++.chip {
++  position: relative;
++  width: 34px;
++  aspect-ratio: 1.5 / 1;
++  /* RULE #1 — no sharp corners. 11px in the handoff; --r-sm is 10px, the
++     nearest token, and the 1px is imperceptible at 34px wide. */
++  border-radius: var(--r-sm);
++  overflow: hidden;
++  display: flex;
++  flex-direction: column;
++  justify-content: center;
++  gap: 2.5px;
++  padding: 5px 6px;
++  flex: none;
++  /* The handoff's default tile ground (a dusk blue-slate), used by pv-A. */
++  background: linear-gradient(135deg, #5b6b8c, #2d3550);
++}
++
++.card {
++  height: 4.5px;
++  border-radius: 2px;
++}
++.a {
++  width: 80%;
++}
++.b {
++  width: 55%;
++}
++
++/* ── A · Calm Glass — frosted floating cards on a photo-ish ground (:101-103) ──
++   The inset top highlight is the lit-edge read that CLAUDE.md §4 calls the
++   signature of glass; it is what distinguishes this swatch from plain white. */
++.glass .card {
++  background: rgba(255, 255, 255, 0.5);
++  -webkit-backdrop-filter: blur(4px);
++  backdrop-filter: blur(4px);
++  border: 1px solid rgba(255, 255, 255, 0.6);
++  box-shadow:
++    0 4px 10px -4px rgba(0, 0, 0, 0.5),
++    inset 0 1px 0 rgba(255, 255, 255, 0.8);
++  border-left: 2px solid var(--subj-10);
++}
++
++/* ── B · Bright — white paper on a warm surface (:105-107) ─────────────────── */
++.paper {
++  background: #ecebe4;
++}
++.paper .card {
++  background: #fff;
++  border: 1px solid rgba(28, 27, 46, 0.1);
++  border-left: 2px solid var(--subj-10);
++  box-shadow: var(--sh-xs);
++}
++
++/* ── C · Pastel — soft subject tints on a pale wash (:109-112) ──────────────
++   ⚠ THE `pv-C` RECIPE IS THE ONE PLACE THE HANDOFF CONTRADICTS ITSELF, and the
++   contradiction is resolved here deliberately.
++
++   settings.css:109-112 still carries the OLD Frame-C swatch, from when Frame C
++   was "Color-forward": a lilac/mint ground (#F4F1F6→#EEF6F2) with two SATURATED
++   subject gradients. That is the swatch for a frame that no longer exists —
++   settings.jsx:80 in the SAME handoff renames C to "Pastel · Soft tints · Common
++   Planner", and pastel-frame.css paints a cool-gray canvas (#f1f5f9) with WHITE
++   cards and subject tints mixed 22% toward white.
++
++   A swatch is a promise about what picking the option does. Shipping the old
++   recipe would have shown a teacher lilac-and-mint saturation and then handed
++   them a gray-and-white planner. So the swatch follows pastel-frame.css — the
++   newer, more specific file, and the one that actually defines the frame — while
++   keeping the handoff's STRUCTURE (a pale ground, two subject-tinted cards).
++   Ground and card fills are taken from the Pastel token tier so the swatch
++   cannot drift from the frame it advertises. */
++.pastel {
++  background: linear-gradient(
++    160deg,
++    var(--pastel-canvas, #f1f5f9),
++    var(--pastel-canvas-2, #eef3f8)
++  );
++}
++.pastel .card {
++  border: 1px solid var(--pastel-hairline, #e4e4e7);
++}
++/* The two cards carry the 22%-toward-white subject mix that IS the Pastel
++   subject treatment (pastel-frame.css:36), so the swatch previews the real
++   thing rather than a stand-in. */
++.pastel .a {
++  background: color-mix(in oklab, var(--subj-10) 22%, white);
++}
++.pastel .b {
++  background: color-mix(in oklab, var(--subj-1) 22%, white);
++}
+diff --git a/components/appearance/frame-chip.tsx b/components/appearance/frame-chip.tsx
+new file mode 100644
+index 0000000..922d948
+--- /dev/null
++++ b/components/appearance/frame-chip.tsx
+@@ -0,0 +1,40 @@
++"use client";
++
++// frame-chip.tsx — the mini-preview swatch for each frame option.
++//
++// The 7.21 handoff's FramePicker (source-home/settings.jsx:76-95) renders a
++// visual mini-preview of each frame's CHARACTER beside its label — two stacked
++// "cards" on a ground, styled per frame. Our frame picker shipped without any
++// preview at all (`renderPreview` was passed only by the Theme group), so the
++// three frames were bare text and a teacher had no way to tell what "Pastel"
++// would look like before choosing it.
++//
++// Shape mirrors ThemeChip (components/appearance/theme-picker.tsx) so it drops
++// into the same `renderPreview` slot with no layout change. All colour lives in
++// frame-chip.module.css, which carries the handoff citations — including a note
++// on the one place the handoff contradicts itself about the Frame C swatch.
++
++import type { ReactNode } from "react";
++import type { ThemeFrame } from "@/lib/theme";
++import styles from "./frame-chip.module.css";
++
++// Frame value → the module class carrying that frame's recipe. Keyed by the
++// axis VALUE (unchanged by the Pastel rename — Frame C is still `color`), with
++// the class named for the LOOK, so the file reads as what it draws.
++const FRAME_CLASS: Record<ThemeFrame, string> = {
++  glass: styles.glass,
++  paper: styles.paper,
++  color: styles.pastel,
++};
++
++export function FrameChip({ id }: { id: ThemeFrame }): ReactNode {
++  return (
++    // aria-hidden: the swatch is decorative. The option's real accessible name
++    // comes from the label + tooltip on the surrounding radio, so announcing
++    // this would only add noise.
++    <span className={`${styles.chip} ${FRAME_CLASS[id]}`} aria-hidden="true">
++      <span className={`${styles.card} ${styles.a}`} />
++      <span className={`${styles.card} ${styles.b}`} />
++    </span>
++  );
++}
+diff --git a/components/appearance/pastel-theme-lock.module.css b/components/appearance/pastel-theme-lock.module.css
+new file mode 100644
+index 0000000..42ed134
+--- /dev/null
++++ b/components/appearance/pastel-theme-lock.module.css
+@@ -0,0 +1,34 @@
++/* pastel-theme-lock.module.css
++ *
++ * The Frame C · Pastel theme locked-note. Ported from the 7.21 handoff's
++ * `.set-lockednote` (source-home/settings.css:83):
++ *
++ *   .set-lockednote{font:600 12px var(--font-sans);color:var(--muted);
++ *     line-height:1.55;border:1px dashed var(--border);border-radius:12px;
++ *     padding:11px 13px;background:var(--surface-warm,#fafafa)}
++ *
++ * Kept token-for-token — the handoff already expresses this rule entirely in
++ * custom properties we also carry, so nothing had to be re-derived and no hex
++ * appears here. Under Pastel those tokens resolve to the tier in app/tokens.css
++ * (--muted #52525c, --border #e4e4e7, --surface-warm #fafafa), which is exactly
++ * the appearance the handoff's literal fallback describes.
++ *
++ * The dashed border is doing real work: it reads as "inert / not a control",
++ * distinguishing the note from the solid-bordered option cards it replaces.
++ */
++
++.lockedNote {
++  font-family: var(--font-sans);
++  font-size: 12px;
++  font-weight: 600;
++  line-height: 1.55;
++  color: var(--muted);
++  border: 1px dashed var(--border);
++  /* RULE #1 — no sharp corners. The handoff's literal is 12px; our scale's
++     --r-lg is 18px, so the exact-value token is --r-12. (Checked rather than
++     assumed — the semantic name would have been 6px off.) */
++  border-radius: var(--r-12);
++  padding: 11px 13px;
++  background: var(--surface-warm);
++  margin-top: 12px;
++}
+diff --git a/components/appearance/pastel-theme-lock.tsx b/components/appearance/pastel-theme-lock.tsx
+new file mode 100644
+index 0000000..cec9b86
+--- /dev/null
++++ b/components/appearance/pastel-theme-lock.tsx
+@@ -0,0 +1,45 @@
++"use client";
++
++// pastel-theme-lock.tsx — the Frame C · Pastel theme locked-note.
++//
++// Frame C is PASTEL (the 7.21 handoff's "Common Planner" skin), and Pastel LOCKS
++// ITS OWN PALETTE: a cool-gray canvas with teal accents, self-coloured, with the
++// theme wash and tint neutralised (app/themes.css) and the tone forced light
++// (lib/theme-values.ts deriveTone rule 0).
++//
++// The handoff does not merely DISABLE the 7-theme picker under this frame — it
++// REPLACES it with an explanatory note (source-home/settings.jsx:185-187):
++//
++//     {t.version==='C'
++//       ? <div className="set-lockednote">Pastel locks its own palette — cool
++//         gray canvas, teal accents. Switch to Calm Glass or Bright to use
++//         themes.</div>
++//       : <ThemePicker value={t.theme} onChange={v=>setTweak('theme',v)} />}
++//
++// Replacement rather than a disabled control is the right call on its own terms:
++// a greyed-out grid of seven swatches invites a teacher to keep clicking and
++// tells them nothing, whereas the note explains the cause AND the remedy. The
++// copy below is the handoff's, verbatim.
++//
++// Styling follows the handoff's `.set-lockednote` recipe (settings.css:83) —
++// dashed hairline border, rounded, muted 12px semibold text on the warm surface
++// — expressed in our tokens rather than its literals, per CLAUDE.md §4.
++//
++// Rendered by BOTH theme-picker.tsx and appearance-controls.tsx, which are two
++// separate theme choosers mounted on three surfaces (/settings/appearance mounts
++// both). Locking lives here, once, so the two cannot drift.
++
++import type { ReactNode } from "react";
++import styles from "./pastel-theme-lock.module.css";
++
++export function PastelThemeLock(): ReactNode {
++  return (
++    // `role="note"` + the aria-label give a screen-reader user the same
++    // explanation a sighted teacher gets from the replaced grid. Without it the
++    // picker would simply VANISH under this frame with no announced reason.
++    <div className={styles.lockedNote} role="note" aria-label="Theme locked">
++      Pastel locks its own palette — cool gray canvas, teal accents. Switch to
++      Calm Glass or Bright to use themes.
++    </div>
++  );
++}
+diff --git a/components/appearance/theme-picker.tsx b/components/appearance/theme-picker.tsx
+index 309a628..9e31422 100644
+--- a/components/appearance/theme-picker.tsx
++++ b/components/appearance/theme-picker.tsx
+@@ -18,6 +18,7 @@ import { useTheme } from "@/lib/theme";
+ import type { ThemeSetting, AppTheme } from "@/lib/theme";
+ import { Tooltip } from "@/components/ui";
+ import { SettingsCard, RadioDot } from "./settings-card";
++import { PastelThemeLock } from "./pastel-theme-lock";
+ import { useRovingRadio } from "./use-roving-radio";
+ import cardStyles from "./settings-card.module.css";
+ import styles from "./theme-picker.module.css";
+@@ -108,13 +109,39 @@ const RESOLVED_LABEL: Record<AppTheme, string> = {
+ };
+ 
+ export function ThemePicker(): ReactNode {
+-  const { theme, resolvedTheme, setTheme } = useTheme();
++  const { theme, resolvedTheme, setTheme, frame } = useTheme();
++  // Frame C · Pastel locks its own palette (7.21 handoff) — the theme grid is
++  // REPLACED by an explanatory note, not disabled. See PastelThemeLock. The
++  // hooks below still run unconditionally (rules-of-hooks) and are simply unused
++  // on this branch; the early return is placed after them for that reason.
++  const pastelLocked = frame === "color";
+   const roving = useRovingRadio({
+     values: THEME_OPTIONS.map((o) => o.id),
+     selected: theme,
+     onSelect: (v) => setTheme(v as ThemeSetting),
+   });
+ 
++  // Frame C · Pastel — the grid is REPLACED by the handoff's locked note. Placed
++  // after every hook call so the hook order is identical on both branches.
++  if (pastelLocked) {
++    return (
++      <SettingsCard
++        eyebrow="Theme"
++        title={
++          <Tooltip
++            content="Pastel supplies its own locked palette, so the app-wide theme choice does not apply on this frame. Switch Frame to Calm Glass or Bright to choose a theme again."
++            side="bottom"
++          >
++            <span>App color theme</span>
++          </Tooltip>
++        }
++        hint="Pastel supplies its own palette — themes are unavailable on this frame."
++      >
++        <PastelThemeLock />
++      </SettingsCard>
++    );
++  }
++
+   return (
+     <SettingsCard
+       eyebrow="Theme"
+diff --git a/components/appearance/theme-quick-switch.tsx b/components/appearance/theme-quick-switch.tsx
+index a064ffb..b7e2cc6 100644
+--- a/components/appearance/theme-quick-switch.tsx
++++ b/components/appearance/theme-quick-switch.tsx
+@@ -19,6 +19,7 @@ import { useTheme } from "@/lib/theme";
+ import type { ThemeSetting } from "@/lib/theme";
+ import { Tooltip } from "@/components/ui";
+ import { ThemeChip } from "./theme-picker";
++import { PastelThemeLock } from "./pastel-theme-lock";
+ import { useRovingRadio } from "./use-roving-radio";
+ import styles from "./theme-quick-switch.module.css";
+ 
+@@ -58,7 +59,15 @@ interface ThemeQuickSwitchProps {
+ export function ThemeQuickSwitch({
+   menuSemantics = false,
+ }: ThemeQuickSwitchProps): ReactNode {
+-  const { theme, setTheme } = useTheme();
++  const { theme, setTheme, frame } = useTheme();
++  // Frame C · Pastel locks its own palette (7.21 handoff). This row is the
++  // THIRD global theme entry point — the two full pickers (theme-picker.tsx,
++  // appearance-controls.tsx) already replace their grid with the locked note,
++  // and a quick-switch that kept working would have made the lock decorative:
++  // a teacher could set Night from the ⋯ More menu while Settings → Appearance
++  // told them themes were unavailable. Same treatment, same note component, so
++  // all three cannot drift.
++  const pastelLocked = frame === "color";
+   const roving = useRovingRadio({
+     values: QUICK_OPTIONS.map((o) => o.id),
+     selected: theme,
+@@ -77,6 +86,18 @@ export function ThemeQuickSwitch({
+     }
+   };
+ 
++  // REPLACED, not disabled — placed after every hook call so the hook order is
++  // identical on both branches. The note is inert (role="note", nothing
++  // focusable), so inside the More menu's role="menu" it is passive content the
++  // menu's roving focus simply steps over; no menuitemradio survives to look
++  // actionable. `PastelThemeLock` carries its own margin-top, which the two
++  // hosts' rows (the More menu's .themeRow, the Settings sidebar's
++  // .sidebarTheme) absorb — both already stack a "Theme" label above/beside the
++  // control, so the note reads as that label's explanation.
++  if (pastelLocked) {
++    return <PastelThemeLock />;
++  }
++
+   return (
+     <div
+       role={menuSemantics ? "group" : "radiogroup"}
+diff --git a/components/shell/command-palette.tsx b/components/shell/command-palette.tsx
+index 35efa89..a1133a4 100644
+--- a/components/shell/command-palette.tsx
++++ b/components/shell/command-palette.tsx
+@@ -176,6 +176,41 @@ const THEME_ACTIONS: readonly ThemeActionDef[] = [
+   },
+ ];
+ 
++// Frame C · Pastel LOCKS its own palette (7.21 handoff), so under it none of
++// the eight rows above may be offered. The palette is the FOURTH global theme
++// entry point, alongside theme-picker.tsx, appearance-controls.tsx and
++// theme-quick-switch.tsx; all three of those REPLACE their control with the
++// handoff's explanatory note rather than disabling it, and this row is the same
++// decision in the palette's own idiom.
++//
++// Three shapes were available and two are wrong. Leaving the rows and no-oping
++// them is the "reports success it did not earn" failure this repo has a
++// standing ruling against. Filtering them to nothing answers a teacher who
++// types "night" with "No results for 'night'" — a denial that is false (the
++// theme exists; it is unavailable HERE, for a reason, with a remedy). So the
++// rows are replaced by ONE row that names the cause and is genuinely
++// actionable: it navigates to Settings → Appearance, where the Frame control
++// that unlocks themes lives. It inherits every theme label + keyword so the
++// searches that used to find the eight rows now find the explanation.
++const PASTEL_THEME_LOCK_LABEL =
++  "Themes are locked by the Pastel frame — switch Frame to use them";
++
++// Label words + every theme name and alias ("night", "dark", "gold", …), so no
++// theme-shaped query falls through to the empty state. Built from THEME_ACTIONS
++// rather than restated, so a theme added there stays findable here.
++const PASTEL_THEME_LOCK_KEYWORDS: string[] = [
++  "theme",
++  "themes",
++  "pastel",
++  "locked",
++  "frame",
++  "appearance",
++  ...THEME_ACTIONS.flatMap((t) => [
++    t.label.replace(/^Theme:\s*/, ""),
++    ...t.keywords,
++  ]),
++];
++
+ // The v1 "Card style" and "Color intensity" command groups were REMOVED
+ // 2026-08-07 with the data-palette retirement: `data-style` never reached the
+ // v2 DOM (those commands changed nothing a teacher could see since the
+@@ -310,7 +345,7 @@ export function CommandPaletteBody({
+   // whatever the store has produced so far, and this only decides what to say
+   // when it has produced nothing.
+   const dataState = usePlannerDataState();
+-  const { theme, setTheme } = useTheme();
++  const { theme, setTheme, frame } = useTheme();
+ 
+   // ── Build the full results list from the current query ───────────────────
+ 
+@@ -350,23 +385,46 @@ export function CommandPaletteBody({
+         },
+       }));
+ 
+-    // Appearance results — apply an app-wide theme or card style without
+-    // leaving the keyboard. Each closes the palette on select (like every
+-    // other action) and marks the currently-live option with a check.
+-    const themeResults: PaletteResult[] = THEME_ACTIONS.filter(
+-      (t) => !q || matchesAny(t.label, t.keywords, q),
+-    ).map((t) => ({
+-      id: `theme-${t.theme}`,
+-      kind: "appearance" as const,
+-      label: t.label,
+-      meta: "Theme",
+-      keywords: t.keywords,
+-      selected: theme === t.theme,
+-      action: () => {
+-        setTheme(t.theme);
+-        onClose();
+-      },
+-    }));
++    // Appearance results — apply an app-wide theme without leaving the
++    // keyboard. Each closes the palette on select (like every other action)
++    // and marks the currently-live option with a check.
++    //
++    // …EXCEPT under Frame C · Pastel, which locks its own palette: there the
++    // eight rows are REPLACED by the single explanatory row (see
++    // PASTEL_THEME_LOCK_LABEL), which navigates to the remedy instead of
++    // setting a theme. Without this the lock was decorative — Settings said
++    // themes were unavailable while ⌘K → "night" still set Night.
++    const themeResults: PaletteResult[] =
++      frame === "color"
++        ? matchesAny(PASTEL_THEME_LOCK_LABEL, PASTEL_THEME_LOCK_KEYWORDS, q)
++          ? [
++              {
++                id: "theme-locked-pastel",
++                kind: "appearance" as const,
++                label: PASTEL_THEME_LOCK_LABEL,
++                meta: "Appearance",
++                keywords: PASTEL_THEME_LOCK_KEYWORDS,
++                action: () => {
++                  router.push("/settings/appearance");
++                  onClose();
++                },
++              },
++            ]
++          : []
++        : THEME_ACTIONS.filter(
++            (t) => !q || matchesAny(t.label, t.keywords, q),
++          ).map((t) => ({
++            id: `theme-${t.theme}`,
++            kind: "appearance" as const,
++            label: t.label,
++            meta: "Theme",
++            keywords: t.keywords,
++            selected: theme === t.theme,
++            action: () => {
++              setTheme(t.theme);
++              onClose();
++            },
++          }));
+ 
+     // Lesson results — match by plain-text title; cap at 12 so the list
+     // stays digestible (most useful when the query is specific).
+@@ -400,6 +458,11 @@ export function CommandPaletteBody({
+     onClose,
+     theme,
+     setTheme,
++    // Rule 0 of the lock: the theme rows are a FUNCTION of the frame, so a
++    // teacher who switches to/from Pastel in another tab must see the list
++    // re-derive. Omitting this would leave a stale, live theme list under a
++    // frame that forbids it.
++    frame,
+   ]);
+ 
+   // Reset selection whenever the results list changes.
+diff --git a/components/week-v2/WeekC.module.css b/components/week-v2/WeekC.module.css
+index 32e36cd..101acdb 100644
+--- a/components/week-v2/WeekC.module.css
++++ b/components/week-v2/WeekC.module.css
+@@ -464,3 +464,65 @@
+   color: inherit;
+   opacity: 0.82;
+ }
++
++/* ══════════════════════════════════════════════════════════════════════════
++   FRAME C · PASTEL — the tile skin (7.21 handoff, source-home/pastel-frame.css)
++   ──────────────────────────────────────────────────────────────────────────
++   WeekC IS the Frame C Week view, so it renders under Pastel. Its tile is a
++   DEEP subject gradient (58%/40% toward black) carrying WHITE text — the right
++   answer for the old "Color-forward" frame, and the wrong one for Pastel, whose
++   whole premise is soft tints on a light canvas. Left alone it produced the
++   live-QA symptom: a pale Pastel page with a row of near-black lesson cards.
++
++   THE FLIP IS ATOMIC — SURFACE AND INK MOVE TOGETHER. That is CLAUDE.md §4's
++   legibility contract, and it is the only real hazard in this block: lighten the
++   gradient without also darkening the ink and every tile becomes white-on-white.
++   `.tileTitle` / `.tileBodyRow` / `.tileBodyEmpty` all use `color: inherit`, so
++   they follow `.tile`'s colour for free; the two that hard-code white
++   (`.tileUnit`, and the focus ring) are re-pointed explicitly below.
++
++   Pastel NEVER INVENTS A SUBJECT COLOUR (pastel-frame.css:36): it mixes the
++   LOCKED hue toward white for the fill and keeps the hue for the ink. The
++   team-wide subject→slot map is untouched — `var(--c)` is still whatever the
++   palette bridge injected.
++
++   SPECIFICITY: `:global(:root[data-frame="color"]) .tile` is (0,4,0) against the
++   base `.tile` (0,1,0), so it wins on specificity alone rather than on module
++   order. `.tileUnit` is TRIPLED in the base rule to clear `.btn.ghost`, so the
++   Pastel override triples it too — an untripled override would be (0,4,0)
++   against the base's (0,4,0) and would depend on source order.
++   ══════════════════════════════════════════════════════════════════════════ */
++
++:global(:root[data-frame="color"]) .tile {
++  /* 22% toward white — the handoff's own subject-tint ratio. */
++  background: linear-gradient(
++    150deg,
++    color-mix(in oklab, var(--c, var(--brand-500)) 24%, white),
++    color-mix(in oklab, var(--c, var(--brand-500)) 12%, white)
++  );
++  /* Ink keeps the subject hue, darkened to near-black for AA on the pale tint
++     (pastel-frame.css:36 uses exactly this 80%-toward-ink mix). */
++  color: color-mix(in oklab, var(--c, var(--brand-500)) 80%, var(--pastel-ink));
++  border: 1px solid var(--pastel-hairline);
++  box-shadow: var(--sh-sm);
++}
++
++/* The unit chip was cut from translucent WHITE because the tile was dark. On a
++   pale tint that is a near-invisible chip, so it inverts to a white fill with
++   hairline border and slate ink — the handoff's `.dchip` recipe
++   (pastel-frame.css:42), which is the same component on the Day hero. */
++:global(:root[data-frame="color"]) .tileUnit.tileUnit.tileUnit {
++  background: rgba(255, 255, 255, 0.8);
++  border-color: var(--pastel-hairline);
++  color: var(--pastel-slate);
++}
++:global(:root[data-frame="color"])
++  .tileUnit.tileUnit.tileUnit:hover:not(:disabled) {
++  background: #fff;
++  border-color: var(--pastel-accent);
++  color: var(--pastel-accent-600);
++}
++/* White on a pale tint is no ring at all — take the teal accent instead. */
++:global(:root[data-frame="color"]) .tileUnit.tileUnit.tileUnit:focus-visible {
++  outline-color: var(--pastel-accent);
++}
+diff --git a/lib/theme-init.tsx b/lib/theme-init.tsx
+index 0d16a1c..13af6c2 100644
+--- a/lib/theme-init.tsx
++++ b/lib/theme-init.tsx
+@@ -93,14 +93,21 @@ const THEME_INIT_SCRIPT = `(function () {
+     if (["dim","normal","bright"].indexOf(dim) < 0) dim = "normal";
+     d.dataset.dim = dim;
+ 
+-    // ── DERIVED tone — replicate deriveTone(theme,glass,bg,dim,null) (see header
+-    // + WAVE-2-VALUE-MATRIX.md §4). MUST match theme.tsx deriveTone, the SSR
+-    // default in app/layout.tsx, and the probe. The async photo-luminance
++    // ── DERIVED tone — replicate deriveTone(theme,glass,bg,dim,null,frame) (see
++    // header + WAVE-2-VALUE-MATRIX.md §4). MUST match theme.tsx deriveTone, the
++    // SSR default in app/layout.tsx, and the probe. The async photo-luminance
+     // "normal → auto" upgrade is reconciled by the provider post-mount.
+-    //   night → dark · glass=light → light · wash → light · photo+bright → light
+-    //   · photo+(dim|normal) → dark
++    //   frame=color → light · night → dark · glass=light → light · wash → light
++    //   · photo+bright → light · photo+(dim|normal) → dark
++    // RULE 0 (frame === "color") IS FIRST, matching deriveTone. Frame C · Pastel
++    // locks a light cool-gray canvas and ships no dark register, so a teacher
++    // holding a persisted theme="night" who then picks Pastel must still boot
++    // light — otherwise first paint flashes black-on-black before the provider
++    // corrects it. tests/theme-tone-lockstep.test.ts pins this replica against
++    // deriveTone over the full axis cross-product.
+     var tone;
+-    if (t === "night") tone = "dark";
++    if (f === "color") tone = "light";
++    else if (t === "night") tone = "dark";
+     else if (g === "light") tone = "light";
+     else if (b === "wash") tone = "light";
+     else if (dim === "bright") tone = "light";
+diff --git a/lib/theme-values.ts b/lib/theme-values.ts
+index cb3a350..60aee21 100644
+--- a/lib/theme-values.ts
++++ b/lib/theme-values.ts
+@@ -154,12 +154,42 @@ export function isThemePalette(v: unknown): v is ThemePalette {
+ /**
+  * DERIVE the tone from the persisted axes (WAVE-2-VALUE-MATRIX.md §4).
+  * Evaluated top-to-bottom; first match wins:
++ *   0. frame === "color"  → light  (Frame C · Pastel — see below)
+  *   1. theme === "night"  → dark   (the only dark theme, app-wide)
+  *   2. glass === "light"  → light  (White-frosted register = a light surface)
+  *   3. bg === "wash"      → light  (Night + White-frosted already handled)
+  *   4. bg === "photo":  dim=dim → dark · dim=bright → light ·
+  *      dim=normal → AUTO (`autoTone` when sampled, else the safe dark).
+  *
++ * RULE 0 — FRAME C · PASTEL IS ALWAYS LIGHT (7.21 handoff).
++ * ---------------------------------------------------------------------------
++ * Pastel locks its own palette: a cool-gray canvas (#f1f5f9) with near-black
++ * ink and one teal accent (source-home/pastel-frame.css). It has NO dark
++ * register — the handoff ships none, and the settings panel replaces the
++ * 7-theme picker with a locked note under this frame ("Pastel locks its own
++ * palette … Switch to Calm Glass or Bright to use themes", settings.jsx:185-187).
++ *
++ * It has to be rule ZERO, ahead of the night check, precisely because a teacher
++ * can arrive here holding a persisted `theme: "night"` from before they picked
++ * Pastel. Without this, tone would derive "dark" while the Pastel token tier
++ * paints a white surface — black ink on black panels, the exact illegibility
++ * CLAUDE.md §4's legibility contract forbids.
++ *
++ * This is also what makes the port tractable: every surface branches on
++ * `data-tone`, never on the theme (the §4 contract), so forcing the tone here
++ * correctly neutralises all 119 `[data-tone="dark"]` rules across the 19
++ * stylesheets that carry them — including ~57 in component modules that could
++ * not have been re-pointed individually.
++ *
++ * ⚠ ALLOWLIST LOCKSTEP. This rule is replicated in the boot script
++ * (lib/theme-init.tsx) and reached through this function by the SSR attributes
++ * (app/layout.tsx). All three MUST agree or first paint flashes; tests/
++ * theme-tone-lockstep.test.ts pins the three against each other over the full
++ * frame × theme × glass × bg × dim cross-product. Surface 3 (the
++ * `teacher_preferences` SQL CHECK) is NOT affected — tone is derived and never
++ * persisted, so there is no `tone` column to constrain
++ * (20260624120000_v2_theme_axes.sql:21 states this explicitly).
++ *
+  * Pure: the async photo-luminance result is passed IN as `autoTone`. The boot
+  * script (lib/theme-init.tsx) and the SSR attributes (app/layout.tsx) both
+  * replicate/call THIS derivation with autoTone=null — the three MUST agree or
+@@ -171,7 +201,14 @@ export function deriveTone(
+   bg: ThemeBg,
+   dim: ThemeDim,
+   autoTone: ThemeTone | null,
++  // REQUIRED, deliberately not defaulted. A default (`= DEFAULT_FRAME`) would
++  // let a caller that forgets this argument silently derive GLASS tone for a
++  // Pastel teacher — a wrong-but-plausible result, which is the failure mode
++  // this repo's lockstep rule exists to prevent. Required makes every missed
++  // callsite a compile error instead.
++  frame: ThemeFrame,
+ ): ThemeTone {
++  if (frame === "color") return "light";
+   if (resolved === "night") return "dark";
+   if (glass === "light") return "light";
+   if (bg === "wash") return "light";
+diff --git a/lib/theme.tsx b/lib/theme.tsx
+index 4fc09dc..f1ea068 100644
+--- a/lib/theme.tsx
++++ b/lib/theme.tsx
+@@ -791,9 +791,12 @@ export function ThemeProvider({
+   // whenever they change. Never persisted; never a setter. `autoTone` only ever
+   // affects the bg === "photo" + dim === "normal" branch (deriveTone); for every
+   // other combination it is ignored, so its null default this wave is inert.
++  // `frame` is rule 0 of the derivation (Frame C · Pastel is always light), so
++  // it MUST be in the dependency list — omitting it would leave a Pastel
++  // teacher on a stale dark tone until some other axis happened to change.
+   const tone = useMemo<ThemeTone>(
+-    () => deriveTone(resolvedTheme, glass, bg, dim, autoTone),
+-    [resolvedTheme, glass, bg, dim, autoTone],
++    () => deriveTone(resolvedTheme, glass, bg, dim, autoTone, frame),
++    [resolvedTheme, glass, bg, dim, autoTone, frame],
+   );
+ 
+   // AUTO photo-luminance effect (matrix §4, rule 3, `dim === "normal"`). Runs
+diff --git a/scripts/probe-theme-wave.mjs b/scripts/probe-theme-wave.mjs
+index 987baf7..b643459 100644
+--- a/scripts/probe-theme-wave.mjs
++++ b/scripts/probe-theme-wave.mjs
+@@ -372,19 +372,29 @@ const KEY = {
+ // photo+dim→dark; photo+bright→light; photo+normal→AUTO (a real photo MUST
+ // resolve to a concrete light|dark via luminance — the W2-4 live proof).
+ // `auto:true` marks the case that polls for the post-mount luminance result.
++// Every case now seeds `frame` EXPLICITLY. It used to be omitted, which left
++// each case depending on the boot script's fallback to "glass" for an empty
++// localStorage — correct today, but silently wrong the moment the default frame
++// changes or a case inherits state. `frame` became load-bearing when Pastel made
++// it rule 0 of deriveTone, so it is no longer safe to leave implicit.
+ const TONE_CASES = [
+-  { id: "night", seed: { theme: "night", glass: "dark", bg: "photo", dim: "normal" }, expectTone: "dark" },
++  { id: "night", seed: { theme: "night", frame: "glass", glass: "dark", bg: "photo", dim: "normal" }, expectTone: "dark" },
++  // Rule 0 — Frame C · Pastel derives LIGHT regardless of every other axis.
++  // Seeded with the strongest possible dark pull (Night + dark glass + photo +
++  // dim), which is the exact combination a teacher reaches by choosing Night and
++  // then switching to Pastel. Anything but "light" here is the illegibility bug.
++  { id: "pastel-forces-light", seed: { theme: "night", frame: "color", glass: "dark", bg: "photo", dim: "dim" }, expectTone: "light" },
+   // White-frosted register forces light even on a photo+normal that would
+   // otherwise sample dark (Wave-2 re-audit MAJOR — glass now feeds deriveTone).
+-  { id: "glass-light", seed: { theme: "clear", glass: "light", bg: "photo", dim: "normal" }, expectTone: "light" },
++  { id: "glass-light", seed: { frame: "glass", theme: "clear", glass: "light", bg: "photo", dim: "normal" }, expectTone: "light" },
+   // Night still wins over the White-frosted register (night is the only dark theme).
+-  { id: "night-over-glass-light", seed: { theme: "night", glass: "light", bg: "photo", dim: "normal" }, expectTone: "dark" },
+-  { id: "wash", seed: { theme: "clear", glass: "dark", bg: "wash", dim: "normal" }, expectTone: "light" },
+-  { id: "photo-dim", seed: { theme: "clear", glass: "dark", bg: "photo", dim: "dim" }, expectTone: "dark" },
+-  { id: "photo-bright", seed: { theme: "clear", glass: "dark", bg: "photo", dim: "bright" }, expectTone: "light" },
++  { id: "night-over-glass-light", seed: { frame: "glass", theme: "night", glass: "light", bg: "photo", dim: "normal" }, expectTone: "dark" },
++  { id: "wash", seed: { frame: "glass", theme: "clear", glass: "dark", bg: "wash", dim: "normal" }, expectTone: "light" },
++  { id: "photo-dim", seed: { frame: "glass", theme: "clear", glass: "dark", bg: "photo", dim: "dim" }, expectTone: "dark" },
++  { id: "photo-bright", seed: { frame: "glass", theme: "clear", glass: "dark", bg: "photo", dim: "bright" }, expectTone: "light" },
+   // photo+normal: AUTO. expectTone is whatever the real /stage/p1.webp luminance
+   // yields — assert only that it is a CONCRETE, STABLE light|dark (not absent).
+-  { id: "photo-normal-auto", seed: { theme: "clear", glass: "dark", bg: "photo", dim: "normal" }, auto: true },
++  { id: "photo-normal-auto", seed: { frame: "glass", theme: "clear", glass: "dark", bg: "photo", dim: "normal" }, auto: true },
+ ];
+ 
+ const toneResults = [];
+@@ -397,6 +407,7 @@ for (const c of TONE_CASES) {
+     ({ keys, seed }) => {
+       try {
+         if (seed.theme) localStorage.setItem(keys.theme, seed.theme);
++        if (seed.frame) localStorage.setItem(keys.frame, seed.frame);
+         if (seed.glass) localStorage.setItem(keys.glass, seed.glass);
+         if (seed.bg) localStorage.setItem(keys.bg, seed.bg);
+         if (seed.dim) localStorage.setItem(keys.dim, seed.dim);
+@@ -459,8 +470,20 @@ const CORNER_CASES = [
+   { id: "glass-light-photo", frame: "glass", glass: "light", bg: "photo", theme: "clear" },
+   { id: "paper-photo", frame: "paper", glass: "dark", bg: "photo", theme: "honey" },
+   { id: "paper-wash", frame: "paper", glass: "dark", bg: "wash", theme: "night" },
+-  { id: "color-photo", frame: "color", glass: "dark", bg: "photo", theme: "blossom" },
+-  { id: "color-wash", frame: "color", glass: "light", bg: "wash", theme: "mint" },
++  // Frame C is PASTEL (7.21 handoff), and Pastel LOCKS its own palette: the
++  // settings panel replaces the 7-theme picker with a locked note under this
++  // frame, and app/themes.css neutralises the theme wash + tint. These two
++  // corners used to seed theme "blossom" / "mint" — which, now that the theme is
++  // locked, tested nothing their names implied: the wash they seeded is painted
++  // over. They are re-seeded to "clear" so the corner exercises the REAL Pastel
++  // appearance a teacher can reach, across both backgrounds.
++  //
++  // Note also that Pastel always derives tone "light" (deriveTone rule 0), so
++  // the glass register is inert here — kept only to keep the corner list's shape
++  // uniform. tests/theme-tone-lockstep.test.ts pins that no colour-frame corner
++  // regains a themed seed.
++  { id: "pastel-photo", frame: "color", glass: "dark", bg: "photo", theme: "clear" },
++  { id: "pastel-wash", frame: "color", glass: "light", bg: "wash", theme: "clear" },
+ ];
+ const cornerResults = [];
+ for (const c of CORNER_CASES) {
+diff --git a/supabase/migrations/20260624120000_v2_theme_axes.sql b/supabase/migrations/20260624120000_v2_theme_axes.sql
+index ba2ce8f..0cfc8e0 100644
+--- a/supabase/migrations/20260624120000_v2_theme_axes.sql
++++ b/supabase/migrations/20260624120000_v2_theme_axes.sql
+@@ -167,7 +167,10 @@ alter table public.teacher_preferences
+ --      the v2 layout character:
+ --        calm  → glass   (Frame A · Calm Glass)
+ --        quiet → paper   (Frame B · Bright workspace)
+---        vivid → color   (Frame C · Color-forward)
++--        vivid → color   (Frame C · Pastel — labelled "Color-forward" when this
++--                         migration shipped; the 7.21 handoff renamed and
++--                         re-skinned the frame. COMMENT ONLY — the axis VALUE is
++--                         still 'color' and the CHECK constraint is unchanged.)
+ --      Only fills NULLs, so it never clobbers a teacher's explicit v2 choice
+ --      and is a no-op on re-run.
+ update public.teacher_preferences
+diff --git a/tests/command-palette-empty.test.ts b/tests/command-palette-empty.test.ts
+index 0e24b84..781e3db 100644
+--- a/tests/command-palette-empty.test.ts
++++ b/tests/command-palette-empty.test.ts
+@@ -77,6 +77,12 @@ vi.mock("@/lib/app-state", () => ({
+ vi.mock("@/lib/theme", () => ({
+   useTheme: () => ({
+     theme: "clear",
++    // Explicit, though the palette only compares it against "color". Without
++    // this key the stub returned `undefined`, which took the unlocked branch
++    // and gave this suite the right result for the wrong reason — it would
++    // have passed identically if the Pastel lock had been keyed on the wrong
++    // value. A stub that omits the field under test is not exercising it.
++    frame: "glass",
+     style: "calm",
+     palette: "normal",
+     setTheme: () => {},
+diff --git a/tests/pastel-frame-css.test.ts b/tests/pastel-frame-css.test.ts
+new file mode 100644
+index 0000000..3199da6
+--- /dev/null
++++ b/tests/pastel-frame-css.test.ts
+@@ -0,0 +1,408 @@
++// tests/pastel-frame-css.test.ts
++//
++// Frame C · Pastel — the CSS contract.
++// ─────────────────────────────────────────────────────────────────────────────
++// The Pastel port re-points the semantic token tier (--surface, --border,
++// --muted, --ink, --ink-soft: ~2300 var() references between them), so two
++// things have to be true and neither is visible from reading a diff:
++//
++//   1. IT WINS. Every Pastel override competes with an existing rule — the dark
++//      tone tier for the neutrals, the Clear+Photo accent for --accent, the
++//      per-theme wash for .theme-tint. CSS resolves those by SPECIFICITY first
++//      and source order only on a tie. A rule that loses is not a subtle bug:
++//      it is invisible, and this repo has a documented history of exactly that
++//      (see docs — "CSS rules that die silently").
++//
++//   2. IT DOES NOT LEAK. A token re-point that escaped its frame scope would
++//      repaint Glass and Bright too.
++//
++// vitest runs in the node environment: there is no cascade and no layout here,
++// so this file reasons about SELECTOR TEXT and computes specificity itself. The
++// rendered consequence is measured separately by the live §4b pass. Both are
++// necessary; neither substitutes for the other.
++
++import { describe, it, expect } from "vitest";
++import { readFileSync } from "node:fs";
++import { fileURLToPath } from "node:url";
++
++const read = (rel: string) =>
++  readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
++
++const TOKENS = read("../app/tokens.css");
++const THEMES = read("../app/themes.css");
++
++/** Blank out comments PRESERVING LENGTH so offsets still line up with the real
++ *  file. Both stylesheets name their own selectors in prose at length, and a
++ *  prose mention is not a rule — without this the Pastel banner comment alone
++ *  would register as a dozen phantom selectors. */
++const mask = (css: string) =>
++  css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
++
++const TOKENS_M = mask(TOKENS);
++const THEMES_M = mask(THEMES);
++
++// ── Specificity ──────────────────────────────────────────────────────────────
++
++/**
++ * Compute (a,b,c) specificity for a SINGLE compound selector.
++ *   a = #id · b = .class | [attr] | :pseudo-class · c = element | ::pseudo-elem
++ * `:root` counts as a pseudo-class (b), which is the whole reason the doubled
++ * `[data-frame="color"][data-frame]` trick is needed: it buys one more `b`.
++ */
++function specificity(sel: string): [number, number, number] {
++  let s = sel.trim();
++  // :is()/:where() — :where() contributes ZERO; :is() takes its most specific
++  // argument. Neither appears in the rules under test, but a future edit could
++  // introduce one, and silently mis-scoring it would defeat the whole file.
++  if (/:where\(/.test(s)) s = s.replace(/:where\([^)]*\)/g, "");
++  if (/:is\(/.test(s)) {
++    // Score the most specific branch and splice it back in as a marker.
++    s = s.replace(/:is\(([^)]*)\)/g, (_m, inner: string) => {
++      const best = inner
++        .split(",")
++        .map((x) => specificity(x))
++        .sort((p, q) => q[0] - p[0] || q[1] - p[1] || q[2] - p[2])[0];
++      return "#".repeat(best[0]) + ".".repeat(best[1]) + "E".repeat(best[2]);
++    });
++  }
++  const ids = (s.match(/#[\w-]+/g) ?? []).length;
++  const attrs = (s.match(/\[[^\]]*\]/g) ?? []).length;
++  const classes = (s.replace(/\[[^\]]*\]/g, "").match(/\.[\w-]+/g) ?? []).length;
++  const pseudoEls = (s.match(/::[\w-]+/g) ?? []).length;
++  const pseudoCls = (
++    s.replace(/::[\w-]+/g, "").match(/:[\w-]+(\([^)]*\))?/g) ?? []
++  ).length;
++  const els = (
++    s
++      .replace(/\[[^\]]*\]/g, " ")
++      .replace(/::?[\w-]+(\([^)]*\))?/g, " ")
++      .replace(/[.#][\w-]+/g, " ")
++      .match(/\b[a-zA-Z][\w-]*\b/g) ?? []
++  ).length;
++  return [ids, attrs + classes + pseudoCls, pseudoEls + els];
++}
++
++const cmp = (x: [number, number, number], y: [number, number, number]) =>
++  x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
++const fmt = (x: [number, number, number]) => `(${x[0]},${x[1]},${x[2]})`;
++
++// Sanity-check the instrument before trusting a single verdict from it. A
++// specificity calculator that silently returned [0,0,0] would make every
++// "Pastel wins" assertion below pass for the wrong reason.
++describe("the specificity calculator itself (instrument check)", () => {
++  it("scores the known reference selectors correctly", () => {
++    expect(specificity(":root")).toEqual([0, 1, 0]);
++    expect(specificity(':root[data-theme="clear"][data-bg="photo"]')).toEqual([
++      0, 3, 0,
++    ]);
++    expect(specificity(':root[data-frame="color"][data-frame]')).toEqual([
++      0, 3, 0,
++    ]);
++    expect(specificity(':root[data-tone="dark"]')).toEqual([0, 2, 0]);
++    expect(
++      specificity(':root[data-bg="photo"][data-theme="honey"] .theme-tint'),
++    ).toEqual([0, 4, 0]);
++    expect(specificity('[data-frame="color"] .card')).toEqual([0, 2, 0]);
++    // ...and that it can tell them apart in the direction the port relies on.
++    expect(
++      cmp(
++        specificity(':root[data-frame="color"][data-frame]'),
++        specificity(':root[data-tone="dark"]'),
++      ),
++    ).toBeGreaterThan(0);
++  });
++});
++
++// ── Rule extraction ──────────────────────────────────────────────────────────
++
++interface Rule {
++  selector: string;
++  index: number;
++  props: Set<string>;
++}
++
++/** Walk a stylesheet, recursing INTO at-rules — all of themes.css and the
++ *  tokens.css theme/tone tier live inside `@media screen`, so an at-rule-
++ *  skipping parser would find nothing at all here. */
++function readRules(text: string, start: number, end: number, out: Rule[]): void {
++  let i = start;
++  let preludeStart = start;
++  while (i < end) {
++    const ch = text[i];
++    if (ch === "{") {
++      const prelude = text.slice(preludeStart, i).trim();
++      let depth = 1;
++      let j = i + 1;
++      while (j < end && depth > 0) {
++        if (text[j] === "{") depth++;
++        else if (text[j] === "}") depth--;
++        j++;
++      }
++      if (prelude.startsWith("@")) {
++        readRules(text, i + 1, j - 1, out);
++      } else if (prelude) {
++        const props = new Set<string>();
++        for (const decl of text.slice(i + 1, j - 1).split(";")) {
++          const colon = decl.indexOf(":");
++          if (colon < 0) continue;
++          const name = decl.slice(0, colon).trim().toLowerCase();
++          if (/^-{0,2}[a-z][a-z0-9-]*$/.test(name)) props.add(name);
++        }
++        out.push({ selector: prelude, index: preludeStart, props });
++      }
++      i = j;
++      preludeStart = i;
++      continue;
++    }
++    if (ch === "}") {
++      i++;
++      preludeStart = i;
++      continue;
++    }
++    i++;
++  }
++}
++
++const parse = (masked: string) => {
++  const out: Rule[] = [];
++  readRules(masked, 0, masked.length, out);
++  return out;
++};
++
++const TOKEN_RULES = parse(TOKENS_M);
++const THEME_RULES = parse(THEMES_M);
++
++/** Every comma-separated arm of a rule, with its own specificity. */
++const arms = (r: Rule) => r.selector.split(",").map((s) => s.trim());
++
++/**
++ * Find the single rule whose selector list contains an exact arm. `prop`
++ * disambiguates when the same arm appears more than once — e.g.
++ * `:root[data-theme="clear"][data-bg="photo"]` is written twice in themes.css,
++ * once for --accent and once inside the reduced-motion guard. Requiring exactly
++ * one match is deliberate: a silent "first match wins" would let this file
++ * measure the wrong rule and report a green it had not earned.
++ */
++function ruleWithArm(rules: Rule[], arm: string, prop?: string): Rule {
++  let hit = rules.filter((r) => arms(r).includes(arm));
++  if (prop) hit = hit.filter((r) => r.props.has(prop));
++  if (hit.length !== 1)
++    throw new Error(
++      `expected exactly 1 rule with arm \`${arm}\`${prop ? ` declaring ${prop}` : ""}, found ${hit.length}`,
++    );
++  return hit[0];
++}
++
++/** The Pastel skin section of themes.css, bounded at both ends — from its banner
++ *  to the start of the next top-level section. Slicing to end-of-file instead
++ *  would drag in every later rule and make these assertions meaningless. */
++function pastelSkinSection(): string {
++  const start = THEMES.indexOf("FRAME C · PASTEL — the skin");
++  if (start < 0) throw new Error("Pastel skin banner not found in themes.css");
++  const rest = THEMES.slice(start);
++  // The next section banner is a line of ═ following a numbered heading.
++  const endRel = rest.indexOf("═══\n     3 · NIGHT TONE");
++  const nextBanner = rest.search(/\n {2,}\/\* ═{10,}\n {5}\d+ · /);
++  const end = endRel > 0 ? endRel : nextBanner > 0 ? nextBanner : rest.length;
++  return rest.slice(0, end);
++}
++
++/** Does `winner` beat `loser`? Specificity first, source order on a tie. */
++function beats(winner: Rule, loser: Rule, arm: string, loserArm: string) {
++  const w = specificity(arm);
++  const l = specificity(loserArm);
++  const bySpec = cmp(w, l);
++  return {
++    bySpec,
++    byOrder: winner.index - loser.index,
++    wins: bySpec > 0 || (bySpec === 0 && winner.index > loser.index),
++    detail: `${arm} ${fmt(w)} @${winner.index} vs ${loserArm} ${fmt(l)} @${loser.index}`,
++  };
++}
++
++// ── 1 · The token tier exists, is frame-scoped, and beats the dark tier ──────
++
++const PASTEL_ARM = ':root[data-frame="color"][data-frame]';
++
++describe("app/tokens.css — the Pastel token tier", () => {
++  const pastel = ruleWithArm(TOKEN_RULES, PASTEL_ARM);
++  const dark = ruleWithArm(TOKEN_RULES, ':root[data-tone="dark"]');
++
++  it("declares the handoff palette literals", () => {
++    for (const [tok, value] of [
++      ["--pastel-canvas", "#f1f5f9"],
++      ["--pastel-canvas-2", "#eef3f8"],
++      ["--pastel-surface", "#ffffff"],
++      ["--pastel-hairline", "#e4e4e7"],
++      ["--pastel-ink", "#09090b"],
++      ["--pastel-muted", "#52525c"],
++      ["--pastel-dim", "#9f9fa9"],
++      ["--pastel-slate", "#314158"],
++      ["--pastel-accent", "#007595"],
++      ["--pastel-accent-600", "#005f7a"],
++      ["--pastel-accent-50", "#d2eff4"],
++    ] as const) {
++      expect(pastel.props.has(tok), `${tok} declared`).toBe(true);
++      // The VALUE matters as much as the token: a typo'd hex would still parse.
++      const decl = new RegExp(`${tok}\\s*:\\s*${value}\\s*;`, "i");
++      expect(decl.test(TOKENS), `${tok} is ${value}`).toBe(true);
++    }
++  });
++
++  it("re-points the five high-traffic semantic tokens", () => {
++    for (const tok of [
++      "--surface",
++      "--border",
++      "--muted",
++      "--ink",
++      "--ink-soft",
++      "--canvas",
++      "--hairline",
++    ])
++      expect(pastel.props.has(tok), `${tok} re-pointed`).toBe(true);
++  });
++
++  it("BEATS the dark-tone tier — on specificity, not source order", () => {
++    const v = beats(pastel, dark, PASTEL_ARM, ':root[data-tone="dark"]');
++    expect(v.wins, v.detail).toBe(true);
++    // Specifically: it must win on SPECIFICITY. A source-order-only win is one
++    // reorder away from silent death, which is the failure this asserts against.
++    expect(v.bySpec, `must win on specificity alone — ${v.detail}`).toBeGreaterThan(
++      0,
++    );
++  });
++
++  it("re-orients the ink ramp to LIGHT (the dark tier inverts it)", () => {
++    // Without this, a stale data-tone="dark" would leave --ink-900 lightest
++    // under a white Pastel surface.
++    for (const tok of ["--ink-900", "--ink-500", "--ink-100", "--ink-50"])
++      expect(pastel.props.has(tok), `${tok} re-oriented`).toBe(true);
++    expect(/--ink-900:\s*#09090b/.test(TOKENS)).toBe(true);
++  });
++
++  it("sets all four type channels to Source Sans 3", () => {
++    for (const tok of [
++      "--font-sans",
++      "--font-display",
++      "--font-display-sm",
++      "--head-font",
++    ]) {
++      expect(pastel.props.has(tok), `${tok} set`).toBe(true);
++    }
++    const body = TOKENS.slice(TOKENS.indexOf(PASTEL_ARM));
++    expect(body).toContain("--font-source-sans");
++    // --font-logo is deliberately NOT re-pointed: the wordmark is brand
++    // identity, not a frame-skinnable channel.
++    expect(pastel.props.has("--font-logo")).toBe(false);
++  });
++
++  it("DOES NOT LEAK — every Pastel declaration is frame-scoped", () => {
++    const leaks = TOKEN_RULES.filter(
++      (r) =>
++        [...r.props].some((p) => p.startsWith("--pastel-")) &&
++        !arms(r).every((a) => a.includes('[data-frame="color"]')),
++    );
++    expect(leaks.map((r) => r.selector)).toEqual([]);
++  });
++});
++
++// ── 2 · The themes.css skin wins its three specificity fights ────────────────
++
++describe("app/themes.css — the Pastel skin overrides win", () => {
++  it("the teal accent beats the Clear+Photo accent", () => {
++    const pastel = ruleWithArm(THEME_RULES, PASTEL_ARM);
++    const clearPhoto = ruleWithArm(
++      THEME_RULES,
++      ':root[data-theme="clear"][data-bg="photo"]',
++      "--accent",
++    );
++    expect(pastel.props.has("--accent")).toBe(true);
++    expect(clearPhoto.props.has("--accent")).toBe(true);
++    const v = beats(
++      pastel,
++      clearPhoto,
++      PASTEL_ARM,
++      ':root[data-theme="clear"][data-bg="photo"]',
++    );
++    // Equal specificity (0,3,0) — this one is won on SOURCE ORDER, exactly as
++    // the handoff wins it. That is why --accent additionally carries
++    // !important here; assert both halves.
++    expect(v.wins, v.detail).toBe(true);
++    expect(v.byOrder, `must be later in the file — ${v.detail}`).toBeGreaterThan(
++      0,
++    );
++    const body = THEMES.slice(THEMES.indexOf(PASTEL_ARM));
++    expect(/--accent:\s*var\(--pastel-accent\)\s*!important/.test(body)).toBe(
++      true,
++    );
++  });
++
++  it("the .theme-tint kill beats the (0,4,0) per-theme photo rules", () => {
++    const arm = `${PASTEL_ARM} .theme-tint`;
++    const pastel = ruleWithArm(THEME_RULES, arm);
++    const honey = ruleWithArm(
++      THEME_RULES,
++      ':root[data-bg="photo"][data-theme="honey"] .theme-tint',
++    );
++    const v = beats(
++      pastel,
++      honey,
++      arm,
++      ':root[data-bg="photo"][data-theme="honey"] .theme-tint',
++    );
++    expect(v.wins, v.detail).toBe(true);
++    // (0,4,0) vs (0,4,0) + later + !important — belt, braces and a third strap.
++    expect(specificity(arm)).toEqual([0, 4, 0]);
++    expect(/\.theme-tint\s*\{\s*opacity:\s*0\s*!important/.test(THEMES)).toBe(
++      true,
++    );
++  });
++
++  it("the Pastel .card beats the legacy Frame-C .card on specificity alone", () => {
++    const arm = `${PASTEL_ARM} .card`;
++    const pastel = ruleWithArm(THEME_RULES, arm);
++    const legacy = ruleWithArm(THEME_RULES, '[data-frame="color"] .card');
++    const v = beats(pastel, legacy, arm, '[data-frame="color"] .card');
++    expect(v.wins, v.detail).toBe(true);
++    expect(v.bySpec, v.detail).toBeGreaterThan(0);
++  });
++
++  it("the colour·Night rules are GONE — they are unreachable and were a hazard", () => {
++    // deriveTone rule 0 makes [data-tone="dark"][data-frame="color"] impossible.
++    // Leaving these would have painted near-black panels under near-black ink if
++    // the derivation ever regressed.
++    const survivors = THEME_RULES.filter((r) =>
++      arms(r).some(
++        (a) => a.includes('[data-tone="dark"]') && a.includes('[data-frame="color"]'),
++      ),
++    );
++    expect(survivors.map((r) => r.selector)).toEqual([]);
++  });
++
++  it("uses NO raw hex — every Pastel colour comes through a token", () => {
++    // CLAUDE.md §4: colours live in tokens.css. The skin may reference
++    // var(--pastel-*) but must not restate a literal.
++    const section = mask(pastelSkinSection());
++    const hexes = section.match(/#[0-9a-fA-F]{3,8}\b/g) ?? [];
++    // #fff on the active-tab foreground is the one allowed literal: it is not a
++    // palette colour but the "text on a solid accent" contrast pair, which the
++    // handoff also writes literally (pastel-frame.css:44).
++    expect(hexes.filter((h) => h.toLowerCase() !== "#fff")).toEqual([]);
++  });
++});
++
++// ── 3 · Radii — RULE #1, no sharp corners ───────────────────────────────────
++
++describe("RULE #1 — Pastel introduces no sharp corners", () => {
++  it("uses --r-pill rather than the handoff's literal 9999px", () => {
++    const section = pastelSkinSection();
++    expect(section).toContain("border-radius: var(--r-pill)");
++    // Mask comments first: the section's own prose CITES the handoff's literal
++    // ("--r-pill rather than the handoff's literal 9999px"), and matching that
++    // would fail the rule the comment exists to document.
++    const code = mask(section);
++    expect(code).not.toContain("9999px");
++    // ...and never sets a zero/sharp radius anywhere in the Pastel skin.
++    expect(/border-radius:\s*0\b/.test(code)).toBe(false);
++  });
++});
+diff --git a/tests/pastel-theme-lock-entry-points.test.ts b/tests/pastel-theme-lock-entry-points.test.ts
+new file mode 100644
+index 0000000..ee271dd
+--- /dev/null
++++ b/tests/pastel-theme-lock-entry-points.test.ts
+@@ -0,0 +1,196 @@
++// tests/pastel-theme-lock-entry-points.test.ts
++//
++// Frame C · Pastel LOCKS its own palette (7.21 handoff). tests/pastel-theme-
++// lock.test.ts pins the TWO full pickers. This file exists because pinning two
++// of four surfaces is what let the lock ship bypassable: `theme-quick-switch`
++// (the ⋯ More menu + the Settings sidebar) and the ⌘K command palette both
++// still called setTheme() with no frame check, so a teacher on Pastel could set
++// Night from either while Settings → Appearance told them themes were
++// unavailable.
++//
++// Two different kinds of assertion live here, and the first is the one that
++// keeps this from happening a third time:
++//
++//   1 · THE CENSUS. Enumerate every setTheme() call site in app/ · components/
++//       · lib/ and require the set to equal a reviewed allowlist, each member
++//       of which must itself carry the frame check. A NEW global theme entry
++//       point therefore fails this file the moment it is written, whether or
++//       not anyone remembered the lock. A per-surface behavioural test can
++//       only ever cover surfaces someone thought of.
++//
++//   2 · THE BEHAVIOUR of the quick-switch itself, at all three frames.
++//       (The palette's behaviour needs the store/router stubs, so it lives in
++//       tests/pastel-theme-lock-palette.test.ts.)
++//
++// The census FAILS CLOSED by construction: a broken scan yields an empty set,
++// which cannot equal the non-empty allowlist. That matters — this repo's
++// costliest bug class is a check that reports a pass it did not earn.
++//
++// Deliberately a .ts file using createElement rather than .tsx with JSX: the
++// suite's include glob is `tests/**/*.test.ts`, so a .tsx file would sit in the
++// tree looking like coverage while never being collected.
++
++import { describe, it, expect } from "vitest";
++import { readFileSync, readdirSync, statSync } from "node:fs";
++import { fileURLToPath } from "node:url";
++import { renderToStaticMarkup } from "react-dom/server";
++import { createElement } from "react";
++
++import { ThemeProvider } from "@/lib/theme";
++import type { ThemeFrame } from "@/lib/theme";
++import { ThemeQuickSwitch } from "@/components/appearance/theme-quick-switch";
++
++const REPO = fileURLToPath(new URL("..", import.meta.url));
++const abs = (rel: string) => fileURLToPath(new URL(`../${rel}`, import.meta.url));
++
++// ── 1 · The census ───────────────────────────────────────────────────────────
++
++/**
++ * Every file, outside the provider itself, that can change the app-wide theme
++ * value. Adding a surface here is a deliberate act; the assertions below then
++ * require that surface to honour the Pastel lock.
++ *
++ * `lib/theme.tsx` is excluded from the scan (not allowlisted) because it is the
++ * DECLARATION site: its setTheme is the useState setter, driven by persistence,
++ * the cross-tab `storage` event and the theme-sync remote apply. Those are not
++ * teacher-facing controls and must keep landing the persisted value under every
++ * frame — Pastel hides the theme, it does not erase it, exactly as the two full
++ * pickers already behave (leave Pastel and the previous theme returns).
++ */
++const THEME_ENTRY_POINTS: readonly string[] = [
++  "components/appearance/appearance-controls.tsx",
++  "components/appearance/theme-picker.tsx",
++  "components/appearance/theme-quick-switch.tsx",
++  "components/shell/command-palette.tsx",
++];
++
++/** The provider — scanned over, never allowlisted. See the note above. */
++const PROVIDER = "lib/theme.tsx";
++
++const SCAN_ROOTS = ["app", "components", "lib"] as const;
++
++function walk(dir: string, out: string[]): void {
++  for (const name of readdirSync(dir)) {
++    if (name === "node_modules" || name === ".next") continue;
++    const full = `${dir}/${name}`;
++    if (statSync(full).isDirectory()) walk(full, out);
++    else if (/\.tsx?$/.test(name)) out.push(full);
++  }
++}
++
++/** Repo-relative, forward-slashed paths of files that call setTheme(...). */
++function findSetThemeCallSites(): string[] {
++  const files: string[] = [];
++  for (const root of SCAN_ROOTS) walk(abs(root), files);
++  const hits: string[] = [];
++  for (const file of files) {
++    const src = readFileSync(file, "utf8");
++    // A CALL, not a mention: `setTheme(` / `setTheme (`. Destructuring
++    // (`const { setTheme } = useTheme()`), the interface member and prose all
++    // fail this, so a file that merely names the setter is not a call site.
++    if (/\bsetTheme\s*\(/.test(src)) {
++      hits.push(file.slice(REPO.length).replace(/\\/g, "/"));
++    }
++  }
++  return hits.sort();
++}
++
++describe("the census of global theme entry points", () => {
++  const found = findSetThemeCallSites();
++
++  it("finds call sites at all (instrument check — this scan must not fail open)", () => {
++    // A scan that silently matched nothing would make every assertion below
++    // pass while checking nothing. The provider is the one call site we know
++    // exists unconditionally, so its presence proves the walker reached the
++    // tree and the pattern matches real code.
++    expect(found).toContain(PROVIDER);
++    expect(found.length).toBeGreaterThan(1);
++  });
++
++  it("is exactly the reviewed allowlist — a NEW entry point fails here", () => {
++    // The failure this file exists for. If you are reading this because the
++    // test just went red: a file gained the ability to change the theme.
++    // Give it the Pastel lock (replace its control with <PastelThemeLock /> or
++    // the palette's equivalent explanatory row — never a silent no-op), then
++    // add it to THEME_ENTRY_POINTS.
++    expect(found.filter((f) => f !== PROVIDER)).toEqual([...THEME_ENTRY_POINTS].sort());
++  });
++
++  it("every allowlisted entry point actually carries the frame check", () => {
++    // Allowlisting without locking would turn the census into a rubber stamp.
++    for (const rel of THEME_ENTRY_POINTS) {
++      const src = readFileSync(abs(rel), "utf8");
++      expect(/frame\s*===\s*"color"/.test(src), `${rel} branches on the Pastel frame`).toBe(
++        true,
++      );
++      // ...and reads `frame` off the theme context rather than inferring it.
++      expect(/\bframe\b/.test(src), `${rel} reads the frame axis`).toBe(true);
++    }
++  });
++});
++
++// ── 2 · The quick-switch behaviour ───────────────────────────────────────────
++
++/** The handoff's locked-note copy, verbatim (settings.jsx:186). */
++const LOCK_COPY =
++  "Pastel locks its own palette — cool gray canvas, teal accents. Switch to Calm Glass or Bright to use themes.";
++
++function renderAt(frame: ThemeFrame, menuSemantics: boolean): string {
++  return renderToStaticMarkup(
++    createElement(ThemeProvider, {
++      initialFrame: frame,
++      children: createElement(ThemeQuickSwitch, { menuSemantics }),
++    }),
++  );
++}
++
++const text = (html: string) =>
++  html
++    .replace(/<[^>]+>/g, " ")
++    .replace(/&#x27;/g, "'")
++    .replace(/&quot;/g, '"')
++    .replace(/&amp;/g, "&")
++    .replace(/&#(\d+);/g, (_m, d) => String.fromCharCode(Number(d)))
++    .replace(/\s+/g, " ")
++    .trim();
++
++describe("ThemeQuickSwitch — the ⋯ More menu + Settings sidebar chips", () => {
++  it("Pastel (color) in the More menu: chips REPLACED by the locked note", () => {
++    const html = renderAt("color", true);
++    expect(text(html)).toContain(LOCK_COPY);
++    // Replaced, not hidden and not disabled-in-place: nothing that looks
++    // actionable survives. `menuitemradio` is the specific control a teacher
++    // could still click on Pastel before this fix.
++    expect(html).not.toContain('role="menuitemradio"');
++    expect(html).not.toContain('role="radio"');
++    expect(html).not.toContain('aria-label="Theme quick switch"');
++    // Announced, not silently swapped in.
++    expect(html).toContain('role="note"');
++    expect(html).toContain('aria-label="Theme locked"');
++  });
++
++  it("Pastel (color) in the Settings sidebar: same treatment", () => {
++    const html = renderAt("color", false);
++    expect(text(html)).toContain(LOCK_COPY);
++    expect(html).not.toContain('role="radiogroup"');
++    expect(html).not.toContain('role="radio"');
++  });
++
++  it("Calm Glass: the chips are present and the note is absent", () => {
++    // The opposite failure, and the likelier one after a fix like this: a lock
++    // that fires everywhere would pass every assertion above while removing the
++    // quick-switch from the two frames that are supposed to have it.
++    const html = renderAt("glass", false);
++    expect(text(html)).not.toContain("Pastel locks its own palette");
++    expect(html).toContain('role="radiogroup"');
++    expect(html).toContain('aria-label="Theme quick switch"');
++    for (const label of ["Clear theme", "Night theme", "Honey theme"])
++      expect(html).toContain(label);
++  });
++
++  it("Bright (paper): unchanged — the lock is frame-scoped, not a blanket off", () => {
++    const html = renderAt("paper", true);
++    expect(text(html)).not.toContain("Pastel locks its own palette");
++    expect(html).toContain('role="menuitemradio"');
++  });
++});
+diff --git a/tests/pastel-theme-lock-palette.test.ts b/tests/pastel-theme-lock-palette.test.ts
+new file mode 100644
+index 0000000..108aa37
+--- /dev/null
++++ b/tests/pastel-theme-lock-palette.test.ts
+@@ -0,0 +1,173 @@
++// tests/pastel-theme-lock-palette.test.ts
++//
++// The ⌘K command palette is the FOURTH global theme entry point, and the one
++// furthest from Settings: `setTheme(t.theme)` on eight rows, with no frame
++// check. A teacher on Frame C · Pastel — whose Settings page shows the locked
++// note in place of the theme grid — could still press ⌘K, type "night", and set
++// Night. The lock was decorative from the keyboard.
++//
++// Under Pastel the eight rows are REPLACED by one explanatory row that
++// navigates to Settings → Appearance (where the Frame control that unlocks
++// themes lives). Three properties are pinned, and the second and third are the
++// ones that distinguish this from the two shapes that would have been wrong:
++//
++//   • no theme row survives to be actionable                (not a no-op);
++//   • a theme-shaped query still finds SOMETHING            (not "No results");
++//   • the row does something real                           (it navigates).
++//
++// Stub set mirrors tests/command-palette-empty.test.ts — the palette's other
++// hooks are navigation and store plumbing with no bearing on this branch. The
++// theme module is spread from the original so only `useTheme` is swapped;
++// everything else its graph exports stays real.
++
++import { describe, it, expect, vi, beforeEach } from "vitest";
++import { createElement, createRef } from "react";
++import { renderToStaticMarkup } from "react-dom/server";
++
++import { CommandPaletteBody } from "@/components/shell/command-palette";
++import { mountReact } from "./mount-react";
++
++const store = vi.hoisted(() => ({
++  /** The axis under test. Drives which branch of the theme bucket renders. */
++  frame: "glass" as "glass" | "paper" | "color",
++  /** Captures router.push so "it navigates" is a fact, not an inference. */
++  pushed: [] as string[],
++}));
++
++vi.mock("@/lib/planner-store", async (importOriginal) => ({
++  ...(await importOriginal<typeof import("@/lib/planner-store")>()),
++  usePlanner: () => ({ lessons: [], subjects: [] }),
++  usePlannerDataState: () => "settled",
++}));
++vi.mock("next/navigation", () => ({
++  useRouter: () => ({
++    push: (href: string) => {
++      store.pushed.push(href);
++    },
++  }),
++}));
++vi.mock("@/lib/app-state", () => ({
++  useAppState: () => ({ setSubjectView: () => {}, setSearch: () => {} }),
++}));
++vi.mock("@/lib/theme", async (importOriginal) => ({
++  ...(await importOriginal<typeof import("@/lib/theme")>()),
++  useTheme: () => ({
++    theme: "clear",
++    resolvedTheme: "clear",
++    frame: store.frame,
++    glass: "dark",
++    bg: "photo",
++    dim: "normal",
++    tone: "light",
++    canvas: "glass-dim",
++    style: "calm",
++    palette: "normal",
++    setTheme: () => {},
++    setFrame: () => {},
++    setGlass: () => {},
++    setBg: () => {},
++    setDim: () => {},
++    setCanvas: () => {},
++    setStyle: () => {},
++    setPalette: () => {},
++  }),
++}));
++
++const DENIAL = "No results for";
++const LOCK_ROW = "Themes are locked by the Pastel frame";
++
++function render(query: string) {
++  return renderToStaticMarkup(
++    createElement(CommandPaletteBody, {
++      query,
++      onQueryChange: () => {},
++      onClose: () => {},
++      inputRef: createRef<HTMLInputElement>(),
++    }),
++  );
++}
++
++beforeEach(() => {
++  store.frame = "glass";
++  store.pushed = [];
++});
++
++describe("⌘K theme rows under Frame C · Pastel", () => {
++  it("offers NO theme row — the eight setTheme rows are gone", () => {
++    store.frame = "color";
++    const html = render("");
++    for (const label of [
++      "Theme: Clear",
++      "Theme: Night",
++      "Theme: Honey",
++      "Theme: Blossom",
++      "Theme: Mint",
++      "Theme: Sky",
++      "Theme: Off (Photo)",
++      "Theme: Follow system",
++    ])
++      expect(html, `${label} must not be offered on Pastel`).not.toContain(label);
++  });
++
++  it('answers a theme query with the explanation, not "No results"', () => {
++    // Filtering the rows to nothing would have been the lazy fix: a teacher who
++    // types "night" would be told, flatly, that no such thing exists. It does
++    // exist; it is unavailable HERE, for a reason, with a remedy.
++    store.frame = "color";
++    for (const query of ["night", "dark", "theme", "pastel", "honey", "sky"]) {
++      const html = render(query);
++      expect(html, `query "${query}"`).toContain(LOCK_ROW);
++      expect(html, `query "${query}"`).not.toContain(DENIAL);
++    }
++  });
++
++  it("the lock row is genuinely actionable — clicking it opens Appearance", async () => {
++    // The whole point of replacing rather than disabling: the row carries the
++    // teacher to the Frame control that unlocks themes. A row that looked
++    // actionable and did nothing would be the exact failure this repo has a
++    // standing ruling against — so this is a real mount and a real click, not a
++    // markup assertion that the row merely exists.
++    store.frame = "color";
++    const h = await mountReact(CommandPaletteBody);
++    try {
++      await h.render({
++        query: "night",
++        onQueryChange: () => {},
++        onClose: () => {},
++        inputRef: createRef<HTMLInputElement>(),
++      });
++      const row = h.query("#result-theme-locked-pastel");
++      expect(row, "the lock row must be in the mounted tree").not.toBeNull();
++      expect(store.pushed).toEqual([]);
++      await h.clickElement(row as Element);
++      expect(store.pushed).toEqual(["/settings/appearance"]);
++    } finally {
++      await h.unmount();
++    }
++  });
++
++  it("a non-theme query is unaffected by the lock", () => {
++    // The lock must not swallow the rest of the palette.
++    store.frame = "color";
++    const html = render("weekly");
++    expect(html).toContain("Weekly planner");
++    expect(html).not.toContain(LOCK_ROW);
++  });
++});
++
++describe("the lock is frame-scoped, not a blanket removal", () => {
++  it("Calm Glass still offers every theme row", () => {
++    store.frame = "glass";
++    const html = render("");
++    expect(html).toContain("Theme: Night");
++    expect(html).toContain("Theme: Clear");
++    expect(html).not.toContain(LOCK_ROW);
++  });
++
++  it("Bright (paper) still offers every theme row", () => {
++    store.frame = "paper";
++    const html = render("night");
++    expect(html).toContain("Theme: Night");
++    expect(html).not.toContain(LOCK_ROW);
++  });
++});
+diff --git a/tests/pastel-theme-lock.test.ts b/tests/pastel-theme-lock.test.ts
+new file mode 100644
+index 0000000..d7c8dd6
+--- /dev/null
++++ b/tests/pastel-theme-lock.test.ts
+@@ -0,0 +1,150 @@
++// tests/pastel-theme-lock.test.ts
++//
++// Frame C · Pastel LOCKS its own palette (7.21 handoff): under this frame the
++// 7-theme picker is REPLACED by an explanatory note, not merely disabled
++// (source-home/settings.jsx:185-187).
++//
++// There are TWO separate theme choosers in this app, and /settings/appearance
++// mounts BOTH — `<AppearanceControls />` (its "theme" axis group) and the
++// standalone `<ThemePicker />`. A lock applied to only one of them would leave a
++// live, fully-functional theme grid sitting directly beneath the note telling
++// the teacher themes are unavailable. This file pins BOTH, which is the whole
++// reason it exists as a separate test rather than a line in another one.
++//
++// Rendered with react-dom/server rather than a DOM harness: these are pure,
++// props-driven branches with no effects to settle, so static markup is the
++// cheapest complete evidence. (react-dom/server does work in this repo's node
++// vitest environment, despite older comments to the contrary.)
++//
++// Deliberately a .ts file using createElement rather than .tsx with JSX: the
++// suite's include glob is `tests/**/*.test.ts`, so a .tsx file is silently NOT
++// COLLECTED — it would sit in the tree looking like coverage while never once
++// running. Renaming was the right fix; widening the shared glob was not mine to
++// make, and would have been a larger change than this file warrants.
++
++import { describe, it, expect } from "vitest";
++import { renderToStaticMarkup } from "react-dom/server";
++import { createElement } from "react";
++import type { ReactElement } from "react";
++
++import { ThemeProvider } from "@/lib/theme";
++import type { ThemeFrame } from "@/lib/theme";
++import { AppearanceControls } from "@/components/appearance/appearance-controls";
++import { ThemePicker } from "@/components/appearance/theme-picker";
++
++/** The handoff's locked-note copy, verbatim (settings.jsx:186). */
++const LOCK_COPY =
++  "Pastel locks its own palette — cool gray canvas, teal accents. Switch to Calm Glass or Bright to use themes.";
++
++function renderAt(frame: ThemeFrame, node: ReactElement): string {
++  // `children` goes in the props object rather than as a positional third
++  // argument: ThemeProviderProps declares it REQUIRED, and the positional form
++  // does not satisfy that for the type-checker.
++  return renderToStaticMarkup(
++    createElement(ThemeProvider, { initialFrame: frame, children: node }),
++  );
++}
++
++// Normalise the HTML entities react emits for the em dash / non-breaking
++// punctuation so a copy comparison is about WORDS, not encoding.
++const text = (html: string) =>
++  html
++    .replace(/<[^>]+>/g, " ")
++    .replace(/&#x27;/g, "'")
++    .replace(/&quot;/g, '"')
++    .replace(/&amp;/g, "&")
++    .replace(/&#(\d+);/g, (_m, d) => String.fromCharCode(Number(d)))
++    .replace(/\s+/g, " ")
++    .trim();
++
++describe("AppearanceControls — the theme axis under each frame", () => {
++  it("Pastel (color): the theme grid is REPLACED by the locked note", () => {
++    const html = renderAt(
++      "color",
++      createElement(AppearanceControls, { axes: ["theme"] }),
++    );
++    expect(text(html)).toContain(LOCK_COPY);
++    // Replaced, not merely hidden or disabled: no theme radio survives.
++    expect(html).not.toContain('aria-label="Theme"');
++    expect(html).not.toContain('role="radiogroup"');
++    expect(html).not.toContain('role="radio"');
++  });
++
++  it("Calm Glass: the theme grid is present and the note is absent", () => {
++    const html = renderAt(
++      "glass",
++      createElement(AppearanceControls, { axes: ["theme"] }),
++    );
++    expect(text(html)).not.toContain("Pastel locks its own palette");
++    expect(html).toContain('role="radiogroup"');
++    // The seven concrete themes are all offered.
++    for (const label of ["Clear", "Night", "Honey", "Blossom", "Mint", "Sky"])
++      expect(text(html)).toContain(label);
++  });
++
++  it("Bright (paper): unchanged — the lock is frame-scoped, not a blanket off", () => {
++    const html = renderAt(
++      "paper",
++      createElement(AppearanceControls, { axes: ["theme"] }),
++    );
++    expect(text(html)).not.toContain("Pastel locks its own palette");
++    expect(html).toContain('role="radiogroup"');
++  });
++});
++
++describe("ThemePicker — the OTHER chooser, mounted alongside on /settings/appearance", () => {
++  it("Pastel (color): replaced by the same locked note", () => {
++    const html = renderAt("color", createElement(ThemePicker));
++    expect(text(html)).toContain(LOCK_COPY);
++    expect(html).not.toContain('role="radiogroup"');
++    expect(html).not.toContain('role="radio"');
++  });
++
++  it("Calm Glass: the full picker renders, including Follow system", () => {
++    const html = renderAt("glass", createElement(ThemePicker));
++    expect(text(html)).not.toContain("Pastel locks its own palette");
++    expect(html).toContain('role="radiogroup"');
++    expect(text(html)).toContain("Clear");
++  });
++});
++
++describe("the locked note is announced, not silently swapped in", () => {
++  it("carries a note role so a screen reader gets the explanation too", () => {
++    const html = renderAt(
++      "color",
++      createElement(AppearanceControls, { axes: ["theme"] }),
++    );
++    // Without this the grid would simply vanish for a screen-reader user with
++    // no announced reason.
++    expect(html).toContain('role="note"');
++    expect(html).toContain('aria-label="Theme locked"');
++  });
++});
++
++describe("the frame picker advertises Pastel by its handoff name", () => {
++  it("labels frame C 'Pastel · Soft tints · Common Planner', not 'Color'", () => {
++    const html = renderAt(
++      "glass",
++      createElement(AppearanceControls, { axes: ["frame"] }),
++    );
++    const t = text(html);
++    expect(t).toContain("Pastel");
++    expect(t).toContain("Soft tints");
++    expect(t).toContain("Common Planner");
++    // The pre-handoff copy must be gone.
++    expect(t).not.toContain("Subject-led");
++    // "Color" must not survive as a standalone frame LABEL. (It may still occur
++    // inside longer prose such as tooltips, so match the label form.)
++    expect(t).not.toMatch(/\bColor Subject-led\b/);
++  });
++
++  it("renders a preview swatch for every frame (there was none before)", () => {
++    const html = renderAt(
++      "glass",
++      createElement(AppearanceControls, { axes: ["frame"] }),
++    );
++    // Three decorative swatches, one per frame option.
++    const swatches = html.match(/aria-hidden="true"/g) ?? [];
++    expect(swatches.length).toBeGreaterThanOrEqual(3);
++  });
++});
+diff --git a/tests/pastel-theme-tier-isolation.test.ts b/tests/pastel-theme-tier-isolation.test.ts
+new file mode 100644
+index 0000000..cf8aec3
+--- /dev/null
++++ b/tests/pastel-theme-tier-isolation.test.ts
+@@ -0,0 +1,434 @@
++// tests/pastel-theme-tier-isolation.test.ts
++//
++// FRAME C · PASTEL MUST NOT WEAR ANOTHER THEME'S TOKENS.
++// ─────────────────────────────────────────────────────────────────────────────
++// `deriveTone()` rule 0 forces tone="light" whenever frame==="color", and the
++// theme picker is replaced by a locked note under Pastel. Neither of those stops
++// a theme that is ALREADY PERSISTED: lib/theme.tsx paints `data-theme` onto
++// <html> under every frame, so
++//
++//     <html data-theme="night" data-frame="color" data-tone="light">
++//
++// is reachable exactly as the boot script's own comment describes — a teacher
++// with Night saved who then selects Pastel. app/tokens.css's biggest dark rule
++// is a two-arm union, `:root[data-tone="dark"], :root[data-theme="night"]`, and
++// only the FIRST arm is disarmed by the tone derivation. The second kept firing:
++// 117 declared tokens against the Pastel tier's 62, so ~82 bled through —
++// including every --subj-N-ink / --tag-*-fg (written as a mix toward `white`,
++// i.e. near-invisible on Pastel's white cards) and the hard-dark --brand-50/100/
++// 200, --honey-50/100, --grad-*.
++//
++// WHAT THIS FILE IS, AND WHAT IT IS NOT.
++// A selector-text assertion ("the rule contains :not(...)") is not sufficient
++// evidence — it passes on a typo'd qualifier, on a rule that was never reachable
++// anyway, and on a fix that scopes one tier while a sibling still bleeds. So the
++// bulk of this file SIMULATES THE CASCADE for :root-scoped custom properties:
++// it parses app/tokens.css, matches each rule against a concrete <html>
++// attribute vector, resolves each token to the rule that actually wins
++// (specificity, then source order), and asserts WHOSE declaration that is.
++//
++// vitest runs `environment: "node"` — there is no real style engine here. The
++// rendered consequence is measured separately, in a browser, by the §4b live
++// pass (real getComputedStyle under data-theme="night" + data-frame="color").
++// Both are necessary; neither substitutes for the other.
++//
++// THE MATCHER IS ITSELF UNDER TEST (first describe block). An absence-assertion
++// over a broken matcher is the fail-open shape this repo keeps getting bitten
++// by: a matcher that matched nothing would pass every "no theme tier applies"
++// assertion below while checking nothing at all. The Glass+Night control proves
++// the tier is visible to the instrument before any Pastel absence is claimed.
++
++import { describe, it, expect } from "vitest";
++import { readFileSync } from "node:fs";
++import { fileURLToPath } from "node:url";
++
++const TOKENS = readFileSync(
++  fileURLToPath(new URL("../app/tokens.css", import.meta.url)),
++  "utf8",
++);
++
++/** Blank comments PRESERVING LENGTH so source offsets still order correctly.
++ *  tokens.css names its own selectors in prose at length; without this the
++ *  banner comments alone would register as a dozen phantom rules. */
++const mask = (css: string) =>
++  css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
++
++// ── Rule extraction ──────────────────────────────────────────────────────────
++
++interface Rule {
++  selector: string;
++  /** Source offset — the tiebreak when specificity is equal. */
++  index: number;
++  /** Custom properties this rule declares (names only). */
++  props: Set<string>;
++  /** Names declared with !important. */
++  important: Set<string>;
++}
++
++/** Walk a stylesheet, recursing INTO at-rules — the whole theme/tone tier lives
++ *  inside `@media screen`, so an at-rule-skipping parser finds nothing here. */
++function readRules(text: string, start: number, end: number, out: Rule[]): void {
++  let i = start;
++  let preludeStart = start;
++  while (i < end) {
++    const ch = text[i];
++    if (ch === "{") {
++      const prelude = text.slice(preludeStart, i).trim();
++      let depth = 1;
++      let j = i + 1;
++      while (j < end && depth > 0) {
++        if (text[j] === "{") depth++;
++        else if (text[j] === "}") depth--;
++        j++;
++      }
++      if (prelude.startsWith("@")) {
++        readRules(text, i + 1, j - 1, out);
++      } else if (prelude) {
++        const props = new Set<string>();
++        const important = new Set<string>();
++        for (const decl of text.slice(i + 1, j - 1).split(";")) {
++          const colon = decl.indexOf(":");
++          if (colon < 0) continue;
++          const name = decl.slice(0, colon).trim();
++          if (!/^--[\w-]+$/.test(name)) continue;
++          props.add(name);
++          if (/!\s*important/i.test(decl.slice(colon))) important.add(name);
++        }
++        out.push({ selector: prelude, index: preludeStart, props, important });
++      }
++      i = j;
++      preludeStart = i;
++      continue;
++    }
++    if (ch === "}") {
++      i++;
++      preludeStart = i;
++      continue;
++    }
++    i++;
++  }
++}
++
++const RULES: Rule[] = [];
++readRules(mask(TOKENS), 0, TOKENS.length, RULES);
++
++/** Every comma-separated arm of a rule. */
++const arms = (r: Rule) => r.selector.split(",").map((s) => s.trim());
++
++// ── A tiny :root-compound matcher ────────────────────────────────────────────
++//
++// Deliberately NARROW. It understands exactly the shape the token tiers use —
++// `:root` followed by attribute selectors and `:not(<attribute selectors>)` —
++// and returns null for ANYTHING ELSE (descendant combinators, classes,
++// elements, other pseudo-classes). Null means "this instrument cannot judge
++// that arm", never "it does not match": a matcher that guessed would be the
++// silent-wrong-answer failure this file exists to prevent.
++
++/** The <html> attributes of one concrete appearance state. */
++type RootAttrs = Record<string, string>;
++
++function matchRootArm(arm: string, attrs: RootAttrs): boolean | null {
++  let s = arm.trim();
++  if (!s.startsWith(":root")) return null;
++  s = s.slice(":root".length);
++  while (s.length > 0) {
++    if (s.startsWith(":not(")) {
++      const close = s.indexOf(")");
++      if (close < 0) return null;
++      const inner = matchRootArm(`:root${s.slice(5, close)}`, attrs);
++      if (inner === null) return null;
++      if (inner) return false;
++      s = s.slice(close + 1);
++      continue;
++    }
++    if (s.startsWith("[")) {
++      const close = s.indexOf("]");
++      if (close < 0) return null;
++      const body = s.slice(1, close);
++      const m = /^([a-zA-Z][\w-]*)(?:="([^"]*)")?$/.exec(body);
++      if (!m) return null;
++      const [, name, value] = m;
++      const present = Object.prototype.hasOwnProperty.call(attrs, name);
++      if (value === undefined) {
++        if (!present) return false;
++      } else if (attrs[name] !== value) {
++        return false;
++      }
++      s = s.slice(close + 1);
++      continue;
++    }
++    return null;
++  }
++  return true;
++}
++
++/** (a,b,c) specificity for one bare :root compound. `:not()` contributes its
++ *  argument's specificity (the argument here is always a single attribute). */
++function specificity(arm: string): [number, number, number] {
++  const attrs = (arm.match(/\[[^\]]*\]/g) ?? []).length;
++  // `:root` plus any `:not(` — :not() itself adds nothing, its argument does
++  // (already counted above as an attribute).
++  const pseudo = (arm.match(/:root\b/g) ?? []).length;
++  return [0, attrs + pseudo, 0];
++}
++
++const cmp = (x: [number, number, number], y: [number, number, number]) =>
++  x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
++
++interface Match {
++  rule: Rule;
++  arm: string;
++  spec: [number, number, number];
++}
++
++/** Every rule that applies to <html> in this state, with its winning arm. */
++function matchingRules(attrs: RootAttrs): Match[] {
++  const out: Match[] = [];
++  for (const rule of RULES) {
++    let best: Match | null = null;
++    for (const arm of arms(rule)) {
++      if (matchRootArm(arm, attrs) !== true) continue;
++      const spec = specificity(arm);
++      if (!best || cmp(spec, best.spec) > 0) best = { rule, arm, spec };
++    }
++    if (best) out.push(best);
++  }
++  return out;
++}
++
++/** Which rule's declaration of `token` actually paints, in this state?
++ *  !important first, then specificity, then source order. */
++function winnerFor(token: string, attrs: RootAttrs): Match | null {
++  const candidates = matchingRules(attrs).filter((m) => m.rule.props.has(token));
++  if (candidates.length === 0) return null;
++  return candidates.reduce((a, b) => {
++    const ai = a.rule.important.has(token) ? 1 : 0;
++    const bi = b.rule.important.has(token) ? 1 : 0;
++    if (ai !== bi) return bi > ai ? b : a;
++    const s = cmp(b.spec, a.spec);
++    if (s !== 0) return s > 0 ? b : a;
++    return b.rule.index > a.rule.index ? b : a;
++  });
++}
++
++// ── The two states under test ────────────────────────────────────────────────
++//
++// PASTEL_NIGHT is the reachable state the bug lives in. GLASS_NIGHT is the
++// control: the same persisted theme on a frame that is SUPPOSED to wear it.
++
++const PASTEL_NIGHT: RootAttrs = {
++  "data-frame": "color",
++  "data-theme": "night",
++  // Forced by deriveTone rule 0 — Pastel is light-only.
++  "data-tone": "light",
++  "data-bg": "photo",
++  "data-dim": "normal",
++  "data-glass": "dark",
++};
++
++const GLASS_NIGHT: RootAttrs = {
++  "data-frame": "glass",
++  "data-theme": "night",
++  "data-tone": "dark",
++  "data-bg": "photo",
++  "data-dim": "normal",
++  "data-glass": "dark",
++};
++
++/** One name from every token family the review named as bleeding. */
++const SAMPLE = [
++  "--subj-1-ink",
++  "--subj-1-tint",
++  "--subj-10-ink",
++  "--subj-15-tint",
++  "--tag-pink-bg",
++  "--tag-pink-fg",
++  "--tag-gray-fg",
++  "--accent",
++  "--chrome-accent",
++  "--mesh-a",
++  "--grad-hero",
++  "--honey-50",
++  "--brand-50",
++  "--brand-700",
++  "--warn-tint",
++  "--danger-tint",
++  "--urgent-bg",
++  "--important-bg",
++  "--logo-book-b",
++] as const;
++
++// ── 0 · The instrument, before any verdict is trusted ────────────────────────
++
++describe("the matcher itself (instrument check — this must not fail open)", () => {
++  it("parses a non-trivial number of rules out of tokens.css", () => {
++    expect(RULES.length).toBeGreaterThan(20);
++  });
++
++  it("understands attribute presence, value and :not()", () => {
++    const a: RootAttrs = { "data-frame": "color", "data-theme": "night" };
++    expect(matchRootArm(":root", a)).toBe(true);
++    expect(matchRootArm(':root[data-theme="night"]', a)).toBe(true);
++    expect(matchRootArm(':root[data-theme="mint"]', a)).toBe(false);
++    expect(matchRootArm(':root[data-frame="color"][data-frame]', a)).toBe(true);
++    expect(
++      matchRootArm(':root[data-theme="night"]:not([data-frame="color"])', a),
++    ).toBe(false);
++    expect(matchRootArm(':root[data-tone="dark"]', a)).toBe(false);
++    // Absent attribute: `:not()` on it MATCHES (the v1 flag-OFF DOM emits no
++    // data-frame at all, and must keep its dark tier).
++    expect(
++      matchRootArm(':root[data-theme="night"]:not([data-frame="color"])', {
++        "data-theme": "night",
++      }),
++    ).toBe(true);
++    // Shapes it must refuse to judge rather than guess at.
++    expect(matchRootArm(':root[data-frame="color"] .card', a)).toBeNull();
++    expect(matchRootArm(".home", a)).toBeNull();
++  });
++
++  it("scores specificity in the direction the port relies on", () => {
++    expect(specificity(":root")).toEqual([0, 1, 0]);
++    expect(specificity(':root[data-theme="night"]')).toEqual([0, 2, 0]);
++    expect(specificity(':root[data-frame="color"][data-frame]')).toEqual([0, 3, 0]);
++    expect(
++      specificity(':root[data-theme="night"]:not([data-frame="color"])'),
++    ).toEqual([0, 3, 0]);
++  });
++
++  // THE CONTROL. Every Pastel absence-assertion below is meaningless unless the
++  // night tier is visible to this instrument in the state that SHOULD have it.
++  it("CONTROL — under Glass+Night the night tier wins every sampled token", () => {
++    // Keyed on the winning RULE, not the winning ARM, and that distinction was
++    // found the hard way: the dark block is `:root[data-tone="dark"],
++    // :root[data-theme="night"]…`, so which ARM the matcher reports for it
++    // depends on a specificity tie-break between its own two arms. An
++    // arm-keyed control passed only because the fix happens to lift the night
++    // arm to (0,3,0) — it went red under the mutation test for a reason that
++    // had nothing to do with tier visibility, which is precisely the false
++    // signal a control must not produce. The rule is what carries the tokens.
++    const themed = matchingRules(GLASS_NIGHT).filter((m) =>
++      m.rule.selector.includes('[data-theme="night"]'),
++    );
++    expect(themed.length).toBeGreaterThan(0);
++    const fromNight = SAMPLE.filter((t) => {
++      const w = winnerFor(t, GLASS_NIGHT);
++      return w !== null && w.rule.selector.includes('[data-theme="night"]');
++    });
++    // Not all 19 live in the night tiers, but most do; a handful (e.g. tokens
++    // only the tone block declares) legitimately come from elsewhere. Requiring
++    // a solid majority keeps this a real control without pinning the tier's
++    // exact contents.
++    expect(fromNight.length).toBeGreaterThanOrEqual(10);
++  });
++});
++
++// ── 1 · The invariant, at source level ───────────────────────────────────────
++
++describe("every [data-theme] tier in tokens.css is frame-scoped", () => {
++  it("no bare :root theme arm is left unqualified", () => {
++    const unqualified = RULES.flatMap((r) => arms(r)).filter(
++      (arm) =>
++        /^:root(\[[^\]]*\]|:not\([^)]*\))*$/.test(arm) &&
++        arm.includes("[data-theme=") &&
++        !arm.includes(':not([data-frame="color"])'),
++    );
++    // If this went red: a theme tier was added or edited without the qualifier,
++    // and it now paints its tokens underneath the Pastel skin. Add
++    // `:not([data-frame="color"])` to the arm.
++    expect(unqualified).toEqual([]);
++  });
++
++  it("the dark-tone arm is NOT qualified — tone is the correct key there", () => {
++    // The other direction. Qualifying the tone arm too would be harmless today
++    // (tone can't be dark under Pastel) but would muddy the contract: dark is
++    // keyed on tone, and the frame carve-out belongs only on the legacy
++    // theme-keyed compat arm.
++    const toneArm = RULES.flatMap((r) => arms(r)).filter(
++      (a) => a === ':root[data-tone="dark"]',
++    );
++    expect(toneArm).toEqual([':root[data-tone="dark"]']);
++  });
++});
++
++// ── 2 · The invariant, resolved through the cascade ──────────────────────────
++
++describe("under data-frame=color no theme tier reaches <html>", () => {
++  it("no matching rule is keyed on data-theme", () => {
++    const themed = matchingRules(PASTEL_NIGHT).filter((m) =>
++      m.arm.includes("[data-theme="),
++    );
++    expect(themed.map((m) => m.arm)).toEqual([]);
++  });
++
++  it("every sampled token resolves to :root or to the Pastel tier", () => {
++    for (const token of SAMPLE) {
++      const w = winnerFor(token, PASTEL_NIGHT);
++      expect(w, `${token} must still be declared somewhere`).not.toBeNull();
++      expect(
++        (w as Match).arm,
++        `${token} resolves from ${(w as Match).arm}`,
++      ).not.toContain("[data-theme=");
++    }
++  });
++
++  it("the fix leaves NOTHING undefined — every night token still resolves", () => {
++    // The failure mode of a scoping fix: a token declared ONLY by the tier you
++    // just disarmed becomes unset under Pastel, and every var() reading it
++    // falls back to its (often absent) default. Assert the opposite.
++    const nightTokens = new Set<string>();
++    for (const rule of RULES)
++      if (arms(rule).some((a) => a.includes('[data-theme="night"]')))
++        for (const p of rule.props) nightTokens.add(p);
++    expect(nightTokens.size).toBeGreaterThan(100);
++
++    const orphans = [...nightTokens].filter(
++      (t) => winnerFor(t, PASTEL_NIGHT) === null,
++    );
++    expect(orphans).toEqual([]);
++  });
++
++  it("the Pastel tier still owns the neutrals it is supposed to own", () => {
++    // The over-reach direction: a scoping change that also knocked out Pastel's
++    // own tier would pass every assertion above.
++    for (const token of [
++      "--surface",
++      "--canvas",
++      "--border",
++      "--muted",
++      "--ink",
++      "--ink-900",
++      "--ink-50",
++    ]) {
++      const w = winnerFor(token, PASTEL_NIGHT);
++      expect(w, `${token} declared`).not.toBeNull();
++      expect((w as Match).arm, `${token} comes from the Pastel tier`).toContain(
++        '[data-frame="color"]',
++      );
++    }
++  });
++});
++
++// ── 3 · The lock is frame-scoped, not a blanket theme kill ───────────────────
++
++describe("themes still work on the frames that have them", () => {
++  it("Glass+Night still gets the full dark neutral tier", () => {
++    for (const token of ["--surface", "--canvas", "--ink-900"]) {
++      const w = winnerFor(token, GLASS_NIGHT);
++      expect(w, `${token} declared`).not.toBeNull();
++      const arm = (w as Match).arm;
++      expect(
++        arm === ':root[data-tone="dark"]' ||
++          arm.includes('[data-theme="night"]'),
++        `${token} comes from the dark tier, got ${arm}`,
++      ).toBe(true);
++    }
++  });
++
++  it("Glass+Mint still gets the mint tier", () => {
++    const mint: RootAttrs = { ...GLASS_NIGHT, "data-theme": "mint", "data-tone": "light" };
++    const w = winnerFor("--logo-book-b", mint);
++    expect(w).not.toBeNull();
++    expect((w as Match).arm).toContain('[data-theme="mint"]');
++  });
++});
+diff --git a/tests/theme-tone-lockstep.test.ts b/tests/theme-tone-lockstep.test.ts
+new file mode 100644
+index 0000000..b605844
+--- /dev/null
++++ b/tests/theme-tone-lockstep.test.ts
+@@ -0,0 +1,372 @@
++// tests/theme-tone-lockstep.test.ts
++//
++// ALLOWLIST LOCKSTEP — the tone derivation, pinned across all three copies.
++// ─────────────────────────────────────────────────────────────────────────────
++// `data-tone` is DERIVED, and the rule that derives it exists in THREE places:
++//
++//   1. lib/theme-values.ts  `deriveTone()`      — the canonical implementation,
++//                                                 used by the client provider
++//                                                 (lib/theme.tsx).
++//   2. lib/theme-init.tsx   the inline boot script — a hand-kept JS replica that
++//                                                 CANNOT import the canonical
++//                                                 one (it runs before any module
++//                                                 loads) and paints <html> before
++//                                                 first paint.
++//   3. app/layout.tsx       the SSR attribute    — calls (1), but has to pass it
++//                                                 the right axes.
++//
++// If (1) and (2) drift, the symptom is a FIRST-PAINT FLASH: the server/boot
++// paints one tone, the provider corrects it a frame later. No ordinary unit test
++// catches that, because each copy is individually self-consistent. This file
++// catches it by running BOTH implementations over the full axis cross-product
++// and asserting they agree on every one of the 252 combinations.
++//
++// The boot script is not exported as a string, so rather than re-typing it (which
++// would test a copy of a copy) this file RENDERS <ThemeInit /> with
++// react-dom/server and executes the real emitted <script> body against stubbed
++// browser globals. What is asserted is therefore what actually ships.
++//
++// Added by the Frame C · Pastel port, which introduced rule 0 (frame === "color"
++// → light). That rule is why the frame axis now participates in the derivation
++// at all, and it is the one most likely to be missed by a future edit to one
++// copy — hence the cross-product rather than a handful of examples.
++
++import { describe, it, expect } from "vitest";
++import { readFileSync } from "node:fs";
++import { fileURLToPath } from "node:url";
++import { renderToStaticMarkup } from "react-dom/server";
++import { createElement } from "react";
++
++import {
++  deriveTone,
++  APP_THEMES,
++  FRAME_VALUES,
++  GLASS_VALUES,
++  BG_VALUES,
++  DIM_VALUES,
++  type AppTheme,
++  type ThemeFrame,
++  type ThemeGlass,
++  type ThemeBg,
++  type ThemeDim,
++  type ThemeTone,
++} from "@/lib/theme-values";
++import { ThemeInit } from "@/lib/theme-init";
++
++// ── Extract the REAL boot script from the REAL component ─────────────────────
++
++const BOOT_HTML = renderToStaticMarkup(createElement(ThemeInit));
++
++/** The script body as it is emitted into the HTML payload. */
++const BOOT_SCRIPT = (() => {
++  const m = BOOT_HTML.match(/<script[^>]*>([\s\S]*)<\/script>/);
++  if (!m) throw new Error("ThemeInit did not render a <script> element");
++  return m[1];
++})();
++
++// Guard: if the extraction silently produced something inert, every "agreement"
++// assertion below would pass vacuously (the stub's tone would stay undefined and
++// so would the expectation if we were careless). Prove the script is real and
++// that it is the tone-deriving one before trusting a single result.
++describe("boot-script extraction (the instrument itself)", () => {
++  it("extracted a non-trivial script that derives tone", () => {
++    expect(BOOT_SCRIPT.length).toBeGreaterThan(400);
++    expect(BOOT_SCRIPT).toContain("dataset.tone");
++    // HTML-escaping would break execution; react escapes `<` in text children
++    // but NOT inside dangerouslySetInnerHTML. Pin that, since a future switch to
++    // a text child would silently produce a script full of &lt; that still
++    // "extracts" fine and then throws — or worse, no-ops inside its try/catch.
++    expect(BOOT_SCRIPT).not.toContain("&lt;");
++    expect(BOOT_SCRIPT).not.toContain("&amp;&amp;");
++  });
++});
++
++// ── A minimal browser stub the boot script can run against ───────────────────
++
++const KEY = {
++  theme: "mycurricula:user:theme",
++  frame: "mycurricula:user:theme-frame",
++  style: "mycurricula:user:theme-style",
++  glass: "mycurricula:user:theme-glass",
++  bg: "mycurricula:user:theme-bg",
++  dim: "mycurricula:user:theme-dim",
++};
++
++interface BootResult {
++  theme?: string;
++  frame?: string;
++  glass?: string;
++  bg?: string;
++  dim?: string;
++  tone?: string;
++}
++
++/**
++ * Execute the shipped boot script with the given persisted axes and return the
++ * dataset it painted. The script is wrapped in its own try/catch, so a thrown
++ * reference error would be swallowed and leave `tone` undefined — which is why
++ * every caller asserts on a CONCRETE tone value rather than on equality alone.
++ */
++function runBootScript(axes: {
++  theme: string;
++  frame: string;
++  glass: string;
++  bg: string;
++  dim: string;
++}): BootResult {
++  const store = new Map<string, string>([
++    [KEY.theme, axes.theme],
++    [KEY.frame, axes.frame],
++    [KEY.glass, axes.glass],
++    [KEY.bg, axes.bg],
++    [KEY.dim, axes.dim],
++  ]);
++
++  const dataset: BootResult = {};
++  const documentStub = { documentElement: { dataset } };
++  const localStorageStub = {
++    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
++    setItem: (k: string, v: string) => void store.set(k, v),
++  };
++  // The script only consults matchMedia for theme === "system", which is not in
++  // APP_THEMES and so never reached here; stubbed for completeness.
++  const matchMediaStub = () => ({ matches: false });
++
++  // `new Function` is deliberate and safe HERE, and only here: BOOT_SCRIPT is
++  // not input of any kind — it is our own first-party source, read out of the
++  // component that ships it, in a test-only file that never runs in the app or
++  // in production. Executing the real string is the entire point: re-typing the
++  // script into the test would test a copy of a copy and could not detect the
++  // drift this file exists to catch. Nothing user-supplied is interpolated into
++  // the body, and the three stubbed globals are the script's only capabilities.
++  // eslint-disable-next-line no-new-func
++  const fn = new Function(
++    "document",
++    "localStorage",
++    "matchMedia",
++    BOOT_SCRIPT,
++  );
++  fn(documentStub, localStorageStub, matchMediaStub);
++  return dataset;
++}
++
++// Prove the harness can actually observe a tone before any agreement claim is
++// made. A stub that silently no-ops would make every cross-product assertion
++// pass while testing nothing — the "absence-assertions fail open" trap.
++describe("boot-script harness (Gate B — a known-good control)", () => {
++  it("paints a concrete tone for a known case", () => {
++    const out = runBootScript({
++      theme: "night",
++      frame: "glass",
++      glass: "dark",
++      bg: "photo",
++      dim: "normal",
++    });
++    expect(out.tone).toBe("dark");
++    expect(out.theme).toBe("night");
++    expect(out.frame).toBe("glass");
++  });
++
++  it("observes a DIFFERENT tone for a case that should differ", () => {
++    // If the harness were inert, both this and the case above would return the
++    // same (or undefined) value. They must differ.
++    const out = runBootScript({
++      theme: "clear",
++      frame: "glass",
++      glass: "light",
++      bg: "photo",
++      dim: "normal",
++    });
++    expect(out.tone).toBe("light");
++  });
++});
++
++// ── The cross-product ────────────────────────────────────────────────────────
++
++const CROSS: {
++  frame: ThemeFrame;
++  theme: AppTheme;
++  glass: ThemeGlass;
++  bg: ThemeBg;
++  dim: ThemeDim;
++}[] = [];
++for (const frame of FRAME_VALUES)
++  for (const theme of APP_THEMES)
++    for (const glass of GLASS_VALUES)
++      for (const bg of BG_VALUES)
++        for (const dim of DIM_VALUES)
++          CROSS.push({ frame, theme, glass, bg, dim });
++
++describe("deriveTone × boot script — full axis cross-product", () => {
++  it("covers every combination (3 × 7 × 2 × 2 × 3 = 252)", () => {
++    expect(CROSS).toHaveLength(
++      FRAME_VALUES.length *
++        APP_THEMES.length *
++        GLASS_VALUES.length *
++        BG_VALUES.length *
++        DIM_VALUES.length,
++    );
++    expect(CROSS).toHaveLength(252);
++  });
++
++  it("the boot script agrees with deriveTone on EVERY combination", () => {
++    const mismatches: string[] = [];
++    for (const c of CROSS) {
++      // autoTone=null — the boot script has no photo sample available either, so
++      // this is the like-for-like comparison. The provider's later AUTO upgrade
++      // is a deliberate, post-mount reconciliation, not a lockstep violation.
++      const canonical = deriveTone(
++        c.theme,
++        c.glass,
++        c.bg,
++        c.dim,
++        null,
++        c.frame,
++      );
++      const boot = runBootScript(c).tone;
++      // A concrete tone, not undefined — an exception swallowed by the script's
++      // own try/catch must fail this test rather than pass it silently.
++      if (boot !== "light" && boot !== "dark") {
++        mismatches.push(
++          `${c.frame}/${c.theme}/${c.glass}/${c.bg}/${c.dim}: boot produced no tone (${String(boot)})`,
++        );
++        continue;
++      }
++      if (boot !== canonical) {
++        mismatches.push(
++          `${c.frame}/${c.theme}/${c.glass}/${c.bg}/${c.dim}: deriveTone=${canonical} boot=${boot}`,
++        );
++      }
++    }
++    expect(mismatches).toEqual([]);
++  });
++});
++
++// ── Rule 0 — the Pastel contract ─────────────────────────────────────────────
++
++describe("rule 0 — Frame C · Pastel is always light", () => {
++  it("derives light for EVERY axis combination under frame=color", () => {
++    const bad: string[] = [];
++    for (const c of CROSS.filter((x) => x.frame === "color")) {
++      const t: ThemeTone = deriveTone(
++        c.theme,
++        c.glass,
++        c.bg,
++        c.dim,
++        // Even a sampled dark autoTone must not win — rule 0 short-circuits
++        // before the AUTO branch is ever consulted.
++        "dark",
++        c.frame,
++      );
++      if (t !== "light")
++        bad.push(`${c.theme}/${c.glass}/${c.bg}/${c.dim} → ${t}`);
++    }
++    expect(bad).toEqual([]);
++  });
++
++  it("the boot script also forces light under frame=color", () => {
++    const bad: string[] = [];
++    for (const c of CROSS.filter((x) => x.frame === "color")) {
++      const out = runBootScript(c);
++      if (out.tone !== "light")
++        bad.push(`${c.theme}/${c.glass}/${c.bg}/${c.dim} → ${String(out.tone)}`);
++    }
++    expect(bad).toEqual([]);
++  });
++
++  it("does NOT regress glass or paper — their tone is unchanged", () => {
++    // The pre-Pastel derivation, transcribed independently of the implementation
++    // so this is a genuine oracle rather than a restatement. If someone widens
++    // rule 0 (say, to `frame !== "glass"`), this goes red.
++    const legacy = (
++      theme: AppTheme,
++      glass: ThemeGlass,
++      bg: ThemeBg,
++      dim: ThemeDim,
++    ): ThemeTone => {
++      if (theme === "night") return "dark";
++      if (glass === "light") return "light";
++      if (bg === "wash") return "light";
++      if (dim === "dim") return "dark";
++      if (dim === "bright") return "light";
++      return "dark";
++    };
++    const bad: string[] = [];
++    for (const c of CROSS.filter((x) => x.frame !== "color")) {
++      const now = deriveTone(c.theme, c.glass, c.bg, c.dim, null, c.frame);
++      const before = legacy(c.theme, c.glass, c.bg, c.dim);
++      if (now !== before)
++        bad.push(
++          `${c.frame}/${c.theme}/${c.glass}/${c.bg}/${c.dim}: was ${before}, now ${now}`,
++        );
++    }
++    expect(bad).toEqual([]);
++  });
++
++  it("the hazard case is fixed: persisted Night + Pastel renders light", () => {
++    // This is the concrete illegibility the port had to resolve — a teacher who
++    // had chosen Night, then switched to Pastel. Before rule 0 this derived
++    // "dark", and app/themes.css's colour·Night rules painted near-black panels
++    // under the Pastel tier's near-black ink.
++    expect(deriveTone("night", "dark", "photo", "dim", "dark", "color")).toBe(
++      "light",
++    );
++    expect(
++      runBootScript({
++        theme: "night",
++        frame: "color",
++        glass: "dark",
++        bg: "photo",
++        dim: "dim",
++      }).tone,
++    ).toBe("light");
++  });
++});
++
++// ── Surface 3 of the lockstep — the SSR attribute ────────────────────────────
++
++describe("app/layout.tsx passes the frame axis to deriveTone", () => {
++  // tsc already guarantees SIX arguments are passed (the parameter is required
++  // and deliberately not defaulted). What it cannot catch is passing the WRONG
++  // sixth argument — a literal, or the wrong axis — which would make SSR derive
++  // a different tone from the boot script and flash on every load.
++  const LAYOUT = readFileSync(
++    fileURLToPath(new URL("../app/layout.tsx", import.meta.url)),
++    "utf8",
++  );
++
++  it("calls deriveTone with axes.frame, not a literal", () => {
++    const call = LAYOUT.match(/deriveTone\(([\s\S]*?)\)/);
++    expect(call).not.toBeNull();
++    const args = call![1];
++    expect(args).toContain("axes.frame");
++    expect(args).not.toMatch(/"(glass|paper|color)"/);
++  });
++});
++
++// ── Surface 5 of the lockstep — the probe ────────────────────────────────────
++
++describe("scripts/probe-theme-wave.mjs knows Pastel is always light", () => {
++  const PROBE = readFileSync(
++    fileURLToPath(
++      new URL("../scripts/probe-theme-wave.mjs", import.meta.url),
++    ),
++    "utf8",
++  );
++
++  it("no colour-frame corner still claims to exercise a theme wash", () => {
++    // The corners named `color-photo` / `color-wash` used to seed theme
++    // "blossom" / "mint". Under Pastel the theme is locked away, so those seeds
++    // no longer test what their names say. The port re-seeds them; this pins
++    // that they are not silently reverted to a themed seed.
++    const corner = PROBE.match(/const CORNER_CASES = \[([\s\S]*?)\];/);
++    expect(corner).not.toBeNull();
++    const colourRows = corner![1]
++      .split("\n")
++      .filter((l) => l.includes('frame: "color"'));
++    expect(colourRows.length).toBeGreaterThan(0);
++    for (const row of colourRows) {
++      expect(row).not.toMatch(/theme: "(blossom|mint|honey|sky|night)"/);
++    }
++  });
++});
+diff --git a/tests/theme-values.test.ts b/tests/theme-values.test.ts
+index dda65e8..7d9a13a 100644
+--- a/tests/theme-values.test.ts
++++ b/tests/theme-values.test.ts
+@@ -115,13 +115,50 @@ describe("mc-theme-axes cookie codec", () => {
+ });
+ 
+ describe("deriveTone (SSR/boot/provider parity)", () => {
++  // The `frame` argument is rule 0 (Frame C · Pastel is always light) and is
++  // REQUIRED — see lib/theme-values.ts. These cases pin rules 1-5 with a
++  // non-Pastel frame so the original ordering is still asserted unchanged;
++  // rule 0 and the full cross-product live in tests/theme-tone-lockstep.test.ts.
+   it("applies the five rules in order, autoTone last", () => {
+-    expect(deriveTone("night", "light", "wash", "bright", "light")).toBe("dark");
+-    expect(deriveTone("clear", "light", "photo", "dim", null)).toBe("light");
+-    expect(deriveTone("clear", "dark", "wash", "dim", null)).toBe("light");
+-    expect(deriveTone("clear", "dark", "photo", "dim", "light")).toBe("dark");
+-    expect(deriveTone("clear", "dark", "photo", "bright", "dark")).toBe("light");
+-    expect(deriveTone("clear", "dark", "photo", "normal", null)).toBe("dark");
+-    expect(deriveTone("clear", "dark", "photo", "normal", "light")).toBe("light");
++    expect(deriveTone("night", "light", "wash", "bright", "light", "glass")).toBe(
++      "dark",
++    );
++    expect(deriveTone("clear", "light", "photo", "dim", null, "glass")).toBe(
++      "light",
++    );
++    expect(deriveTone("clear", "dark", "wash", "dim", null, "glass")).toBe(
++      "light",
++    );
++    expect(deriveTone("clear", "dark", "photo", "dim", "light", "glass")).toBe(
++      "dark",
++    );
++    expect(deriveTone("clear", "dark", "photo", "bright", "dark", "glass")).toBe(
++      "light",
++    );
++    expect(deriveTone("clear", "dark", "photo", "normal", null, "glass")).toBe(
++      "dark",
++    );
++    expect(
++      deriveTone("clear", "dark", "photo", "normal", "light", "glass"),
++    ).toBe("light");
++  });
++
++  it("rule 0 — Frame C · Pastel forces light, ahead of every other rule", () => {
++    // The hazard case: a teacher holding a persisted Night who then picks
++    // Pastel. Every one of these would derive "dark" on any other frame.
++    expect(deriveTone("night", "dark", "photo", "dim", "dark", "color")).toBe(
++      "light",
++    );
++    expect(deriveTone("night", "dark", "wash", "normal", null, "color")).toBe(
++      "light",
++    );
++    // ...and the same axes on glass/paper still derive dark, so rule 0 is
++    // genuinely frame-scoped rather than a blanket light-forcing bug.
++    expect(deriveTone("night", "dark", "photo", "dim", "dark", "glass")).toBe(
++      "dark",
++    );
++    expect(deriveTone("night", "dark", "photo", "dim", "dark", "paper")).toBe(
++      "dark",
++    );
+   });
+ });
