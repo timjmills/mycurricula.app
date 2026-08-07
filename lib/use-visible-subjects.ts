@@ -8,6 +8,10 @@
 //      team subjects, ids + colors immutable per CLAUDE.md §4);
 //   2. TEAM overrides (lib/use-subject-settings.ts) — display renames
 //      applied, academic flags resolved, archived subjects separated;
+//   2b. The TEAM subject ORDER (useTeamSubjectOrder) — the roster is
+//      sorted by it. The order is a complete permutation of the locked
+//      roster, so sorting can never drop or duplicate a subject; only
+//      the sequence changes, never a subject's id or color;
 //   3. PERSONAL custom subjects appended — each borrowing a locked
 //      subject's color family via its `swatch` field;
 //   4. The PERSONAL hidden-subjects filter ("I don't teach this").
@@ -37,6 +41,13 @@
 // Until adoption, this hook is intentionally read-only composition —
 // no setters — so the seam stays one-directional: settings WRITE via
 // lib/use-subject-settings.ts, views READ via this hook.
+//
+// PROVIDER REQUIREMENT (since the order key was notebook-scoped): the
+// team-order layer resolves its storage scope from useNotebookState(),
+// so this hook now requires a <NotebookProvider> ancestor — satisfied by
+// both real mount points (app/settings/layout.tsx and
+// app/(planner)/layout.tsx). Scope is resolved INSIDE the order hook on
+// purpose; see the LOAD-BEARING note on useTeamSubjectOrder.
 
 import { useMemo } from "react";
 import type { SubjectId } from "./types";
@@ -45,7 +56,21 @@ import {
   useHiddenSubjects,
   usePersonalSubjects,
   useSubjectOverrides,
+  useTeamSubjectOrder,
 } from "./use-subject-settings";
+
+// ── Catalog ────────────────────────────────────────────────────────────────
+
+/**
+ * The id list of the roster THIS hook composes — passed to
+ * useTeamSubjectOrder as its reconcile catalog, so the order seam
+ * follows whatever this seam actually renders rather than a fixture
+ * constant buried in another module (Codex F3 review, Medium 3). Today
+ * that is the locked 8 (this file's documented pre-adoption job); when
+ * the planner catalog goes live, this constant is the single line that
+ * changes. Module-level so its identity is stable across renders.
+ */
+const COMPOSED_CATALOG_IDS: readonly SubjectId[] = SUBJECTS.map((s) => s.id);
 
 // ── Public shape ───────────────────────────────────────────────────────────
 
@@ -132,13 +157,27 @@ export function useVisibleSubjects(): VisibleSubjectsResult {
   const { overrides } = useSubjectOverrides();
   const { hidden: hiddenIds } = useHiddenSubjects();
   const { subjects: personalSubjects } = usePersonalSubjects();
+  const { order } = useTeamSubjectOrder({
+    catalogOrder: COMPOSED_CATALOG_IDS,
+  });
 
   return useMemo(() => {
     const hiddenSet = new Set<string>(hiddenIds);
 
-    // 1+2 — the locked roster with team overrides applied. Order is the
-    // canonical fixture order so rosters render consistently app-wide.
-    const team: EffectiveSubject[] = SUBJECTS.map((s) => {
+    // 2b — the team's saved arrangement. `order` is guaranteed to be a
+    // complete permutation of the locked roster, so every fixture id has
+    // a slot; the fallback keeps an unmatched id at the end instead of
+    // silently collapsing several to position 0.
+    const slotOf = new Map<string, number>(order.map((id, i) => [id, i]));
+    const rosterInTeamOrder = [...SUBJECTS].sort(
+      (a, b) =>
+        (slotOf.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+        (slotOf.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+    );
+
+    // 1+2 — the locked roster with team overrides applied, in the team's
+    // display order so every roster reads the same way app-wide.
+    const team: EffectiveSubject[] = rosterInTeamOrder.map((s) => {
       const o = overrides[s.id];
       const renamed = o?.name !== undefined;
       return {
@@ -178,5 +217,5 @@ export function useVisibleSubjects(): VisibleSubjectsResult {
       hidden: all.filter((s) => !s.archived && s.hidden),
       archived: all.filter((s) => s.archived),
     };
-  }, [overrides, hiddenIds, personalSubjects]);
+  }, [overrides, hiddenIds, personalSubjects, order]);
 }

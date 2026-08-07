@@ -35,12 +35,28 @@
   animation: backdropIn 0.15s ease forwards;
 }
 
+/* Animates background-COLOR only, never the `background` shorthand.
+ *
+ * This ran as `from/to { background: … }` and that silently broke the
+ * surface-theming contract. Animation declarations outrank normal author
+ * declarations at ANY specificity, and `animation-fill-mode: forwards` keeps
+ * the final keyframe applied indefinitely — so the shorthand's implied
+ * `background-image: none` permanently beat themes.css's `.cfg-scrim` accent
+ * wash. Measured: the rule matched, `--accent` resolved, and computed
+ * `background-image` was still `none`.
+ *
+ * The modal half of the same contract was unaffected only because ITS rule
+ * carries `!important` (important author declarations do outrank animations)
+ * — which is why this looked like a themes.css bug rather than one here.
+ *
+ * The fade only ever wanted to bring the dim up, so the longhand is both the
+ * fix and the honest expression of the intent. Do not restore the shorthand. */
 @keyframes backdropIn {
   from {
-    background: transparent;
+    background-color: transparent;
   }
   to {
-    background: var(--scrim);
+    background-color: var(--scrim);
   }
 }
 

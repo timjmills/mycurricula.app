@@ -77,13 +77,14 @@ function CurriculumLabelSection(): ReactNode {
     const previous = currentUser.curriculumLabel ?? "";
     if (trimmed === previous) return;
     updateCurriculumLabel(trimmed);
-    // W2-B8: name the team-wide effect. Curriculum label is team-scoped
-    // (every teacher sees the same suffix), so the toast leads with the
-    // blast radius and offers Undo while the toast is visible.
+    // W2-B8 + §4a Medium 4: the toast names the OBSERVABLE effect (this
+    // device's top bar) and is explicit that team sync hasn't landed yet —
+    // it must not promise teammates a change they cannot see. Undo offered
+    // while the toast is visible.
     showConsequence({
       message: trimmed
-        ? `Curriculum label set to "${trimmed}" — every teacher on your team now sees it.`
-        : "Curriculum label cleared — every teacher on your team now sees no suffix.",
+        ? `Curriculum label set to "${trimmed}" — your top bar shows it now. Saved on this device for now; teammates see it once team sync arrives.`
+        : "Curriculum label cleared — your top bar shows no suffix. Saved on this device for now.",
       onUndo: () => updateCurriculumLabel(previous),
     });
   };
@@ -96,8 +97,9 @@ function CurriculumLabelSection(): ReactNode {
       scope="team"
       title={
         <Tooltip
-          content="Your team's display name shown in the top bar — what shows after MyCurricula. Shared with everyone on your grade-level team."
+          content="Your team's display name shown in the top bar — what shows after MyCurricula. Team-scoped by design; for now it saves on this device only."
           side="bottom"
+          required
         >
           <span>Curriculum label</span>
         </Tooltip>
@@ -110,8 +112,9 @@ function CurriculumLabelSection(): ReactNode {
           Label
         </label>
         <Tooltip
-          content="Type what your team calls this curriculum — it appears next to the MyCurricula wordmark for every teacher on the team. Saves when you click out of the field."
+          content="Type what your team calls this curriculum — it appears next to the MyCurricula wordmark. Saved on this device for now; it reaches your teammates once team sync arrives. Saves when you click out of the field."
           side="bottom"
+          required
         >
           <input
             id="curriculum-label"
@@ -124,7 +127,7 @@ function CurriculumLabelSection(): ReactNode {
             autoComplete="off"
             spellCheck={false}
             maxLength={60}
-            title="Type what your team calls this curriculum — it appears next to the MyCurricula wordmark for every teacher on the team. Saves when you click out of the field."
+            title="Type what your team calls this curriculum — it appears next to the MyCurricula wordmark. Saved on this device for now; it reaches your teammates once team sync arrives. Saves when you click out of the field."
             className={styles.textInput}
           />
         </Tooltip>
@@ -137,25 +140,32 @@ function CurriculumLabelSection(): ReactNode {
   );
 }
 
-// ── "Shared with your team" chip ───────────────────────────────────────────
-// A subtle visual cue pinned to each Card header. The tooltip explains
-// the scope to a first-time teacher; the visual is intentionally
-// understated so it doesn't compete with the section header itself.
+// ── Team-scope chip — the honest, unsynced variant (§4a Medium 4) ──────────
+// The curriculum label is team-scoped BY DESIGN but persists to this
+// browser's localStorage (lib/app-state.tsx, `mycurricula:team:
+// curriculum-label`) until the team-settings backend lands — so the chip
+// states what is true TODAY instead of claiming teammates see the value.
+// Amber dot + distinct label so the unsynced state reads at a glance, not
+// only on hover. Mirrors the calendar page's TeamChip; when this page gains
+// a genuinely DB-backed setting, port that page's `synced` prop rather than
+// re-widening this copy.
 
 function TeamChip(): ReactNode {
+  const tip =
+    "A team setting by design — but right now it saves on this device only. Teammates won't see it until team sync arrives with the backend update.";
   return (
-    <Tooltip
-      content="This setting affects every teacher on your grade-level team."
-      side="bottom"
-    >
+    <Tooltip content={tip} side="bottom" required>
       <span
-        className={styles.teamChip}
+        className={`${styles.teamChip} ${styles.teamChipLocal}`}
         tabIndex={0}
-        title="This setting affects every teacher on your grade-level team."
-        aria-label="Shared with your team"
+        title={tip}
+        aria-label="Team setting, saved on this device only"
       >
-        <span aria-hidden="true" className={styles.teamChipDot} />
-        Shared with your team
+        <span
+          aria-hidden="true"
+          className={`${styles.teamChipDot} ${styles.teamChipDotLocal}`}
+        />
+        Team setting · this device only
       </span>
     </Tooltip>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-// use-subject-settings — the three storage-backed states behind
+// use-subject-settings — the four storage-backed states behind
 // Settings → Subjects.
 //
 //   1. useSubjectOverrides()  — TEAM-scoped tweaks to the 8 locked
@@ -11,6 +11,18 @@
 //      teammates are unaffected.
 //   3. usePersonalSubjects()  — PERSONAL custom subjects (e.g. "Band",
 //      "Quran") this teacher runs outside the team's locked roster.
+//   4. useTeamSubjectOrder()  — TEAM-scoped display ORDER of the locked
+//      roster. Order is arrangement, not identity: it never adds,
+//      removes, renames or recolors a subject.
+//
+// ── SCOPE HONESTY (read before writing copy about any of these) ───────
+// The `mycurricula:team:*` prefix records the INTENDED scope. The
+// storage behind it is localStorage, i.e. per-browser — nothing here is
+// actually shared with a teammate, or even with this teacher's other
+// device, until the team-settings backend lands. Never write UI copy
+// promising a teammate will see one of these values (the same rule
+// app/settings/calendar/page.tsx states at length for its own four
+// team-prefixed keys). Describe the observable effect instead.
 //
 // Locked-roster doctrine (CLAUDE.md §4): the 8 subjects (math, reading,
 // writing, grammar, spelling, ufli, explorers, sel) and their swatch
@@ -44,9 +56,20 @@
 // `team_settings` row and the personal pieces to per-user rows when the
 // Supabase backend (Phase 1B) lands.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SubjectId } from "./types";
 import { SUBJECTS, SUBJECT_BY_ID } from "./mock";
+// The saved-order normalizer is shared with the per-teacher Weekly row
+// order (lib/subject-order.ts). One normalizer, one set of semantics —
+// duplicating it is exactly the drift that lets two "orders" disagree
+// about what happens to a subject the catalog no longer has.
+import { reconcileOrder, type MoveDirection } from "./subject-order";
+// Notebook identity for the ORDER key's scope (§4 below). This makes
+// useTeamSubjectOrder — and, transitively, useVisibleSubjects — require
+// a <NotebookProvider> ancestor. Both mount points that matter provide
+// one (app/settings/layout.tsx and app/(planner)/layout.tsx). No cycle:
+// notebook-state does not import this module.
+import { useNotebookState } from "./notebook-state";
 
 // ── Shared: the locked-roster id set ───────────────────────────────────────
 
@@ -672,6 +695,399 @@ export function usePersonalSubjects(): {
   );
 
   return { subjects, add, remove };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. TEAM subject order
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The locked roster's DISPLAY ORDER. Ordering is arrangement, not
+// identity — it can never add, drop, rename or recolor a subject
+// (CLAUDE.md §4: the subject→slot map is not a preference). The stored
+// value is a plain `SubjectId[]`, which maps 1:1 onto the
+// `subjects.display_order` column when the backend lands.
+//
+// Team-scoped, unlike lib/subject-order.ts (`mycurricula:user:…`), which
+// is one teacher's private Weekly ROW arrangement. Two different
+// questions: "what order does this roster read in" vs "how do I like my
+// own grid stacked". They share `reconcileOrder`, nothing else.
+
+/**
+ * localStorage key BASE. TEAM-scoped by intent, per-browser in fact —
+ * see the SCOPE HONESTY note at the top of this file before writing UI
+ * copy about it. Migrates to `subjects.display_order` (already present
+ * in the schema) when the team-settings backend lands.
+ *
+ * The real key is NOTEBOOK-scoped via `teamSubjectOrderStorageKey`
+ * (Codex F3 review, Medium 3): a bare key would be browser-global, so a
+ * reorder in one notebook/workspace would rearrange every other one on
+ * the same browser — a multi-grade violation (CLAUDE.md: never assume a
+ * single grade). The bare base key survives only as the read-once
+ * legacy-fallback source for values written before scoping landed.
+ */
+const ORDER_KEY_BASE = "mycurricula:team:subject-order";
+
+/**
+ * Build the storage key for a notebook scope. Pure + exported so the
+ * scoping rule is unit-testable without React.
+ *
+ * WHY THE NOTEBOOK (grade_levels) ID, not a workspace:notebook composite
+ * — coordinator-approved 2026-08-07:
+ *   • On the MULTI_WORKSPACE **ON** path, notebook ids are per-workspace
+ *     UUIDs, so notebook scoping already isolates workspaces: workspace
+ *     A's Grade 5 and workspace B's Grade 5 are different ids.
+ *   • On today's **OFF** path `workspaceId` is always null, so a
+ *     composite would degrade to exactly this with more moving parts.
+ *   • This mirrors the repo's one existing scoping precedent,
+ *     lib/subject-order.ts `storageKeyFor` (grade-scoped for the same
+ *     reason).
+ * Residual gap, on the record: OFF-path notebook ids are static mock
+ * strings, and the SIBLING team keys this order composes with
+ * (subject-overrides, holidays, …) remain browser-global — tracked
+ * separately, out of this wave's scope.
+ *
+ * A null/undefined/empty scope (identity still resolving on the ON
+ * path, or no provider value) falls back to the bare base key.
+ */
+export function teamSubjectOrderStorageKey(
+  scope: string | null | undefined,
+): string {
+  return scope ? `${ORDER_KEY_BASE}:${scope}` : ORDER_KEY_BASE;
+}
+
+/**
+ * The locked roster in catalog order — the DEFAULT catalog
+ * `useTeamSubjectOrder` reconciles against when the caller passes none.
+ * UI code should not import this: the hook returns its resolved
+ * `catalog`, and reset/deviation checks go through that so they follow a
+ * caller-supplied catalog. Exported for tests and for the default.
+ */
+export const CANONICAL_SUBJECT_ORDER: readonly SubjectId[] = SUBJECTS.map(
+  (s) => s.id,
+);
+
+/**
+ * Same-tab channel, KEYED by storage key — unlike the three flat-key
+ * channels above. Instances announce which key they wrote so a
+ * subscriber whose scope differs (mid notebook-switch, or a stale-scope
+ * write racing a scope flip) never applies another notebook's order.
+ */
+const orderChannel = createSameTabChannel<{
+  storageKey: string;
+  next: SubjectId[];
+}>();
+
+export type { MoveDirection };
+
+/**
+ * Normalize any stored/parsed value into a complete, de-duped permutation
+ * of `catalogOrder`:
+ *   • unknown or removed ids are dropped;
+ *   • duplicates collapse to their first occurrence;
+ *   • a catalog subject the saved order never mentioned is APPENDED (in
+ *     canonical-relative order) rather than lost — so a subject added to
+ *     the roster after a teacher saved an order still appears.
+ *
+ * `catalogOrder` is a parameter, not a module constant read, so a grade
+ * with a different subject set reuses this untouched (CLAUDE.md: never
+ * assume a single grade).
+ */
+export function normalizeSubjectOrder(
+  input: unknown,
+  catalogOrder: readonly SubjectId[] = CANONICAL_SUBJECT_ORDER,
+): SubjectId[] {
+  return reconcileOrder(
+    Array.isArray(input) ? (input as unknown[]) : null,
+    catalogOrder,
+  );
+}
+
+/**
+ * Move one subject one slot up or down, purely.
+ *
+ * `among` is the subset the teacher can actually SEE — the active roster,
+ * which excludes archived subjects. Without it a "move up" past an
+ * archived neighbour would swap with a row that isn't rendered and look
+ * like nothing happened. With it, the subject swaps with its nearest
+ * VISIBLE neighbour while ids outside `among` hold their absolute slots.
+ * Omit `among` for a plain adjacent swap.
+ *
+ * Returns the SAME array reference when nothing moved — an unknown id, or
+ * a subject already at the first/last visible slot — so a caller can test
+ * `next === order` to suppress a no-op toast.
+ */
+export function moveSubjectInOrder(
+  order: readonly SubjectId[],
+  id: SubjectId,
+  dir: MoveDirection,
+  among?: readonly SubjectId[],
+): readonly SubjectId[] {
+  const index = order.indexOf(id);
+  if (index === -1) return order; // not in this order — nothing to move
+  const step = dir === "up" ? -1 : 1;
+  const visible = among ? new Set<SubjectId>(among) : null;
+
+  // Walk in `dir` to the nearest swappable neighbour, stepping over any
+  // id that is not currently visible.
+  let target = index + step;
+  while (target >= 0 && target < order.length) {
+    if (visible === null || visible.has(order[target])) break;
+    target += step;
+  }
+  if (target < 0 || target >= order.length) return order; // at the boundary
+
+  const next = [...order];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
+/** Read + parse the order under one key. Null when unset / malformed /
+ *  not an array. Normalizes against the LIVE catalog the hook resolved —
+ *  never a module constant — so a non-default catalog is respected. */
+function readOrderFromStorage(
+  storageKey: string,
+  catalogOrder: readonly SubjectId[],
+): SubjectId[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (raw == null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return normalizeSubjectOrder(parsed, catalogOrder);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist the order under one key. Storage failures are swallowed for the
+ * caller's purposes — in-memory state still updates — but REPORTED, because
+ * one caller cannot treat them as harmless: the legacy migration deletes the
+ * only other copy of the value once it believes this write landed.
+ *
+ * @returns true when the value is known to be persisted.
+ */
+function writeOrderToStorage(
+  storageKey: string,
+  next: readonly SubjectId[],
+): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    return true;
+  } catch {
+    // Storage disabled / quota exceeded — in-memory state still updates.
+    return false;
+  }
+}
+
+/**
+ * Resolve a notebook's stored order, migrating the pre-scoping value if this
+ * is the first notebook to meet it.
+ *
+ * Exported and separated from the hook so the migration can be tested at all:
+ * it lives in an effect, effects do not run under `react-dom/server`, and the
+ * vitest environment is `node`. A guard that cannot be exercised is how the
+ * original leak shipped described as "read-once" while being read once PER
+ * SCOPE — a distinction no test was in a position to catch.
+ *
+ * The claim is a write-then-delete, and the delete is conditional on the write
+ * having actually landed, so no failure path can destroy the value.
+ *
+ * KNOWN RESIDUAL — two tabs, two notebooks, opened at the same instant can both
+ * read the legacy value before either deletes it, and it lands in both scopes.
+ * localStorage has no atomic test-and-set, so closing this properly needs
+ * `navigator.locks` and an async effect. Left open deliberately: the bound is
+ * two notebooks in a rare interleaving, against EVERY notebook before this
+ * change, and the residual is cosmetic ordering rather than data loss.
+ */
+export function loadTeamSubjectOrder(
+  storageKey: string,
+  catalogOrder: readonly SubjectId[],
+): SubjectId[] {
+  let stored = readOrderFromStorage(storageKey, catalogOrder);
+  if (stored === null && storageKey !== ORDER_KEY_BASE) {
+    const legacy = readOrderFromStorage(ORDER_KEY_BASE, catalogOrder);
+    if (legacy !== null) {
+      // DELETE ONLY AFTER A CONFIRMED WRITE. In private mode or at quota the
+      // scoped write fails silently while removeItem succeeds, and deleting
+      // regardless would destroy the teacher's only saved reorder — trading a
+      // cosmetic leak for actual data loss. On a failed write the legacy entry
+      // stays and simply gets offered again next time.
+      if (writeOrderToStorage(storageKey, legacy)) {
+        try {
+          window.localStorage.removeItem(ORDER_KEY_BASE);
+        } catch {
+          // Migration missed, value intact: the next notebook claims it.
+        }
+      }
+      stored = legacy;
+    }
+  }
+  return stored ?? normalizeSubjectOrder(null, catalogOrder);
+}
+
+/** Options for `useTeamSubjectOrder`. */
+export interface UseTeamSubjectOrderOptions {
+  /**
+   * The authoritative subject catalog to reconcile against. Defaults to
+   * the locked canonical 8. Pass the id list the consuming surface
+   * ACTUALLY renders (useVisibleSubjects passes the roster it composes)
+   * so that when a live planner catalog replaces the fixture, this seam
+   * follows the caller instead of a module constant. Every returned
+   * `order` is a complete permutation of THIS list.
+   */
+  catalogOrder?: readonly SubjectId[];
+}
+
+/**
+ * Returns the team's subject order plus setters.
+ *
+ * `order` is ALWAYS a complete permutation of `catalog` (the resolved
+ * catalog, also returned so callers can reset to it / detect deviation
+ * without importing any fixture-derived constant). SSR-safe by the same
+ * three steps as the hooks above: canonical order on the server and the
+ * first client paint, localStorage in a post-mount effect, `storage` +
+ * same-tab channel for propagation.
+ *
+ * SCOPE IS RESOLVED INTERNALLY — LOAD-BEARING, do not add a
+ * caller-supplied scope parameter. The settings page and
+ * useVisibleSubjects each mount their own instance of this hook; if
+ * scope were a parameter they could disagree, and a reorder would write
+ * one key while the seam reads another — mutations silently invisible.
+ * Deriving it here, from the one shared <NotebookProvider>, makes that
+ * divergence impossible. (Consequence: this hook — and transitively
+ * useVisibleSubjects — throws outside a NotebookProvider. Both real
+ * mount points provide one: app/settings/layout.tsx and
+ * app/(planner)/layout.tsx.)
+ *
+ * `moveSubject` returns true when the order actually changed, so the
+ * caller can skip the toast on a boundary press.
+ */
+export function useTeamSubjectOrder(options: UseTeamSubjectOrderOptions = {}): {
+  order: SubjectId[];
+  /** The resolved catalog (canonical order) — the reset target. */
+  catalog: SubjectId[];
+  setOrder: (ids: readonly SubjectId[]) => void;
+  moveSubject: (
+    id: SubjectId,
+    dir: MoveDirection,
+    among?: readonly SubjectId[],
+  ) => boolean;
+} {
+  const { catalogOrder = CANONICAL_SUBJECT_ORDER } = options;
+
+  // The notebook scope — see the LOAD-BEARING note above. Empty string
+  // (identity still loading on the ON path) degrades to the base key.
+  const { activeNotebookId } = useNotebookState();
+  const scope = activeNotebookId || null;
+  const storageKey = useMemo(() => teamSubjectOrderStorageKey(scope), [scope]);
+
+  // Stable identity for the catalog so the effects below don't re-run
+  // per render (callers typically pass a fresh array each render) —
+  // same idiom as lib/subject-order.ts.
+  const catalogJoinKey = catalogOrder.join("|");
+  const stableCatalog = useMemo(
+    () => [...catalogOrder],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [catalogJoinKey],
+  );
+
+  // SSR-safe default — the catalog order.
+  const [order, setOrderState] = useState<SubjectId[]>(() =>
+    normalizeSubjectOrder(null, stableCatalog),
+  );
+  const latestRef = useRef<SubjectId[]>(order);
+
+  const apply = useCallback((next: SubjectId[]): void => {
+    latestRef.current = next;
+    setOrderState(next);
+  }, []);
+
+  // Post-mount (and on scope/catalog change): sync from localStorage.
+  //
+  // LEGACY FALLBACK — MIGRATED ONCE, not consulted once per scope.
+  // A value written before scoping landed lives under the bare base key. The
+  // first version of this read it whenever the scoped key was unset, which is
+  // true for EVERY notebook the teacher has not yet reordered — so one legacy
+  // reorder reappeared in every grade and every workspace, which is exactly
+  // the cross-notebook bleed the scoping was introduced to stop. The comment
+  // called it "read-once"; it was read once per scope, and those are only the
+  // same thing when there is one scope.
+  //
+  // So the first notebook to observe it CLAIMS it: the value is written under
+  // that notebook's scoped key and the bare key is then removed. Nothing is
+  // lost (the write precedes the delete), and no second notebook can inherit
+  // it. Deleting is what makes this a migration rather than a shared default.
+  useEffect(() => {
+    apply(loadTeamSubjectOrder(storageKey, stableCatalog));
+  }, [apply, storageKey, stableCatalog]);
+
+  // Same-tab sync — KEYED: apply only writes to this instance's scope.
+  useEffect(
+    () =>
+      orderChannel.subscribe((msg) => {
+        if (msg.storageKey === storageKey) apply(msg.next);
+      }),
+    [apply, storageKey],
+  );
+
+  // Cross-tab sync — only this scope's key.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: StorageEvent): void => {
+      if (e.key !== storageKey) return;
+      if (e.newValue == null) {
+        apply(normalizeSubjectOrder(null, stableCatalog));
+        return;
+      }
+      try {
+        const parsed: unknown = JSON.parse(e.newValue);
+        apply(normalizeSubjectOrder(parsed, stableCatalog));
+      } catch {
+        // Ignore malformed values; keep current state.
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, [apply, storageKey, stableCatalog]);
+
+  /** Commit a new order: normalize, apply, persist, propagate. */
+  const commit = useCallback(
+    (ids: readonly SubjectId[]): SubjectId[] => {
+      const next = normalizeSubjectOrder(ids, stableCatalog);
+      apply(next);
+      writeOrderToStorage(storageKey, next);
+      orderChannel.emit({ storageKey, next });
+      return next;
+    },
+    [apply, storageKey, stableCatalog],
+  );
+
+  const setOrder = useCallback(
+    (ids: readonly SubjectId[]): void => {
+      commit(ids);
+    },
+    [commit],
+  );
+
+  const moveSubject = useCallback(
+    (
+      id: SubjectId,
+      dir: MoveDirection,
+      among?: readonly SubjectId[],
+    ): boolean => {
+      const prev = latestRef.current;
+      const next = moveSubjectInOrder(prev, id, dir, among);
+      if (next === prev) return false; // boundary / unknown id — no write
+      commit(next);
+      return true;
+    },
+    [commit],
+  );
+
+  return { order, catalog: stableCatalog, setOrder, moveSubject };
 }
 
 // ── Display helpers ────────────────────────────────────────────────────────

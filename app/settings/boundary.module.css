@@ -1,0 +1,96 @@
+/* boundary.module.css — shared shell for the Settings segment's route-level
+   loading + error boundaries (app/settings/loading.tsx, error.tsx).
+ *
+ * Both render INSIDE app/settings/layout.tsx's `{children}` slot, so the
+ * modal chrome, the section sidebar and the header all stay on screen and
+ * only the content pane changes. That is the whole point of scoping the
+ * boundary to this segment: before it existed, one slow or failed Supabase
+ * query in a section page (e.g. Standards' four-query Promise.all) escaped
+ * to app/error.tsx and took the ENTIRE Settings modal down with it —
+ * dropping the teacher on a full-page error with no way back to the other
+ * sections. Now a broken section is a broken section.
+ *
+ * Geometry deliberately mirrors the section pages' own `.page` / `.inner`
+ * (see standards/page.module.css) so the pane doesn't jump when the real
+ * content swaps in. Tokens only — no hex, no raw px type sizes. */
+
+.page {
+  width: 100%;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5, 20px);
+  max-width: 760px;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────── */
+
+/* Stand-in for the PageHeader the real section will paint, so the skeleton
+   occupies roughly the same block and the swap reads as content arriving
+   rather than the pane re-flowing. */
+.headSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2, 8px);
+}
+
+.cardSkeleton {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: var(--s5, 20px);
+}
+
+/* ── Error ───────────────────────────────────────────────────────────── */
+
+.errorCard {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  padding: var(--s6, 24px);
+  /* Never a sharp corner (BUILD_STANDARD RULE #1) — the radius token above
+     is the only corner treatment; no square-cornered variant exists. */
+}
+
+.errorEyebrow {
+  margin: 0;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--danger);
+}
+
+.errorTitle {
+  margin: var(--s2, 8px) 0 0;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-20, 20px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.errorBody {
+  margin: var(--s3, 12px) 0 0;
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--body);
+  text-wrap: pretty;
+}
+
+.errorRef {
+  margin: var(--s2, 8px) 0 0;
+  font-size: var(--t-11);
+  font-family: var(--font-mono, monospace);
+  color: var(--faint);
+}
+
+.errorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3, 12px);
+  margin-top: var(--s5, 20px);
+}

@@ -111,6 +111,26 @@ export interface ButtonProps extends Omit<
   tooltip?: string;
   /** Optional side override for the wrapping <Tooltip>. Default "top". */
   tooltipSide?: "top" | "right" | "bottom" | "left";
+  /**
+   * Always-on override for the high-consequence tooltip list (CLAUDE.md §4).
+   * Forwards `required` to the wrapping <Tooltip>, so the bubble ignores BOTH
+   * per-id dismissal AND the global "show onboarding tooltips" off switch, and
+   * never renders the "Turn off these tips" mini-link.
+   *
+   * Pass it on — and only on — the three categories §4 names:
+   *   • the Personal / Team Curriculum toggle,
+   *   • destructive actions (archive, delete, remove, mass-clear, …),
+   *   • team-wide settings (holidays, academic year, school week, the
+   *     curriculum label — anything whose change reaches every teacher).
+   *
+   * Mirrors `tooltipRequired` on the ToggleGroup primitive, which propagates
+   * the same flag to each option's wrapping tooltip. Closes the Button half of
+   * the pair §4 anticipated ("future passes will expose a matching
+   * tooltipId / tooltipRequired pair on Button").
+   *
+   * No effect without `tooltip` — there is no bubble to make required.
+   */
+  tooltipRequired?: boolean;
 }
 
 // ── Button ────────────────────────────────────────────────────────────────────
@@ -127,6 +147,7 @@ export function Button({
   children,
   tooltip,
   tooltipSide,
+  tooltipRequired = false,
   title,
   ...rest
 }: ButtonProps): ReactNode {
@@ -197,7 +218,11 @@ export function Button({
   if (!tooltip) return buttonEl;
 
   return (
-    <Tooltip content={tooltip} side={tooltipSide ?? "top"}>
+    <Tooltip
+      content={tooltip}
+      side={tooltipSide ?? "top"}
+      required={tooltipRequired}
+    >
       {buttonEl}
     </Tooltip>
   );

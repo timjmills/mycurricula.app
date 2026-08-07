@@ -260,3 +260,50 @@
     width: 100%;
   }
 }
+
+/* ── Sign-in email (audit §B8) ──────────────────────────────────────────
+   A read-only definition row, NOT an input: the address is the account's
+   identity (Google SSO), so it is a fact to state, not a field to edit.
+   Styled as a quiet inset chip rather than a text box so it never invites
+   a click. `tabIndex=0` on the value makes it keyboard-reachable, which is
+   what surfaces the tooltip explaining why it can't be changed — hence a
+   real focus ring here rather than `outline: none`. */
+.emailRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.emailValue {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  min-height: 44px; /* matches .textInput — touch target, BUILD_STANDARD §9 */
+  padding: 0 12px;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--hairline);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md); /* RULE #1 — never a sharp corner */
+  /* A long address must wrap inside the chip rather than push the card
+     sideways: BUILD_STANDARD §9 forbids document-level horizontal scroll,
+     and this string is user-supplied and unbounded. */
+  overflow-wrap: anywhere;
+}
+
+.emailValue:focus-visible {
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
+}
+
+/* Pre-session / prototype state. Italic + muted so it reads as "nothing
+   here yet" rather than as an address literally called that. */
+.emailPending {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--muted);
+}

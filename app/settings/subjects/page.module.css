@@ -131,7 +131,18 @@
     grid-template-columns: auto minmax(0, 1fr);
     padding: 12px;
   }
-  .rowControls {
+  /* Doubled on purpose. The base `.rowControls` rule (0,1,0) is declared
+     BELOW this media block, so at equal specificity source order gave it
+     the win and `justify-content: flex-start` here was dead — measured
+     `flex-end` at 375px while `grid-column` and `padding-left`, which the
+     base rule does not set, applied normally. The cluster therefore
+     right-packed instead of aligning under the name, which the reorder
+     arrows made obvious (they wrapped to a line of their own, hard right,
+     detached from the row they belong to). `.rowControls.rowControls` is
+     (0,2,0) and wins regardless of order. The `.rosterRowInline` override
+     below is also (0,2,0) and still wins for inline rows — it comes later
+     in this same block. */
+  .rowControls.rowControls {
     grid-column: 1 / -1;
     justify-content: flex-start;
     padding-left: 36px; /* 24px swatch + 12px gap — aligns under the name */
@@ -297,6 +308,33 @@
   border-radius: var(--r-sm);
   outline: none;
   box-shadow: 0 0 0 4px var(--brand-50);
+}
+
+/* ── Reorder controls (team roster) ────────────────────────────────────
+   A tight pair of ↑ / ↓ icon buttons. The Button primitive owns their
+   look, hit-area inflation (≥44px on any coarse pointer) and focus ring,
+   so nothing here paints — this rule only groups them and keeps the pair
+   from being split by `.rowControls`' flex-wrap, which would strand a
+   lone arrow on the next line. `flex: none` because an arrow must never
+   be squeezed below its 32px visual on a narrow row.
+
+   No color, no tone branching: the buttons inherit the same tokens as
+   every other Button, so they survive Wash / Photo-Dim / Photo-Bright /
+   Night for the same reason the Archive button beside them does. */
+
+.moveGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+/* The reset affordance sits below the roster, left-aligned under it, and
+   only renders while the order actually deviates from the default. */
+.orderReset {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 8px;
 }
 
 /* ── "I teach this" switch ─────────────────────────────────────────────

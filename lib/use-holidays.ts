@@ -40,7 +40,18 @@ export interface Holiday {
 
 export interface UseHolidaysResult {
   holidays: Holiday[];
-  add: (h: Omit<Holiday, "id">) => void;
+  /**
+   * Add a holiday. Returns the MINTED ID of the new row, or null when the
+   * input fails validation and nothing was written.
+   *
+   * The return value exists for Undo (§4a Medium 2): an "undo this add" that
+   * matches by (date, name) can delete a DIFFERENT identical row added in the
+   * meantime — another tab via the `storage` sync, or a later manual re-add.
+   * The id names exactly the row this call created, so `remove(id)` undoes
+   * this action and nothing else; if the row is already gone, the remove is a
+   * no-op.
+   */
+  add: (h: Omit<Holiday, "id">) => string | null;
   remove: (id: string) => void;
   clear: () => void;
 }
@@ -156,17 +167,23 @@ export function useHolidays(): UseHolidaysResult {
 
   // ── Mutations ──────────────────────────────────────────────────────
 
-  const add = useCallback((h: Omit<Holiday, "id">): void => {
+  const add = useCallback((h: Omit<Holiday, "id">): string | null => {
     const date = typeof h.date === "string" ? h.date : "";
     const name = typeof h.name === "string" ? h.name.trim() : "";
-    if (!ISO_DATE_RE.test(date) || !name) return;
+    if (!ISO_DATE_RE.test(date) || !name) return null;
+    // Mint the id OUTSIDE the state updater so it can be returned to the
+    // caller (for Undo-by-id). Also correctness: React may invoke an updater
+    // more than once (StrictMode double-invoke), and an id minted inside
+    // would differ between invocations.
+    const id = makeId();
     setHolidays((prev) => {
-      const next = [...prev, { id: makeId(), date, name }].sort((a, b) =>
+      const next = [...prev, { id, date, name }].sort((a, b) =>
         a.date.localeCompare(b.date),
       );
       writeToStorage(next);
       return next;
     });
+    return id;
   }, []);
 
   const remove = useCallback((id: string): void => {

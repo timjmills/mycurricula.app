@@ -30,14 +30,33 @@
 // Tooltip rule (CLAUDE.md §4): every interactive control carries an
 // onboarding-voice tooltip. Inputs use `title=`; Buttons use the
 // `tooltip` prop on the canonical primitive.
+//
+// ALWAYS-ON TOOLTIPS + UNDO (audit 2026-07-31 §C1). Every control on this
+// page is in CLAUDE.md §4's always-on list — §4 names "holidays, academic
+// year, school week" by name as team-wide settings whose tooltips ignore
+// both per-id dismissal and the global off switch. They are therefore all
+// `required`, and none renders the "Turn off these tips" link. Every
+// mutation additionally fires a ConsequenceToast with an Undo, because
+// these controls auto-persist on click: before this pass, removing a
+// holiday was a silent, unrecoverable write with no confirmation step.
+//
+// TOAST HONESTY. The toasts describe what OBSERVABLY happens, not what the
+// `team:` key prefix implies. Only the school week actually writes for the
+// team (`schools.school_week`) — and that write can be REFUSED by RLS, so
+// its toast defers the outcome to SchoolWeekSaveNote rather than claiming a
+// save. Months, academic-year dates and holidays persist to this browser
+// only (see the scope note above), so their toasts speak about this
+// teacher's views and never promise teammates will see the change.
 
 import {
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
   type ReactNode,
 } from "react";
+import { useConsequenceToast } from "@/lib/consequence-toast";
 import {
   ALL_SCHOOL_MONTHS,
   SCHOOL_MONTH_PRESETS,
@@ -54,6 +73,7 @@ import {
   type Weekday,
 } from "@/lib/use-school-week";
 import { useHolidays, type Holiday } from "@/lib/use-holidays";
+import { formatIsoDate, summarizeWeek } from "@/lib/settings-calendar-format";
 import {
   useAcademicYear,
   academicYearDateToIso,
@@ -261,6 +281,7 @@ const SCHOOL_WEEK_PRESET_OPTIONS: readonly SchoolWeekPresetOption[] = [
 
 function SchoolMonthsSection(): ReactNode {
   const [months, setMonths] = useSchoolMonths();
+  const { showConsequence } = useConsequenceToast();
   const selected = useMemo(() => new Set(months), [months]);
   const activePreset = useMemo(() => detectPreset(months), [months]);
 
@@ -268,13 +289,32 @@ function SchoolMonthsSection(): ReactNode {
     const key = e.target.value as PresetKey;
     if (key === "custom") return; // "custom" is implicit, not actionable
     const preset = SCHOOL_MONTH_PRESETS[key];
-    if (preset) setMonths([...preset]);
+    if (!preset) return;
+    // Snapshot BEFORE the write so Undo restores the exact prior selection
+    // (not a re-detected preset — a custom set has no preset to detect).
+    const previous = [...months];
+    setMonths([...preset]);
+    const label =
+      PRESET_OPTIONS.find((o) => o.key === key)?.label ?? "a preset";
+    // Widened to `number` deliberately: every preset today is 3–12 months
+    // long, so TS narrows `preset.length` to that literal union and rejects
+    // the `=== 1` pluralization check as impossible. Widening keeps the
+    // sentence correct if a single-month preset is ever added, instead of
+    // hard-coding "months" and quietly producing "1 months" later.
+    const count: number = preset.length;
+    showConsequence({
+      message: `School months set to ${label} — the Year view now shows ${count} ${count === 1 ? "month" : "months"}.`,
+      onUndo: () => setMonths(previous),
+    });
   };
 
   /** Toggle a single month's membership in the selection. */
   const onToggleMonth = (monthIdx: number): void => {
+    const previous = [...months];
+    const long = MONTH_NAMES_LONG[monthIdx];
     const next = new Set(selected);
-    if (next.has(monthIdx)) {
+    const wasOn = next.has(monthIdx);
+    if (wasOn) {
       next.delete(monthIdx);
     } else {
       next.add(monthIdx);
@@ -284,9 +324,19 @@ function SchoolMonthsSection(): ReactNode {
     // surface must derive its columns from the configured set.
     if (next.size === 0) {
       setMonths([...ALL_SCHOOL_MONTHS]);
+      showConsequence({
+        message: `${long} was your last school month, so the selection reset to all twelve — the Year view always needs at least one month.`,
+        onUndo: () => setMonths(previous),
+      });
       return;
     }
     setMonths(Array.from(next));
+    showConsequence({
+      message: wasOn
+        ? `${long} removed from the school year — it no longer appears in the Year view.`
+        : `${long} added to the school year — it now appears in the Year view.`,
+      onUndo: () => setMonths(previous),
+    });
   };
 
   return (
@@ -297,14 +347,15 @@ function SchoolMonthsSection(): ReactNode {
       eyebrow="Calendar"
       title={
         <Tooltip
-          content="Which calendar months your school operates in — only these months show in /year. Shared with your team."
+          content="Which calendar months your school operates in — only these months show in /year. Team-scoped by design; for now it saves on this device only."
           side="bottom"
+          required
         >
           <span>School months</span>
         </Tooltip>
       }
       hint="Which calendar months your team treats as the academic year. The Year view and any month-scoped filters use this."
-      action={<TeamChip />}
+      action={<TeamChip synced={false} />}
     >
       {/* ── Preset dropdown ─────────────────────────────────────────── */}
       <div className={styles.presetRow}>
@@ -312,14 +363,15 @@ function SchoolMonthsSection(): ReactNode {
           Preset
         </label>
         <Tooltip
-          content="Quick-pick a common school-year shape. Picking one updates the month toggles below for the whole team."
+          content="Quick-pick a common school-year shape. Picking one updates the month toggles below — on this device for now, until team sync arrives."
           side="bottom"
+          required
         >
           <select
             id="school-months-preset"
             value={activePreset}
             onChange={onPresetChange}
-            title="Quick-pick a common school-year shape. Picking one updates the month toggles below for the whole team."
+            title="Quick-pick a common school-year shape. Picking one updates the month toggles below — on this device for now, until team sync arrives."
             className={styles.select}
           >
             {PRESET_OPTIONS.map((opt) => (
@@ -341,9 +393,9 @@ function SchoolMonthsSection(): ReactNode {
             const isOn = selected.has(monthIdx);
             const short = MONTH_NAMES_SHORT[monthIdx];
             const long = MONTH_NAMES_LONG[monthIdx];
-            const tip = `Include ${long} in this curriculum's school year. Every teacher on the team sees the change.`;
+            const tip = `Include ${long} in this curriculum's school year. Changes apply to your views on this device for now — team sync arrives with the backend update.`;
             return (
-              <Tooltip key={monthIdx} content={tip} side="top">
+              <Tooltip key={monthIdx} content={tip} side="top" required>
                 <button
                   type="button"
                   role="switch"
@@ -385,7 +437,8 @@ function SchoolMonthsSection(): ReactNode {
 // number under the inputs is the same one that drives the timeline.
 
 function AcademicYearSection(): ReactNode {
-  const { start, end, setStart, setEnd } = useAcademicYear();
+  const { start, end, setStart, setEnd, setRange } = useAcademicYear();
+  const { showConsequence } = useConsequenceToast();
 
   const startIso = useMemo(() => academicYearDateToIso(start), [start]);
   const endIso = useMemo(() => academicYearDateToIso(end), [end]);
@@ -400,14 +453,75 @@ function AcademicYearSection(): ReactNode {
     return weeksInRange(start, end);
   }, [start, end]);
 
+  // Undo restores the {start, end} PAIR through `setRange` — never a
+  // single-endpoint setter (§4a Medium 1). The single setters normalize
+  // against the OTHER CURRENT endpoint, so `setStart(x)` can legitimately
+  // clamp the end too; an Undo of only one endpoint would restore the start
+  // while keeping that clamped end. `setRange` on a previously-valid pair is
+  // exact: normalizePair is idempotent on pairs already satisfying its
+  // invariants (tests/academic-year-pair-restore.test.ts pins this).
+  //
+  // THE SNAPSHOT IS ANCHORED PER EDITING BURST, BY TIME — not per change
+  // event and not at focus. Two live findings (2026-08-07) drove this:
+  //
+  //   1. A date input fires `change` PER SEGMENT during keyboard entry
+  //      (month, then day, then year). A per-change snapshot captures
+  //      INTERMEDIATE states, so the visible toast's Undo restored only the
+  //      last segment edit, not the date the teacher started from.
+  //   2. A focus-anchored snapshot was tried and ALSO restored an
+  //      intermediate. On a CONTROLLED date input, every segment change
+  //      re-renders and rewrites `value`, and Chrome's segment/focus state
+  //      does not survive that rewrite — the anchor re-captured mid-burst
+  //      (the restored value was the seeded day with an intermediate month:
+  //      a mid-burst snapshot's fingerprint).
+  //
+  // The time anchor depends on neither: the first change after ≥1.2s of
+  // quiet starts a burst and snapshots the pair; every change inside the
+  // window extends it and reuses the SAME snapshot. Keyboard segments arrive
+  // well inside the window, so every toast of one burst restores the same
+  // pre-burst pair — whichever toast survives, its Undo is a FULL undo.
+  // Known, accepted edge: a pause >1.2s mid-entry starts a new burst, so an
+  // Undo then restores to that pause point rather than the very beginning —
+  // a second Undo is available on the earlier toast until it expires.
+  //
+  // The hook clamps the span to 30–60 weeks, so the value that lands may
+  // differ from the one typed — the toast therefore names the DATE THE
+  // TEACHER PICKED, and the live "= N weeks" readout above shows the result.
+  const BURST_MS = 1200;
+  const burstRef = useRef<{
+    pair: { start: Date; end: Date };
+    last: number;
+  } | null>(null);
+  const burstSnapshot = (): { start: Date; end: Date } => {
+    const now = Date.now();
+    if (burstRef.current == null || now - burstRef.current.last > BURST_MS) {
+      burstRef.current = { pair: { start, end }, last: now };
+    } else {
+      burstRef.current.last = now;
+    }
+    return burstRef.current.pair;
+  };
+
   const onStartChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const next = academicYearIsoToDate(e.target.value);
-    if (next) setStart(next);
+    if (!next) return;
+    const previous = burstSnapshot();
+    setStart(next);
+    showConsequence({
+      message: `School year now starts ${formatIsoDate(e.target.value)} — the Roadmap and Progression timelines re-scale to the new range.`,
+      onUndo: () => setRange(previous.start, previous.end),
+    });
   };
 
   const onEndChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const next = academicYearIsoToDate(e.target.value);
-    if (next) setEnd(next);
+    if (!next) return;
+    const previous = burstSnapshot();
+    setEnd(next);
+    showConsequence({
+      message: `School year now ends ${formatIsoDate(e.target.value)} — the Roadmap and Progression timelines re-scale to the new range.`,
+      onUndo: () => setRange(previous.start, previous.end),
+    });
   };
 
   return (
@@ -418,14 +532,15 @@ function AcademicYearSection(): ReactNode {
       eyebrow="Calendar"
       title={
         <Tooltip
-          content="The exact dates your academic year starts and ends — Roadmap + Progression scale to this range. Shared with your team."
+          content="The exact dates your academic year starts and ends — Roadmap + Progression scale to this range. Team-scoped by design; for now it saves on this device only."
           side="bottom"
+          required
         >
           <span>Academic year dates</span>
         </Tooltip>
       }
       hint="When your school year starts and ends. The Year view's Roadmap and Progression timelines line up exactly with these dates."
-      action={<TeamChip />}
+      action={<TeamChip synced={false} />}
     >
       <div className={styles.dateRangeRow}>
         {/* Start date */}
@@ -436,6 +551,7 @@ function AcademicYearSection(): ReactNode {
           <Tooltip
             content="The first day of your school year. The Year view's Roadmap and Progression timelines start exactly here, so units pinned to early weeks land on the same calendar dates a teacher would see in their school's calendar."
             side="bottom"
+            required
           >
             <input
               id="academic-year-start"
@@ -457,6 +573,7 @@ function AcademicYearSection(): ReactNode {
           <Tooltip
             content="The last day of your school year. The Roadmap and Progression timelines end here — final-week units are anchored to this date, so a unit that ends two weeks before school finishes lands two weeks back from this date."
             side="bottom"
+            required
           >
             <input
               id="academic-year-end"
@@ -514,14 +631,39 @@ function AcademicYearSection(): ReactNode {
 
 function SchoolWeekSection(): ReactNode {
   const { days, setDays, saveState } = useSchoolWeek();
+  const { showConsequence } = useConsequenceToast();
   const selected = useMemo(() => new Set(days), [days]);
   const activePreset = useMemo(() => detectSchoolWeekPreset(days), [days]);
+
+  // The ONLY control on this page whose write leaves the browser
+  // (`schools.school_week`) — and RLS can refuse it, because moving
+  // everyone's grid is admin-only. So the toast deliberately does NOT claim
+  // a team-wide save: it names the local change and points at
+  // SchoolWeekSaveNote, which reports the real outcome (saving / saved /
+  // local / denied / failed). Promising "every teacher now sees this" here
+  // would be exactly the lie the save-note was added to prevent.
+  const announceWeek = (
+    previous: readonly Weekday[],
+    summary: string,
+  ): void => {
+    showConsequence({
+      message: `School week set to ${summary}. This one saves for the whole team — the note under the chips confirms whether it went through.`,
+      onUndo: () => setDays([...previous]),
+    });
+  };
 
   const onPresetChange = (e: ChangeEvent<HTMLSelectElement>): void => {
     const key = e.target.value as SchoolWeekDropdownKey;
     if (key === "custom") return; // "custom" is implicit, not actionable
     const preset = SCHOOL_WEEK_PRESETS[key];
-    if (preset) setDays([...preset]);
+    if (!preset) return;
+    const previous = [...days];
+    setDays([...preset]);
+    announceWeek(
+      previous,
+      SCHOOL_WEEK_PRESET_OPTIONS.find((o) => o.key === key)?.label ??
+        summarizeWeek(preset),
+    );
   };
 
   /** Toggle a single weekday's membership in the selection. */
@@ -531,13 +673,17 @@ function SchoolWeekSection(): ReactNode {
       // Empty-state guard — refuse to drop below 1 day. The hook would
       // fall back to the default anyway, but silently swapping the
       // user's selection on "delete last" feels surprising; ignoring
-      // the click is clearer.
+      // the click is clearer. No toast either: nothing changed, and a
+      // toast for a no-op would train teachers to ignore them.
       if (next.size <= 1) return;
       next.delete(day);
     } else {
       next.add(day);
     }
-    setDays(Array.from(next));
+    const previous = [...days];
+    const ordered = WEEKDAY_ORDER.filter((d) => next.has(d));
+    setDays(ordered);
+    announceWeek(previous, summarizeWeek(ordered));
   };
 
   return (
@@ -550,12 +696,13 @@ function SchoolWeekSection(): ReactNode {
         <Tooltip
           content="Which weekdays your school holds lessons — Sun-Thu for Qatar, Mon-Fri for US, etc. Shared with your team."
           side="bottom"
+          required
         >
           <span>School week</span>
         </Tooltip>
       }
       hint="Which weekdays your school runs. The Weekly grid, Daily list, and Schedule all use this set as their day columns. Existing lessons map by index — day 0 stays day 0 (the first day of your school week)."
-      action={<TeamChip />}
+      action={<TeamChip synced />}
     >
       {/* ── Preset dropdown ─────────────────────────────────────────── */}
       <div className={styles.presetRow}>
@@ -565,6 +712,7 @@ function SchoolWeekSection(): ReactNode {
         <Tooltip
           content="Quick-pick a common school-week shape. Picking one updates the weekday toggles below for the whole team."
           side="bottom"
+          required
         >
           <select
             id="school-week-preset"
@@ -597,7 +745,7 @@ function SchoolWeekSection(): ReactNode {
               ? `${long} is the only school day right now — pick another weekday first before removing it.`
               : `Include ${long} in your school week. Every teacher on the team sees the change, and every calendar view updates its day columns.`;
             return (
-              <Tooltip key={day} content={tip} side="top">
+              <Tooltip key={day} content={tip} side="top" required>
                 <button
                   type="button"
                   role="switch"
@@ -684,6 +832,7 @@ function SchoolWeekSaveNote({
 
 function HolidaysSection(): ReactNode {
   const { holidays, add, remove } = useHolidays();
+  const { showConsequence } = useConsequenceToast();
 
   // Draft form state — cleared on submit. We intentionally keep the
   // form *inline* (no modal) so a teacher adding several holidays in a
@@ -699,9 +848,36 @@ function HolidaysSection(): ReactNode {
   const onSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     if (!canSubmit) return;
-    add({ date: draftDate, name: draftName.trim() });
+    const date = draftDate;
+    const name = draftName.trim();
+    // `add` returns the MINTED ID of the row it created (§4a Medium 2), so
+    // Undo removes exactly that row by id — never a (date, name) lookup,
+    // which could match a different identical holiday added in the meantime
+    // (another tab via the storage sync, or a later manual re-add). The id is
+    // stable across list changes, so the closure cannot go stale; removing an
+    // already-removed id is a safe no-op inside the hook.
+    const id = add({ date, name });
+    if (id == null) return; // hook-level validation refused; nothing to toast
     setDraftDate("");
     setDraftName("");
+    showConsequence({
+      message: `“${name}” added on ${formatIsoDate(date)} — the Year view now greys out that week.`,
+      onUndo: () => remove(id),
+    });
+  };
+
+  /** Remove a holiday, with an Undo that re-adds it.
+   *
+   *  The restored row gets a FRESH id (`useHolidays.add` always mints one),
+   *  which is invisible to the teacher — the id is an internal list key,
+   *  never displayed and never referenced by another surface. Date and name,
+   *  the only fields that carry meaning, round-trip exactly. */
+  const onRemove = (holiday: Holiday): void => {
+    remove(holiday.id);
+    showConsequence({
+      message: `“${holiday.name}” removed — the Year view no longer greys out ${formatIsoDate(holiday.date)}.`,
+      onUndo: () => add({ date: holiday.date, name: holiday.name }),
+    });
   };
 
   return (
@@ -712,14 +888,15 @@ function HolidaysSection(): ReactNode {
       eyebrow="Calendar"
       title={
         <Tooltip
-          content="Holidays + breaks during the school year — these days grey out on /year so you don't plan lessons on them. Shared with your team."
+          content="Holidays + breaks during the school year — these days grey out on /year so you don't plan lessons on them. Team-scoped by design; for now it saves on this device only."
           side="bottom"
+          required
         >
           <span>Holidays</span>
         </Tooltip>
       }
-      hint="Non-instruction dates — Eid, Spring Break, in-service days, anything where lessons shouldn't run. The Year view greys out the matching week so the team can see at a glance where the school week is short."
-      action={<TeamChip />}
+      hint="Non-instruction dates — Eid, Spring Break, in-service days, anything where lessons shouldn't run. The Year view greys out the matching week. Saved on this device for now — holidays reach your whole team once team sync arrives."
+      action={<TeamChip synced={false} />}
     >
       {/* ── Add form ─────────────────────────────────────────────────── */}
       <form className={styles.holidayForm} onSubmit={onSubmit} noValidate>
@@ -731,6 +908,7 @@ function HolidaysSection(): ReactNode {
             <Tooltip
               content="The calendar date this holiday falls on. Pick from the picker or type YYYY-MM-DD."
               side="bottom"
+              required
             >
               <input
                 id="holiday-date"
@@ -751,6 +929,7 @@ function HolidaysSection(): ReactNode {
             <Tooltip
               content="What this holiday is called — appears on the Year-view tooltip and in this list."
               side="bottom"
+              required
             >
               <input
                 id="holiday-name"
@@ -774,16 +953,18 @@ function HolidaysSection(): ReactNode {
               variant="primary"
               size="md"
               disabled={!canSubmit}
-              tooltip="Add this holiday — the Year view greys out the week it lands on for the whole team."
+              tooltip="Add this holiday — your Year view greys out the week it lands on. Saved on this device for now; teammates see it once team sync arrives."
+              tooltipRequired
             >
               + Add holiday
             </Button>
           </div>
         </div>
         <p className={styles.fieldHint}>
-          Both a date and a name are required. Holidays appear on every
-          teacher&rsquo;s Year view — the Roadmap greys out the matching week so
-          the team knows lessons there shouldn&rsquo;t be planned.
+          Both a date and a name are required. The Roadmap greys out the
+          matching week so lessons there aren&rsquo;t planned. Holidays save on
+          this device for now — they reach your whole team once team sync
+          arrives.
         </p>
       </form>
 
@@ -795,7 +976,7 @@ function HolidaysSection(): ReactNode {
           </li>
         ) : (
           holidays.map((h) => (
-            <HolidayRow key={h.id} holiday={h} onRemove={() => remove(h.id)} />
+            <HolidayRow key={h.id} holiday={h} onRemove={() => onRemove(h)} />
           ))
         )}
       </ul>
@@ -813,22 +994,9 @@ function HolidayRow({
   holiday: Holiday;
   onRemove: () => void;
 }): ReactNode {
-  // Render the ISO date in the user's locale. We parse manually — passing
-  // an ISO string to `new Date()` would interpret it as UTC and could
-  // shift the calendar date by one day in negative-offset locales.
-  const display = useMemo(() => {
-    const [y, m, d] = holiday.date
-      .split("-")
-      .map((s) => Number.parseInt(s, 10));
-    if (!y || !m || !d) return holiday.date;
-    const local = new Date(y, m - 1, d);
-    return local.toLocaleDateString(undefined, {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }, [holiday.date]);
+  // Locale-rendered date. The UTC-shift guard now lives in formatIsoDate,
+  // shared with the academic-year toasts.
+  const display = useMemo(() => formatIsoDate(holiday.date), [holiday.date]);
 
   return (
     <li className={styles.holidayItem}>
@@ -838,7 +1006,10 @@ function HolidayRow({
         variant="ghost"
         size="sm"
         onClick={onRemove}
-        tooltip={`Remove “${holiday.name}” from the team's holiday list — the Year view will stop greying out the matching week.`}
+        tooltip={`Remove “${holiday.name}” from the holiday list on this device — your Year view will stop greying out the matching week. You can undo this from the toast.`}
+        // Destructive + team-scoped: CLAUDE.md §4's always-on list on both
+        // counts, so the explanation survives the global tooltip off switch.
+        tooltipRequired
         aria-label={`Remove holiday ${holiday.name} on ${holiday.date}`}
       >
         Remove
@@ -847,25 +1018,53 @@ function HolidayRow({
   );
 }
 
-// ── "Shared with your team" chip ───────────────────────────────────────────
-// A subtle visual cue pinned to each Card header. The tooltip explains
-// the scope to a first-time teacher; the visual is intentionally
-// understated so it doesn't compete with the section header itself.
+// ── Team-scope chip, in two honest variants (§4a Medium 4) ─────────────────
+// A cue pinned to each Card header. `synced` states what is TRUE TODAY, not
+// the design intent:
+//
+//   • synced      — the value writes to the database (`schools.school_week` is
+//                   the only one on this page) and genuinely reaches every
+//                   teacher. The chip may say so.
+//   • not synced  — the value is team-scoped BY DESIGN but persists to THIS
+//                   BROWSER's localStorage until the team-settings backend
+//                   lands. The chip must not claim teammates see it: a teacher
+//                   who believes a holiday reached the team will discover the
+//                   truth in front of a class. Amber dot + different label so
+//                   the two states are distinguishable at a glance, not only
+//                   on hover.
+//
+// The tooltips stay `required` in both variants: the scope explanation is the
+// high-consequence content; only the false half of the old wording was the
+// problem.
 
-function TeamChip(): ReactNode {
+function TeamChip({ synced }: { synced: boolean }): ReactNode {
+  const tip = synced
+    ? "This setting affects every teacher on your grade-level team."
+    : "A team setting by design — but right now it saves on this device only. Teammates won't see it until team sync arrives with the backend update.";
+  const label = synced
+    ? "Shared with your team"
+    : "Team setting · this device only";
   return (
-    <Tooltip
-      content="This setting affects every teacher on your grade-level team."
-      side="bottom"
-    >
+    <Tooltip content={tip} side="bottom" required>
       <span
-        className={styles.teamChip}
+        className={
+          synced
+            ? styles.teamChip
+            : `${styles.teamChip} ${styles.teamChipLocal}`
+        }
         tabIndex={0}
-        title="This setting affects every teacher on your grade-level team."
-        aria-label="Shared with your team"
+        title={tip}
+        aria-label={label}
       >
-        <span aria-hidden="true" className={styles.teamChipDot} />
-        Shared with your team
+        <span
+          aria-hidden="true"
+          className={
+            synced
+              ? styles.teamChipDot
+              : `${styles.teamChipDot} ${styles.teamChipDotLocal}`
+          }
+        />
+        {label}
       </span>
     </Tooltip>
   );

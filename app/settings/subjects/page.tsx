@@ -4,8 +4,12 @@
 //
 // Sections (top to bottom):
 //   1. Team subjects    — the 8 locked subjects. Inline rename,
-//                         academic/non-academic flag, archive. TEAM-scoped:
-//                         every change here lands on every teacher's view.
+//                         academic/non-academic flag, reorder (↑/↓),
+//                         archive. TEAM-scoped by intent — but see the
+//                         ORDER SCOPE HONESTY note above section 1: the
+//                         storage behind `mycurricula:team:*` is
+//                         per-browser today, so copy must describe the
+//                         roster, not a teammate's screen.
 //   2. Subjects I teach — per-teacher hide list ("I don't teach this").
 //                         PERSONAL-scoped: hiding affects only this
 //                         teacher's views; teammates are untouched.
@@ -61,6 +65,8 @@ import {
   useHiddenSubjects,
   usePersonalSubjects,
   useSubjectOverrides,
+  useTeamSubjectOrder,
+  type MoveDirection,
 } from "@/lib/use-subject-settings";
 import {
   useVisibleSubjects,
@@ -240,21 +246,160 @@ function InlineRename({
   );
 }
 
+// ── Reorder control (team roster) ───────────────────────────────────────────
+// Two move buttons per row — NOT a drag handle. BUILD_STANDARD §9 makes
+// touch first-class, and drag is the one gesture a keyboard cannot
+// perform and a finger performs badly inside a scrolling list. Buttons
+// are operable by click, tap, Enter/Space, and screen reader alike; the
+// Button primitive's ::before overlay inflates each 32px icon button to a
+// ≥44px hit area on any coarse pointer (components/ui/Button.module.css).
+// A drag affordance could be layered on later, but never as the only path.
+//
+// The buttons are DISABLED at the ends rather than hidden, so the control
+// column keeps a constant width and a keyboard user tabbing down the list
+// meets the same two stops on every row. A disabled button still carries
+// its tooltip (the primitive mirrors it to `title=`, which Chromium shows
+// even when pointer events are suppressed), so the tooltip can explain
+// why it's disabled — CLAUDE.md §4 asks for exactly that.
+
+interface ReorderControlsProps {
+  /** Effective display name, for the accessible labels + tooltips. */
+  name: string;
+  /** Display name of the row above, or null at the top. */
+  above: string | null;
+  /** Display name of the row below, or null at the bottom. */
+  below: string | null;
+  onMove: (dir: MoveDirection) => void;
+}
+
+function ReorderControls({
+  name,
+  above,
+  below,
+  onMove,
+}: ReorderControlsProps): ReactNode {
+  return (
+    <div
+      className={styles.moveGroup}
+      role="group"
+      aria-label={`Move ${name} in the subject order`}
+    >
+      <Button
+        variant="icon"
+        size="sm"
+        disabled={above === null}
+        onClick={() => onMove("up")}
+        iconAriaLabel={
+          above === null
+            ? `${name} is already first in the subject order`
+            : `Move ${name} above ${above}`
+        }
+        tooltip={
+          above === null
+            ? `“${name}” is already first — nothing to move it above.`
+            : `Move “${name}” above “${above}” in the roster. Order is how the roster reads; each subject keeps its locked color.`
+        }
+        tooltipRequired
+      >
+        ↑
+      </Button>
+      <Button
+        variant="icon"
+        size="sm"
+        disabled={below === null}
+        onClick={() => onMove("down")}
+        iconAriaLabel={
+          below === null
+            ? `${name} is already last in the subject order`
+            : `Move ${name} below ${below}`
+        }
+        tooltip={
+          below === null
+            ? `“${name}” is already last — nothing to move it below.`
+            : `Move “${name}” below “${below}” in the roster. Order is how the roster reads; each subject keeps its locked color.`
+        }
+        tooltipRequired
+      >
+        ↓
+      </Button>
+    </div>
+  );
+}
+
 // ── Section 1 — Team subjects ───────────────────────────────────────────────
 // Roster rows for the active (non-archived) locked subjects. Each row:
 // color swatch (locked), inline rename, academic/non-academic toggle,
-// archive action. All three mutations are TEAM-scoped → ConsequenceToast
-// with Undo + savedTick bump.
+// reorder buttons, archive action. All mutations are TEAM-scoped →
+// ConsequenceToast with Undo + savedTick bump.
+//
+// ORDER SCOPE HONESTY. The order persists under `mycurricula:team:…`,
+// which records the INTENDED scope — the storage is localStorage, so it
+// is per-browser and no teammate sees it yet. The toasts and tooltips
+// below therefore describe the roster, never a teammate's screen (same
+// rule app/settings/calendar/page.tsx applies to its team-prefixed keys).
 
 function TeamSubjectsSection(): ReactNode {
   const { all } = useVisibleSubjects();
   const { updateOverride } = useSubjectOverrides();
+  // No catalog option: this instance and the one inside
+  // useVisibleSubjects resolve the same default (the locked 8) and the
+  // same internally-derived notebook scope, so both read and write the
+  // same key — see the LOAD-BEARING note on useTeamSubjectOrder.
+  const { order, catalog, setOrder, moveSubject } = useTeamSubjectOrder();
   const { showConsequence } = useConsequenceToast();
   const [savedTick, setSavedTick] = useState(0);
   const bump = (): void => setSavedTick((t) => t + 1);
 
   // Archived subjects live in section 4; this roster shows the rest.
+  // `all` already arrives in the team order (useVisibleSubjects sorts by
+  // it), so the rendered sequence and the stored order agree by
+  // construction — there is no second ordering rule to keep in sync.
   const active = useMemo(() => teamRoster(all), [all]);
+
+  // The visible subset move steps are measured against. Archived
+  // subjects keep their stored slots but are never a move's neighbour —
+  // otherwise "move up" would swap with a row that isn't on screen and
+  // read as a dead button.
+  const activeIds = useMemo(() => active.map((s) => s.cls), [active]);
+
+  // True once the roster deviates from the catalog order — gates the
+  // reset affordance so it never appears with nothing to undo. `catalog`
+  // comes from the hook (not a fixture-derived import) so reset and
+  // deviation-detection follow whatever catalog the hook reconciles
+  // against, today and after planner-catalog adoption.
+  const isCustomOrder = useMemo(
+    () => order.some((id, i) => id !== catalog[i]),
+    [order, catalog],
+  );
+
+  /** Move one subject past its nearest VISIBLE neighbour. */
+  const moveRow = (entry: EffectiveSubject, dir: MoveDirection): void => {
+    const index = active.findIndex((s) => s.cls === entry.cls);
+    const neighbour = active[dir === "up" ? index - 1 : index + 1];
+    // Snapshot before the write so Undo restores the exact prior order
+    // rather than re-deriving it from a second move (which would drift
+    // if anything else changed the order in between).
+    const previous = order;
+    if (!moveSubject(entry.cls, dir, activeIds)) return; // at an end — no-op
+    bump();
+    showConsequence({
+      message: neighbour
+        ? `“${entry.name}” moved ${dir === "up" ? "above" : "below"} “${neighbour.name}” in the subject roster.`
+        : `“${entry.name}” moved ${dir === "up" ? "up" : "down"} in the subject roster.`,
+      onUndo: () => setOrder(previous),
+    });
+  };
+
+  /** Put the roster back in its original (catalog) order. */
+  const resetOrder = (): void => {
+    const previous = order;
+    setOrder(catalog);
+    bump();
+    showConsequence({
+      message: "Subject order reset to the original roster order.",
+      onUndo: () => setOrder(previous),
+    });
+  };
 
   /** Commit an inline rename. Empty draft = reset to the locked name. */
   const commitRename = (entry: EffectiveSubject, raw: string): void => {
@@ -317,10 +462,10 @@ function TeamSubjectsSection(): ReactNode {
           <span>Team subjects</span>
         </Tooltip>
       }
-      hint="The team's shared subject roster. Names, academic flags, and archiving are editable; each subject's color is locked team-wide so it carries the same meaning for everyone."
+      hint="The team's shared subject roster. Names, academic flags, order, and archiving are editable; each subject's color is locked team-wide so it carries the same meaning for everyone."
     >
       <ul className={styles.rosterList}>
-        {active.map((s) => {
+        {active.map((s, i) => {
           const base = s.baseName ?? s.name;
           return (
             <li key={s.id} className={styles.rosterRow}>
@@ -339,6 +484,12 @@ function TeamSubjectsSection(): ReactNode {
               </div>
 
               <div className={styles.rowControls}>
+                <ReorderControls
+                  name={s.name}
+                  above={i > 0 ? active[i - 1].name : null}
+                  below={i < active.length - 1 ? active[i + 1].name : null}
+                  onMove={(dir) => moveRow(s, dir)}
+                />
                 <ToggleGroup
                   size="sm"
                   ariaLabel={`${s.name} — academic or non-academic`}
@@ -377,11 +528,26 @@ function TeamSubjectsSection(): ReactNode {
           );
         })}
       </ul>
+      {isCustomOrder && (
+        <div className={styles.orderReset}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetOrder}
+            tooltip="Put the subjects back in their original roster order. Nothing else about them changes."
+            tooltipRequired
+          >
+            Reset order
+          </Button>
+        </div>
+      )}
       <p className={styles.fieldHint}>
         Subject colors are locked team-wide — a renamed subject keeps its color,
         so &ldquo;Maths&rdquo; still reads as Math on every teacher&rsquo;s
         grid. Archiving hides a subject everywhere for everyone; it never
-        deletes the team&rsquo;s lessons.
+        deletes the team&rsquo;s lessons. The ↑ / ↓ buttons set the order the
+        roster reads in — Settings follows it today, and your planner views
+        adopt it as that rollout lands.
       </p>
     </SettingsCard>
   );

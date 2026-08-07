@@ -285,6 +285,18 @@ export interface UseAcademicYearResult {
   setStart: (d: Date) => void;
   /** Update the end date. Clamped to maintain invariants. */
   setEnd: (d: Date) => void;
+  /**
+   * Set BOTH endpoints in one call (normalized as a pair, persisted
+   * together). Added for the settings page's Undo (§4a Medium 1): a
+   * single-endpoint setter normalizes against the OTHER CURRENT endpoint, so
+   * `setStart(x)` can move the end too — an Undo built from `setStart` /
+   * `setEnd` alone can therefore restore one endpoint while keeping a clamp
+   * it should have unwound. Restoring a previously-valid pair through this
+   * setter is EXACT: the snapshot was itself `normalizePair` output, and
+   * `normalizePair` is idempotent on any pair already satisfying its
+   * invariants (see the test).
+   */
+  setRange: (start: Date, end: Date) => void;
 }
 
 /**
@@ -364,7 +376,17 @@ export function useAcademicYear(): UseAcademicYearResult {
     [start],
   );
 
-  return { start, end, setStart, setEnd };
+  // Both values are arguments, so this callback closes over no state and can
+  // never act on a stale endpoint — which is exactly why the Undo path uses
+  // it instead of the single-endpoint setters above.
+  const setRange = useCallback((nextStart: Date, nextEnd: Date): void => {
+    const { start: ns, end: ne } = normalizePair(nextStart, nextEnd);
+    setStartState(ns);
+    setEndState(ne);
+    persistPair(ns, ne);
+  }, []);
+
+  return { start, end, setStart, setEnd, setRange };
 }
 
 // ── Pure helpers — exported for use by year-calendar.ts and tests ─────────

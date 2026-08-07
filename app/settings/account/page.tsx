@@ -143,9 +143,29 @@ function ProfileSection(): ReactNode {
   // once the session resolves, or the mock ME teacher on the backend-less
   // path. Passing it into useDisplayName means a teacher with no stored
   // display name sees THEIR name here, not a fabricated mock person.
-  const { accountDefaultName } = useAppState();
+  const { accountDefaultName, currentUser } = useAppState();
   const { displayName, setDisplayName } = useDisplayName(accountDefaultName);
   const [savedTick, setSavedTick] = useState(0);
+
+  // Sign-in email (audit 2026-07-31 §B8 — the handoff's `config.jsx:68`
+  // Email field had no shipped counterpart; zero hits for "email" on this
+  // page).
+  //
+  // READ-ONLY, deliberately diverging from the handoff, which renders it as
+  // an editable `Field`. Here the address IS the identity: it arrives from
+  // the Google SSO session (lib/app-state.tsx derives `currentUser.email`
+  // straight off the Supabase user) and every row a teacher owns is keyed on
+  // that auth uid. An editable box would imply a teacher can change who they
+  // are signed in as, which is false — the change would either be silently
+  // dropped or, worse, read as "I can move my account to a new address".
+  // Changing it means signing in with a different Google account, which the
+  // Sign-in section below already handles. The handoff is a localStorage
+  // mock with no auth at all, so it never had to answer this.
+  //
+  // Empty string is the honest "not resolved" state, not an error: it is the
+  // value before the auth session lands, and on the backend-less prototype
+  // path (see the CurrentUser default in lib/app-state.tsx).
+  const email = currentUser.email;
 
   // Local draft — independent during typing; re-syncs whenever the hook
   // value updates (cross-tab rename, post-mount storage sync, the auth
@@ -239,6 +259,33 @@ function ProfileSection(): ReactNode {
             Saves when you press Enter or click out of the field. Clear it to go
             back to your account&rsquo;s default name.
           </p>
+
+          {/* Sign-in email — read-only (see the note by `email` above). Not
+              an <input readOnly>: a disabled-looking box still reads as
+              "something I could edit". A definition row states plainly that
+              this is a fact about the account, not a setting. */}
+          <div className={styles.emailRow}>
+            <span className={styles.fieldLabel} id="account-email-label">
+              Signed in as
+            </span>
+            <Tooltip
+              content="The Google account you're signed in with. It identifies your work across the app, so it can't be edited here — to use a different address, sign out and sign back in with that account."
+              side="bottom"
+            >
+              <span
+                className={styles.emailValue}
+                aria-labelledby="account-email-label"
+                tabIndex={0}
+                title="The Google account you're signed in with. It identifies your work across the app, so it can't be edited here — to use a different address, sign out and sign back in with that account."
+              >
+                {email === "" ? (
+                  <span className={styles.emailPending}>Not signed in yet</span>
+                ) : (
+                  email
+                )}
+              </span>
+            </Tooltip>
+          </div>
         </div>
 
         {/* Live avatar preview — the same dawn-gradient circle the top bar

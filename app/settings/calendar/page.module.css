@@ -475,3 +475,20 @@
     padding: 16px;
   }
 }
+
+/* ── Unsynced team-chip variant (§4a Medium 4) ─────────────────────────
+   The team-scoped-BY-DESIGN settings that still persist to this browser
+   only. Amber = the semantic "attention" tier (--warn), NOT a subject
+   colour — colour is information: the dot warns that the value has not
+   reached the team. Must be distinguishable at a glance (a teacher who
+   believes a setting reached their team discovers otherwise in front of a
+   class), so the variant changes the label text AND the dot, never colour
+   alone. */
+.teamChipLocal.teamChipLocal {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
+  background: color-mix(in srgb, var(--warn-tint) 55%, var(--surface-warm));
+}
+
+.teamChipDotLocal.teamChipDotLocal {
+  background: var(--warn);
+}

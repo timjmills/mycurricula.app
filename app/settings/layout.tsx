@@ -39,6 +39,25 @@
 //     "Save changes and close?" ONLY when a setting changed this session
 //     (useSettingsDirty); otherwise it exits straight away. Settings
 //     auto-persist, so "Save & close" just navigates back.
+//
+// SURFACE-THEMING CONTRACT (BUILD_STANDARD §15.7). The dialog carries the
+// GLOBAL class `cfg-modal` and the backdrop `cfg-scrim`, alongside their
+// CSS-Module classes. Both names are pre-registered in app/themes.css §5
+// ("SURFACE THEMING CONTRACT") — `cfg-` is the handoff's own prefix for this
+// surface (6.24 config.css), which is why those two entries were already in
+// the rule's `:is()` lists.
+//
+// They were registered but never applied to any element, so until now the
+// Settings popup was the one Tier-1 overlay that opted OUT of the contract:
+// it sits above `.theme-tint` (z-index 90), so the app-wide wash cannot
+// reach it, and without a registered class it received no accent wash of
+// its own — reading visibly off-theme in Honey / Blossom / Mint / Sky /
+// Night while every sibling overlay (.cu-modal, .hub-modal, …) picked the
+// theme up. Applied unconditionally, matching CatchUpModal
+// (components/catchup-v2/CatchUpModal.tsx:777, :788): the contract is a
+// theme concern, not a v2-skin concern, so it must hold on the flag-OFF v1
+// path too. Clear and Off are excluded by the rule itself, so the resting
+// default is unchanged.
 
 import {
   useCallback,
@@ -360,7 +379,7 @@ export default function SettingsLayout({
           {/* Dimmed backdrop — click-out (press + release both on the
               backdrop itself) prompts when dirty, else exits. */}
           <div
-            className={styles.backdrop}
+            className={`${styles.backdrop} cfg-scrim`}
             data-v2={V2 ? "" : undefined}
             onPointerDown={onBackdropPointerDown}
             onPointerUp={onBackdropPointerUp}
@@ -372,7 +391,7 @@ export default function SettingsLayout({
                 immediately (SettingsHeader). */}
             <div
               ref={dialogRef}
-              className={styles.dialog}
+              className={`${styles.dialog} cfg-modal`}
               data-v2={V2 ? "" : undefined}
               role="dialog"
               aria-modal="true"
