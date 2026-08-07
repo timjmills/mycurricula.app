@@ -1,0 +1,108 @@
+/* compare-to-master.module.css — the overlay shell around <ForkDiffPanel>.
+ *
+ * The panel itself is a quiet bordered SECTION (fork-diff-panel.module.css)
+ * designed to sit inline in the v1 lesson-detail body. On the v2 build there is
+ * no such inline seam on /daily (the day canvas owns that column), so the diff
+ * arrives as a centred overlay instead — and an overlay has to earn its keep
+ * against the appearance engine.
+ *
+ * THEMING. The root carries the GLOBAL `ll-dlg` class and the scrim
+ * `ll-dlgscrim` — both already enrolled in app/themes.css §5 (the surface-
+ * theming contract), so the active theme's faint accent wash reaches this
+ * surface even though it renders above the z-90 `.theme-tint`. Those two class
+ * names are load-bearing; renaming them silently drops the wash. They were
+ * chosen over minting a new pair because §5 requires a NEW overlay to either
+ * reuse a registered container class or add its own root + scrim to that rule,
+ * and this pair is registered, unowned by any other component, and semantically
+ * "a lesson-scoped dialog" — which is exactly what this is.
+ *
+ * TONE, NEVER THEME (CLAUDE.md §4 legibility contract). The fill mixes from
+ * var(--panel-bg) — which is white on the light themes and deep violet on Night
+ * — and the text rides the --ink scale, so both flip together with data-tone.
+ * Nothing here branches on data-theme. Zero hex literals, zero px font sizes.
+ *
+ * RULE #1 — no sharp corners: --r-xl on the card, and the panel inside is
+ * clipped to it by overflow:hidden so its own square top edge can't poke out. */
+
+/* ── Scrim ──────────────────────────────────────────────────────────────── */
+.scrim {
+  /* One gutter token drives the scrim padding AND the card's width cap below,
+     so the two can never drift (the CatchUpModal lesson: `max-width:100%`
+     inside a `place-items:center` grid resolves against a track that has
+     already grown to the item, so it fails to cap the box on phones — bound
+     the WIDTH itself, in the same length the padding uses). */
+  --fd-gutter: 16px;
+  position: fixed;
+  inset: 0;
+  /* Above --z-menu (1000): this opens FROM a context menu, and on the warm
+     path the menu's own close animation can still be on screen. */
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: var(--fd-gutter);
+  background: rgba(12, 11, 20, 0.5);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: fdFade 0.18s ease;
+}
+
+@keyframes fdFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Dialog card ────────────────────────────────────────────────────────── */
+.dialog {
+  width: min(680px, calc(100vw - 2 * var(--fd-gutter, 16px)));
+  max-width: 100%;
+  max-height: min(88vh, calc(100dvh - 2 * var(--fd-gutter, 16px)));
+  overflow-y: auto;
+  /* The one axis that must never scroll (CLAUDE.md §4 responsive contract).
+     Long unbroken diff values wrap inside the panel's own rows. */
+  overflow-x: hidden;
+  border-radius: var(--r-xl, 24px);
+  /* Frosted, tone-aware — see the header note. */
+  background: color-mix(in srgb, var(--panel-bg, var(--surface)) 92%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--ink-500) 16%, transparent);
+  box-shadow:
+    /* The lit-edge read every glass surface carries (CLAUDE.md §4). */
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 40px 100px -30px rgba(8, 8, 18, 0.55);
+  animation: fdPop 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes fdPop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The inline panel paints its own border + radius for the v1 in-body mount.
+   Inside this shell that reads as a box-in-a-box, so it is flattened here —
+   the card above supplies the frame. Scoped to a descendant of .dialog so the
+   v1 mount is untouched. */
+.dialog > :global(*) {
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .dialog {
+    animation: none;
+  }
+}

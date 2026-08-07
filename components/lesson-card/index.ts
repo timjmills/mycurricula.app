@@ -14,6 +14,10 @@ export type { RelocatePickerProps, RelocateTarget } from "./relocate-picker";
 export { CompareToMaster } from "./compare-to-master";
 export type { CompareToMasterProps } from "./compare-to-master";
 
+// The singleton that makes the fork diff reachable on the v2 build. Mounted
+// once, from app/(planner)/layout.tsx, behind the V2 flag — never per-card.
+export { ForkDiffHost } from "./fork-diff-host";
+
 export { ForkDiffPanel } from "./fork-diff";
 export type { ForkDiffPanelProps } from "./fork-diff";
 

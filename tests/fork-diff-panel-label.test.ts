@@ -23,10 +23,12 @@ import type { Lesson } from "@/lib/types";
 // A mount, not a string render: the assertion is about what a PRESS does.
 //
 // (tests/fork-diff.test.ts covers the pure diff engine and says the component
-// "is verified in the browser". On this build it cannot be: the documented
-// entry `/daily?lesson=<id>&compare=1` is stripped by the v2 Day surface's URL
-// mirror before the panel can open — see the F0 report. Until that entry is
-// restored, this file is the verification.)
+// "is verified in the browser". That WAS false for a while: the panel had no
+// live host under NEXT_PUBLIC_V2, so neither `/daily?lesson=<id>&compare=1`
+// nor the card menu could open it and this file was the only verification.
+// F2 restored both entry points via <ForkDiffHost>; the reachability itself is
+// now covered by tests/fork-diff-reachability.test.ts and live by
+// scripts/probe-f2-forkdiff.mjs. This file stays focused on the FOOTER COPY.)
 
 const spies = vi.hoisted(() => ({
   editMode: "personal" as "personal" | "master",

@@ -10,11 +10,15 @@
 // the PROTOTYPE `Lesson.masterSnapshot` seam (Phase 1B swaps that for
 // persisted fork lineage).
 //
-// This component is retained as a thin overlay HOST for the panel so the
-// existing callsite (weekly-lesson-card's "compare-master" handling) keeps
-// compiling and, if reached, shows the real diff instead of placeholder
-// copy. The primary entry points now route to the Daily lesson detail
-// (`/daily?lesson=<id>&compare=1`), where the panel renders inline.
+// F2 — THIS IS NOW THE V2 SURFACE, not a legacy shell. On the flag-OFF (v1)
+// build the diff still renders INLINE in LessonDetail's body, which is what
+// the item-01 spec asks for. On the shipped v2 build /daily is the day-v2
+// canvas: it mounts no LessonDetail, so there is no inline seam to render
+// into. <ForkDiffHost> (fork-diff-host.tsx) mounts this overlay instead, from
+// the planner layout, so EVERY host of the card context menu — Weekly, Day,
+// Year — reaches the diff, and so does the documented deep link
+// `/daily?lesson=<id>&compare=1`. weekly-lesson-card's legacy
+// "compare-master" branch still points here too and is unchanged.
 //
 // Focus behavior mirrors the old stub: focus moves into the dialog on open,
 // Tab is trapped, Escape closes, outside-click closes, and focus returns to
@@ -24,6 +28,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Lesson } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { ForkDiffPanel } from "./fork-diff";
+import styles from "./compare-to-master.module.css";
 
 // ── Focus-trap selector ───────────────────────────────────────────────────
 const FOCUSABLE =
@@ -124,39 +129,21 @@ export function CompareToMaster(props: CompareToMasterProps) {
   if (editMode !== "personal") return null;
 
   return (
-    <div
-      role="presentation"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-        // Scrim treatment matches the command palette / shortcuts overlay
-        // (no scrim token exists yet; this is the established literal).
-        background: "rgba(20, 22, 32, 0.32)",
-      }}
-    >
+    // `ll-dlgscrim` / `ll-dlg` are the GLOBAL surface-theming classes from
+    // app/themes.css §5 — see the module CSS header. They carry no geometry;
+    // the module classes do.
+    <div role="presentation" className={`${styles.scrim} ll-dlgscrim`}>
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Compare with Team Curriculum"
         onKeyDown={handleKeyDown}
-        style={{
-          width: 640,
-          maxWidth: "100%",
-          maxHeight: "calc(100vh - 80px)",
-          overflowY: "auto",
-          borderRadius: 10,
-          boxShadow: "var(--shadow-popover)",
-          background: "var(--paper)",
-        }}
+        className={`${styles.dialog} ll-dlg`}
       >
-        {/* The real diff — same panel LessonDetail mounts inline. Its own
-            close affordance + footer actions drive this dialog's close. */}
+        {/* The real diff — same panel LessonDetail mounts inline on the v1
+            build. Its own close affordance + footer actions drive this
+            dialog's close. */}
         <ForkDiffPanel lesson={lesson} onClose={close} />
       </div>
     </div>

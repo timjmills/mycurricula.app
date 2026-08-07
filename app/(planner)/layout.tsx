@@ -21,6 +21,7 @@ import {
   WriteFailureBridge,
 } from "@/components/shell";
 import { ChromeShell } from "@/components/chrome";
+import { ForkDiffHost } from "@/components/lesson-card";
 import { PlannerSeedGate, PlannerServerSeed } from "@/components/planner-seed";
 import {
   PLANNER_SERVER_SEED_ENABLED,
@@ -295,6 +296,17 @@ export default async function PlannerLayout({
                     only trace in the console. Must sit inside BOTH
                     PlannerProvider and ConsequenceToastProvider. */}
                         <WriteFailureBridge />
+                        {/* F2: the ONE host of the fork-diff compare surface.
+                    Renders nothing until the card menu's "Compare with Team
+                    Curriculum" fires COMPARE_REQUEST_EVENT, or the page loads
+                    on the documented `/daily?lesson=<id>&compare=1` deep link.
+                    Mounted here so EVERY host of the card context menu —
+                    Weekly, Day, Year — reaches the diff, which is what
+                    context-menu.tsx:330-333 already claimed. V2-ONLY: on the
+                    flag-OFF build LessonDetail consumes the same URL and the
+                    same event itself, inline in the lesson body, and two hosts
+                    would open two panels for one request. */}
+                        {V2 && <ForkDiffHost />}
                         {/* W3.3 shell: the v2 corner-grammar chrome (ChromeShell —
                     Framework §3 overlay grid: ChromeTopBar with brand +
                     Personal/Team icon toggle + bell · routed content in the
