@@ -55,6 +55,20 @@ naturally in Settings → Subjects (or the course row itself) — calling
 
 A locked user decision that nothing surfaces is a promise the product does not keep.
 
+> ✅ **GAP CLOSED — this section is a HISTORICAL snapshot as of `e8f403f`. Corrected
+> 2026-08-07.** The surface it asks for was built exactly where it predicted:
+> `components/settings/course-sharing-manager.tsx`, rendered from
+> `app/settings/subjects/page.tsx:95`, landed in `73a97ca` (#67) and was refactored in
+> `3f2111c` (#72). It carries the empty state, load-error + Retry, per-row pending and
+> inline RPC errors, an optimistic flip with a monotonic reconcile token, and Undo via
+> the inverse RPC.
+>
+> **Do not re-derive the "zero importers" finding from a grep.** The `git grep` above is
+> reproducible and still returns nothing, because the component reaches the actions
+> through `lib/subjects/client.ts` rather than importing them directly. That false
+> negative was read as confirmation on 2026-08-07 and cost a build wave. Check the
+> indirection, or check `app/settings/subjects/page.tsx`.
+
 ### 2b. The RLS inverts both halves of the decision
 
 `subjects_read` (live policy on prod):
