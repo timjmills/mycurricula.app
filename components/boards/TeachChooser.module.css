@@ -95,19 +95,46 @@
   color: var(--ink-500);
 }
 
-/* Over a PHOTO background the classroom photo shows through behind the hero copy
-   and the light sub-text (--ink-600 / --ink-500) washes out on bright areas
-   (prod QA MINOR-3). Mirror the app's glass-photo hero idiom (themes.css
-   .fr-title): force white + a dark text-shadow halo so the sub-copy stays legible
-   on any photo. Gated to [data-bg="photo"] so wash / solid themes keep their
-   normal ink and are not muddied. Shadow colour is the dark --scrim token (no
-   raw hex); the titles already read white-bold so they are left as-is. */
-:global([data-bg="photo"]) .prompt,
-:global([data-bg="photo"]) .cardSub {
+/* Over a PHOTO background the hero prompt floats on the bare stage, so it needs
+   a treatment the stage's own material cannot give it. The rule this replaces
+   forced `--on-solid` (white) on `[data-bg="photo"]` with NO TONE BRANCH, which
+   is the §4 legibility-contract violation in its pure form — "branch on
+   `data-tone`, never the theme [or the background axis]".
+   ────────────────────────────────────────────────────────────────────────────
+   It was correct when it was written: glass+photo always painted a DARK stage
+   scrim, so white was the only legible ink. Commit 3121908 then added the
+   light-tone veil (`themes.css` `[data-tone="light"][data-frame="glass"]
+   [data-bg="photo"] .stage::after`), which turns the Photo-Bright stage nearly
+   WHITE — and this rule kept painting white on it. Measured on the running app
+   at **1.00:1 and 1.18:1**, i.e. worse than the 1.13:1 that opened task #30;
+   the crop `docs/screenshots/photo-bright-remeasure/CROP-teachchooser-photo-
+   bright.png` shows both strings as ghost outlines, only the text-shadow
+   rendering. Report: docs/qa/2026-08-07-photo-bright-remeasure.md §4.2.
+
+   The two halves are now split by the DERIVED tone, which is the axis that
+   actually decides whether the stage under this text is dark or light. The
+   shape (photo as trigger, tone as branch, white halo in light tone) is copied
+   from `components/day-v2/day-v2.module.css:211-244`, which the same report
+   names as the correct pattern and which does not fail on this axis.
+
+   `.cardSub` is deliberately NOT here any more. It never sits on the stage: it
+   is inside `.card.card`, which paints an OPAQUE `var(--surface)`. When this
+   rule was written that background was being stripped by the `.cp-root button`
+   reset (see the doubling note at :36-55), so the sub-copy really was on bare
+   photo; restoring the card background made the photo override obsolete for it
+   and turned it into pure white-on-white. It now simply inherits `--ink-500`,
+   which flips with the tone on its own. */
+:global([data-bg="photo"][data-tone="dark"]) .prompt {
   color: var(--on-solid);
   text-shadow:
     0 1px 2px var(--scrim),
     0 1px 10px var(--scrim);
+}
+:global([data-bg="photo"][data-tone="light"]) .prompt {
+  color: var(--ink-600);
+  text-shadow:
+    0 1px 3px rgba(255, 255, 255, 0.7),
+    0 0 14px rgba(255, 255, 255, 0.5);
 }
 
 /* ── Lesson-picker dialog ─────────────────────────────────────────────── */

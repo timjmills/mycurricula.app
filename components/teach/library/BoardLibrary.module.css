@@ -415,6 +415,26 @@
   white-space: nowrap;
 }
 
+/* The filter row is one of the Board Library controls that still sits on the
+   BARE stage — /boards has no glass panel behind it (audit B2, narrowed by the
+   light-tone veil but not closed). `--ink-400` is the MUTED rung and it has no
+   headroom over a photograph: even veiled, the backdrop here photographs at
+   rgb(217,216,215) where the same label measures rgb(252,251,247) on Wash, and
+   the ratio falls to 3.66:1 against a 4.5 floor
+   (docs/qa/2026-08-07-photo-bright-remeasure.md §4.3).
+
+   Stepping to `--ink-600` restores the margin (~6:1 on that same backdrop).
+   No tone branch is needed — and none is wanted — because the VALUE itself is
+   tone-derived: `--ink-600` is #494862 in the light ramp and #c4c2d6 in the
+   dark one (`tokens.css` :110 / :1714), so this rule reads correctly in both
+   directions by construction. That is the §4 contract satisfied at the token
+   level rather than at the selector level; a rule is only a violation when it
+   pins a tone-FIXED value (a literal #fff, `--on-solid`) behind a non-tone
+   axis, which is what TeachChooser was doing. */
+:global([data-bg="photo"]) .sortLabel {
+  color: var(--ink-600);
+}
+
 .sortSelect {
   min-height: 44px;
   padding: 8px 13px;
@@ -744,8 +764,20 @@
   margin-bottom: 4px;
 }
 
+/* `--wf-purple-accent` (#7c5cf6) is a CHIP/accent hue, not a text ink: as 16px
+   type it is 4.40:1 on `--surface-warm` and 3.36:1 on the DARK `--surface-warm`
+   (#262538) — it fails the 4.5 floor on both tones, and 16px/800 is not
+   WCAG-large (that needs ≥18.66px), so 4.5 is the floor that applies. Measured
+   at 4.38:1 (docs/qa/2026-08-07-photo-bright-remeasure.md §4.3, which could not
+   attribute it to an axis — correctly, because it is not axis-specific).
+
+   Mixing 25% toward `--ink-900` keeps the purple identity while buying the
+   margin, and it is SELF-INVERTING: `--ink-900` is #1c1b2e in the light ramp
+   and #f0eff8 in the dark one, so the mix darkens the purple on a light surface
+   and lightens it on a dark one. No hard-coded hex (§4). Computed: 6.15:1
+   light, 4.85:1 dark. */
 .teamLibraryTitle {
-  color: var(--wf-purple-accent);
+  color: color-mix(in srgb, var(--wf-purple-accent) 75%, var(--ink-900));
   font-size: var(--t-16);
   font-weight: 800;
 }
