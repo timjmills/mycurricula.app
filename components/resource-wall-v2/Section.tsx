@@ -206,6 +206,9 @@ export interface SectionProps {
   onEnlarge: (item: WallItem) => void;
   onBoard: (item: WallItem, fromLessonId?: string) => void;
   onModal: (item: WallItem) => void;
+  /** Close the lightbox. Forwarded to Card, which needs it to put a preview
+   *  away when a slow double-click beat the deferral (Card.tsx, task #9). */
+  onCloseModal: () => void;
   onAddCard: (sectionId: string) => void;
   onAddSection: (after: WallSection) => void;
   onCommitCard: (item: WallItem) => void;
@@ -242,6 +245,7 @@ export function Section({
   onEnlarge,
   onBoard,
   onModal,
+  onCloseModal,
   onAddCard,
   onAddSection,
   onCommitCard,
@@ -381,6 +385,7 @@ export function Section({
               onEnlarge={onEnlarge}
               onBoard={onBoard}
               onModal={onModal}
+              onCloseModal={onCloseModal}
               onCommit={onCommitCard}
               onDiscard={onDiscardCard}
             />

@@ -1091,6 +1091,12 @@ export function ResourceWall({
       setLight({ slides: [item], index: 0, mode: "enlarge" as const }),
     onBoard: board,
     onModal: (item: WallItem) => setLight({ slides: [item], index: 0 }),
+    // A card that can OPEN the preview has to be able to shut it: a double-click
+    // slower than Card's deferral window opens the lightbox on its first click
+    // and the composer on its second, leaving the editor underneath the modal
+    // (§4a gate, task #9). Bails out rather than re-rendering when nothing is
+    // open, so calling it on every double-click costs nothing.
+    onCloseModal: () => setLight(null),
     onAddCard: addInlineNote,
     onAddSection: (after: WallSection) => addSection(after),
     onCommitCard: commitCard,

@@ -79,7 +79,7 @@ vi.mock("@/lib/palette", () => ({
   useSubjectColor: () => ({ c: "var(--subj-1)", cls: "math" }),
 }));
 
-const { Card, isAttachableLink } = await import(
+const { Card, isAttachableLink, linkEdited } = await import(
   "@/components/resource-wall-v2/Card"
 );
 const { linkToLessonResource } = await import("@/lib/resource-embed");
@@ -129,6 +129,11 @@ const committed: WallItem[] = [];
 const discarded: string[] = [];
 /** Every card the surface asked to open in the preview lightbox. */
 const modals: WallItem[] = [];
+/** Every time the card asked the wall to SHUT the lightbox. */
+const closes: number[] = [];
+/** Every card sent to the Enlarge action — a nested control that must win over
+ *  a lightbox the card queued a moment earlier. */
+const enlarged: WallItem[] = [];
 
 function Harness({ readOnly = false }: { readOnly?: boolean }): ReactNode {
   return createElement(Card, {
@@ -142,7 +147,8 @@ function Harness({ readOnly = false }: { readOnly?: boolean }): ReactNode {
     onOpen: () => {},
     onEnlarge: () => {},
     onBoard: () => {},
-    onModal: () => {},
+    onModal: (it: WallItem) => void modals.push(it),
+    onCloseModal: () => void closes.push(Date.now()),
     onCommit: (it: WallItem) => void committed.push(it),
     onDiscard: (k: string) => void discarded.push(k),
   } as never);
@@ -159,9 +165,10 @@ function cardProps(item: WallItem) {
     onDragState: () => {},
     onDropBefore: () => {},
     onOpen: () => {},
-    onEnlarge: () => {},
+    onEnlarge: (it: WallItem) => void enlarged.push(it),
     onBoard: () => {},
     onModal: (it: WallItem) => void modals.push(it),
+    onCloseModal: () => void closes.push(Date.now()),
     onCommit: (it: WallItem) => void committed.push(it),
     onDiscard: (k: string) => void discarded.push(k),
   };
@@ -177,6 +184,8 @@ async function openSaved() {
   committed.length = 0;
   discarded.length = 0;
   modals.length = 0;
+  closes.length = 0;
+  enlarged.length = 0;
   nextText = "";
   const h = await mountReact(LinkHarness);
   await h.render({ readOnly: false });
@@ -499,47 +508,52 @@ describe("Remove link actually removes the link", () => {
     }
   });
 
-  it("commits when only the attachment's LABEL differs from what is stored", async () => {
-    // The guard compares label as well as URL, so a note whose stored link has
-    // no name gets one the moment it is re-saved, rather than being read as
-    // "nothing changed".
-    //
-    // WHAT THIS DOES AND DOES NOT PROVE. It proves the LABEL term of the guard
-    // is live — the URL is identical on both sides, so nothing else can carry
-    // this commit. It is not a teacher typing a new name: this harness cannot
-    // drive a controlled field (see the file header), so the label difference
-    // comes from `linkToLessonResource`'s own fallback filling a blank one. A
-    // typed rename is the same comparison with `attachName` as its source, and
-    // is covered in the live §4b pass.
-    const BLANK_LABEL = {
-      ...WITH_LINK,
-      key: "k-3",
-      resource: {
-        ...WITH_LINK.resource,
-        gallery: [
-          { type: "link", label: "", url: "https://example.test/applet" },
-        ],
-      },
-    } as unknown as WallItem;
+  // ── The comparison itself ────────────────────────────────────────────────
+  // `linkEdited` is exported for these four: the mount harness cannot type into
+  // a controlled field (see the file header), so a RENAME — the case the label
+  // half of the guard exists for — is unreachable through the UI here. It is
+  // proven directly on the function, and the field that feeds it is proven in
+  // the live §4b pass.
+  describe("linkEdited — did the teacher change the link?", () => {
+    const SAVED = {
+      type: "link",
+      label: "Number line applet",
+      url: "https://example.test/applet",
+    } as never;
+    const build = (url: string, label?: string) =>
+      linkToLessonResource(url, label);
 
-    const h = await mountReact(() =>
-      createElement(Card, { ...cardProps(BLANK_LABEL) } as never),
-    );
-    try {
-      await h.render({ readOnly: false });
-      await h.dblClick(shell(h));
-      expect(h.queryAll("input")).toHaveLength(2); // control: composer open
-      await h.click(byText("Done"));
+    it("says NO when the composer rebuilds exactly what was stored", () => {
+      // The no-churn property: reopening a note and pressing Done must not
+      // fork the wall.
+      expect(
+        linkEdited(SAVED, build("https://example.test/applet", "Number line applet")),
+      ).toBe(false);
+    });
 
-      expect(committed).toHaveLength(1);
-      const saved = committed[0]?.resource.gallery?.[0];
-      // Same URL, a real name — the link was kept, not dropped.
-      expect(saved?.url).toBe("https://example.test/applet");
-      expect(saved?.label).toBeTruthy();
-      expect(saved?.label).not.toBe("");
-    } finally {
-      await h.unmount();
-    }
+    it("says YES when the link was removed", () => {
+      expect(linkEdited(SAVED, null)).toBe(true);
+    });
+
+    it("says YES when only the LABEL changed — a rename is an edit", () => {
+      expect(
+        linkEdited(SAVED, build("https://example.test/applet", "Fraction tool")),
+      ).toBe(true);
+    });
+
+    it("says NO when the difference is only the builder's own normalisation", () => {
+      // The trap this shape exists to avoid (§4a review, Medium). A stored
+      // entry with a BLANK label seeds a blank name field, and the builder
+      // fills it with the parsed display name on the way out — so a raw
+      // payload-vs-storage comparison reads a composer nobody touched as an
+      // edit, and forks a preset wall on a no-op Done. Worse, if the display
+      // name derivation ever changes, that shape would commit EVERY note with
+      // a link the next time it was opened.
+      const BLANK = { ...SAVED, label: "" } as never;
+      const rebuilt = build("https://example.test/applet", "");
+      expect(rebuilt?.label).toBeTruthy(); // control: it really does normalise
+      expect(linkEdited(BLANK, rebuilt)).toBe(false);
+    });
   });
 
   it("still refuses to churn the wall when nothing changed at all", async () => {
@@ -690,6 +704,62 @@ describe("a double-click opens the editor, not the lightbox over it", () => {
     } finally {
       await h.unmount();
     }
+  });
+
+  it("shuts a lightbox that a SLOW double-click already opened", async () => {
+    // The window is a heuristic and cannot be anything else — the platform's
+    // own double-click interval is ~500ms and is not readable from JS. So a
+    // teacher who clicks slowly gets the preview first, and the composer would
+    // mount underneath it exactly as before. Correctness comes from the card
+    // being able to shut the preview, not from the number (§4a gate, task #9).
+    const h = await openSaved();
+    try {
+      await clickWithDetail(shell(h), 1);
+      await waitPastWindow();
+      // The slow half: the lightbox is already open when the second click
+      // lands. Control — assert that, rather than assuming the wait worked.
+      expect(modals).toHaveLength(1);
+      expect(closes).toHaveLength(0);
+
+      await clickWithDetail(shell(h), 2);
+      await h.dblClick(shell(h));
+      expect(closes).toHaveLength(1); // the preview was put away …
+      expect(h.queryAll("input")).toHaveLength(2); // … and the composer is up
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("drops the queued lightbox when the next click is a nested action", async () => {
+    // Click the note body, then reach for one of the hover-bar actions inside
+    // the window. `fromInteractive` stops that click opening the modal, but the
+    // one already QUEUED used to survive it — so the preview popped open on top
+    // of the thing the teacher had just asked for (§4a review, Medium).
+    const h = await openSaved();
+    try {
+      await clickWithDetail(shell(h), 1);
+      expect(modals).toHaveLength(0); // control: queued, not yet fired
+      const enlarge = h.query('[aria-label="Enlarge Fractions note"]');
+      expect(enlarge).toBeTruthy(); // control: the nested action is really there
+      await h.clickElement(enlarge as Element);
+
+      expect(enlarged).toHaveLength(1); // the action the teacher asked for ran
+      await waitPastWindow();
+      expect(modals).toHaveLength(0); // and nothing opened on top of it
+    } finally {
+      await h.unmount();
+    }
+  });
+
+  it("does not fire a queued lightbox into an unmounted card", async () => {
+    // A timer outliving its component would open a preview for a card on a
+    // wall the teacher has already left.
+    const h = await openSaved();
+    await clickWithDetail(shell(h), 1);
+    expect(modals).toHaveLength(0); // control: it really is queued
+    await h.unmount();
+    await waitPastWindow();
+    expect(modals).toHaveLength(0);
   });
 });
 

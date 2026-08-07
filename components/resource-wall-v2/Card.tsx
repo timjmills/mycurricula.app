@@ -86,25 +86,23 @@ export const WALL_CARD_DND_TYPE = "text/card";
  * only edit affordance on the card looked broken (live QA 2026-08-02, bug 2).
  * 250ms stays under the ~300ms at which a delay starts to feel like lag.
  *
- * ⚠ KNOWN RESIDUAL (§4a gate, 2026-08-07, Medium — accepted, not fixed).
- * 250ms is a heuristic, and it is NOT the platform's threshold: Windows and
- * macOS both default their double-click interval to ~500ms, so a teacher who
- * clicks slowly can have this timer fire first (lightbox opens), then land the
- * second click and re-create the exact defect the window exists to prevent —
- * the editor mounting UNDER the lightbox. `cancelPendingClick()` cannot help
- * there: by then there is no pending timer left to cancel.
+ * THIS NUMBER IS NOT THE SAFETY MECHANISM, and must never be treated as one
+ * (§4a gate, 2026-08-07, Medium; task #9). It is a heuristic, and it is NOT the
+ * platform's threshold: Windows and macOS both default their double-click
+ * interval to ~500ms, so a teacher who clicks slowly has this timer fire first
+ * and then lands the second click — re-creating the exact defect the window
+ * exists to prevent. `cancelPendingClick()` cannot help there; by then there is
+ * no pending timer left to cancel.
  *
- * Why accepted rather than tuned: raising the window to 500ms would make every
- * single click on a note feel sluggish to buy an edge case, and the correct fix
- * is structural, not numeric — this Card cannot CLOSE the lightbox it asked
- * for. The lightbox is the parent's state (`setLight`, ResourceWall.tsx:1093)
- * reached through `onModal`, with Section.tsx in between; closing it on a late
- * double-click needs that capability threaded through.
- *
- * What makes the residual tolerable NOW: the double-click is no longer the only
- * way in. This same wave added an explicit Edit control to the note's hover bar
- * — the non-modal primary path — so a teacher who loses the race still has a
- * visible, timing-independent way to edit. Filed for the structural fix.
+ * So the window is only an OPTIMISATION — it means a normal, quick double-click
+ * never flashes a lightbox at all. Correctness comes from `onCloseModal`, which
+ * `handleDoubleClick` calls unconditionally: whatever the timing, a
+ * double-click ends with the preview shut and the composer up. Raising this to
+ * 500ms was rejected (it makes every single click on a note feel sluggish to
+ * buy the tail); dropping it to zero was rejected too (the preview would then
+ * flash open and shut on every single note edit, which is the more visible of
+ * the two costs). The third path in — the hover bar's explicit Edit button —
+ * depends on no timing at all.
  */
 const DOUBLE_CLICK_WINDOW_MS = 250;
 
@@ -378,8 +376,7 @@ export function linkEdited(
     ? linkToLessonResource(saved.url.trim(), saved.label)
     : null;
   return (
-    (before?.url ?? null) !== (next?.url ?? null) ||
-    (before?.label ?? null) !== (next?.label ?? null)
+    (before?.url ?? null) !== (next?.url ?? null)
   );
 }
 
@@ -395,6 +392,7 @@ export function Card({
   onEnlarge,
   onBoard,
   onModal,
+  onCloseModal,
   onCommit,
   onDiscard,
 }: CardProps): ReactNode {
