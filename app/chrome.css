@@ -1515,6 +1515,132 @@
     opacity: 0;
     transform: translateY(-100%);
   }
+  /* A hidden bar must not stay HIT-TESTABLE. `.immersbar` is pointer-events:
+     none but `.immersbar > *` re-enables every child, so an invisible bar
+     parked at translateY(-100%) still owns whatever it overlaps — the handoff
+     gets away with a bare `pointer-events:none` on `.cbar` only because it has
+     no child override. Latent until the auto-hide was wired (2026-08-07). */
+  .immersbar.immersbar-hidden > * {
+    pointer-events: none;
+  }
+  /* KEYBOARD ESCAPE HATCH. The hide is opacity+transform, deliberately NOT
+     `visibility:hidden` and NOT `inert`: those would drop the bar out of the
+     tab order, and on the immersive routes this bar is the ONLY nav — a
+     keyboard user would be trapped. Instead the children stay tabbable and
+     focus REVEALS the bar, so nobody ever lands on an unseeable Back button.
+     The hook's `focusin` wake flips React's state to match in the same tick.
+
+     THIS RULE IS A TRAP IF THE HOOK DOES NOT CLEAN UP AFTER A CLICK. A clicked
+     button stays focused, so `:focus-within` would hold the bar at opacity 1
+     for the rest of the session and auto-hide would be silently dead after the
+     teacher's first click in the bar (measured live, 2026-08-07). The hook
+     therefore refuses to hide only under KEYBOARD focus (`:focus-visible`) and
+     blurs mouse-planted focus immediately before hiding — see `blocked()` and
+     `dropStaleFocus()` in use-immersive-autohide.ts. Change one and change the
+     other. */
+  .immersbar.immersbar-hidden:focus-within {
+    opacity: 1;
+    transform: none;
+  }
+  .immersbar.immersbar-hidden:focus-within > * {
+    pointer-events: auto;
+  }
+  /* compact-bar.css:16 — the slide is atmosphere; reduce kills it. Note the
+     bar still auto-HIDES under reduced motion (it snaps instead of sliding),
+     matching the handoff: reduced-motion is a vestibular-safety request, not
+     a request to disable the feature. */
+  @media (prefers-reduced-motion: reduce) {
+    .immersbar {
+      transition: none;
+    }
+  }
+  /* Peek tab — the way back for touch users, who have no top-edge hotzone
+     (port of `.cb-peek`, compact-bar.css:51-55). Hidden for mouse (hotzone),
+     shown under `(hover: none)`, hidden again ≤640px where auto-hide never
+     runs at all. 44px tall = CLAUDE.md §4's touch-target minimum. `position:
+     absolute`, not the handoff's `fixed`: `.overlay.immersive` is the
+     positioning context and clips to the frame card's radius, so a fixed tab
+     would escape the frame. RULE #1 — the bottom corners are rounded.
+
+     SCOPED `.overlay .ib-peek`, never bare `.ib-peek`: this button lives
+     inside <body class="cp-root">, and tokens.css:1184 `.cp-root button`
+     (0,1,1) would out-specify a single class (0,1,0) and strip the
+     background, border and padding right back off — the ≥2-class convention
+     this file's SideNav-retirement header already states. */
+  .overlay .ib-peek {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 41;
+    display: none;
+    place-items: center;
+    width: 88px;
+    height: 44px;
+    padding: 0;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-top: 0;
+    border-radius: 0 0 16px 16px;
+    background: rgba(20, 19, 32, 0.5);
+    color: #fff;
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  .overlay .ib-peek svg {
+    width: 18px;
+    height: 18px;
+    opacity: 0.9;
+  }
+  :root[data-tone="light"] .overlay .ib-peek,
+  .home[data-tone="light"] .overlay .ib-peek {
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--ink);
+    border-color: rgba(28, 27, 46, 0.16);
+  }
+  /* `any-pointer: coarse`, NOT the handoff's `hover: none` (compact-bar.css:54).
+     THE HYBRID GAP. `hover: none` means "no hovering pointer at all" — a pure
+     tablet or phone. A touchscreen laptop or 2-in-1 has a trackpad, so it
+     reports `hover: hover` and never matched that rule: it got auto-hide (it is
+     ≥640px wide) and NO peek tab. A teacher driving such a machine by touch
+     lost the toolbar with no visible way back — the only recovery was an
+     unadvertised touch in the top 28px, which nobody discovers. School-managed
+     kit is full of convertibles, so this is an ordinary configuration, not an
+     exotic one.
+
+     `any-pointer: coarse` asks the right question: "does this device have a
+     touch input at all?" — true for pure touch AND for hybrids. The trade is
+     that a hybrid user working with the trackpad also sees the small peek tab
+     while the bar is hidden; that is strictly better than stranding a touch
+     user with no exit (verified visually, not assumed).
+
+     Deliberately NOT applied to the timing gate: `IMMERSIVE_AUTOHIDE_TOUCH_MQ`
+     stays `(hover: none)`, so a hybrid keeps the 3200ms pointer delay. It has a
+     real pointer; only the VISIBILITY of the recovery control needed widening.
+
+     Same specificity as the base rule above — later source order wins, so these
+     two `display` flips must stay in this order (compact-bar.css:54-55 relies
+     on exactly the same ordering). */
+  @media (any-pointer: coarse) {
+    .overlay .ib-peek {
+      display: grid;
+    }
+  }
+  /* 639.98, NOT 640 — the two ranges must not overlap.
+     `IMMERSIVE_AUTOHIDE_WIDE_MQ` is `(min-width: 640px)`, so auto-hide is ON at
+     exactly 640. The handoff pairs `innerWidth < 640` in JS with
+     `max-width: 640px` in CSS (compact-bar.css:55), and both being inclusive of
+     640 leaves a one-pixel-wide tier where a touch-only device hides its only
+     nav and renders NO peek button — recovery would be a blind touch above
+     y=28, an affordance the teacher cannot see. Fixed on the CSS side rather
+     than by moving the JS to 641 so that "auto-hide is on at ≥640" stays the
+     single source of truth and keeps matching the handoff's threshold.
+     tests/immersive-autohide.test.ts asserts the two ranges stay disjoint. */
+  @media (max-width: 639.98px) {
+    .overlay .ib-peek {
+      display: none;
+    }
+  }
   .immersbar-left {
     display: flex;
     align-items: center;
@@ -1527,7 +1653,17 @@
     gap: 10px;
     flex: 0 0 auto;
   }
-  .ib-exit {
+  /* SCOPED `.overlay .ib-exit`, never bare `.ib-exit` — the same cp-root trap
+     documented on `.ib-peek` below, and this one was LIVE. Measured on
+     /planner 2026-08-07: background-color `rgba(0, 0, 0, 0)` and
+     border-top-width `0px`, i.e. tokens.css:1184 `.cp-root button` (0,1,1) was
+     beating this single-class rule (0,1,0) and the round glass Back circle was
+     rendering as a bare floating chevron. Only `width/height/border-radius`
+     survived, because the reset does not touch those — which is exactly why it
+     never looked obviously broken. The handoff's `.navback` is a glass circle
+     (7.21 compact-bar.css); this restores it. The `:hover` and light-tone
+     rules below already carried ≥2 selectors and were never affected. */
+  .overlay .ib-exit {
     width: 42px;
     height: 42px;
     flex: 0 0 auto;

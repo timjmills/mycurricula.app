@@ -42,6 +42,7 @@ import { ChromeToolsMenu } from "./ChromeToolsMenu";
 import { ChromeAccountMenu } from "./ChromeAccountMenu";
 import { ViewTitle } from "./ViewTitle";
 import { ViewEditToggle } from "./ViewEditToggle";
+import { useImmersiveAutohide } from "./use-immersive-autohide";
 import { CatchUpModalHost } from "@/components/catchup-v2";
 
 // §9b immersive surfaces — exactly Plan · Post · Teach (WAVE-3-PLAN R1).
@@ -78,6 +79,20 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
   const immersive = IMMERSIVE_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(p + "/"),
   );
+
+  // The immersive bar's idle auto-hide (audit finding A1 — the `hidden` prop
+  // and its CSS shipped in W3.3 with no caller, so the feature was inert).
+  // MUST be called here, above the `if (immersive)` early return below: a hook
+  // after a conditional return violates the rules of hooks, so the hook takes
+  // `immersive` as its `enabled` flag and no-ops (force-showing the bar) on the
+  // corner-grammar routes.
+  //
+  // SCOPE: this reaches `/planner*` and `/post*` only. `/teach` is listed in
+  // IMMERSIVE_PREFIXES but that entry is INERT — /teach renders under route
+  // group `(teach)`, whose layout mounts providers and never this shell
+  // (finding A2, docs/audits/2026-07-31-post-teach-catchup-shell.md). Teach
+  // gets auto-hide only when that separate shell gap is closed.
+  const autohide = useImmersiveAutohide(immersive);
 
   // Bundle scoping for the bottom chrome (see the render comment below).
   // W3.8b: the clock/console row is suppressed while Day is in EDIT mode —
@@ -117,6 +132,9 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
         <ImmersiveBar
           title={viewTitle}
           showModeSwitch={showModeSwitch}
+          hidden={autohide.hidden}
+          barRef={autohide.barRef}
+          onShow={autohide.show}
           // R1b: the six-tab view console rides the immersbar center on the
           // immersive surfaces (Plan/Post), matching the handoff compact-bar.
           nav={<ConsoleNav compact />}

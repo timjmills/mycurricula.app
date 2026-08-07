@@ -4,6 +4,18 @@
 export { ChromeShell } from "./ChromeShell";
 export { ChromeTopBar } from "./ChromeTopBar";
 export { ImmersiveBar } from "./ImmersiveBar";
+// The immersive bar's idle auto-hide timer — exported for the tests and for
+// any future immersive shell (notably the `(teach)` group, which does NOT
+// mount ChromeShell and so does not get auto-hide today).
+export {
+  useImmersiveAutohide,
+  IMMERSIVE_AUTOHIDE_DESKTOP_MS,
+  IMMERSIVE_AUTOHIDE_TOUCH_MS,
+  IMMERSIVE_AUTOHIDE_WIDE_MQ,
+  IMMERSIVE_AUTOHIDE_TOUCH_MQ,
+  IMMERSIVE_AUTOHIDE_MOUSE_WAKE_Y,
+  IMMERSIVE_AUTOHIDE_TOUCH_WAKE_Y,
+} from "./use-immersive-autohide";
 export { ModeSwitch } from "./ModeSwitch";
 export { ChromeContext } from "./ChromeContext";
 export { ChromeClock } from "./ChromeClock";

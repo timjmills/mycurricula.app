@@ -15,11 +15,24 @@
 //     the custom-wall back-pop (`cc-rw-back` analogue) BEFORE router
 //     navigation (WAVE-3-PLAN §1 W3.3). This component just reports the
 //     click.
-//   • `hidden` — the Teach-only auto-hide (2.8s stillness, wakes on any
-//     mousemove/touch) is the enrolling surface's timer, not ours; we only
-//     append the bundle's ` hidden` class so chrome.css can slide the bar
-//     away. `pointer-events` stays CSS's concern (`.immersbar` is
-//     none; children re-enable) so a hidden bar never eats input.
+//   • `hidden` / `barRef` / `onShow` — the idle auto-hide. The timer is NOT
+//     here: it lives in `use-immersive-autohide.ts`, which ChromeShell calls
+//     and whose `{ hidden, show, barRef }` it hands straight to these three
+//     props. We only append the ` immersbar-hidden` class so chrome.css can
+//     slide the bar away, host the ref the hook attaches its wake listeners
+//     to, and render the touch-tier peek tab while hidden.
+//     Delay is 3200ms on pointer devices / 5000ms on touch (7.21.26 handoff
+//     source-home/app.jsx:534 — the "2.8s" this comment used to quote was the
+//     older 6.24/7.2 figure, corrected 2026-08-07).
+//     `pointer-events` stays CSS's concern (`.immersbar` is none; children
+//     re-enable — and re-disable while hidden, chrome.css) so a hidden bar
+//     never eats input.
+//
+// SCOPE: only `/planner*` and `/post*` actually receive `hidden` today.
+// `/teach` is nominally an immersive prefix but renders under route group
+// `(teach)`, whose layout never mounts ChromeShell — see the header of
+// use-immersive-autohide.ts and finding A2 of
+// docs/audits/2026-07-31-post-teach-catchup-shell.md.
 //   • `showModeSwitch` — Personal/Team appears in the immersive bar on
 //     Plan ONLY (verified against the bundle; WAVE-3-PLAN §3 R1). Post and
 //     Teach pass nothing and get an empty right slot.
@@ -30,7 +43,7 @@
 // explanation per CLAUDE.md §4 — dismissible (navigation, not a
 // high-consequence control).
 
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { Tooltip } from "@/components/ui";
 import { ModeSwitch } from "./ModeSwitch";
 
@@ -48,6 +61,23 @@ function BackChevronIcon(): ReactNode {
       aria-hidden="true"
     >
       <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+/** Peek chevron — the handoff's `.cb-peek` glyph (app.jsx:593). */
+function PeekChevronIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }
@@ -78,8 +108,18 @@ export interface ImmersiveBarProps {
    * before navigating — this component only reports the click.
    */
   onBack: () => void;
-  /** Teach auto-hide: slide the bar away (caller owns the stillness timer). */
+  /** Idle auto-hide: slide the bar away. Owned by `useImmersiveAutohide`. */
   hidden?: boolean;
+  /**
+   * Bar root ref — `useImmersiveAutohide` binds its `mouseenter` / `focusin`
+   * wakes to this element and reads it for the open-popover gate.
+   */
+  barRef?: RefObject<HTMLDivElement | null>;
+  /**
+   * Bring a hidden bar back — the peek tab's handler. Omit it and no peek tab
+   * renders, which is the right default for a caller that never hides the bar.
+   */
+  onShow?: () => void;
 }
 
 export function ImmersiveBar({
@@ -89,39 +129,77 @@ export function ImmersiveBar({
   tools,
   onBack,
   hidden = false,
+  barRef,
+  onShow,
 }: ImmersiveBarProps): ReactNode {
+  // The peek tab is a SIBLING of the bar, not a child — it has to stay
+  // visible while `.immersbar-hidden` sits at opacity 0 (handoff
+  // app.jsx:593 renders it the same way, outside `.cbar`).
   return (
-    // "immersbar-hidden", not the bundle's bare "hidden": Tailwind's .hidden
-    // utility (display:none, emitted AFTER chrome.css) would beat the
-    // opacity/transform slide recipe and kill the Teach auto-hide transition
-    // (§4a finding #10). Recorded bundle-parity deviation; chrome.css keys
-    // the same name.
-    <div className={"immersbar" + (hidden ? " immersbar-hidden" : "")}>
-      <div className="immersbar-left">
+    <>
+      {/* "immersbar-hidden", not the bundle's bare "hidden": Tailwind's
+          .hidden utility (display:none, emitted AFTER chrome.css) would beat
+          the opacity/transform slide recipe and kill the auto-hide
+          transition (§4a finding #10). Recorded bundle-parity deviation;
+          chrome.css keys the same name. */}
+      <div
+        ref={barRef}
+        className={"immersbar" + (hidden ? " immersbar-hidden" : "")}
+      >
+        <div className="immersbar-left">
+          <Tooltip
+            content="Back to the previous screen"
+            side="bottom"
+            tooltipId="chrome-immersive-back"
+          >
+            {/* Bare <button>: `.ib-exit` (round 42px glass circle) IS the
+                complete handoff recipe; the ui Button primitive's `.btn`
+                base would fight it — same reasoning as ModeSwitch. */}
+            <button
+              type="button"
+              className="ib-exit"
+              aria-label="Back"
+              onClick={onBack}
+            >
+              <BackChevronIcon />
+            </button>
+          </Tooltip>
+          {title}
+        </div>
+        {nav ? <div className="immersbar-center">{nav}</div> : null}
+        <div className="immersbar-right">
+          {showModeSwitch && <ModeSwitch />}
+          {tools}
+        </div>
+      </div>
+      {/* Peek tab — touch-tier only (`.ib-peek` is display:none until
+          `@media (hover: none)`, and off again ≤640px where auto-hide never
+          runs). Mouse users get the top-edge hotzone instead; a touch user
+          has no hover, so without this the bar would be unrecoverable.
+
+          TOOLTIP (CLAUDE.md §4): icon-only and non-obvious, so it earns one —
+          but the text explains WHY the bar vanished rather than restating
+          "Show the top bar", which the aria-label already says. Dismissible
+          (`tooltipId`), not `required`: nothing here is destructive or
+          team-wide. On touch the primitive suppresses the styled bubble and
+          mirrors the string to native `title=` for long-press, which is the
+          only tier this button renders on. */}
+      {hidden && onShow ? (
         <Tooltip
-          content="Back to the previous screen"
+          content="The bar slides away while you work. Tap to bring it back."
           side="bottom"
-          tooltipId="chrome-immersive-back"
+          tooltipId="chrome-immersive-peek"
         >
-          {/* Bare <button>: `.ib-exit` (round 42px glass circle) IS the
-              complete handoff recipe; the ui Button primitive's `.btn`
-              base would fight it — same reasoning as ModeSwitch. */}
           <button
             type="button"
-            className="ib-exit"
-            aria-label="Back"
-            onClick={onBack}
+            className="ib-peek"
+            aria-label="Show the top bar"
+            onClick={onShow}
           >
-            <BackChevronIcon />
+            <PeekChevronIcon />
           </button>
         </Tooltip>
-        {title}
-      </div>
-      {nav ? <div className="immersbar-center">{nav}</div> : null}
-      <div className="immersbar-right">
-        {showModeSwitch && <ModeSwitch />}
-        {tools}
-      </div>
-    </div>
+      ) : null}
+    </>
   );
 }
