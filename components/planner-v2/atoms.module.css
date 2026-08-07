@@ -265,6 +265,32 @@
   .addRowEvent.addRowEvent {
     min-height: 44px;
   }
+  /* `.selectTitle` WAS MISSING FROM THIS LIST, and it is the one control on a
+     lesson row that a teacher has to hit — it is the row's whole keyboard and
+     AT selection path (see the note above it), and on touch it is the only
+     thing between a finger and choosing a lesson. Its reset gives it
+     `padding: 0`, so its height was purely its own line-box: measured 31px at
+     the phone tier, well under the 44px floor. (The audit that filed this said
+     21px; 31px is what the running app actually reports at 375 and 768, and
+     36px at 1440 where this rule correctly does not fire.)
+
+     `display: flex` + `align-items: center` rather than a bare `min-height`.
+     The reset makes this a `display: block` button whose only child is the
+     title span; growing the box with `min-height` alone would leave the text
+     pinned to the top and the extra 23px as dead space BELOW it, which looks
+     like a layout bug and puts the visual target and the hit target in
+     different places. Centring keeps the row reading exactly as it did while
+     the pressable area grows around the text.
+
+     Not `padding` either: the row is a fixed-height grid cell in some frames,
+     and padding would push the subject line and the fork cues out of it.
+     `min-height` grows only if there is room, which is the behaviour a
+     touch-target floor wants. */
+  .selectTitle.selectTitle {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
 }
 
 /* ── Reduced motion — drop the "now" pulse ──────────────────────────────── */
