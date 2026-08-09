@@ -24,6 +24,13 @@
 // app/settings/calendar/page.tsx states at length for its own four
 // team-prefixed keys). Describe the observable effect instead.
 //
+// Per-browser does NOT mean browser-GLOBAL, though: both team keys here
+// (overrides and order) are NOTEBOOK-scoped, so one browser holds a
+// separate value per notebook/workspace. Overrides earned that in the
+// same wave as order and for a worse symptom — a rename or an archive
+// made in one notebook changed what a subject was CALLED, and whether it
+// appeared at all, in every other notebook on the machine.
+//
 // Locked-roster doctrine (CLAUDE.md §4): the 8 subjects (math, reading,
 // writing, grammar, spelling, ufli, explorers, sel) and their swatch
 // mapping are locked team-wide. Nothing in this file can add a 9th team
@@ -151,12 +158,43 @@ export type SubjectOverridePatch = Partial<{
 }>;
 
 /**
- * localStorage key. Subject overrides are TEAM-scoped — a rename or an
- * archive affects every teacher on the grade-level team (same doctrine
+ * localStorage key BASE. Subject overrides are TEAM-scoped — a rename or
+ * an archive affects every teacher on the grade-level team (same doctrine
  * as `mycurricula:team:holidays` / `school-week-days`). Migrates to a
  * `team_settings` row when Supabase lands.
+ *
+ * The real key is NOTEBOOK-scoped via `teamSubjectOverridesStorageKey`,
+ * for the same reason (and by the same recipe) as the ORDER key below:
+ * a bare key is browser-GLOBAL, so renaming "Explorers" or archiving
+ * "UFLI" in one notebook/workspace renamed and archived it in every other
+ * one on the same browser. That is a wider blast radius than the order
+ * key's — order is arrangement, but an override changes what a subject is
+ * CALLED and whether it appears at all. The bare base key survives only as
+ * the read-once legacy-fallback source for values written before scoping
+ * landed.
  */
-const OVERRIDES_KEY = "mycurricula:team:subject-overrides";
+const OVERRIDES_KEY_BASE = "mycurricula:team:subject-overrides";
+
+/**
+ * Build the overrides storage key for a notebook scope. Pure + exported so
+ * the scoping rule is unit-testable without React.
+ *
+ * Scoped by the NOTEBOOK (grade_levels) id rather than a
+ * workspace:notebook composite, for the reasons spelled out on
+ * `teamSubjectOrderStorageKey` below — notebook ids are already
+ * per-workspace UUIDs on the MULTI_WORKSPACE ON path, and `workspaceId` is
+ * always null on the OFF path. The two team keys must agree on their scope
+ * shape: `useVisibleSubjects` composes them, and a rename keyed one way
+ * against an order keyed another would drift the moment either changed.
+ *
+ * A null/undefined/empty scope (identity still resolving on the ON path,
+ * or no provider value) falls back to the bare base key.
+ */
+export function teamSubjectOverridesStorageKey(
+  scope: string | null | undefined,
+): string {
+  return scope ? `${OVERRIDES_KEY_BASE}:${scope}` : OVERRIDES_KEY_BASE;
+}
 
 /**
  * The onboarding wizard's persisted state (lib/onboarding-state.tsx,
@@ -165,7 +203,47 @@ const OVERRIDES_KEY = "mycurricula:team:subject-overrides";
  */
 const ONBOARDING_KEY = "mycurricula:onboarding";
 
-const overridesChannel = createSameTabChannel<SubjectOverrides>();
+/**
+ * Same-tab channel, KEYED by storage key — like the order channel below,
+ * and unlike the two flat PERSONAL channels (hidden / personal subjects,
+ * which are genuinely browser-wide). Instances announce which key they
+ * wrote so a subscriber whose scope differs (mid notebook-switch, or a
+ * stale-scope write racing a scope flip) never applies another notebook's
+ * overrides.
+ */
+const overridesChannel = createSameTabChannel<{
+  storageKey: string;
+  next: SubjectOverrides;
+}>();
+
+/**
+ * An override map TOGETHER WITH the storage key it was loaded under.
+ *
+ * Keying the storage and the channel is not enough on its own: React state
+ * survives a scope change, so between the render that resolves the new
+ * notebook's key and the passive effect that loads it, the hook holds the
+ * PREVIOUS notebook's map under the NEW notebook's key. A mutation in that
+ * window would merge onto the previous notebook's overrides and persist them
+ * under this one — the original leak, re-entering through the switch rather
+ * than through the key. The stamp is what makes that window detectable;
+ * without it a bare map cannot say which notebook it came from.
+ */
+interface LoadedOverrides {
+  /** The key `map` was read under. `null` before the first load (SSR + the
+   *  first client paint), which matches no scope and so reads as empty. */
+  storageKey: string | null;
+  map: SubjectOverrides;
+}
+
+/** Stable empty map — the "no overrides for this scope" identity. Shared so
+ *  the fallback below does not hand consumers a fresh object per render. */
+const NO_OVERRIDES: SubjectOverrides = {};
+
+/** Pre-load state: belongs to no scope, so every consumer reads it as empty. */
+const NOTHING_LOADED: LoadedOverrides = {
+  storageKey: null,
+  map: NO_OVERRIDES,
+};
 
 /**
  * Normalize a parsed value into a clean, minimal SubjectOverrides map:
@@ -250,11 +328,11 @@ function seedOverridesFromOnboarding(): SubjectOverrides | null {
   }
 }
 
-/** Read + parse the stored overrides. Null when unset / malformed. */
-function readOverridesFromStorage(): SubjectOverrides | null {
+/** Read + parse the overrides under one key. Null when unset / malformed. */
+function readOverridesFromStorage(storageKey: string): SubjectOverrides | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(OVERRIDES_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (raw == null) return null;
     const parsed: unknown = JSON.parse(raw);
     return normalizeOverrides(parsed);
@@ -263,14 +341,88 @@ function readOverridesFromStorage(): SubjectOverrides | null {
   }
 }
 
-/** Persist the override map. Storage failures are swallowed. */
-function writeOverridesToStorage(next: SubjectOverrides): void {
-  if (typeof window === "undefined") return;
+/**
+ * Persist the override map under one key. Storage failures are swallowed for
+ * the caller's purposes — in-memory state still updates — but REPORTED,
+ * because one caller cannot treat them as harmless: the legacy migration
+ * deletes the only other copy of the value once it believes this write landed.
+ *
+ * @returns true when the value is known to be persisted.
+ */
+function writeOverridesToStorage(
+  storageKey: string,
+  next: SubjectOverrides,
+): boolean {
+  if (typeof window === "undefined") return false;
   try {
-    window.localStorage.setItem(OVERRIDES_KEY, JSON.stringify(next));
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    return true;
   } catch {
     // Storage disabled / quota exceeded — in-memory state still updates.
+    return false;
   }
+}
+
+/**
+ * Resolve a notebook's stored overrides, migrating the pre-scoping value if
+ * this is the first notebook to meet it, and seeding from onboarding when
+ * there is nothing to migrate.
+ *
+ * Exported and separated from the hook for the same reason
+ * `loadTeamSubjectOrder` is: the migration lives in an effect, effects do not
+ * run under `react-dom/server`, and a guard that cannot be exercised is how
+ * the ORDER key's first "read-once" fallback shipped while actually being read
+ * once PER SCOPE.
+ *
+ * Precedence:
+ *   1. this scope's own saved overrides;
+ *   2. the pre-scoping bare key — CLAIMED by the first notebook to observe it
+ *      (written under that notebook's key, then removed), so no second
+ *      notebook can inherit it. The delete is conditional on the write having
+ *      actually landed, so no failure path destroys the value;
+ *   3. the one-time onboarding seed.
+ *
+ * WHY THE SEED IS NOT ALSO CLAIM-AND-DELETE. `mycurricula:onboarding` is the
+ * teacher's setup answers, still read by the wizard itself, and the only thing
+ * lifted from it is `isAcademic: false` — never a rename, never an archive. A
+ * fresh notebook inheriting "SEL is non-academic here too" is a sane DEFAULT,
+ * not the cross-notebook bleed this scoping exists to stop; and deleting a key
+ * this module does not own would break the wizard. Each scope is still seeded
+ * at most once: the scoped key existing IS the already-seeded marker.
+ *
+ * KNOWN RESIDUAL (identical to the order key's, and bounded the same way): two
+ * tabs on two notebooks opened at the same instant can both read the legacy
+ * value before either deletes it. localStorage has no atomic test-and-set.
+ */
+export function loadTeamSubjectOverrides(storageKey: string): SubjectOverrides {
+  const stored = readOverridesFromStorage(storageKey);
+  if (stored !== null) return stored;
+
+  if (storageKey !== OVERRIDES_KEY_BASE) {
+    const legacy = readOverridesFromStorage(OVERRIDES_KEY_BASE);
+    if (legacy !== null) {
+      // DELETE ONLY AFTER A CONFIRMED WRITE — in private mode or at quota the
+      // scoped write fails silently while removeItem succeeds, and deleting
+      // regardless would destroy the team's only saved renames.
+      if (writeOverridesToStorage(storageKey, legacy)) {
+        try {
+          window.localStorage.removeItem(OVERRIDES_KEY_BASE);
+        } catch {
+          // Migration missed, value intact: the next notebook claims it.
+        }
+      }
+      return legacy;
+    }
+  }
+
+  const seeded = seedOverridesFromOnboarding();
+  if (seeded !== null) {
+    // Persist even an empty seed so this branch never runs again for this
+    // scope — the scoped key existing IS the "already seeded" marker.
+    writeOverridesToStorage(storageKey, seeded);
+    return seeded;
+  }
+  return {};
 }
 
 /**
@@ -281,82 +433,140 @@ function writeOverridesToStorage(next: SubjectOverrides): void {
  * are stripped — renaming back to the original name clears the rename),
  * persists, and propagates to every other hook instance: same-tab
  * siblings via the channel, other tabs via the `storage` event.
+ *
+ * SCOPE IS RESOLVED INTERNALLY — LOAD-BEARING, do not add a caller-supplied
+ * scope parameter, for exactly the reason spelled out on
+ * `useTeamSubjectOrder`: Settings → Subjects and `useVisibleSubjects` each
+ * mount their own instance, and if scope were a parameter they could
+ * disagree — a rename would write one key while the seam that renders the
+ * roster read another, making the mutation silently invisible. (Consequence:
+ * this hook — and transitively `useVisibleSubjects` — throws outside a
+ * <NotebookProvider>. Both real mount points provide one:
+ * app/settings/layout.tsx and app/(planner)/layout.tsx.)
  */
 export function useSubjectOverrides(): {
   overrides: SubjectOverrides;
   updateOverride: (id: SubjectId, patch: SubjectOverridePatch) => void;
 } {
-  // SSR-safe default — no overrides. We intentionally do NOT read
-  // localStorage during the initial render (hydration mismatch guard).
-  const [overrides, setOverrides] = useState<SubjectOverrides>({});
+  // The notebook scope — see the LOAD-BEARING note above. Empty string
+  // (identity still loading on the ON path) degrades to the base key.
+  const { activeNotebookId } = useNotebookState();
+  const scope = activeNotebookId || null;
+  const storageKey = useMemo(
+    () => teamSubjectOverridesStorageKey(scope),
+    [scope],
+  );
+
+  // SSR-safe default — no overrides, and `storageKey: null` for "nothing
+  // loaded yet". We intentionally do NOT read localStorage during the
+  // initial render (hydration mismatch guard); the load lands post-mount.
+  const [loaded, setLoaded] = useState<LoadedOverrides>(NOTHING_LOADED);
   // Latest-value ref so the stable setter can read-modify-write without
   // re-creating itself per render (and without an impure setState
   // updater — writes + emits must happen in event-handler context).
-  const latestRef = useRef<SubjectOverrides>(overrides);
+  const latestRef = useRef<LoadedOverrides>(loaded);
 
-  /** Apply a new value to this instance (state + ref). */
-  const apply = useCallback((next: SubjectOverrides): void => {
+  /** Apply a value to this instance (state + ref), STAMPED with the key it
+   *  was loaded under. The stamp is what makes the staleness above
+   *  detectable — an unstamped map cannot say which notebook it is from. */
+  const apply = useCallback((key: string, map: SubjectOverrides): void => {
+    const held = latestRef.current;
+    // Same key AND same map reference — nothing moved. The channel's own
+    // writer re-applies its emit, and this keeps that a true no-op rather
+    // than a re-render on a fresh wrapper object.
+    if (held.storageKey === key && held.map === map) return;
+    const next: LoadedOverrides = { storageKey: key, map };
     latestRef.current = next;
-    setOverrides(next);
+    setLoaded(next);
   }, []);
 
-  // Post-mount: sync from localStorage; seed from onboarding when the
-  // key has never been written (one-time — see seedOverridesFromOnboarding).
+  // Post-mount (and on scope change): sync from localStorage, migrating the
+  // pre-scoping value or seeding from onboarding as needed. RE-KEYING is the
+  // point of the `storageKey` dep — switching notebook must re-read the NEW
+  // scope's overrides rather than carry the previous notebook's forward.
   useEffect(() => {
-    const stored = readOverridesFromStorage();
-    if (stored != null) {
-      apply(stored);
-      return;
-    }
-    const seeded = seedOverridesFromOnboarding();
-    if (seeded != null) {
-      // Persist even an empty seed so this branch never runs again —
-      // the overrides key existing IS the "already seeded" marker.
-      writeOverridesToStorage(seeded);
-      apply(seeded);
-    }
-  }, [apply]);
+    apply(storageKey, loadTeamSubjectOverrides(storageKey));
+  }, [apply, storageKey]);
 
   // Same-tab sync — sibling hook instances (other cards on the settings
-  // page, useVisibleSubjects consumers) announce their writes here.
-  useEffect(() => overridesChannel.subscribe(apply), [apply]);
+  // page, useVisibleSubjects consumers) announce their writes here. KEYED:
+  // apply only writes made in this instance's scope.
+  useEffect(
+    () =>
+      overridesChannel.subscribe((msg) => {
+        if (msg.storageKey === storageKey) apply(storageKey, msg.next);
+      }),
+    [apply, storageKey],
+  );
 
   // Cross-tab sync. The `storage` event fires on OTHER tabs (not the
   // one doing the write), so the settings page in one tab and /weekly
-  // in another stay consistent without extra plumbing.
+  // in another stay consistent without extra plumbing — for this scope only.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = (e: StorageEvent): void => {
-      if (e.key !== OVERRIDES_KEY) return;
+      if (e.key !== storageKey) return;
       if (e.newValue == null) {
-        apply({});
+        apply(storageKey, NO_OVERRIDES);
         return;
       }
       try {
         const parsed: unknown = JSON.parse(e.newValue);
-        apply(normalizeOverrides(parsed));
+        apply(storageKey, normalizeOverrides(parsed));
       } catch {
         // Ignore malformed values; keep current state.
       }
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
-  }, [apply]);
+  }, [apply, storageKey]);
 
   const updateOverride = useCallback(
     (id: SubjectId, patch: SubjectOverridePatch): void => {
       if (!isSubjectId(id)) return;
-      const prev = latestRef.current;
+      const held = latestRef.current;
+      // NEVER merge onto a map loaded under another key. In the switch
+      // window `held` is still the PREVIOUS notebook's map, and merging onto
+      // it would persist that notebook's renames under this one — the very
+      // leak the scoping removed, re-entering through the switch instead of
+      // through the key. Re-read this scope's own value instead: it is a
+      // synchronous localStorage read, it is exact (so a notebook that DOES
+      // have saved overrides is not clobbered down to just this patch), and
+      // an event handler is a legal place for it.
+      //
+      // CROSS-TAB SEMANTICS ARE LAST-WRITER-WINS, DELIBERATELY. This is a
+      // read-modify-write, so another tab can persist the same key between the
+      // read above and the `setItem` below, and this tab then overwrites it —
+      // that tab's patch is lost. It is not an oversight and it is not new
+      // here: every `mycurricula:*` hook in this codebase does read-modify-
+      // write against localStorage, which has no atomic compare-and-set, so
+      // the property is inherited from the storage layer rather than chosen
+      // by this key. Closing it means a revision/compare-and-retry scheme
+      // applied across ALL the team and personal hooks at once — smuggling it
+      // into one key would leave the others racing while implying they are
+      // safe. Tracked with the team-key scoping sweep.
+      const prev =
+        held.storageKey === storageKey
+          ? held.map
+          : loadTeamSubjectOverrides(storageKey);
       const next = normalizeOverrides({
         ...prev,
         [id]: { ...prev[id], ...patch },
       });
-      apply(next);
-      writeOverridesToStorage(next);
-      overridesChannel.emit(next);
+      apply(storageKey, next);
+      writeOverridesToStorage(storageKey, next);
+      overridesChannel.emit({ storageKey, next });
     },
-    [apply],
+    [apply, storageKey],
   );
+
+  // KEY-BOUND READ. Between the render that resolves a new notebook's key
+  // and the passive effect that loads it, `loaded` still holds the previous
+  // notebook's map — one paint in which the roster would otherwise show
+  // notebook A's renames while notebook B is active. Reporting "nothing
+  // loaded for this scope" is the honest state: consumers fall back to the
+  // locked roster names for that frame rather than to another notebook's.
+  const overrides = loaded.storageKey === storageKey ? loaded.map : NO_OVERRIDES;
 
   return { overrides, updateOverride };
 }
@@ -742,9 +952,13 @@ const ORDER_KEY_BASE = "mycurricula:team:subject-order";
  *     lib/subject-order.ts `storageKeyFor` (grade-scoped for the same
  *     reason).
  * Residual gap, on the record: OFF-path notebook ids are static mock
- * strings, and the SIBLING team keys this order composes with
- * (subject-overrides, holidays, …) remain browser-global — tracked
- * separately, out of this wave's scope.
+ * strings, and the SIBLING calendar/config team keys (holidays, school
+ * week, school months, academic year, curriculum label) remain
+ * browser-global — tracked separately. `subject-overrides` was in that
+ * list and no longer is: it is scoped by `teamSubjectOverridesStorageKey`
+ * above, deliberately by the same rule as this one, because
+ * `useVisibleSubjects` composes the two and a rename keyed one way
+ * against an order keyed another would drift.
  *
  * A null/undefined/empty scope (identity still resolving on the ON
  * path, or no provider value) falls back to the bare base key.

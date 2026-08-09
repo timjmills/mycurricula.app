@@ -17,10 +17,15 @@
 //   • Sections whose hooks are mountable here read them directly
 //     (theme, school week, holidays, notebooks, account, catch-up via a
 //     local CatchupProvider — the settings tree doesn't mount one).
-//   • Sections owned by sibling pages (schedule, subjects, templates)
-//     are summarized from their localStorage keys via useStoredJson —
-//     the keys are the stable contract, so this page never depends on
-//     those pages' internals.
+//   • Sections owned by sibling pages (schedule, templates, the two
+//     PERSONAL subject lists) are summarized from their localStorage keys
+//     via useStoredJson — those keys are flat and browser-wide, so the key
+//     IS the stable contract and this page never depends on those pages'
+//     internals.
+//   • The TEAM subject overrides are the exception: that key is
+//     notebook-scoped, so its stable contract is the hook
+//     (useSubjectOverrides), not a string. A literal key read here would
+//     summarize a scope nobody is in.
 
 import { useEffect, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/ui";
@@ -35,6 +40,7 @@ import {
 } from "@/lib/use-school-week";
 import { useHolidays } from "@/lib/use-holidays";
 import { useDisplayName, useDefaultView } from "@/lib/use-account-settings";
+import { useSubjectOverrides } from "@/lib/use-subject-settings";
 import { LESSON_TEMPLATES } from "@/lib/lesson-templates";
 import { SUBJECTS } from "@/lib/mock";
 import { OverviewCard } from "@/components/settings";
@@ -142,9 +148,12 @@ function OverviewBody(): ReactNode {
     "mycurricula:user:schedule-blocks",
     {},
   );
-  const subjectOverrides = useStoredJson<
-    Record<string, { archived?: boolean }>
-  >("mycurricula:team:subject-overrides", {});
+  // Subject overrides are NOT read as a raw key like the two above: the
+  // team keys are notebook-scoped, so the stable contract is the hook, not
+  // a string. Reading `mycurricula:team:subject-overrides` literally here
+  // would summarize the pre-scoping leftover — zero archived for every
+  // teacher whose notebook has its own value.
+  const { overrides: subjectOverrides } = useSubjectOverrides();
   const hiddenSubjects = useStoredJson<string[]>(
     "mycurricula:user:hidden-subjects",
     [],
@@ -198,7 +207,7 @@ function OverviewBody(): ReactNode {
   ).length;
 
   const archivedCount = Object.values(subjectOverrides).filter(
-    (o) => o && typeof o === "object" && o.archived === true,
+    (o) => o?.archived === true,
   ).length;
   const teamSubjectCount = SUBJECTS.length - archivedCount;
 

@@ -42,12 +42,13 @@
 // no setters — so the seam stays one-directional: settings WRITE via
 // lib/use-subject-settings.ts, views READ via this hook.
 //
-// PROVIDER REQUIREMENT (since the order key was notebook-scoped): the
-// team-order layer resolves its storage scope from useNotebookState(),
-// so this hook now requires a <NotebookProvider> ancestor — satisfied by
-// both real mount points (app/settings/layout.tsx and
-// app/(planner)/layout.tsx). Scope is resolved INSIDE the order hook on
-// purpose; see the LOAD-BEARING note on useTeamSubjectOrder.
+// PROVIDER REQUIREMENT (since the two TEAM keys were notebook-scoped):
+// both the team-override layer and the team-order layer resolve their
+// storage scope from useNotebookState(), so this hook requires a
+// <NotebookProvider> ancestor — satisfied by both real mount points
+// (app/settings/layout.tsx and app/(planner)/layout.tsx). Scope is
+// resolved INSIDE each hook on purpose; see the LOAD-BEARING note on
+// useTeamSubjectOrder.
 
 import { useMemo } from "react";
 import type { SubjectId } from "./types";

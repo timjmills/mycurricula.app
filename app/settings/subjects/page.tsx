@@ -341,10 +341,12 @@ function ReorderControls({
 function TeamSubjectsSection(): ReactNode {
   const { all } = useVisibleSubjects();
   const { updateOverride } = useSubjectOverrides();
-  // No catalog option: this instance and the one inside
-  // useVisibleSubjects resolve the same default (the locked 8) and the
-  // same internally-derived notebook scope, so both read and write the
-  // same key — see the LOAD-BEARING note on useTeamSubjectOrder.
+  // Neither team hook takes a scope: both this section's instances and the
+  // ones inside useVisibleSubjects derive the notebook scope internally, so
+  // a rename written here lands under the very key the roster above reads.
+  // No catalog option either — this instance and useVisibleSubjects resolve
+  // the same default (the locked 8). See the LOAD-BEARING note on
+  // useTeamSubjectOrder.
   const { order, catalog, setOrder, moveSubject } = useTeamSubjectOrder();
   const { showConsequence } = useConsequenceToast();
   const [savedTick, setSavedTick] = useState(0);
