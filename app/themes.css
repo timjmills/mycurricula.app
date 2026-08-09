@@ -772,8 +772,32 @@
   }
 
   /* — glass on PHOTO · DARK frosted (default material) — cinematic, legible — */
-  [data-frame="glass"][data-bg="photo"] {
+  /* THE TONE BRANCH IS NOT DECORATION — this selector matches <html>, and the
+     rule used to set white ink for BOTH tones. In Photo-Bright the derived tone
+     is `light` and the stage veil above turns the backdrop nearly white, so the
+     un-branched form was white-on-white for anything that inherited it.
+
+     WHAT IT IS NOT: the 2026-08-07 re-measure recorded this as "armed app-wide,
+     inert today only because every component sets its own ink". That diagnosis
+     is wrong, and the difference matters to anyone deciding how urgent this is.
+     `app/globals.css` `body { color: var(--ink) }` is UNCONDITIONAL and sits on
+     the element every rendered node descends from, so inheritance from <html>
+     never reaches content — a component that sets no ink of its own inherits
+     `--ink`, not this. Measured under Photo-Bright on the running app
+     (scripts/tmp/diag-lane-b-root-ink.mjs): `<html>` computed
+     `rgb(244,246,251)` while `<body>`, a bare injected `<div>` in body, and a
+     bare `<span>` inside `#main-content` all computed `rgb(28,27,46)`.
+
+     So this was a trap rather than a live defect: unreachable only because of
+     one unconditional rule in a different stylesheet, and it would go live the
+     moment `body`'s colour is conditionalised or dropped. Branching it costs a
+     selector and removes the trap. The dark arm is unchanged, so Photo-Dim,
+     Night and every dark-tone render are byte-identical to before. */
+  [data-frame="glass"][data-bg="photo"][data-tone="dark"] {
     color: #f4f6fb;
+  }
+  [data-frame="glass"][data-bg="photo"][data-tone="light"] {
+    color: var(--ink);
   }
   [data-frame="glass"][data-bg="photo"] .fr-chrome {
     background: rgba(20, 24, 36, 0.5);

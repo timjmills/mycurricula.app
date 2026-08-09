@@ -6,6 +6,74 @@
   flex: none;
 }
 
+/* ── The hero veil — #18, Photo-Dim's half of the white-on-white bug ────────
+   THE DEFECT. `.title` and `.prompt` float on the BARE stage — nothing between
+   the glyphs and the photograph but the stage's own scrim, and in dark tone
+   that scrim is at its weakest exactly where this hero sits. `themes.css`
+   `[data-frame="glass"][data-bg="photo"] .stage::after` starts its linear at
+   `rgba(12,16,26,0.12)` and its radial at `rgba(12,16,26,0)` out to 30% of
+   `120% 90% at 50% 8%`, so the top strip of the viewport is ~88% raw
+   photograph. Measured on /boards at 1440 in Photo-Dim, with the backdrop
+   photographed off the pixels the glyphs sit on and graded on the worst
+   percentile (docs/screenshots/lane-b-contrast/results-before-boards.json):
+
+     element                       worst   median   floor
+     .title  "Teach Boards"        2.81    5.28     3.0   (26px/700, WCAG-large)
+     .prompt "What do you want…"   4.01    8.41     4.5
+
+   The MEDIAN passes both. That is the signature of text on a photograph: the
+   backdrop under `.prompt` ranges from rgb(23,18,18) to rgb(168,114,94) across
+   its own box, so the string is comfortable over the dark half and unreadable
+   over the bright half. `diag-boards-photo-dim.png` shows it — the hero sits on
+   a child's blonde hair.
+
+   THIS IS THE EXACT MIRROR OF THE 1.00:1 BUG THE NOTE BELOW RECORDS. Commit
+   3121908 gave the LIGHT tone a stage veil and Photo-Bright now measures 11.49
+   and 6.00 on these same two elements. The dark tone never got the equivalent,
+   so the tone that was "already fine" was fine only on average.
+
+   WHY THE TEXT-SHADOW BELOW IS NOT THE FIX, THOUGH IT LOOKS LIKE ONE. `.prompt`
+   ALREADY carries a two-layer `var(--scrim)` halo and still measures 4.01. A
+   halo darkens the pixels immediately around a stroke; it cannot bound what the
+   photograph does across the whole glyph box, so it improves the median and
+   leaves the worst case where it was. Only a surface under the text bounds the
+   worst case. The halos stay — they sharpen the edge — but they are not load
+   -bearing any more.
+
+   WHY IT IS LOCAL RATHER THAN A STRONGER GLOBAL SCRIM. Raising the stage's own
+   0.12 top stop would fix this and every other top-of-viewport surface at once,
+   but it would darken the photograph app-wide in dark tone, and the cinematic
+   photo IS the Photo-Dim register. This veil is scoped to the one surface with
+   a measured defect and fades to nothing before the section ends, so nothing
+   below it changes.
+
+   TOKENS, TONE-BRANCHED, NO HARD-CODED COLOUR: `--scrim-soft` already inverts
+   with the tone (rgba(20,22,32,.32) light / rgba(5,5,10,.45) dark). Only the
+   DARK arm is painted — Photo-Bright's global veil already carries the light
+   arm, and stacking a second one there would wash the photo out. A background
+   rather than a pseudo-element, so it paints behind the section's content with
+   no z-index or stacking-context games; `.card` is opaque `--surface`, so the
+   part of the veil behind the two tiles is invisible either way.
+
+   IT IS ROUNDED AND IT FADES OUT, because the first version was neither and it
+   showed. `.chooser` is INSET from the viewport (the shell pads it), so a plain
+   full-bleed `linear-gradient` painted a hard rectangle with visible vertical
+   seams down both sides and a hard top edge across the photograph — see
+   `docs/screenshots/lane-b-contrast/boards-photo-dim-1440-after.png`, where the
+   scrim's left edge is legible at x≈64. Two things fix that and both are the
+   app's existing language rather than a new idea: the corners round (CLAUDE.md
+   §4 RULE #1 — no sharp corners, ever) and the fill fades to fully transparent
+   before the section ends, so the only edges left are curved or invisible. */
+:global([data-bg="photo"][data-tone="dark"]) .chooser {
+  border-radius: var(--r-2xl);
+  background: linear-gradient(
+    180deg,
+    var(--scrim-soft) 0%,
+    color-mix(in srgb, var(--scrim-soft) 55%, transparent) 48%,
+    transparent 88%
+  );
+}
+
 .title {
   margin: 0;
   font-size: var(--t-26);

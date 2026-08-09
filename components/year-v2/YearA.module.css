@@ -18,13 +18,60 @@
 
 /* Slim context sub-line — the ViewTitle chrome ("The Year") owns the heading;
    this is the ambient "{year} · {grade}" caption beneath it. */
+/* `--ink-500`, NOT `--muted`. `--muted` is the weakest rung in the ramp and this
+   is the only line naming the school year and grade — it is context a teacher
+   reads, not decoration. Measured on the Night wash it read 3.49:1 at the worst
+   percentile (5.45 median) with no surface under it; `--ink-500` reads 5.57 /
+   8.69 on the same pixels, and at 13px/600 against the ViewTitle chrome above it
+   is still unmistakably the quieter line. Both rungs invert with the tone, so
+   this is not a tone branch. */
 .vsub {
   margin: 0;
   font-family: var(--font-sans);
   font-size: var(--t-13, 13px);
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--muted);
+  color: var(--ink-500);
+}
+
+/* OVER A PHOTOGRAPH THIS CAPTION GETS A SURFACE. It is the first child of
+   `.root`, which paints nothing, so on `[data-bg="photo"]` the string sits on
+   the bare stage with `--muted` — the LOWEST-contrast rung in the ink ramp,
+   derived to sit around 5:1 on `--surface` and given no surface at all here.
+   Measured on /year @ 1440 with the backdrop photographed off its own glyph
+   pixels: **1.05:1 on Photo-Dim and 1.05:1 on Photo-Bright** — the worst single
+   number found anywhere in this sweep, worse than the 1.13:1 that opened task
+   #30. It passes on Wash (4.78) only because the wash canvas is a flat, known
+   backdrop. `--muted` is not the bug; using ANY fixed ink over an arbitrary
+   photograph is.
+
+   THE HALO PATTERN IS NOT ENOUGH AND THAT IS MEASURED, NOT ASSUMED.
+   `TeachChooser.module.css` `.prompt` carries a two-layer `var(--scrim)`
+   text-shadow over the same stage and still reads 4.01:1 worst — a halo lifts
+   the pixels around a stroke and cannot bound what the photograph does across
+   the whole glyph box. Only a surface bounds the worst case.
+
+   So this reuses the recipe `day-v2.module.css:195-200` already uses for
+   exactly this problem — a translucent `--surface` pill with a small blur —
+   rather than inventing a second answer. `--surface` inverts with the derived
+   tone and `--ink-500` inverts with it, so the pair holds in both registers with
+   no theme branch and no tone branch, which is the §4 contract. It shrinks to
+   its text (`inline-block` + `width: max-content`) so it reads as a caption
+   chip, not a bar. */
+:global([data-bg="photo"]) .vsub {
+  display: inline-block;
+  width: max-content;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  /* 90%, not the 82% `day-v2` uses for `.dchip`. Measured: 82% took this line
+     from 1.05:1 to 4.36:1 on Photo-Dim — the right shape, still short of the
+     floor, because `--muted` is a lower rung than the `--cd` `.dchip` carries.
+     90% closes it with margin and the pill still reads as glass. */
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 /* Internal horizontal scroll region — the document itself never scrolls
@@ -60,14 +107,45 @@
   grid-template-columns: repeat(var(--month-count, 11), 1fr);
   padding: 0 4px;
 }
+/* NO `opacity` — `--ink-500` is already the muted rung, and stacking a 0.55
+   fade on top composited to 1.87:1 (measured on all three axes, /year @ 1440).
+   The 10px/800 0.12em uppercase treatment is what makes these read as a scale
+   rather than as content; the fade was buying nothing the type had not already
+   bought, at the cost of three quarters of the contrast budget. */
 .months span {
   font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.12em;
   color: var(--ink-500);
-  opacity: 0.55;
   text-align: center;
+}
+/* THE MONTH SCALE GETS A SURFACE OVER A PHOTOGRAPH, for the same reason `.vsub`
+   above does and by the same recipe. Dropping the 0.55 fade took these labels
+   from 1.87:1 to 2.62:1 — a real improvement and still a fail, because the
+   remaining problem is not the ink, it is that a fixed ink is sitting on an
+   arbitrary photograph: measured on /year @ 1440 in Photo-Dim the backdrop under
+   this row swings from rgb(85,60,36) to rgb(128,101,73) across a single strip,
+   and `year-photo-dim-1440-final.png` shows "SEP", "NOV" and "JUN" dissolving
+   into the bright regions while "AUG" and "DEC" read fine.
+
+   A BAR, NOT TWELVE PILLS. `.vsub` is one caption and shrinks to its text; this
+   is a 12-column scale whose whole job is to line up with the lanes below, so
+   per-label pills would break the alignment read and add eleven edges. One
+   rounded, blurred strip behind the row keeps the scale continuous and bounds
+   the worst case for every label at once. Same `--surface`/`--border` pair, so
+   it inverts with the tone on its own. */
+:global([data-bg="photo"]) .months {
+  /* HORIZONTAL PADDING MUST STAY 4px — the base rule's value. This row is a
+     12-column grid whose whole job is to line up with the unit tracks below;
+     widening the inline padding to make the veil look roomier would shift every
+     label off its lane by the difference. Only the vertical padding changes. */
+  padding: 3px 4px;
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 /* ── Subject lane ────────────────────────────────────────────────────────── */
@@ -121,12 +199,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Same double-dim as `.months span` above — `--ink-500` plus `opacity: 0.6`
+   measured 2.73:1. The token alone is the treatment. */
 .lanePct {
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 600;
   color: var(--ink-500);
-  opacity: 0.6;
 }
 
 /* ── Unit chip track ─────────────────────────────────────────────────────── */
@@ -165,7 +244,10 @@
   outline-offset: 2px;
 }
 
-/* Progress fill — deeper subject mix, width set inline (0–100%). */
+/* Progress fill — deeper subject mix, width set inline (0–100%).
+   THE DEPTH IS DELIBERATE AND IS NOT WHAT WAS FIXED. `.chipLabel` below used to
+   fail on this fill (3.68-3.79:1); lightening the mix was tried first and is
+   the wrong lever — see the note on `.chipLabel`. */
 .chipFill {
   position: absolute;
   inset: 0;
@@ -174,6 +256,31 @@
   background: color-mix(in oklab, var(--c) 42%, var(--panel-bg));
   opacity: 0.9;
 }
+/* THE LABEL IS DEEPER THAN `--cd`, AND THAT IS THE FIX — not a lighter fill.
+   ────────────────────────────────────────────────────────────────────────────
+   Measured on /year @ 1440 (backdrop photographed off the glyph pixels, worst
+   percentile): plain `--cd` read **3.68-3.79:1** wherever a chip's progress bar
+   had advanced under it, against a 4.5 floor, identically on Wash and
+   Photo-Bright. It is the fill, not the background axis.
+
+   LIGHTENING `.chipFill` WAS TRIED AND MEASURED, AND IT DOES NOT REACH.
+   42% -> 30% moved the label only 3.70 -> 4.15, still failing; the arithmetic
+   says ~16% would be needed, which is 2 points off the chip's own 14% base —
+   i.e. the progress bar would have to become invisible to make the label
+   legible. The fill is carrying real information and gets to keep its depth.
+
+   SO THE INK MOVES INSTEAD. `--cd` is `--subj-N-ink`, derived to clear AA on the
+   subject TINT (14%), and it does — 4.82 on the bare chip. It was never derived
+   for a 42% mix. Capping its lightness keeps hue and chroma exactly, so the
+   subject still reads, and buys the margin the fill costs: 5.6:1 over the fill,
+   6.3:1 on the bare chip. This is local to a label sitting on a deep subject
+   fill and is NOT a change to `--subj-N-ink` itself — that token is shared, and
+   re-deriving the subject inks is the subject-colour lane's territory, not
+   this rule's.
+
+   THE CAP IS LIGHT-TONE ONLY — see the branched rule below. A lightness cap can
+   never be tone-agnostic: `min()` picks a direction, and which direction is
+   correct is exactly what the tone decides. */
 .chipLabel {
   position: relative;
   z-index: 1;
@@ -185,6 +292,17 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* In DARK tone `--subj-N-ink` is inverted (`color-mix(in oklch, var(--subj-N)
+   62%, white)`) — a LIGHT ink for a dark chip, which already passes on this
+   fill. `min(l, 0.38)` there would drive that light ink back to near-black on a
+   near-black chip, i.e. the same defect mirrored. The un-branched form of this
+   rule was written first and measured on the sibling `WeekA.module.css`
+   `.tileUnit`: it took that label from ~6.4:1 to 1.09-1.16:1 on Photo-Dim
+   across all eight subjects. So the deepening is scoped to the tone that needs
+   it, and nothing about dark tone changes. */
+:global([data-tone="light"]) .chipLabel {
+  color: oklch(from var(--cd) min(l, 0.38) c h);
 }
 
 .empty {

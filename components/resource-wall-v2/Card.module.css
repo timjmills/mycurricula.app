@@ -113,24 +113,36 @@
   height: 100%;
 }
 
-/* ── Type-keyed color (tokens only — mirrors the artboard's TT map) ──────── */
+/* ── Type-keyed color (tokens only — mirrors the artboard's TT map) ────────
+   EVERY CONSUMER OF `--kind-c` IS A `color:` — :82, :101 and :370, all text,
+   no fill. It was pointed at the SOLID rung of each family (`--subj-N` /
+   `--honey-500`), which is a fill colour: measured on /post @ 1440, the `.kind`
+   label ("DOC", 11px/700) read **3.31:1 on white** on Wash and Photo-Bright
+   alike — a component recipe, not the photo path. Each family already ships the
+   companion built for text-on-light (`--subj-N-ink`), and both rungs invert
+   with the derived tone, so this is a rename rather than a new colour: the hue
+   that identifies the resource type is unchanged, only its depth.
+
+   `--honey-700` is new (app/tokens.css) — the honey ramp stopped at 600, which
+   is still fill-weight and reads 3.03:1 as body text. Note and Link share it,
+   as they shared `--honey-500` before. */
 .card[data-kind="note"] {
-  --kind-c: var(--honey-500);
+  --kind-c: var(--honey-700);
 }
 .card[data-kind="worksheet"] {
-  --kind-c: var(--subj-10);
+  --kind-c: var(--subj-10-ink);
 }
 .card[data-kind="image"] {
-  --kind-c: var(--subj-13);
+  --kind-c: var(--subj-13-ink);
 }
 .card[data-kind="doc"] {
-  --kind-c: var(--subj-7);
+  --kind-c: var(--subj-7-ink);
 }
 .card[data-kind="video"] {
-  --kind-c: var(--subj-3);
+  --kind-c: var(--subj-3-ink);
 }
 .card[data-kind="link"] {
-  --kind-c: var(--honey-500);
+  --kind-c: var(--honey-700);
 }
 
 /* ── Note face ──────────────────────────────────────────────────────────── */

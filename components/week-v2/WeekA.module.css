@@ -77,18 +77,30 @@
   letter-spacing: -0.01em;
   color: var(--ink);
 }
+/* DOUBLE-DIMMED: this was `--ink-500` (already the muted rung of the ink ramp,
+   chosen to sit around 5:1) AND `opacity: 0.62` on top, which multiplies down
+   to 2.86:1 — measured on all three axes. The token is the whole treatment;
+   the fade was a second helping of the same idea and it is what broke AA. */
 .dayHeadSub {
   font-size: 11px;
   font-weight: 600;
   color: var(--ink-500);
-  opacity: 0.62;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* `--brand-700`, NOT `--brand-600`. `app/tokens.css`'s dark-tone block redefines
+   brand-50/100/200 and brand-700 and says so explicitly — "brand-500/600 (solid
+   CTAs) stay saturated" — so 600 is a FILL rung that does not invert, and using
+   it as text puts a mid-blue on the near-black dark-tone surface. Measured on
+   /weekly @ 1440 in Photo-Dim: this heading read 3.01:1 and the chip below
+   2.28:1, both against a 4.5 floor. 700 is the rung built for this: #2543b0 in
+   light tone (deeper than 600, so light tone improves too) and
+   `color-mix(#3b6cf6 45%, white)` in dark, i.e. it inverts on its own and needs
+   no tone branch here. */
 .dayHeadToday .dayHeadName {
-  color: var(--brand-600);
+  color: var(--brand-700);
 }
 /* "Today" chip — quiet brand label (matches the weekly surface). */
 .todayChip {
@@ -99,7 +111,7 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: var(--brand-600);
+  color: var(--brand-700);
   background: var(--brand-50);
   border: 1px solid var(--brand-100);
   border-radius: 999px;
@@ -194,8 +206,55 @@
 .tileSelected {
   box-shadow: 0 0 0 2px var(--brand-500);
 }
+/* A DONE TILE QUIETS ITS FILL, NOT ITS TEXT.
+   ────────────────────────────────────────────────────────────────────────────
+   THIS RULE WAS `opacity: 0.62` ON THE WHOLE TILE, and it was the single worst
+   legibility defect on this surface — worse than anything the colour recipes
+   do, and completely invisible to the probe that audited them.
+   `getComputedStyle(el).color` returns the declared ink regardless of any
+   ancestor's opacity, so a contrast probe that does not composite the ancestor
+   chain reads a done tile's text as if it were at full strength. Measured with
+   that chain composited (docs/screenshots/lane-b-contrast/results-before-14
+   .json, /weekly @ 1440, backdrop photographed off the glyph pixels, worst
+   percentile) — the same elements, both readings:
+
+     element                       TRUE   what an opacity-blind probe reads
+     .tileSubject ("Math")         1.79   4.66      ← 0.62 x its own 0.70
+     .tileSubject ("SEL")          1.81   4.64
+     UnitChip .name                2.29   4.29
+     .tileTitle                    2.38   4.66
+     .tileTitle ("Launching…")     3.10   7.34
+
+   All of them fail identically on Wash, Photo-Bright and Photo-Dim, because
+   this has nothing to do with the background axis. `.tileSubject` is the worst
+   because two fades MULTIPLY: 0.62 x 0.70 = 0.43, and at 0.43 a `--cd` ink over
+   a 26% subject tint is 1.79:1 — text you cannot read at all.
+
+   WHAT REPLACES IT, AND WHY THE SIGNAL IS NOT SIMPLY DROPPED. Checked against
+   `WeekA.tsx:434-500` before touching this: a WeekA tile renders NO other
+   done affordance — no StatusDot, no check, no pill. The fade was the ONLY
+   signal, so removing it without a replacement would have deleted the state,
+   not just recoloured it. (That is the difference between this and
+   `day-v2.module.css`'s `.dcTl` / `.dcStepMin` fades, which were pure emphasis
+   on top of type that already differentiated itself and could just go.)
+   So the signal moves from the TEXT to the SURFACE, which is where a state
+   belongs when the alternative is spending the text's contrast budget: the
+   subject tint drops from 26% to 10% of `--panel-bg` and the 3px subject stripe
+   desaturates to 45%, so a done tile visibly recedes from its neighbours in the
+   same column while its ink stays at full strength. Both values are mixes
+   toward `--panel-bg`, so the recession reads the same way in Night as in
+   light tone.
+
+   SPECIFICITY: this is (0,1,0) and so is `.tile` above, so SOURCE ORDER is what
+   makes it win — it must stay BELOW `.tile` in this file. (Repo memory
+   cp-root-button-reset-trap: a modifier written above its base is dead.)
+
+   NOTHING BELOW MAY REINTRODUCE A SUBTREE FADE HERE. If a future state needs
+   to recede, move the tint, the border or the weight — not `opacity` on an
+   element that contains text. */
 .tileDone {
-  opacity: 0.62;
+  background: color-mix(in oklab, var(--c) 10%, var(--panel-bg));
+  border-left-color: color-mix(in oklab, var(--c) 45%, var(--panel-bg));
 }
 .tileTitle {
   font-size: 13px;
@@ -204,11 +263,17 @@
   line-height: 1.2;
   color: var(--cd);
 }
+/* NO `opacity` HERE EITHER — it was 0.7, and on a done tile it multiplied with
+   the 0.62 above into 0.43 (see the note on `.tileDone`). The hierarchy this
+   fade was buying is already carried by four other axes: 10.5px against the
+   title's 13px, weight 600 against 700, and it sits below the title in reading
+   order. `--cd` at full strength on the tint measures 4.66-7.34 depending on
+   subject; at 0.7 alone it was 3.2-5.1, i.e. failing for the darker half of the
+   palette even on a tile that is NOT done. */
 .tileSubject {
   font-size: 10.5px;
   font-weight: 600;
   color: var(--cd);
-  opacity: 0.7;
 }
 
 /* The unit pop-in chip on a subject-TINTED tile. The ghost pill's neutral --ink
@@ -218,6 +283,9 @@
    hugging its label instead of stretching the full column width, and the mixes
    go toward `transparent` so the tile's tint shows through rather than being
    overpainted. Tripled for the same order-independence reason as the base. */
+/* The base keeps plain `--cd` for BOTH tones; the light tone's deepening is the
+   separate branched rule below, and the note there explains why it cannot live
+   on this rule. */
 .tileUnit.tileUnit.tileUnit {
   align-self: flex-start;
   margin-top: 2px;
@@ -225,6 +293,33 @@
   border-color: color-mix(in oklab, var(--cd) 34%, transparent);
   color: var(--cd);
 }
+/* THE DEEPENING IS LIGHT-TONE ONLY, AND THE BRANCH IS THE WHOLE POINT.
+   ────────────────────────────────────────────────────────────────────────────
+   In LIGHT tone `--cd` (= `--subj-N-ink`) is a dark ink derived to clear AA on
+   the subject TINT; this chip stacks a 12% `--cd` fill ON TOP of the tile's own
+   26% tint, and on that double mix the label measured 4.24-4.36:1 against a 4.5
+   floor. Capping its lightness keeps hue and chroma — the chip still reads as
+   this subject's — and takes it to ~6.5:1.
+
+   IN DARK TONE `--subj-N-ink` IS INVERTED: `color-mix(in oklch, var(--subj-N)
+   62%, white)`, i.e. a LIGHT ink for a dark tile. `min(l, 0.38)` there would
+   force that light ink back down to near-black on a near-black tile, which is
+   the same defect in the opposite direction. It is not hypothetical — the
+   un-branched version of this rule was written first and measured, and it took
+   `UnitChip .name` on Photo-Dim from a passing ~6.4:1 to **1.09-1.16:1** across
+   all eight subjects. Dark tone needs no help here (it already passes on plain
+   `--cd`), so it simply does not get the cap.
+
+   This is CLAUDE.md §4's "branch on data-tone, never the theme" in its literal
+   form, and the reason a lightness CAP can never be tone-agnostic: `min()` and
+   `max()` pick a direction, and the direction is what the tone decides. */
+:global([data-tone="light"]) .tileUnit.tileUnit.tileUnit,
+:global([data-tone="light"]) .tileUnit.tileUnit.tileUnit:hover:not(:disabled) {
+  color: oklch(from var(--cd) min(l, 0.38) c h);
+}
+/* Hover deepens the fill further; the light-tone rule above covers it in the
+   same selector list so restating plain `--cd` below cannot hand the contrast
+   back. */
 .tileUnit.tileUnit.tileUnit:hover:not(:disabled) {
   background: color-mix(in oklab, var(--cd) 22%, transparent);
   border-color: color-mix(in oklab, var(--cd) 55%, transparent);
@@ -324,13 +419,17 @@
   color: var(--cd);
 }
 
+/* Same call as `.tileSubject` and `.dayHeadSub` above: the fade is dropped and
+   the quiet is bought with type instead. 9.5px/700 UPPERCASE at 0.04em against
+   an 11.5px/400 sentence-case body row is four axes of differentiation before
+   opacity is considered, and at 0.62 this label composited to 2.8-3.5:1 on a
+   tinted tile. */
 .tileBodyLabel {
   display: block;
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  opacity: 0.62;
 }
 
 .tileBodyEmpty {

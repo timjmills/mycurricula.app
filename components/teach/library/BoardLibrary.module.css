@@ -67,10 +67,26 @@
   outline-offset: 1px;
 }
 
+/* THIS ONE NEEDS A TONE BRANCH, AND IT NEEDS IT IN THE OPPOSITE DIRECTION TO
+   `.navItemActive` ABOVE. Both were `--wf-blue-accent`, but they sit on
+   different backgrounds and so they fail differently:
+     • `.navItemActive` is on `--wf-blue-soft`, a tone-FIXED pale blue — the same
+       pair in both tones, so a single deeper ink (`--wf-blue-ink`) fixes both.
+     • `.segmentActive` is on `--paper`, which INVERTS with the tone. In light
+       tone `--wf-blue-accent` on near-white measures fine; in dark tone the same
+       blue lands on `rgb(30,29,44)` and reads **3.44:1** (measured on /boards @
+       1440, Photo-Dim). Making it darker there would make it worse.
+   So the base keeps the accent and dark tone gets a LIGHTER rung. `--brand-400`
+   is already the light-tone-safe brand blue the rest of the dark register uses
+   (WeekA's "now" ring, for one) and it clears on `--paper` in dark tone.
+   Deriving the branch from the surface, not the theme, is CLAUDE.md §4. */
 .segmentActive.segmentActive {
   background: var(--paper);
   color: var(--wf-blue-accent);
   box-shadow: var(--wf-shadow-inner);
+}
+:global([data-tone="dark"]) .segmentActive.segmentActive {
+  color: var(--brand-400);
 }
 
 .searchRow {
@@ -303,9 +319,16 @@
   color: var(--ink-400);
 }
 
+/* THE LABEL TAKES THE INK RUNG, THE ICON KEEPS THE ACCENT. `--wf-blue-accent`
+   on `--wf-blue-soft` measured 3.84:1 at 14px/700 — identically on Wash,
+   Photo-Bright and Photo-Dim, so it is this pair and not the background axis.
+   `--wf-blue-ink` is the same blue at 6.04:1 on the same fill. The icon stays on
+   `-accent` deliberately: it is a non-text component graded against WCAG
+   1.4.11's 3:1 floor, which `-accent` clears at 3.84, and keeping it brighter
+   than the label preserves the active row's read. */
 .navItemActive.navItemActive {
   background: var(--wf-blue-soft);
-  color: var(--wf-blue-accent);
+  color: var(--wf-blue-ink);
   font-weight: 700;
 }
 
@@ -408,8 +431,15 @@
   margin-left: auto;
 }
 
+/* `--ink-500`, NOT `--ink-400` — the same call `.segment` above made, for the
+   same reason and now with a measurement behind it. `--ink-400` cleared at 1440
+   but read **4.38:1 at 375** on Wash (backdrop rgb(243,234,249)), i.e. it fails
+   AA on the phone tier, and CLAUDE.md §4 makes the responsive tiers a hard
+   contract rather than a desktop-first one. This is a control label on a row
+   that still sits on the bare stage (see the note below), which is the least
+   forgiving place in the app for the muted rung. */
 .sortLabel {
-  color: var(--ink-400);
+  color: var(--ink-500);
   font-size: var(--t-13);
   font-weight: 600;
   white-space: nowrap;

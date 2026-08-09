@@ -170,6 +170,14 @@
   --honey-400: #f4b740; /* default */
   --honey-500: #e9a526;
   --honey-600: #c9871a;
+  /* The INK rung. honey-600 is the deepest amber the ramp had, and it is still
+     a FILL-weight colour: measured as 11px/700 text it reads 3.03:1 on white
+     and 2.85:1 on --honey-50, i.e. it fails AA wherever it is used as body-size
+     text (`WeeklyGrid .currentTag`, `resource-wall Card .kind` for the note/link
+     kinds). 700 exists so those callsites have somewhere to go: 5.08:1 on white
+     and 4.78:1 on --honey-50, while still reading unmistakably as the amber.
+     Use 600 for large/heavy display text and 700 for anything body-sized. */
+  --honey-700: #96631a;
 
   /* Tooltip surface — richer-than-ink-900 near-black + light text. The
      Tooltip primitive uses these instead of --ink-900 / --paper so we
@@ -813,6 +821,13 @@
   --wf-blue-chip: #c1d9fb;
   --wf-blue-accent: #2e6be6;
   --wf-blue-soft: #d8e7fd;
+  /* The INK rung of this family. `-accent` is a FILL/stroke colour and fails as
+     body text on its own `-soft` companion: measured 3.84:1 for the Board
+     Library's active nav item (`--wf-blue-accent` on `--wf-blue-soft`, 14px/700)
+     on every axis. `-ink` is the same blue taken deep enough to be read: 6.04:1
+     on `-soft` and 7.56:1 on white. Use `-accent` for fills, icons, rings and
+     large display type; `-ink` for anything body-sized on a tinted fill. */
+  --wf-blue-ink: #1e4fae;
   --wf-blue-line: #cfe0fb;
   --wf-blue-grad: linear-gradient(165deg, #f6faff 0%, #e4edfe 100%);
   /* Neutral theme options (appearance editor): slate / cloud(white) / dark(night) */
@@ -1806,6 +1821,15 @@
     --honey-50: color-mix(in srgb, #e9a526 14%, #1e1d2c);
     --honey-100: color-mix(in srgb, #e9a526 26%, #1e1d2c);
     --honey-600: color-mix(in srgb, #e9a526 60%, white);
+    /* 700 MUST be lifted toward white here, exactly as 600 is — the light-tone
+       #96631a is a near-black amber and would be the mirror of the bug this
+       rung was added to fix. Note what "deeper" means once both are lifted: 700
+       keeps MORE of the amber (74% vs 600's 60%) and is therefore slightly
+       DARKER than 600 in this register, not lighter. That inverts the light-tone
+       ordering and it is correct — on a dark surface the pair is ranked by how
+       much colour survives, not by lightness. Both clear comfortably: measured
+       on `--surface` (#1e1d2c), 600 = 10.59:1 and 700 = 9.49:1. */
+    --honey-700: color-mix(in srgb, #e9a526 74%, white);
 
     /* Subject tint/ink recipes — mix toward the dark surface so fills sit on
        night without glowing, and lift ink toward white for AA on the dark

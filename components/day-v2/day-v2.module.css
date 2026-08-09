@@ -629,14 +629,53 @@
    MATERIAL: the fill becomes translucent, a real backdrop blur picks up the
    photograph, and the lit top edge every glass surface in this system carries
    appears.
-   THE FILL STAYS NEAR-OPAQUE ON PURPOSE (86%/80%, not the 50-60% themes.css
+   THE FILL STAYS NEAR-OPAQUE ON PURPOSE (93%/90%, not the 50-60% themes.css
    uses for neutral chrome). This card's header records two commits spent on
    text that sat on a stage photo with no surface of its own; a genuinely sheer
    card would put the objective and the flow chips back on an arbitrary
-   photograph, where no fixed recipe can hold a contrast floor. At this opacity
-   the blur has plenty to work with visually while the worst case the backdrop
-   can do is bounded — and it IS measured, in photo-bright, the brightest
-   backdrop the app can put behind it.
+   photograph, where no fixed recipe can hold a contrast floor.
+   ────────────────────────────────────────────────────────────────────────────
+   THIS USED TO BE 86%/80%, AND THE NOTE HERE USED TO CLAIM "the worst case the
+   backdrop can do is bounded — and it IS measured, in photo-bright, the
+   brightest backdrop the app can put behind it." BOTH HALVES WERE WRONG, and
+   the correction is the reason for the numbers above.
+
+     • WASH, NOT PHOTO-BRIGHT, IS THE BINDING BACKDROP. Measured on this card
+       at 1440 on the `sel` subject, with the element's cumulative opacity
+       composited into the foreground and the backdrop photographed off the
+       pixels the glyphs sit on: `.dobj` read **4.55:1 on Wash** against
+       **4.63:1 on Photo-Bright**. The case the old note named as the worst is
+       not the worst; the case it never measured is. (It is not a coincidence —
+       glass over Wash gets a `rgba(255,255,255,.1)` stage veil and nothing
+       else, while glass over Photo-Bright gets the much heavier light-tone
+       veil from `themes.css`, so Photo-Bright arrives at this card LIGHTER
+       overall but Wash arrives FLATTER and brighter exactly where the card
+       sits.)
+     • "BOUNDED" OVERSTATED WHAT 86%/80% BOUGHT. The bound it actually reached
+       was 4.55:1 — the AA floor itself, at 1.01x. That is a number with no
+       room for a photo phase, a subject-hue tweak, or a viewport change, and
+       three separate elements sat on it.
+
+   THE LADDER, same page and same glyph pixels, `sel` @ 1440, worst percentile
+   of `.dobj` / `.dunChip` (docs/screenshots/lane-b-contrast/results-ladder-sel
+   .json):
+
+     top/bottom alpha    Wash          Photo-Bright
+     0.86 / 0.80 (was)   4.55  1.01x   4.63  1.03x
+     0.90 / 0.86         4.98  1.11x   5.11  1.14x
+     0.93 / 0.90 (now)   5.37  1.19x   5.44  1.21x
+     0.96 / 0.93         5.78          5.87
+     1.00 / 1.00         6.42          6.42   ← this is Frame C, not glass
+
+   93/90 is the rung that buys a real margin while the surface is still GLASS
+   and still reads as glass: 7-10% of the backdrop composites through (enough
+   to move the fill from (36,99,89) opaque to (54,112,103) here, a visible
+   shift), the `backdrop-filter: blur(22px) saturate(1.25)` still has that
+   backdrop to sample, and the lit top edge below is untouched. It also stays
+   clearly short of 1.0 — going opaque would make Frame A render identically to
+   the colour-forward card, which is the exact "DISTINCT CARD MATERIALS: 1/3"
+   defect the FRAME RESPONSE block below exists to fix.
+   ────────────────────────────────────────────────────────────────────────────
    Safe to make this a stacking context: the two overlays that escape this card
    both leave the subtree anyway — Tooltip portals to document.body
    (components/ui/Tooltip.tsx:923) and UnitChip opens the global workspace host,
@@ -646,19 +685,19 @@
     150deg,
     color-mix(
       in srgb,
-      color-mix(in oklab, var(--c) 58%, black) 86%,
+      color-mix(in oklab, var(--c) 58%, black) 93%,
       transparent
     ),
     color-mix(
       in srgb,
-      color-mix(in oklab, var(--c) 40%, black) 80%,
+      color-mix(in oklab, var(--c) 40%, black) 90%,
       transparent
     )
   );
   background: linear-gradient(
     150deg,
-    oklch(from var(--c) min(l, 0.4) c h / 0.86),
-    oklch(from var(--c) min(l, 0.3) c h / 0.8)
+    oklch(from var(--c) min(l, 0.4) c h / 0.93),
+    oklch(from var(--c) min(l, 0.3) c h / 0.9)
   );
   -webkit-backdrop-filter: blur(22px) saturate(1.25);
   backdrop-filter: blur(22px) saturate(1.25);
@@ -842,21 +881,27 @@
    independent axes of differentiation before opacity is considered. The fade
    was spending the contrast budget on a distinction the type had already made.
 
-   THE BINDING CONSTRAINT HAS MOVED, AND IT IS WORTH KNOWING WHERE TO.
-   The `.vcDetail` note above names this eyebrow as the element that binds the
-   card, and at 0.82 it was. At 1.0 it clears by 1.02× (4.61 on `sel` in wash)
-   and the new floor of the card is `.dobj` — the learning-target text itself —
-   at 4.50 and 4.51 in wash and photo-bright, i.e. EXACTLY the AA threshold
-   with no margin at all. That is not this rule's to fix and it was not
-   touched here: `.dobj` is already at 0.98, so there is no fade left to
-   remove, and the remaining ~1.25× that the two light backdrops cost comes
-   from the FRAME — Frame A renders this card at 0.86/0.80 alpha, so a light
-   backdrop shows through and lifts the surface the white text sits on. On the
-   opaque colour-forward card the same elements measure 5.9–7.4. Raising the
-   glass alpha is the change that would restore real headroom to all seven text
-   elements at once; it is a deliberate material decision about the app's
-   signature surface, not a contrast tweak, and it is recorded here rather than
-   made in passing. */
+   THE BINDING CONSTRAINT MOVED TWICE, AND BOTH MOVES ARE NOW SPENT.
+   The `.vcDetail` note above named this eyebrow as the element that bound the
+   card, and at 0.82 it was. Removing the fade moved the floor to `.dobj` — the
+   learning-target text itself — at 4.50/4.51 in wash and photo-bright, i.e.
+   EXACTLY the AA threshold with no margin, and `.dobj` is already at 0.98 so
+   there was no fade left to remove. The remaining ~1.25x came from the FRAME,
+   not from any element: Frame A rendered this card at 0.86/0.80 alpha, so a
+   light backdrop showed through and lifted the surface the white text sits on.
+
+   THAT FRAME CHANGE HAS NOW BEEN MADE — `.vcDetail`'s glass fill is 0.93/0.90,
+   with the ladder and the reasoning in the `[data-frame="glass"] .vcDetail`
+   note. It lifted every element on this card at once rather than one rule at a
+   time: re-measured on the same subject and width, `.dobj` reads 5.37 on Wash
+   and 5.44 on Photo-Bright, and this eyebrow 5.52 / 5.59. The `1.0` column of
+   the ladder above is Frame C's opaque card, which is why those elements
+   measured 5.9-7.4 there all along.
+
+   ONE CORRECTION TO CARRY FORWARD: the worst light backdrop for this card is
+   WASH, not photo-bright. Every earlier note here (and the `.vcDetail` one)
+   assumed photo-bright because it is the brightest STAGE; the card's own
+   composite says otherwise, by ~0.08 consistently. Measure both. */
 .dcTl {
   display: block;
   font-size: 11px;
