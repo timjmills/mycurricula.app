@@ -35,7 +35,7 @@
 //   — identical to lib/use-school-week.ts and lib/tooltip-dismissal.ts. The
 //   server never reaches localStorage, so there is no hydration mismatch.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SubjectId } from "@/lib/types";
 import { SUBJECTS } from "@/lib/mock";
 
@@ -157,6 +157,27 @@ function writeStoredOrder(
   }
 }
 
+// ── Scope-stamped state ──────────────────────────────────────────────────────
+
+/**
+ * An order TOGETHER WITH the storage key it was read under.
+ *
+ * Namespacing the key is not enough on its own: React state survives a scope
+ * change, so between the render that resolves the new grade's key and the
+ * passive effect that loads it, the hook holds the PREVIOUS grade's order
+ * under the NEW grade's key. A `move()` in that window used to read the
+ * previous grade's arrangement and persist it under this one — the same
+ * cross-scope leak the namespacing was introduced to stop, re-entering
+ * through the switch rather than through the key. The stamp is what makes
+ * that window detectable; a bare array cannot say which grade it is from.
+ */
+interface LoadedOrder {
+  /** The key `order` was read under. `null` before the first load (SSR + the
+   *  first client paint), which matches no scope and so reads as canonical. */
+  storageKey: string | null;
+  order: SubjectId[];
+}
+
 // ── Public surface ───────────────────────────────────────────────────────────
 
 /** State + actions returned by `useSubjectOrder`. */
@@ -230,12 +251,36 @@ export function useSubjectOrder(
     [catalogJoinKey],
   );
 
-  // SSR-safe: start at the canonical order. The saved order (if any) is read
-  // post-mount in the effect below and applied with a re-render, so the server
-  // HTML and the first client paint agree (no hydration mismatch).
-  const [order, setOrderState] = useState<SubjectId[]>(() =>
-    reconcileOrder(stableCatalog, stableCatalog),
+  // The canonical order for THIS catalog — the SSR value, and the fallback
+  // whenever the loaded order belongs to a different scope (see the key-bound
+  // read at the end of the hook).
+  const canonical = useMemo(
+    () => reconcileOrder(stableCatalog, stableCatalog),
+    [stableCatalog],
   );
+
+  // SSR-safe: start at the canonical order, stamped with no scope. The saved
+  // order (if any) is read post-mount in the effect below and applied with a
+  // re-render, so the server HTML and the first client paint agree (no
+  // hydration mismatch).
+  const [loaded, setLoaded] = useState<LoadedOrder>(() => ({
+    storageKey: null,
+    order: canonical,
+  }));
+  // Latest-value ref so the callbacks below can read-modify-write without
+  // re-creating themselves per render, and WITHOUT reading state from inside a
+  // setState updater — see `move`.
+  const latestRef = useRef<LoadedOrder>(loaded);
+
+  /** Apply an order to this instance (state + ref), STAMPED with the key it
+   *  was read under. */
+  const apply = useCallback((key: string, next: SubjectId[]): void => {
+    const held = latestRef.current;
+    if (held.storageKey === key && held.order === next) return;
+    const value: LoadedOrder = { storageKey: key, order: next };
+    latestRef.current = value;
+    setLoaded(value);
+  }, []);
 
   // Post-mount: hydrate from localStorage. Re-runs if the catalog OR the
   // storage key (grade scope) changes, so switching grade re-reads that grade's
@@ -244,23 +289,33 @@ export function useSubjectOrder(
     const stored = readRawStoredOrder(storageKey);
     // Single reconciliation point — against the LIVE catalog, so a saved order
     // is normalized to whatever subject set this grade actually has.
-    setOrderState(reconcileOrder(stored, stableCatalog));
-  }, [stableCatalog, storageKey]);
+    apply(storageKey, reconcileOrder(stored, stableCatalog));
+  }, [apply, stableCatalog, storageKey]);
 
   // Cross-tab sync — a reorder in another /weekly tab reflects here. The
   // `storage` event fires only on OTHER tabs (not the writer), matching the
   // pattern in use-school-week.ts / tooltip-dismissal.ts.
+  //
+  // NO SAME-TAB CHANNEL, deliberately — not an omission. Both TEAM hooks in
+  // lib/use-subject-settings.ts carry one because Settings → Subjects mounts
+  // several instances at once and they must agree without a reload. This
+  // PERSONAL key has two consumers, WeeklyGrid and WeekC, which are
+  // alternative Week canvases: one or the other renders, never both. Add a
+  // channel here the day that stops being true (a second live consumer, or a
+  // reorder control outside the canvas) — until then it would be moving parts
+  // with nothing to synchronise.
   useEffect(() => {
     if (typeof window === "undefined") return;
     function handler(e: StorageEvent): void {
       if (e.key !== storageKey) return;
       if (e.newValue == null) {
-        setOrderState(reconcileOrder(null, stableCatalog));
+        apply(storageKey, reconcileOrder(null, stableCatalog));
         return;
       }
       try {
         const parsed: unknown = JSON.parse(e.newValue);
-        setOrderState(
+        apply(
+          storageKey,
           reconcileOrder(Array.isArray(parsed) ? parsed : null, stableCatalog),
         );
       } catch {
@@ -269,36 +324,89 @@ export function useSubjectOrder(
     }
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
-  }, [stableCatalog, storageKey]);
+  }, [apply, stableCatalog, storageKey]);
 
   const setOrder = useCallback(
     (next: readonly SubjectId[]): void => {
+      // Safe against the switch window by construction: the ids come from the
+      // caller, not from this hook's state, so there is nothing stale to read.
       const reconciled = reconcileOrder(next, stableCatalog);
-      setOrderState(reconciled);
+      apply(storageKey, reconciled);
       writeStoredOrder(storageKey, reconciled);
     },
-    [stableCatalog, storageKey],
+    [apply, stableCatalog, storageKey],
   );
 
   const move = useCallback(
     (id: SubjectId, dir: MoveDirection): void => {
-      setOrderState((prev) => {
-        const idx = prev.indexOf(id);
-        if (idx === -1) return prev;
-        const target = dir === "up" ? idx - 1 : idx + 1;
-        // No-op at the ends — nothing to swap with.
-        if (target < 0 || target >= prev.length) return prev;
-        const nextOrder = [...prev];
-        // Swap the two adjacent entries.
-        [nextOrder[idx], nextOrder[target]] = [
-          nextOrder[target],
-          nextOrder[idx],
-        ];
-        writeStoredOrder(storageKey, nextOrder);
-        return nextOrder;
-      });
+      // TWO defects used to live in this callback, and they are independent.
+      //
+      // 1. STALE SCOPE. It read `prev` from state, which in the switch window
+      //    is the PREVIOUS grade's order, and wrote it under the new grade's
+      //    key. The stamp below is the guard: when the held order belongs to
+      //    another scope, re-read this scope's own saved order instead.
+      // 2. IMPURE WRITE. The whole body ran inside a `setOrderState(prev =>
+      //    …)` updater with `writeStoredOrder` called from within it. Updaters
+      //    must be pure — React may invoke one more than once for a single
+      //    dispatch (StrictMode double-invokes them in development, which is
+      //    exactly what this repo's tests run under), so one keypress issued
+      //    two localStorage writes. Reading through the ref and applying
+      //    afterwards keeps the write in event-handler context, where it
+      //    happens once.
+      // 3. STALE CATALOG — a SECOND axis on the same window. The stamp says
+      //    which KEY the held order came from, not which CATALOG it was
+      //    reconciled against, so when the catalog changes without the key
+      //    changing (a subject added to or removed from the roster) the held
+      //    order is a permutation of the OLD catalog until the effect re-runs.
+      //    Moving from it persists an order that omits a new subject or
+      //    retains a removed one. Reconciling here rather than adding a second
+      //    stamp keeps ONE source of truth: `reconcileOrder` is already the
+      //    normalizer, and it is idempotent, so this costs nothing when the
+      //    catalog has not moved. (Self-healing, so severity is lower than it
+      //    reads: the next read re-appends a missing subject. But the persisted
+      //    value is briefly wrong and the teacher's chosen position for it is
+      //    lost, so it is still a bug.)
+      const held = latestRef.current;
+      const base =
+        held.storageKey === storageKey
+          ? held.order
+          : readRawStoredOrder(storageKey);
+      const prev = reconcileOrder(base, stableCatalog);
+
+      const idx = prev.indexOf(id);
+      if (idx === -1) return;
+      const target = dir === "up" ? idx - 1 : idx + 1;
+      // No-op at the ends — nothing to swap with, and nothing to persist.
+      if (target < 0 || target >= prev.length) return;
+
+      const nextOrder = [...prev];
+      // Swap the two adjacent entries.
+      [nextOrder[idx], nextOrder[target]] = [nextOrder[target], nextOrder[idx]];
+
+      apply(storageKey, nextOrder);
+      writeStoredOrder(storageKey, nextOrder);
     },
-    [storageKey],
+    [apply, stableCatalog, storageKey],
+  );
+
+  // KEY-BOUND READ. Between the render that resolves a new grade's key and the
+  // passive effect that loads it, `loaded` still holds the previous grade's
+  // arrangement — one paint in which the rows would otherwise be ordered by a
+  // grade the teacher is no longer looking at. The canonical order is the
+  // honest value for that frame.
+  //
+  // Reconciled for the same reason `move` reconciles: the stamp tracks the KEY
+  // but not the CATALOG, so a catalog change with an unchanged key would
+  // otherwise render a permutation of the old roster. Memoized so the returned
+  // identity is stable across renders — `useVisibleSubjects` and the grid keep
+  // `order` in dependency arrays, and a fresh array per render would churn
+  // every one of them.
+  const order = useMemo(
+    () =>
+      loaded.storageKey === storageKey
+        ? reconcileOrder(loaded.order, stableCatalog)
+        : canonical,
+    [loaded, storageKey, stableCatalog, canonical],
   );
 
   return { order, setOrder, move };

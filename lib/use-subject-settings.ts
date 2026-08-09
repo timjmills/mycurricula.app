@@ -544,7 +544,7 @@ export function useSubjectOverrides(): {
       // by this key. Closing it means a revision/compare-and-retry scheme
       // applied across ALL the team and personal hooks at once — smuggling it
       // into one key would leave the others racing while implying they are
-      // safe. Tracked with the team-key scoping sweep.
+      // safe. Tracked with the team-key scoping sweep (task #25).
       const prev =
         held.storageKey === storageKey
           ? held.map
@@ -991,6 +991,19 @@ const orderChannel = createSameTabChannel<{
   next: SubjectId[];
 }>();
 
+/**
+ * An order TOGETHER WITH the key it was read under — the same stamp
+ * `LoadedOverrides` carries, and for the same reason. React state survives a
+ * notebook switch, so without it the hook holds the PREVIOUS notebook's
+ * arrangement under the NEW notebook's key for one paint, and a `moveSubject`
+ * in that window persists the previous notebook's order under this one.
+ */
+interface LoadedTeamOrder {
+  /** The key `order` was read under. `null` before the first load. */
+  storageKey: string | null;
+  order: SubjectId[];
+}
+
 export type { MoveDirection };
 
 /**
@@ -1208,15 +1221,29 @@ export function useTeamSubjectOrder(options: UseTeamSubjectOrderOptions = {}): {
     [catalogJoinKey],
   );
 
-  // SSR-safe default — the catalog order.
-  const [order, setOrderState] = useState<SubjectId[]>(() =>
-    normalizeSubjectOrder(null, stableCatalog),
+  // The canonical order for THIS catalog — the SSR value, and the fallback
+  // whenever the loaded order belongs to another scope (see the key-bound read
+  // at the end of the hook).
+  const canonical = useMemo(
+    () => normalizeSubjectOrder(null, stableCatalog),
+    [stableCatalog],
   );
-  const latestRef = useRef<SubjectId[]>(order);
 
-  const apply = useCallback((next: SubjectId[]): void => {
-    latestRef.current = next;
-    setOrderState(next);
+  // SSR-safe default — the catalog order, stamped with no scope.
+  const [loaded, setLoaded] = useState<LoadedTeamOrder>(() => ({
+    storageKey: null,
+    order: canonical,
+  }));
+  const latestRef = useRef<LoadedTeamOrder>(loaded);
+
+  /** Apply an order to this instance, STAMPED with the key it was read
+   *  under — the stamp is what makes a stale-scope read detectable. */
+  const apply = useCallback((key: string, next: SubjectId[]): void => {
+    const held = latestRef.current;
+    if (held.storageKey === key && held.order === next) return;
+    const value: LoadedTeamOrder = { storageKey: key, order: next };
+    latestRef.current = value;
+    setLoaded(value);
   }, []);
 
   // Post-mount (and on scope/catalog change): sync from localStorage.
@@ -1235,14 +1262,14 @@ export function useTeamSubjectOrder(options: UseTeamSubjectOrderOptions = {}): {
   // lost (the write precedes the delete), and no second notebook can inherit
   // it. Deleting is what makes this a migration rather than a shared default.
   useEffect(() => {
-    apply(loadTeamSubjectOrder(storageKey, stableCatalog));
+    apply(storageKey, loadTeamSubjectOrder(storageKey, stableCatalog));
   }, [apply, storageKey, stableCatalog]);
 
   // Same-tab sync — KEYED: apply only writes to this instance's scope.
   useEffect(
     () =>
       orderChannel.subscribe((msg) => {
-        if (msg.storageKey === storageKey) apply(msg.next);
+        if (msg.storageKey === storageKey) apply(storageKey, msg.next);
       }),
     [apply, storageKey],
   );
@@ -1253,12 +1280,12 @@ export function useTeamSubjectOrder(options: UseTeamSubjectOrderOptions = {}): {
     const handler = (e: StorageEvent): void => {
       if (e.key !== storageKey) return;
       if (e.newValue == null) {
-        apply(normalizeSubjectOrder(null, stableCatalog));
+        apply(storageKey, normalizeSubjectOrder(null, stableCatalog));
         return;
       }
       try {
         const parsed: unknown = JSON.parse(e.newValue);
-        apply(normalizeSubjectOrder(parsed, stableCatalog));
+        apply(storageKey, normalizeSubjectOrder(parsed, stableCatalog));
       } catch {
         // Ignore malformed values; keep current state.
       }
@@ -1271,7 +1298,7 @@ export function useTeamSubjectOrder(options: UseTeamSubjectOrderOptions = {}): {
   const commit = useCallback(
     (ids: readonly SubjectId[]): SubjectId[] => {
       const next = normalizeSubjectOrder(ids, stableCatalog);
-      apply(next);
+      apply(storageKey, next);
       writeOrderToStorage(storageKey, next);
       orderChannel.emit({ storageKey, next });
       return next;
@@ -1281,6 +1308,8 @@ export function useTeamSubjectOrder(options: UseTeamSubjectOrderOptions = {}): {
 
   const setOrder = useCallback(
     (ids: readonly SubjectId[]): void => {
+      // Safe against the switch window by construction — the ids come from the
+      // caller, not from this hook's state.
       commit(ids);
     },
     [commit],
@@ -1292,13 +1321,42 @@ export function useTeamSubjectOrder(options: UseTeamSubjectOrderOptions = {}): {
       dir: MoveDirection,
       among?: readonly SubjectId[],
     ): boolean => {
-      const prev = latestRef.current;
+      // NEVER move relative to an order loaded under another key. In the
+      // switch window `held` is still the PREVIOUS notebook's arrangement, and
+      // committing a move derived from it would persist that notebook's order
+      // under this one. Re-read this scope's own saved order instead.
+      //
+      // And normalize against the LIVE catalog: the stamp records which KEY
+      // the held order came from, not which CATALOG it was reconciled against,
+      // so a notebook whose roster changes without its id changing holds a
+      // permutation of the old catalog until the effect re-runs. Same fix as
+      // lib/subject-order.ts `move` — reconcile rather than add a second stamp
+      // that can drift from the first. (`loadTeamSubjectOrder` already
+      // normalizes, so only the held branch needs it.)
+      const held = latestRef.current;
+      const prev =
+        held.storageKey === storageKey
+          ? normalizeSubjectOrder(held.order, stableCatalog)
+          : loadTeamSubjectOrder(storageKey, stableCatalog);
       const next = moveSubjectInOrder(prev, id, dir, among);
       if (next === prev) return false; // boundary / unknown id — no write
       commit(next);
       return true;
     },
-    [commit],
+    [commit, stableCatalog, storageKey],
+  );
+
+  // KEY-BOUND READ — same rule as useSubjectOverrides. Until this scope's own
+  // order has loaded, report the canonical arrangement rather than the
+  // previous notebook's. Normalized against the live catalog for the catalog
+  // axis (see `moveSubject`), and memoized so the identity is stable —
+  // `useVisibleSubjects` keeps `order` in a dependency array.
+  const order = useMemo(
+    () =>
+      loaded.storageKey === storageKey
+        ? normalizeSubjectOrder(loaded.order, stableCatalog)
+        : canonical,
+    [loaded, storageKey, stableCatalog, canonical],
   );
 
   return { order, catalog: stableCatalog, setOrder, moveSubject };
