@@ -1252,12 +1252,17 @@ Ordered by (visible improvement ÷ risk). Every value is an existing token.
 
 **Follow-up observations, deliberately not pursued:**
 
-- **The subject→slot map in `app/tokens.css:247-285` disagrees with CLAUDE.md §4
+- ~~**The subject→slot map in `app/tokens.css:247-285` disagrees with CLAUDE.md §4
   and BUILD_STANDARD §7 for four subjects** — *writing* is `--subj-2` (docs say
   `--subj-5`), *spelling* `--subj-5` (docs: `--subj-9`), *ufli* `--subj-3`
-  (docs: `--subj-2`), *sel* `--subj-9` (docs: `--subj-12`). Out of scope here,
-  but a doc-vs-code drift on a value CLAUDE.md calls "locked team-wide" is worth
-  someone's attention.
+  (docs: `--subj-2`), *sel* `--subj-9` (docs: `--subj-12`).~~ **RESOLVED
+  2026-08-01 (task #50).** It was code-vs-handoff drift, not doc drift: the
+  mockup's own `source/data.js`, `V2 Framework.md` §4 and CLAUDE.md §4 all agreed
+  with each other, and `tokens.css` plus `DEFAULT_SUBJECT_MAPPING` were the sole
+  divergent sources. Both now carry the handoff map, and
+  `tests/subject-slot-map.test.ts` pins them against it — including the
+  `-light/-deep/-bright` companions, which is what catches a half-applied
+  re-point.
 - **`--warn-ink` exists and is the text-safe honey**; `--warn` is documented as a
   fill. Several surfaces may be using the wrong one.
 - **The timeline uses raw `rgb()` shadows** (`:461`, `:503`) where `--sh-md` /

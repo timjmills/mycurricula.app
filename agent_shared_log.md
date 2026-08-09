@@ -2778,6 +2778,13 @@ verified against prototype source. Shipped v1.1 as **PR #71** (branch
   NO log entries — this is the backfill).
 - **Vocab trap (load-bearing):** handoff "Pastel" frame + "Hero" theme have NO shipped tokens
   (frames = glass|paper|color; "bright" = dim level). §2 now carries a translation table.
+  **UPDATE 2026-08-07 — the Pastel half is settled by USER RULING: Pastel is DROPPED;
+  Frame C = COLOR-FORWARD.** It was never a naming mismatch waiting on a translation:
+  it was an unbuilt design that got built, staged, reviewed live, and rejected for its
+  pale colours, and was never committed. "No shipped Pastel tokens" is the *correct*
+  end state, not a gap. Its shelved patch was deleted 2026-08-09. The **Hero theme**
+  half is untouched by the ruling and remains unshipped (and would need the
+  `teacher_preferences` `CHECK` migration + the 5-surface ALLOWLIST LOCKSTEP).
 - **Unowned surfaces now owned:** Refine tab → B3; .pb-rchip menu wiring → B4; NEW **B6** =
   timeline authoring (paint-a-new-unit, anchor-stacking, zoom, ripple, hover preview) +
   Needs-Attention triage drawer — all ABSENT on master, previously covered by no item.
@@ -7455,3 +7462,33 @@ the dead `.rowDot` modifier · `#27` four handoff timeline pieces · `#28` Refin
 Catch-Up reporting **today's** lesson as "4 days late" · `#34` Week add affordance missing
 below 900px.
 
+
+### Timeline design — ALL questions now answered by the user (2026-07-31)
+
+The dot vocabulary is closed. **Blue = not completed yet · grey = completed · yellow =
+assessment · red ring = an assessment whose date has passed and is still not marked
+complete.** Nothing else. In particular:
+
+- **"Needs work" is no longer a canvas state.** It was 203 of 310 marks (65%), drawn as a
+  dashed ring that read as a loading spinner — an alarm at that prevalence is wallpaper.
+  It now renders as ordinary blue; the distinction survives in the drawer's Needs
+  Attention tab and in the accessible name, so nothing is lost, it just stops shouting.
+- **A missed ordinary lesson stays blue.** User: *"lessons that are not completed yet are
+  just blue dots."* Red is reserved for the assessment ring — and that ring appears only
+  **after** the date has passed, so a future assessment is a plain yellow dot.
+- **Fit = Year · Term · Week**, and **Year genuinely fits the year**: one column per school
+  week, bars only, no dots, month labels across the top. The cheap alternative (Year =
+  narrowest columns, ~10 weeks) was rejected because the page would keep promising a year
+  it does not show.
+- **Phone: the whole control strip folds into one "Filters & View" trigger** — the pattern
+  paper-Year already ships, so it is proven here. Today 86% of the phone viewport is chrome
+  before the first lane; the plan is entirely below the fold.
+- **Fork marks (dashed stripe / move arrow) render at the Week stop only.** At Term and Year
+  the dot is too small to carry a second signal without becoming the noise we just removed.
+- **Assessment kind (summative/formative) is carried by the WORDS, not a second colour** —
+  the pill at the Week stop and the accessible name at every stop. One yellow, one meaning.
+
+Sequence in task #36. Wave 3 (the mark) is the one the user actually asked for and is gated
+on a four-axis contrast measurement; wave 4 (marks to their own sub-row) resolves the
+grip/dot collision **by construction** rather than by z-index, and takes three other
+measured defects with it.

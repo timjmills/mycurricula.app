@@ -102,7 +102,37 @@ for Teach/Plan/Post alike. **7.21 outranks 7.2**, so the Plan-only restriction i
 now a divergence, not a verified constraint — but a live Team-mode toggle on a
 projection surface may be a deliberate hazard. **Get a ruling before changing it.**
 
-#### A4 — Frame C is the 6.24 "Color-forward" recipe; 7.21 respecifies it as Pastel. · **L** · Observed · NEEDS A USER RULING
+#### A4 — Frame C is the 6.24 "Color-forward" recipe; 7.21 respecifies it as Pastel. · **L** · Observed · ~~NEEDS A USER RULING~~ → **RULED 2026-08-07: PASTEL DROPPED**
+
+> **RESOLVED 2026-08-07 by USER RULING.** This finding asked the right question and
+> got its answer. The ruling: **Pastel is DROPPED; Frame C stays COLOR-FORWARD** —
+> deep, saturated subject colour. So the `app/themes.css` `[data-frame="color"]`
+> recipe this audit calls "the older colour-forward recipe" is the **right
+> direction**, and the 7.21 Pastel respec is not a divergence to close.
+>
+> **But do not read that as "Frame C is fine."** That block (≈`themes.css:1271-1445`)
+> is **largely inert**: nearly every rule targets the handoff frame-GALLERY demo
+> classes (`.fr-chrome`, `.fr-title`, `.fr-eyebrow`, `.metapill`, bare `.card` /
+> `.chip` / `.badge` / `.bar` / `.lane`) which have **zero app consumers** — verified
+> 2026-08-09; the app's own `.lane`/`.card` usages are CSS-module `styles.*` hashed
+> names and `cp-card-*`, which those global selectors never match. **Removal of
+> Pastel is not replacement.** Frame C today renders close to Frame A, and making it
+> genuinely colour-forward is separate, tracked work.
+>
+> How it was decided: the Pastel skin *was* built (Source Sans 3 added to the
+> `next/font` set, the teal `#007595` accent lock, a `PastelThemeLock` replacing the
+> theme picker, the ghosted photo, the suppressed theme washes). It was **staged and
+> never committed**; the user reviewed it live on 2026-08-07, rejected the pale
+> colours, and ruled it out. The shelved patch
+> (`docs/shelved/2026-08-07-frame-c-pastel.patch`) was deleted 2026-08-09 so nobody
+> re-applies a rejected design.
+>
+> The audit's collision note was therefore correct in the other direction:
+> **`CLAUDE.md` §4's "Color-forward" is authoritative**, and the 7.21 handoff's
+> Pastel respec is the artifact that loses here — the one place where a later
+> handoff bundle does **not** win, because the user overrode it. The paragraphs
+> below are preserved as the accurate 2026-07-31 reading of the handoff; do not
+> read them as work to do.
 
 7.21 README §6: *"Pastel frame — a third frame beside Glass and Bright
 (`source-home/pastel-frame.css`), Common-Planner styling, Source Sans 3."*

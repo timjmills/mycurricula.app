@@ -192,7 +192,38 @@ Documents/      Planning docs + design handoff — NOT part of the app, never im
 > modular stylesheet disagree, the **modular file is newer** — it gained text the
 > bundle lacks rather than losing text the bundle has. Verify which is actually newer
 > before applying the authority chain mechanically; mtimes are identical and do not
-> disambiguate.
+> disambiguate. *(This staleness test is unaffected by the ruling below: the 7.21
+> bundle really does predate that cycle's Pastel frame, which is what makes it
+> evidence of the bundle's age. It is a fact about the ARTIFACTS, not an instruction
+> to build Pastel.)*
+>
+> ⛔ **USER RULING 2026-08-07 — PASTEL IS DROPPED. FRAME C = COLOR-FORWARD.** The
+> 7.21 handoff respecs Frame C as a pastel skin (`source-home/pastel-frame.css`:
+> slate `#f1f5f9` canvas, one locked teal `#007595` accent, subject colours softened
+> to tints of themselves, **Source Sans 3**, photo ghosted to `.38`, theme washes
+> neutralised, and a locked-note theme picker). It was ported in full, **staged, and
+> never committed**; the user reviewed it live, rejected the pale colours, and ruled
+> it out. **Frame C keeps the 6.24 colour-forward identity** — deep, saturated
+> subject colour, the picker unlocked, all seven themes honoured.
+>
+> **Removing Pastel did NOT build that — do not read this ruling as "Frame C is
+> done."** `app/themes.css` `[data-frame="color"]` (≈`:1271-1445`) states the
+> colour-forward *direction*, but it is **largely inert**: nearly every rule targets
+> the handoff frame-GALLERY demo classes — `.fr-chrome`, `.fr-title`, `.fr-eyebrow`,
+> `.metapill`, and bare `.card` / `.chip` / `.badge` / `.bar` / `.lane` — which have
+> **zero app consumers** (verified 2026-08-09; the app's `.lane`/`.card` usages are
+> CSS-module `styles.*` hashed names and `cp-card-*`, neither of which those global
+> selectors match). That inertness is the same root cause as the dead
+> `[data-version]` selectors noted below, and it is why Frame C renders close to
+> Frame A. Building the real colour-forward Frame C is separate, tracked work.
+>
+> **This is the one place a user ruling OVERRIDES the handoff authority chain.**
+> Do not reintroduce Pastel by
+> citing 7.21; do not read a `docs/audits/2026-07-31-*.md` "needs the pastel skin"
+> line as open work (those are corrected in place). Unrelated and NOT covered by this
+> ruling: the app's own longstanding pastel vocabulary — the `--hlp-*` highlighter
+> pastels, the six pastel widget families from the 5.31 handoff, the resource-tile
+> and card-wash tints — all of which stay.
 
 ### The v2 appearance engine — attribute vocabulary
 

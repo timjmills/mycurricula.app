@@ -109,8 +109,14 @@
   - **Immersive shell branch** keyed by route: Day/Week/Year/Home = full
     corner grammar; Plan/Post/Teach routes = `.overlay.immersive` +
     `.immersbar` (round `.ib-exit` Back · title + gear · Personal/Team on
-    Plan ONLY). Auto-hide is **Teach-only** (2.8s stillness, wakes on any
-    mousemove/touch — not "near the top edge" as the docs say). The Back
+    Plan ONLY). Auto-hide is **Teach-only** (~~2.8s~~ **3200ms desktop /
+    5000ms touch** — corrected 2026-08-07 against the 7.21.26 handoff,
+    `source-home/app.jsx:534`; the 2.8s figure was the older 6.24/7.2 cycle's)
+    stillness, wakes on any mousemove/touch — not "near the top edge" as the
+    docs say. Wired 2026-08-07 in `components/chrome/use-immersive-autohide.ts`
+    — but only for `/planner*` + `/post*`; `/teach` renders under route group
+    `(teach)`, which never mounts ChromeShell, so Teach still has no auto-hide.
+    The Back
     button must settle any pending View Transition and honor the
     `cc-rw-back`-style custom-wall back-pop before router navigation.
   - W3.3 builds the CAPABILITY and enrolls `/planner` only; Post/Teach content
@@ -259,7 +265,8 @@ corrections are folded in — refuted claims dropped, adjusted wording used.
   purely additive → an inert delta port (W3.3b) precedes component work
   (W3.3), exactly like W3.3a preceded it. Verified details baked in: immersive
   is scoped to exactly Plan/Post/Teach; Personal/Team appears in the immersbar
-  on Plan only; auto-hide is Teach-only (2.8s, any mousemove).
+  on Plan only; auto-hide is Teach-only (~~2.8s~~ **3200ms desktop / 5000ms
+  touch**, corrected 2026-08-07 against the 7.21.26 handoff; any mousemove).
 - **R2 — Plan retirement (§9a) → W3.4 rescope + design flag.** NAV_SUB.Plan →
   "Planner hub", the nav row routes to the Planning Hub, `openPlan` no longer
   navigates to a Plan view, and the planner icon button is gone. BUT the

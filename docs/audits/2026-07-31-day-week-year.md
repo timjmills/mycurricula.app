@@ -7,6 +7,17 @@
 > Snapshot disclaimer (CLAUDE.md §8): this is a dated audit. Verify against current
 > code before treating any finding as open.
 
+> ⚠ **SUPERSEDED IN PART — 2026-08-09.** Everything below about **Frame C · Pastel**
+> accurately reported the **7.21 handoff's** spec on 2026-07-31 and is preserved as
+> that record. It is **no longer the target.** On **2026-08-07 the user ruled:
+> Pastel is DROPPED; Frame C = COLOR-FORWARD** — deep, saturated subject colour, not
+> pale tints. The Pastel port (Source Sans 3, the teal `#007595` accent lock, a
+> `PastelThemeLock`, the ghosted photo, the suppressed theme washes) was built and
+> **staged, and was never committed**; its shelved patch was deleted 2026-08-09.
+> Read every "Frame C is PASTEL" / "needs the pastel skin" line below as **history,
+> not a gap to close.** Nothing here revises the *other* 7.21 findings (the `ViewSet`
+> remap, the Year gap, reachability) — those stand on their own.
+
 ## Precondition
 
 ```
@@ -52,10 +63,16 @@ Consequences under 7.21:
 1. **`ViewsB` is retired.** `DayB` / `WeekB` / `YearB` are still *loaded*
    (`New v2 Site Design.html:48`) but never *selected*.
 2. **Frame B (paper/Bright) renders `DayC` / `WeekC` / `YearC`** on Bright's white paper.
-3. **Frame C is PASTEL**, not "color-forward" — `7.21 source-home/pastel-frame.css:1-6`:
+3. ~~**Frame C is PASTEL**, not "color-forward" — `7.21 source-home/pastel-frame.css:1-6`:
    `data-version="C"` reskin, canvas `#f1f5f9`, white cards, teal `--accent:#007595`,
    Source Sans 3, photo ghosted to `.38` opacity, and theme washes **explicitly
-   neutralised** (`.theme-tint{opacity:0 !important}`, `:22`). Same layouts as B; skin only.
+   neutralised** (`.theme-tint{opacity:0 !important}`, `:22`). Same layouts as B; skin
+   only.~~ **SUPERSEDED 2026-08-07 by USER RULING.** The reading of the handoff was
+   correct — `pastel-frame.css` says exactly this. The *decision* went the other way:
+   the user saw the ported Pastel skin, rejected the pale colours, and ruled **Pastel
+   DROPPED; Frame C = COLOR-FORWARD** (the 6.24 recipe: deep saturated subject colour).
+   The port was staged and never committed. Frame C keeps the 6.24 colour-forward
+   identity; there is no teal lock, no Source Sans 3, and no photo ghosting to build.
 
 **Shipped instead:** the *7.2* mapping, implemented consistently — `paper→B`, `color→C`
 on Day and Week; `paper→TimelineYear`, `color→YearC` on Year.
@@ -71,6 +88,11 @@ outside unrelated widget-tint tokens. *(All Observed.)*
 ---
 
 ## (A) The nine cells — surface × frame
+
+> **Colour (C) column — SUPERSEDED 2026-08-07.** Every "Needs the pastel skin —
+> absent" verdict below is void: Pastel was dropped by user ruling and Frame C stays
+> COLOR-FORWARD. Those three cells read ✅ on the layout finding they actually made
+> (`DayC` / `WeekC` / `YearC` are faithful); only the pastel-skin half is retired.
 
 | | **Glass (A)** | **Paper (B)** | **Colour (C)** |
 |---|---|---|---|
@@ -158,10 +180,18 @@ is an accidental frame asymmetry where a third of teachers get a different *prod
 Router-only in principle (~3 lines), but it retires three shipped components and
 **removes information on Week** — see §(C4). Price that in.
 
-### B3 · The Pastel skin for frame C — **M** — *Observed*
+### B3 · ~~The Pastel skin for frame C — **M** — *Observed*~~ — **RETIRED**
 
-`7.21 source-home/pastel-frame.css` (§0) vs **absent** — zero `pastel` hits in
-`lib/ app/ components/`. **NOT a migration** (see §D).
+~~`7.21 source-home/pastel-frame.css` (§0) vs **absent** — zero `pastel` hits in
+`lib/ app/ components/`. **NOT a migration** (see §D).~~
+
+**RETIRED 2026-08-07 by USER RULING — do not build this.** The gap was real against
+the 7.21 handoff and was subsequently *closed by dropping the requirement*, not by
+building it: the port landed in the working tree, the user reviewed it live, rejected
+the pale colours, and ruled **Frame C = COLOR-FORWARD, Pastel DROPPED.** The port was
+never committed and its shelved patch was deleted 2026-08-09. There is no pastel skin
+to ship. The follow-on work is the *opposite* one — rework Frame C toward deeper,
+more saturated subject colour.
 
 ### B4 · "Open in editor" reachability — **M** — *Observed*
 
@@ -304,7 +334,7 @@ build lane does not stall waiting on one.
 
 | Item | Verdict |
 |---|---|
-| **Pastel frame (B3)** | **NO migration.** 7.21 maps B and C to the *same* `ViewsC` layouts and separates them by CSS alone (`pastel-frame.css` keys on `data-version="C"`). So `lib/theme.tsx:7`'s `frame ∈ {glass, paper, color}` is unchanged and the 5-surface ALLOWLIST LOCKSTEP — including the `teacher_preferences` `CHECK` constraint — is **untouched**. Ship it as a stylesheet. *(Observed.)* |
+| ~~**Pastel frame (B3)**~~ **— RETIRED 2026-08-07 (user ruling: Pastel DROPPED, Frame C = COLOR-FORWARD)** | ~~**NO migration.** 7.21 maps B and C to the *same* `ViewsC` layouts and separates them by CSS alone (`pastel-frame.css` keys on `data-version="C"`). So `lib/theme.tsx:7`'s `frame ∈ {glass, paper, color}` is unchanged and the 5-surface ALLOWLIST LOCKSTEP — including the `teacher_preferences` `CHECK` constraint — is **untouched**. Ship it as a stylesheet.~~ The "no migration" verdict held and still holds — for the *inverse* reason: the frame axis was never going to change, and now the skin is not being built at all. *(Observed; superseded by ruling.)* |
 | **Frame-B remap (B2), YearB (B5), Year states (C1), hover card (C5), not-covered badge (C6)** | **NO migration.** Pure UI/read-path. *(Observed.)* |
 | **`taught_at` / pacing (C2)** | **NO migration — the column already exists** (`supabase-source.ts:437,472,506`). It is a **write-path design problem**: writing it forks the master lesson (`source.ts:65-67`). Needs a fork-safe per-teacher teaching-event shape. This is the real blocker behind every "am I behind" feature. *(Observed.)* |
 | **`room`** | No column on `Lesson` (`lib/types.ts`). Handoff `DayC` renders `sel.room` (`7.21 views-c.jsx:51`); we omit it (`DayB.tsx:252-260`). Either drop the chip or add one nullable column — additive, not worth scheduling alone. *(Observed.)* |

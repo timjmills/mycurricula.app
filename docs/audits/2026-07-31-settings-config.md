@@ -13,6 +13,18 @@ git diff HEAD --stat -- app/settings components/settings lib supabase → empty
 
 Every claim below is about **commit `6ba6ae8`**, not a dirty working tree.
 
+> Snapshot disclaimer (CLAUDE.md §8): this is a dated audit. Verify against current
+> code before treating any finding as open.
+
+> ⚠ **SUPERSEDED IN PART — 2026-08-09.** Every claim below about **Frame C · Pastel**
+> — the "Color" → "Pastel" rename, the locked-note theme picker, the Pastel palette
+> lock — accurately reported the **7.21 handoff's** spec on 2026-07-31. It is **no
+> longer the target.** On **2026-08-07 the user ruled: Pastel is DROPPED; Frame C =
+> COLOR-FORWARD.** The port was built, **staged, and never committed**; its shelved
+> patch was deleted 2026-08-09. Frame C keeps the "Color" label and the normal
+> seven-theme picker. The **Hero theme** half of the same 7.21 delta is a separate
+> question this ruling did not touch — see §C7.
+
 **Evidence tags used throughout:**
 
 - **Observed** — a literal value at a cited `file:line`. I could not render the app, so no
@@ -42,9 +54,12 @@ tweaks panel that `config.jsx:201` embeds as its Appearance section via
 wins. Two changes, neither shipped (see C7):
 
 - An **8th theme, "Hero"** — `settings.jsx:17` (gradient) + `:25` (picker entry).
-- **Frame C renamed "Color" → "Pastel"** with its theme picker **replaced by a locked
+- ~~**Frame C renamed "Color" → "Pastel"** with its theme picker **replaced by a locked
   note** — `settings.jsx:79-80` and `:185-187`, styled by `.set-lockednote`
-  (`settings.css:83`).
+  (`settings.css:83`).~~ **SUPERSEDED 2026-08-07 by USER RULING: Pastel DROPPED,
+  Frame C = COLOR-FORWARD.** The handoff reading was correct; the design was
+  rejected. Frame C keeps the "Color" label and the ordinary seven-theme picker —
+  **do not build the rename or the locked note.**
 
 Anyone sizing this surface off the "byte-identical" summary would have missed both.
 
@@ -156,10 +171,16 @@ school-default + per-teacher override, framework-list-shaped. **Not a migration*
 
 `config.jsx:68`. Zero hits for `email` in `app/settings/account/page.tsx`.
 
-### B9 — 7.21 appearance delta unshipped — **S** — Observed
+### B9 — 7.21 appearance delta unshipped — **S** — Observed — **HALF RETIRED 2026-08-07**
 
-See §0 and C7. `lib/theme.tsx:10` still lists seven themes; no `hero`, no Pastel palette
-lock. **Ownership unverified** — this may belong to the appearance lane.
+See §0 and C7. `lib/theme.tsx:10` still lists seven themes; no `hero`, ~~no Pastel palette
+lock~~. **Ownership unverified** — this may belong to the appearance lane.
+
+**The Pastel half is RETIRED, not open** (user ruling 2026-08-07: Pastel DROPPED,
+Frame C = COLOR-FORWARD). "No Pastel palette lock" is now the *correct* state, not a
+gap. Only the **Hero theme** remains an unshipped delta — and it is the one that
+would hit the `teacher_preferences` `CHECK` constraint and the full 5-surface
+ALLOWLIST LOCKSTEP, so it is not small.
 
 ### B10 — Stale link — **trivial** — Observed
 
@@ -239,12 +260,20 @@ Fix together: add `app/settings/loading.tsx` + `app/settings/error.tsx`, and rep
 fallback at `workspace/page.tsx:50-56` — a bare "Loading team…" line with an inline
 hardcoded `padding: 24` — with a tokenised skeleton like every other settings surface.
 
-### C7 — **Enhancement** — Ship the 7.21 appearance delta — **S** — Observed
+### C7 — **Enhancement** — Ship the 7.21 appearance delta — **S** — Observed — **SCOPE HALVED 2026-08-07**
 
-The Hero theme and the Frame-C Pastel palette lock (§0). Note the lock is a *behaviour*
+The Hero theme and ~~the Frame-C Pastel palette lock (§0). Note the lock is a *behaviour*
 change, not a palette addition: in Frame C the theme picker is **replaced** by an
 explanatory note (`settings.jsx:185-187`). If Frame C ships without it, a teacher can pick
-a theme that Pastel then ignores.
+a theme that Pastel then ignores.~~
+
+**SUPERSEDED 2026-08-07 by USER RULING — the palette-lock half is cancelled.** Pastel
+is DROPPED; Frame C = COLOR-FORWARD, and a colour-forward Frame C honours the theme
+picker like every other frame, so there is no lock to build and no "theme the frame
+ignores" hazard to guard. The lock *was* built (`PastelThemeLock`) and staged; it was
+never committed and its patch was deleted 2026-08-09. **What remains of C7 is the
+Hero theme alone** — and per §D that one needs a `teacher_preferences` `CHECK`
+migration plus the 5-surface lockstep, so it is no longer an "S".
 
 ### C8 — **Enhancement** — The Setup IA splits one question across two pages — **M** — Inferred
 
