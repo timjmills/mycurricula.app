@@ -76,7 +76,21 @@ export const V2: boolean = process.env.NEXT_PUBLIC_V2 !== "0";
  *   • `app/(planner)/catch-up/page.tsx` → V2 ? <CatchUpRouteV2> : <CatchupScreen>
  *   • `app/onboarding/page.tsx`         → gated (added to this roster 2026-08-07;
  *                                         it was gated in code but missing here)
+ *   • `components/teach/TeachWorkspace.tsx:1471`
+ *                                       → V2 ? <TeachV2Shell>  : <TeachV1Zones>
+ *                                         (added 2026-08-09; gated in code
+ *                                         since W11 but missing from this
+ *                                         roster AND from the exception list
+ *                                         below, so `/teach` read as ungated)
+ *   • `app/(teach)/layout.tsx`          → V2 ? the immersive bar : (nothing —
+ *                                         TeachV1Zones renders its own
+ *                                         TeachTopBar, so an ungated mount
+ *                                         would stack two bars)
  * where the `*V1` shells are verbatim copies of master's live-on-prod views.
+ * NOTE the Teach gate is the one router-half branch that does NOT live in a
+ * `page.tsx`: the route's page is a thin server component that awaits
+ * searchParams, and the skin choice sits one level down in the client
+ * workspace. Look for it there, not in `app/(teach)/teach/page.tsx`.
  * KEEP THIS ROSTER CURRENT — it is the readable record of what the router half
  * covers. If you v2-swap another route's mount, gate it and add it here.
  *

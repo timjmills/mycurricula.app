@@ -44,15 +44,20 @@
 //      outright in live testing — see `keyboardModality` below before touching
 //      it.
 //
-// SCOPE LIMITATION — READ BEFORE FILING "TEACH STILL DOESN'T AUTO-HIDE".
-// The only consumer is `ChromeShell`, which mounts in the `(planner)` route
-// group. So this delivers auto-hide to `/planner*` and `/post*` ONLY.
-// `IMMERSIVE_PREFIXES` also lists `/teach`, but that entry is inert: `/teach`
-// lives in route group `(teach)` and `app/(teach)/layout.tsx` mounts providers
-// only, never `ChromeShell` (independently recorded as finding A2 in
-// docs/audits/2026-07-31-post-teach-catchup-shell.md). The surface the prop's
-// own comment named — Teach — therefore does NOT get auto-hide until that
-// separate shell gap is closed, which is deliberately out of scope here.
+// SCOPE — ALL THREE IMMERSIVE SURFACES, as of the A2 fix.
+// The only consumer is `ImmersiveBarHost`, and both immersive shells mount it:
+// `ChromeShell` (route group `(planner)` → `/planner*`, `/post*`) and
+// `app/(teach)/layout.tsx` (route group `(teach)` → `/teach*`). Teach's own
+// layout mounts the host directly because it cannot host `ChromeShell` — the
+// `.overlay.immersive` grid would clip the 100dvh workspace; that layout's
+// header carries the measurement.
+//
+// This paragraph used to read "SCOPE LIMITATION — READ BEFORE FILING 'TEACH
+// STILL DOESN'T AUTO-HIDE'", describing the `/teach` entry in
+// `IMMERSIVE_PREFIXES` as inert (finding A2,
+// docs/audits/2026-07-31-post-teach-catchup-shell.md). That gap is CLOSED —
+// /teach now gets the bar, the timer, and the wake handlers like every other
+// immersive route.
 //
 // ACCESSIBILITY CONTRACT (the CSS half lives in app/chrome.css):
 //   • The hidden bar is `opacity:0` + `translateY(-100%)`, NOT `visibility:

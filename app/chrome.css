@@ -876,37 +876,76 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* NO ACCENT AND NO FADE — this line broke the legibility contract twice over,
+     and the two faults compounded into the worst ratio in the quote block:
+     **2.26:1 in Night and 2.23:1 in Clear**, at every width, against a 4.5
+     floor.
+       • `color: var(--accent-600)` put ACCENT on plain reading text. CLAUDE.md
+         §4 allows accent only on interactive/emphasis elements — primary
+         buttons, the active tab, focus, the now-ring — "never plain reading
+         text or nav labels". That is a violation on its own terms regardless of
+         the ratio. (`--accent-600` is live, not dead: `app/themes.css:63-122`
+         defines it per theme, so the by-line's colour was also swinging with
+         the theme while its backdrop did not.)
+       • `opacity: 0.5` then halved whatever survived. It was also the ONLY
+         element in this block with no `[data-tone]` arm, so it could not flip
+         with the register the way `.hero-quote` and `.hero-quote-text` do.
+     Removing the `color` fixes the missing tone arm for free: the line now
+     inherits `.hero-quote`, which already branches correctly (`#fff` in dark,
+     `var(--ink)` in light).
+     HIERARCHY IS CARRIED BY TYPE, as it already was: 11.5px/600 UPPERCASE at
+     0.08em against the quote's clamp(16px,1.7vw,21px)/300 sentence case — four
+     independent axes before opacity is considered. Same finding, same fix and
+     the same reasoning as `day-v2.module.css`'s `.dcTl` / `.dcStepMin` notes:
+     no value on the fade ladder clears the floor, so the fade was spending the
+     contrast budget on a distinction the type had already made. */
   .hero-quote-by {
     font-size: 11.5px;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    opacity: 0.5;
-    color: var(--accent-600);
   }
-  .hero-quote:hover .hero-quote-text {
-    opacity: 0.9;
-  }
-  .hero-quote:hover .hero-quote-by {
-    opacity: 0.7;
-  }
+  /* The `.hero-quote-text` hover lift is gone for the same reason as the
+     by-line's below: both resting fades have been removed (see the tone arms
+     further down), so `opacity: 0.9` on hover would now REDUCE the quote's
+     contrast rather than raise it. */
+  /* THE HOVER RULE FOR `.hero-quote-by` IS GONE, DELIBERATELY. It set
+     `opacity: 0.7`, which was fine as a lift from a 0.5 resting state but
+     becomes a REDUCTION from the full-strength resting state above — hover
+     would have lowered the by-line's contrast while raising the quote's, in the
+     same interaction. There is no fade left to lift, so there is nothing for
+     this rule to do. */
   :root[data-tone="dark"] .hero-quote,
   .home[data-tone="dark"] .hero-quote {
     color: #fff;
   }
+  /* FULL-STRENGTH WHITE, not `rgba(255,255,255,0.82)`. This quote floats on the
+     BARE stage — the halo below is the only thing between it and the
+     photograph — and at 0.82 it measured **4.01:1 on Photo-Dim** (worst
+     percentile, backdrop rgb(110,110,117) where the quote crosses a bright
+     patch). At full strength the same pixels give ~5.1. The halo stays: it
+     sharpens the edge, but this file already has the measurement showing a halo
+     alone cannot hold a floor over a photograph (see
+     `components/boards/TeachChooser.module.css`, where a two-layer scrim shadow
+     still left the hero at 4.01 until it got a surface). */
   :root[data-tone="dark"] .hero-quote-text,
   .home[data-tone="dark"] .hero-quote-text {
-    color: rgba(255, 255, 255, 0.82);
+    color: var(--on-solid);
     text-shadow: 0 1px 16px rgba(12, 11, 20, 0.4);
   }
   :root[data-tone="light"] .hero-quote,
   .home[data-tone="light"] .hero-quote {
     color: var(--ink);
   }
+  /* DOUBLE-DIMMED: `--ink-soft` is already a quieted rung AND `opacity: 0.72`
+     sat on top, giving **4.15:1 on Photo-Bright** and 4.68 on Wash — one of
+     them failing, the other inside a rounding error of the floor. Dropping the
+     fade takes it to 8.47 on the same pixels (that is not an estimate: it is
+     what the opacity-blind reading of this element already was, i.e. the value
+     the ink alone produces). The token is the whole treatment. */
   :root[data-tone="light"] .hero-quote-text,
   .home[data-tone="light"] .hero-quote-text {
     color: var(--ink-soft);
-    opacity: 0.72;
   }
   .home[data-bg="ambient"] .hero-quote {
     color: var(--ink);
@@ -1562,12 +1601,24 @@
      positioning context and clips to the frame card's radius, so a fixed tab
      would escape the frame. RULE #1 — the bottom corners are rounded.
 
-     SCOPED `.overlay .ib-peek`, never bare `.ib-peek`: this button lives
-     inside <body class="cp-root">, and tokens.css:1184 `.cp-root button`
-     (0,1,1) would out-specify a single class (0,1,0) and strip the
-     background, border and padding right back off — the ≥2-class convention
-     this file's SideNav-retirement header already states. */
-  .overlay .ib-peek {
+     TWO-CLASS SCOPE, never bare `.ib-peek`: this button lives inside
+     <body class="cp-root">, and tokens.css:1184 `.cp-root button` (0,1,1)
+     would out-specify a single class (0,1,0) and strip the background, border
+     and padding right back off — the ≥2-class convention this file's
+     SideNav-retirement header already states.
+
+     ⚠ THE ANCESTOR IS `:is(.overlay, .immersbar-host)`, NOT `.overlay` ALONE.
+     It was `.overlay` until the A2 fix, which was correct while ChromeShell
+     was the only thing that could mount an immersive bar. `/teach` mounts the
+     same bar from `app/(teach)/layout.tsx` WITHOUT `.overlay` (that recipe
+     insets 30px and clips, which would eat the 100dvh workspace), and outside
+     it this whole block stopped matching — leaving the peek tab at the browser
+     default `position:static; display:inline-block`. Measured on /teach at
+     1440 before the fix: an in-flow 18px line box that pushed the entire
+     workspace down the moment the bar hid, putting the writing bar 18px below
+     the fold. `:is()` takes its most specific argument, so this stays (0,2,0)
+     and the cascade on /planner and /post is byte-identical. */
+  :is(.overlay, .immersbar-host) .ib-peek {
     position: absolute;
     top: 0;
     left: 50%;
@@ -1587,13 +1638,13 @@
     -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
   }
-  .overlay .ib-peek svg {
+  :is(.overlay, .immersbar-host) .ib-peek svg {
     width: 18px;
     height: 18px;
     opacity: 0.9;
   }
-  :root[data-tone="light"] .overlay .ib-peek,
-  .home[data-tone="light"] .overlay .ib-peek {
+  :root[data-tone="light"] :is(.overlay, .immersbar-host) .ib-peek,
+  .home[data-tone="light"] :is(.overlay, .immersbar-host) .ib-peek {
     background: rgba(255, 255, 255, 0.6);
     color: var(--ink);
     border-color: rgba(28, 27, 46, 0.16);
@@ -1622,7 +1673,7 @@
      two `display` flips must stay in this order (compact-bar.css:54-55 relies
      on exactly the same ordering). */
   @media (any-pointer: coarse) {
-    .overlay .ib-peek {
+    :is(.overlay, .immersbar-host) .ib-peek {
       display: grid;
     }
   }
@@ -1637,7 +1688,7 @@
      single source of truth and keeps matching the handoff's threshold.
      tests/immersive-autohide.test.ts asserts the two ranges stay disjoint. */
   @media (max-width: 639.98px) {
-    .overlay .ib-peek {
+    :is(.overlay, .immersbar-host) .ib-peek {
       display: none;
     }
   }
@@ -1653,8 +1704,11 @@
     gap: 10px;
     flex: 0 0 auto;
   }
-  /* SCOPED `.overlay .ib-exit`, never bare `.ib-exit` — the same cp-root trap
-     documented on `.ib-peek` below, and this one was LIVE. Measured on
+  /* TWO-CLASS SCOPE, never bare `.ib-exit` — the same cp-root trap documented
+     on `.ib-peek` above (including why the ancestor is `:is(.overlay,
+     .immersbar-host)` rather than `.overlay`: /teach mounts the bar outside
+     `.overlay`, and this rule stopped matching there, rendering the Back
+     control as a bare chevron again). Measured on
      /planner 2026-08-07: background-color `rgba(0, 0, 0, 0)` and
      border-top-width `0px`, i.e. tokens.css:1184 `.cp-root button` (0,1,1) was
      beating this single-class rule (0,1,0) and the round glass Back circle was
@@ -1663,7 +1717,7 @@
      never looked obviously broken. The handoff's `.navback` is a glass circle
      (7.21 compact-bar.css); this restores it. The `:hover` and light-tone
      rules below already carried ≥2 selectors and were never affected. */
-  .overlay .ib-exit {
+  :is(.overlay, .immersbar-host) .ib-exit {
     width: 42px;
     height: 42px;
     flex: 0 0 auto;
@@ -1763,17 +1817,36 @@
     width: 18px;
     height: 18px;
   }
+  /* NO `opacity` — and this one was reported to me as the element that "already
+     passes, so 0.6 on `.clock-empty` is an outlier not a systemic value". It is
+     not an outlier. `.clock-done` at 0.62 passes only on the two easy axes
+     (4.71 Wash, 4.60 Photo-Bright — both inside a rounding error of the floor)
+     and FAILS at **3.35:1 on Photo-Dim**, where the botbar sits on bare
+     photograph. That is worse than the 4.45 the sibling was flagged for, so the
+     fade is systemic across this block, not a one-off value. Opacity-blind, the
+     same element reads 5.81 — which is why it looked fine.
+     11px/800 UPPERCASE at 0.06em is already three axes of quiet against the
+     time it sits under; it does not need a fourth that costs 38% of the
+     contrast budget. */
   .clock-done {
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    opacity: 0.62;
     margin: 0 0 9px;
   }
+  /* NO `opacity` — it was 0.6 and measured **4.45:1** in light tone, i.e. it
+     misses AA by five hundredths. Raising it to the lowest passing value was
+     the obvious move and is the wrong one: 0.7 measures 6.19 but leaves the
+     same rule one token tweak away from failing again, and this is an
+     EMPTY-STATE line ("No classes scheduled") whose entire job is to be read.
+     Nothing else on the clock competes with it when it renders — it is shown
+     INSTEAD of the schedule, not alongside it (`ChromeClock.tsx:196-198`
+     renders `.clock-done` or `.clock-empty`, never both) — so there is no
+     hierarchy for the fade to express. Its 12.5px regular weight against
+     `.clock-done`'s 11px/800 uppercase already separates the two states. */
   .clock-empty {
     font-size: 12.5px;
-    opacity: 0.6;
     padding: 4px 0;
   }
 

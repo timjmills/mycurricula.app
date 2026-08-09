@@ -676,9 +676,29 @@ describe("auto-hide / peek breakpoint contract", () => {
     "utf8",
   );
 
+  /**
+   * The scope both peek `display` rules MUST carry, spelled out on purpose.
+   *
+   * ⚠ THIS PIN IS THE ASSERTION, not incidental strictness. The A2 fix widened
+   * the selector from `.overlay .ib-peek` to `:is(.overlay, .immersbar-host)
+   * .ib-peek` because `/teach` mounts the bar WITHOUT ChromeShell's `.overlay`
+   * (that recipe insets 30px and clips a 100dvh workspace). `.immersbar-host`
+   * is therefore the only thing that makes these rules reach Teach at all.
+   *
+   * Both regexes below briefly matched the prefix as `[^{}]*` — widened so they
+   * would survive that very rewrite. That FAILED OPEN: a revert to
+   * `.overlay .ib-peek` would strand a Teach touch user with a hidden bar and
+   * no visible peek recovery, while `[^{}]*` happily matched the planner-only
+   * rule and every test stayed green. Matching the scope is the point; if it
+   * legitimately changes again, these SHOULD fail and be re-read.
+   */
+  const PEEK_SCOPE = String.raw`:is\(\.overlay, \.immersbar-host\)`;
+
   /** The `@media (max-width: …)` that hides the peek tab. */
   const peekFloor = css.match(
-    /@media \(max-width:\s*([\d.]+)px\)\s*\{\s*\.overlay \.ib-peek\s*\{\s*display:\s*none;/,
+    new RegExp(
+      String.raw`@media \(max-width:\s*([\d.]+)px\)\s*\{\s*${PEEK_SCOPE} \.ib-peek\s*\{\s*display:\s*none;`,
+    ),
   );
   /** The `(min-width: …)` the hook arms above. */
   const wideFloor = IMMERSIVE_AUTOHIDE_WIDE_MQ.match(
@@ -686,7 +706,9 @@ describe("auto-hide / peek breakpoint contract", () => {
   );
   /** The media query that REVEALS the peek tab — the device-capability gate. */
   const peekGate = css.match(
-    /@media \(([^)]+)\)\s*\{\s*\.overlay \.ib-peek\s*\{\s*display:\s*grid;/,
+    new RegExp(
+      String.raw`@media \(([^)]+)\)\s*\{\s*${PEEK_SCOPE} \.ib-peek\s*\{\s*display:\s*grid;`,
+    ),
   );
 
   it("all three gates are actually found in the source", () => {
@@ -695,13 +717,41 @@ describe("auto-hide / peek breakpoint contract", () => {
     // the failure mode this whole file is written against.
     expect(
       peekFloor,
-      "no `@media (max-width: …) { .overlay .ib-peek { display: none } }` in app/chrome.css — the rule was renamed, reformatted, or removed, and this test can no longer see it",
+      "no `@media (max-width: …) { :is(.overlay, .immersbar-host) .ib-peek { display: none } }` in app/chrome.css — either the rule was renamed/reformatted/removed, or its scope was narrowed back to `.overlay`, which would strand /teach",
     ).not.toBeNull();
     expect(
       peekGate,
-      "no `@media (…) { .overlay .ib-peek { display: grid } }` in app/chrome.css — the peek tab's reveal rule is gone or reformatted, and this test can no longer see it",
+      "no `@media (…) { :is(.overlay, .immersbar-host) .ib-peek { display: grid } }` in app/chrome.css — either the reveal rule is gone/reformatted, or its scope was narrowed back to `.overlay`, leaving a Teach touch user with a hidden bar and no visible way back",
     ).not.toBeNull();
     expect(wideFloor).not.toBeNull();
+  });
+
+  it("NO peek/exit rule is scoped to `.overlay` alone", () => {
+    // The sharp invariant, and deliberately not a COUNT. A first attempt here
+    // asserted ">= 5 scoped rules"; there are six, so reverting any single one
+    // left five and the mutant survived. Counting is the wrong question.
+    //
+    // This is the right one: `:is(.overlay, .immersbar-host) .ib-peek` does not
+    // CONTAIN the substring `.overlay .ib-peek` (it reads `.overlay,` then `)`
+    // then ` .ib-peek`), so a literal search for the unscoped form matches
+    // exactly the reverted rules and nothing else. It catches a partial revert
+    // of ANY of the six, stays correct when a seventh is added, and needs no
+    // maintenance.
+    //
+    // Why it matters: /teach renders the bar outside `.overlay`, so
+    // `.immersbar-host` is its only route into these rules. Lose the base rule
+    // and the peek tab drops to `position:static; display:inline-block` — an
+    // in-flow 18px line box that displaced the whole workspace and pushed the
+    // writing bar below the fold (measured). Lose the reveal rule and a touch
+    // user gets a hidden bar with no visible way back.
+    expect(
+      css.includes(".overlay .ib-peek"),
+      "a `.ib-peek` rule is scoped to `.overlay` alone again — /teach mounts the bar outside `.overlay`, so that rule no longer reaches it",
+    ).toBe(false);
+    expect(
+      css.includes(".overlay .ib-exit"),
+      "the `.ib-exit` rule is scoped to `.overlay` alone again — on /teach the round glass Back circle degrades to a bare chevron",
+    ).toBe(false);
   });
 
   it("the peek tab is revealed for ANY touch-capable device, hybrids included", () => {

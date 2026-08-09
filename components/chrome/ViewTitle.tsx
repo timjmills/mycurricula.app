@@ -43,6 +43,13 @@ const VIEW_TITLES: readonly { match: string; title: string }[] = [
   // /post is IMMERSIVE_PREFIXES-listed, so its name lives in the immersbar
   // slot — the wall renders no title of its own.
   { match: "/post", title: "Resource Wall" },
+  // Teach enrolls with the A2 fix: `app/(teach)/layout.tsx` mounts the
+  // immersive bar, so this slot finally has somewhere to render on /teach.
+  // "Teach Board" is the handoff's own string (7.21 source-home/app.jsx:23,
+  // `VIEW_TITLES = { … Teach:'Teach Board' }`) — NOT the nav tab's "Teach",
+  // which is the console word. /boards keeps the corner grammar and gets its
+  // title from the top bar, so it is deliberately absent here.
+  { match: "/teach", title: "Teach Board" },
 ];
 
 // The bundle's settings-cog glyph, inlined (24×24, currentColor).

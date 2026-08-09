@@ -13,6 +13,15 @@
   min-height: 0;
   background: var(--canvas);
   overflow: hidden;
+  /* Headroom for the floating immersive bar that app/(teach)/layout.tsx mounts
+     above this shell (audit A2). The bar is `position:absolute; top:0`, so
+     without this it lands ON the board header — measured at 1440: the bar's
+     right cluster covered Board settings / Expand / Present, making the
+     projector controls unclickable. Reserving it as PADDING (preflight gives
+     border-box) keeps the shell exactly 100dvh, so the writing bar stays on
+     screen — the thing the height comment above exists to protect.
+     Defaults to 0px, so this file is inert without that layout. */
+  padding-top: var(--immersbar-clear, 0px);
 }
 
 /* True-fullscreen projector takeover (Esc exits). z-index sits ABOVE the shell's
@@ -25,13 +34,23 @@
   z-index: 50;
   grid-template-columns: minmax(0, 1fr) !important;
   background: var(--canvas);
+  /* The takeover sits ABOVE the bar (z-50 > the bar's z-40) and is the whole
+     point of this route group escaping the planner chrome — so it reclaims the
+     reserved headroom. Without this the projected board would carry a dead
+     60px band it is covering anyway. Same reason browser fullscreen is safe:
+     the bar is mounted OUTSIDE rootRef, so it does not paint there at all. */
+  padding-top: 0;
 }
 
 /* ── Resizer (Pointer Events) ─────────────────────────────────────────────── */
 
 .resizer {
   position: absolute;
-  top: 0;
+  /* Same padding-box rule as .mobToggle: without this the drag handle's top
+     60px runs under the bar. Desktop-only control, so this is tidiness rather
+     than a blocked action — the bar's gaps are pointer-events:none — but a
+     handle that visually starts above the panel it resizes reads as a bug. */
+  top: var(--immersbar-clear, 0px);
   bottom: 0;
   z-index: 6;
   width: 16px;
@@ -62,7 +81,13 @@
 
 .mobToggle {
   position: absolute;
-  top: 8px;
+  /* An abs-positioned child resolves against `.teach`'s PADDING box, so the
+     `--immersbar-clear` reserve does NOT move it — `top:8px` still lands at
+     y=8, underneath the bar (z-40 vs this z-8). It has to be added back by
+     hand. This matters most at 375, where auto-hide is deliberately OFF ("the
+     bar IS the nav") so the bar never slides away to reveal it, and this
+     toggle is the ONLY route to the lesson panel on a phone. */
+  top: calc(8px + var(--immersbar-clear, 0px));
   right: 8px;
   z-index: 8;
   min-height: 36px;
@@ -352,12 +377,43 @@
   .zoomReset {
     min-height: 44px;
   }
+  /* The board header's own controls were NOT covered by this block, so five of
+     them stayed 32px on a touch screen — Start timer, Reset timer, Board
+     settings, Expand board and Present fullscreen. Measured at 375×812,
+     isMobile+hasTouch, DSF 3, with `pointer: coarse` verified true; the audit
+     that found this counted four and missed Board settings.
+     `min-width` too: these are icon-only squares, so height alone would leave a
+     44×32 target. `.boardTools button` reaches the timer's buttons as well —
+     BoardTimer renders inside this cluster. */
+  .boardTools button {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 @media (max-width: 900px) {
   /* Let the header flow onto a second row instead of clipping trailing controls
      (title + switcher + timer + settings + expand + present exceed 375px). */
   .boardHead {
     flex-wrap: wrap;
+    /* Keep the header out from under the floating "Lesson ›" pill, which is
+       `position:absolute; right:8px` and therefore sits OVER this row rather
+       than in flow with it. Measured (375×812 and 820×1180, isMobile+hasTouch,
+       `pointer: coarse`): the pill overlapped the lesson title by 45px at 375,
+       and at 820 it covered "Browse boards" outright — a tap at that button's
+       centre hit-tested to the pill, not the button.
+       51px pill + 8px offset + 9px breathing room. `padding-inline-end`, not a
+       margin on the children, so the wrap points move with it.
+
+       ⚠ THIS IS THE CONTAINMENT FIX, NOT THE HANDOFF SHAPE. The 7.21 handoff
+       puts this control bottom-centre — `.teach-mobtoggle{position:fixed;
+       left:50%;bottom:18px;transform:translateX(-50%);z-index:130}`
+       (source-home/views.css:428-430) — precisely so it can never sit on the
+       header at all, and reserves room for it with `.teach-lesson .lnav
+       {padding-bottom:72px}`. Moving it there needs a matching bottom reserve
+       on the board column (the writing bar currently runs to the viewport
+       edge), which is board-layout work: it belongs to the Teach board rebuild,
+       not to the chrome wave. Until then this stops the collision. */
+    padding-inline-end: 68px;
   }
   .headSpacer {
     display: none;

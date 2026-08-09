@@ -1,0 +1,54 @@
+/* Teach route-group shell — tokens only, layout only (CLAUDE.md §4). */
+
+/*
+ * The positioned containing block for the immersive bar, and NOTHING else.
+ *
+ * `.immersbar` is `position:absolute; top:0; left:0; right:0` (app/chrome.css),
+ * and <body> is static, so the bar needs a positioned ancestor or it anchors to
+ * the viewport's initial containing block. Everything here is deliberately
+ * minimal: no inset, no padding, no `overflow`, no grid. The Teach workspace
+ * inside is `height:100dvh` and must keep every pixel — this wrapper only has
+ * to not get in its way, which is why it is NOT `.overlay.immersive` (that
+ * recipe insets 30px and clips, see the layout header).
+ *
+ * `min-height:0` + `display:contents`-like flex behaviour is unnecessary here:
+ * <body> is `flex min-h-full flex-col` and this is its flex child, so it sizes
+ * to the 100dvh workspace it contains.
+ */
+.teachShell {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/*
+ * Applied ONLY when the immersive bar is actually mounted (the `V2` gate in
+ * layout.tsx). On the flag-OFF rollback build TeachV1Zones renders its own v1
+ * top bar inside the workspace and no bar floats above it, so reserving
+ * headroom there would open a 60px empty strip for nothing.
+ */
+.barHost {
+  /*
+   * How far the surface below must start, to clear the floating bar.
+   *
+   * This is the app's established contract, not a Teach invention: the bar is
+   * `position:absolute` and every immersive SURFACE reserves its own headroom
+   * (`.cp-planner-stub { padding: clamp(72px,12vh,120px) … }`, app/chrome.css
+   * :767 — "Top padding clears the absolutely-positioned .immersbar"). It also
+   * matches the 7.21 handoff, where `.cbar` is `position:relative` and so
+   * occupies ~70px of layout permanently; hiding it is transform-only
+   * (compact-bar.css:14 — "animating margin-top (layout) relayouts the whole
+   * page every frame"), which is exactly why the reserve is CONSTANT here and
+   * does not follow the hidden state.
+   *
+   * MEASURED, not guessed: `.immersbar` is 78px tall at 1440 and 768, 80px at
+   * 375, with padding `14px … 22px`. The 22px tail is the gradient falloff,
+   * drawn deliberately OVER content; the solid controls occupy 14 + 44 = 58px.
+   * 60px clears them with a hairline to spare at all three tiers.
+   *
+   * Consumed by components/teach-v2/TeachV2Shell.module.css, which defaults it
+   * to 0px — so the Teach shell is unchanged anywhere this layout is absent.
+   */
+  --immersbar-clear: 60px;
+}

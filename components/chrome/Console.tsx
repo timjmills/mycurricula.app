@@ -44,6 +44,16 @@ interface ConsoleEntry {
   sub: string;
   /** Onboarding tooltip — what the surface accomplishes. */
   tip: string;
+  /**
+   * Extra route prefixes this tab also owns for the ACTIVE read.
+   *
+   * The Teach tab links to `/boards` (the boards home) but the family also
+   * contains `/teach` (the live workspace), which the bar now renders on. With
+   * a plain href match, standing on /teach lit no tab at all — the console
+   * claimed the teacher was nowhere. Navigation still goes to `href`; this only
+   * widens what counts as "here".
+   */
+  alsoActiveOn?: readonly string[];
 }
 
 // Day/Week/Year/Plan. Subs + tips are the bundle's NAV_SUB / NAV_TIP verbatim.
@@ -89,6 +99,7 @@ const CONSOLE_NAV: readonly ConsoleEntry[] = [
     word: "Teach",
     sub: "Present",
     tip: "Teach Board — present your lesson and resources to the class",
+    alsoActiveOn: ["/teach"],
   },
 ];
 
@@ -106,14 +117,19 @@ export const COMPACT_CONSOLE_ROUTES: readonly string[] = [
   "/boards",
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(href + "/");
+function matchesPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(prefix + "/");
+}
+
+function isActive(pathname: string, entry: ConsoleEntry): boolean {
+  if (matchesPrefix(pathname, entry.href)) return true;
+  return (entry.alsoActiveOn ?? []).some((p) => matchesPrefix(pathname, p));
 }
 
 // The segmented button row shared by every mount (home, the compact console
 // atop Day/Week/Year/Boards, and — exported — the ImmersiveBar center on
-// /planner + /post). `compact` drops the captions and lets the chrome.css
-// `.views.console.compact` recipe slim the padding.
+// /planner, /post and /teach). `compact` drops the captions and lets the
+// chrome.css `.views.console.compact` recipe slim the padding.
 export function ConsoleNav({
   compact = false,
 }: {
@@ -135,7 +151,7 @@ export function ConsoleNav({
       aria-label={compact ? "Views" : "Primary views"}
     >
       {CONSOLE_NAV.map((e) => {
-        const active = isActive(pathname, e.href);
+        const active = isActive(pathname, e);
         return (
           <Tooltip
             key={e.key}

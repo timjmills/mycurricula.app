@@ -16,9 +16,9 @@
 //     navigation (WAVE-3-PLAN §1 W3.3). This component just reports the
 //     click.
 //   • `hidden` / `barRef` / `onShow` — the idle auto-hide. The timer is NOT
-//     here: it lives in `use-immersive-autohide.ts`, which ChromeShell calls
-//     and whose `{ hidden, show, barRef }` it hands straight to these three
-//     props. We only append the ` immersbar-hidden` class so chrome.css can
+//     here: it lives in `use-immersive-autohide.ts`, which `ImmersiveBarHost`
+//     calls and whose `{ hidden, show, barRef }` it hands straight to these
+//     three props. We only append the ` immersbar-hidden` class so chrome.css can
 //     slide the bar away, host the ref the hook attaches its wake listeners
 //     to, and render the touch-tier peek tab while hidden.
 //     Delay is 3200ms on pointer devices / 5000ms on touch (7.21.26 handoff
@@ -28,11 +28,11 @@
 //     re-enable — and re-disable while hidden, chrome.css) so a hidden bar
 //     never eats input.
 //
-// SCOPE: only `/planner*` and `/post*` actually receive `hidden` today.
-// `/teach` is nominally an immersive prefix but renders under route group
-// `(teach)`, whose layout never mounts ChromeShell — see the header of
-// use-immersive-autohide.ts and finding A2 of
-// docs/audits/2026-07-31-post-teach-catchup-shell.md.
+// SCOPE: all three immersive surfaces receive `hidden` — `/planner*` and
+// `/post*` via ChromeShell, `/teach*` via `app/(teach)/layout.tsx`. Both
+// mount the same `ImmersiveBarHost`. (Finding A2 of
+// docs/audits/2026-07-31-post-teach-catchup-shell.md — that /teach got no bar
+// at all — is CLOSED; this note used to record it as open.)
 //   • `showModeSwitch` — Personal/Team appears in the immersive bar on
 //     Plan ONLY (verified against the bundle; WAVE-3-PLAN §3 R1). Post and
 //     Teach pass nothing and get an empty right slot.

@@ -14,11 +14,16 @@
 //     `.botbar` with ChromeContext BL + ChromeClock BR (row 3), plus the
 //     absolutely-positioned bottom-center ChromeQuote (a direct overlay
 //     child; `.hero-quote` self-positions, chrome.css:664).
-//   • IMMERSIVE (/planner /post /teach): `.overlay.immersive` — content
-//     fills the frame card; a single floating ImmersiveBar carries Back +
-//     title (+ Personal/Team on /planner ONLY, per the bundle). This branch
-//     is the CAPABILITY; no immersive route exists in this group until the
-//     W3.4 /planner stub (Post/Teach enroll with their surfaces, Phases 2–3).
+//   • IMMERSIVE (/planner /post): `.overlay.immersive` — content fills the
+//     frame card; a single floating ImmersiveBarHost carries Back + title
+//     (+ Personal/Team on /planner ONLY, per the bundle).
+//
+//     `/teach` is an immersive SURFACE but not an immersive route OF THIS
+//     SHELL: it renders under route group `(teach)`, whose layout mounts the
+//     same <ImmersiveBarHost/> directly. See that layout's header for the
+//     measured reason this shell cannot wrap the Teach workspace. The
+//     `/teach` entry stays in IMMERSIVE_PREFIXES below only so a future
+//     re-parenting keeps working; nothing in this file reaches that route.
 //
 // TEAM-MODE GLOW: mirrors editMode === "master" onto <html data-mode="team">
 // so the chrome.css policy layer (frame edge-glow + pink toggle, two-pulse
@@ -28,21 +33,17 @@
 // renders team mode; the boot default is personal).
 
 import { useEffect, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { useViewEditMode } from "@/lib/edit-mode-state";
-import { settlePendingNavigation } from "@/lib/view-transition";
 import { ChromeTopBar } from "./ChromeTopBar";
-import { ImmersiveBar } from "./ImmersiveBar";
+import { ImmersiveBarHost } from "./ImmersiveBarHost";
 import { ChromeContext } from "./ChromeContext";
 import { ChromeClock } from "./ChromeClock";
 import { ChromeQuote } from "./ChromeQuote";
-import { CompactConsole, ConsoleNav, COMPACT_CONSOLE_ROUTES } from "./Console";
-import { ChromeToolsMenu } from "./ChromeToolsMenu";
-import { ChromeAccountMenu } from "./ChromeAccountMenu";
+import { CompactConsole, COMPACT_CONSOLE_ROUTES } from "./Console";
 import { ViewTitle } from "./ViewTitle";
 import { ViewEditToggle } from "./ViewEditToggle";
-import { useImmersiveAutohide } from "./use-immersive-autohide";
 import { CatchUpModalHost } from "@/components/catchup-v2";
 
 // §9b immersive surfaces — exactly Plan · Post · Teach (WAVE-3-PLAN R1).
@@ -54,7 +55,6 @@ const IMMERSIVE_MODESW_PREFIXES = ["/planner"] as const;
 
 export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
   const pathname = usePathname();
-  const router = useRouter();
   const { editMode } = useAppState();
   // W3.8b: Day's View↔Edit UI mode (the shared cc_editmode map — NOT the
   // forking editMode above; same word, unrelated axis). Read here to suppress
@@ -79,20 +79,6 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
   const immersive = IMMERSIVE_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(p + "/"),
   );
-
-  // The immersive bar's idle auto-hide (audit finding A1 — the `hidden` prop
-  // and its CSS shipped in W3.3 with no caller, so the feature was inert).
-  // MUST be called here, above the `if (immersive)` early return below: a hook
-  // after a conditional return violates the rules of hooks, so the hook takes
-  // `immersive` as its `enabled` flag and no-ops (force-showing the bar) on the
-  // corner-grammar routes.
-  //
-  // SCOPE: this reaches `/planner*` and `/post*` only. `/teach` is listed in
-  // IMMERSIVE_PREFIXES but that entry is INERT — /teach renders under route
-  // group `(teach)`, whose layout mounts providers and never this shell
-  // (finding A2, docs/audits/2026-07-31-post-teach-catchup-shell.md). Teach
-  // gets auto-hide only when that separate shell gap is closed.
-  const autohide = useImmersiveAutohide(immersive);
 
   // Bundle scoping for the bottom chrome (see the render comment below).
   // W3.8b: the clock/console row is suppressed while Day is in EDIT mode —
@@ -129,39 +115,10 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
             `mount="chrome"` WINS the election over any route-mounted Host —
             deliberately, because this one outlives every navigation. */}
         <CatchUpModalHost mount="chrome" />
-        <ImmersiveBar
-          title={viewTitle}
-          showModeSwitch={showModeSwitch}
-          hidden={autohide.hidden}
-          barRef={autohide.barRef}
-          onShow={autohide.show}
-          // R1b: the six-tab view console rides the immersbar center on the
-          // immersive surfaces (Plan/Post), matching the handoff compact-bar.
-          nav={<ConsoleNav compact />}
-          // R1a/c/d: Tools popover + account menu in the immersbar right slot,
-          // so every re-homed destination is reachable from these routes too.
-          tools={
-            <>
-              <ChromeToolsMenu />
-              <ChromeAccountMenu />
-            </>
-          }
-          onBack={() => {
-            // Contract (WAVE-3-PLAN R1): settle any in-flight soft swap so
-            // the snapshot cannot hold input through a back-navigation this
-            // module didn't start. TODO(W3.4/Phase-2): honor the custom-wall
-            // back-pop (cc-rw-back analogue) before leaving /post.
-            settlePendingNavigation();
-            // Deep-link guard (§4a finding #11): with no in-app history
-            // entry, back() would exit the site — land on the default
-            // route instead (the bundle keeps its own back stack).
-            if (window.history.length <= 1) {
-              router.push("/weekly");
-            } else {
-              router.back();
-            }
-          }}
-        />
+        {/* The bar, its stillness timer, and all four slot fills live in
+            ImmersiveBarHost so `(teach)` mounts the SAME wiring rather than a
+            second copy. Personal/Team stays Plan-only. */}
+        <ImmersiveBarHost showModeSwitch={showModeSwitch} />
         {children}
       </div>
     );

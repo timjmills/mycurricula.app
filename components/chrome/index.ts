@@ -4,9 +4,13 @@
 export { ChromeShell } from "./ChromeShell";
 export { ChromeTopBar } from "./ChromeTopBar";
 export { ImmersiveBar } from "./ImmersiveBar";
-// The immersive bar's idle auto-hide timer — exported for the tests and for
-// any future immersive shell (notably the `(teach)` group, which does NOT
-// mount ChromeShell and so does not get auto-hide today).
+// The bar WIRED — timer, back handler, and all four slot fills. Mounted by
+// ChromeShell's immersive branch AND by app/(teach)/layout.tsx, so all three
+// §9b surfaces (Plan · Post · Teach) share one implementation.
+export { ImmersiveBarHost } from "./ImmersiveBarHost";
+export type { ImmersiveBarHostProps } from "./ImmersiveBarHost";
+// The immersive bar's idle auto-hide timer — exported for the tests. Its only
+// production consumer is ImmersiveBarHost above.
 export {
   useImmersiveAutohide,
   IMMERSIVE_AUTOHIDE_DESKTOP_MS,
