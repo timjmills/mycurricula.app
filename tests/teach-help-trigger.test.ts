@@ -34,6 +34,7 @@ const shell = read("../components/teach-v2/TeachV2Shell.tsx");
 const icons = read("../components/teach-v2/icons.tsx");
 const overlays = read("../components/teach/TeachOverlays.tsx");
 const contract = read("../components/teach/zones-contract.ts");
+const helpOverlay = read("../components/teach/chrome/TeachHelpOverlay.tsx");
 
 describe("the Teach help overlay has a trigger under V2", () => {
   it("the contract still carries setHelpOpen, and TeachOverlays still mounts the dialog", () => {
@@ -90,6 +91,17 @@ describe("the Teach help overlay has a trigger under V2", () => {
     // surface.
     const handler = shell.match(/const onKey = \(e: KeyboardEvent\): void => \{[\s\S]*?\n    \};/)?.[0];
     expect(/e\.metaKey \|\| e\.ctrlKey \|\| e\.altKey/.test(handler!)).toBe(true);
+  });
+
+  it("the dialog documents the key that opens it", () => {
+    // It listed nine shortcuts and not the one that summons it. The button
+    // tooltip does not cover this: a teacher who opened the dialog WITH the
+    // button has already stopped hovering it, so the tooltip is gone exactly
+    // when they are reading the shortcut list.
+    expect(
+      /\{ keys: \["\?"\], label: "Open this help/.test(helpOverlay),
+      "the `?` row is gone from TeachHelpOverlay's shortcut list — the dialog documents every shortcut except the one that opens it",
+    ).toBe(true);
   });
 
   it("the listener is removed on unmount", () => {

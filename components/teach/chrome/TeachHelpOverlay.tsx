@@ -55,6 +55,12 @@ export function TeachHelpOverlay({
   if (!open) return null;
 
   const rows: ShortcutRow[] = [
+    // The key that opens THIS dialog, listed first. It was missing while the
+    // dialog documented nine other shortcuts — and the button's tooltip is not
+    // a substitute, because a teacher who opened this with the button has
+    // already stopped hovering it. Bound in components/teach-v2/TeachV2Shell.tsx
+    // (not use-teach-shortcuts.ts, which owns only modifier chords).
+    { keys: ["?"], label: "Open this help — press again to close" },
     { keys: [mod, "1–9"], label: "Jump to the Nth board" },
     { keys: [mod, "L"], label: "Focus the Lessons panel" },
     { keys: [mod, "⇧", "L"], label: "Focus the Boards panel" },

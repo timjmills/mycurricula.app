@@ -254,12 +254,19 @@ export function TeachV2Shell(props: TeachZonesProps): ReactNode {
   // ── Lesson/board resizer (Pointer Events) ─────────────────────────────────
   const onResizeStart = useCallback((e: ReactPointerEvent): void => {
     e.preventDefault();
-    const rootRect = rootRef.current?.getBoundingClientRect();
-    if (!rootRect) return;
+    const root = rootRef.current;
+    const rootRect = root?.getBoundingClientRect();
+    if (!root || !rootRect) return;
+    // A3: the shell now insets its cards, so the grid's first column starts
+    // `--teach-inset` in from the root's left edge. Without subtracting it the
+    // pointer would set a lesson width that is one inset TOO WIDE, and the card
+    // would creep right by 16px on every drag.
+    const inset =
+      parseFloat(getComputedStyle(root).getPropertyValue("--teach-inset")) || 0;
     const handle = e.currentTarget as HTMLElement;
     handle.setPointerCapture?.(e.pointerId);
     const onMove = (ev: PointerEvent): void => {
-      const raw = ev.clientX - rootRect.left;
+      const raw = ev.clientX - rootRect.left - inset;
       const clamped = Math.max(
         LESSON_MIN,
         Math.min(rootRect.width * LESSON_MAX_FRACTION, raw),
@@ -589,7 +596,13 @@ export function TeachV2Shell(props: TeachZonesProps): ReactNode {
       {showResizer ? (
         <div
           className={styles.resizer}
-          style={{ left: lessonW }}
+          // Centred on the GAP between the two cards, not on the old shared
+          // edge: inset + lesson width + half the gap. Reads both values from
+          // the stylesheet so the handle cannot drift from the CSS that draws
+          // the layout (TeachV2Shell.module.css `--teach-inset`/`--teach-gap`).
+          style={{
+            left: `calc(var(--teach-inset) + ${lessonW}px + var(--teach-gap) / 2)`,
+          }}
           onPointerDown={onResizeStart}
           role="separator"
           aria-orientation="vertical"
