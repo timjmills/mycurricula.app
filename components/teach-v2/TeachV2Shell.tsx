@@ -88,6 +88,7 @@ export function TeachV2Shell(props: TeachZonesProps): ReactNode {
     libraryOverlay,
     boardSettingsOpen,
     helpOpen,
+    setHelpOpen,
     toggleFullscreen,
     onOpenWidgetLibrary,
     onOpenBoardLibrary,
@@ -187,6 +188,47 @@ export function TeachV2Shell(props: TeachZonesProps): ReactNode {
     openPopovers.writing ||
     openPopovers.timer ||
     openPopovers.switcher;
+
+  // ── `?` opens Help / keyboard shortcuts ───────────────────────────────────
+  // The overlay itself has been live all along (TeachOverlays mounts it), but
+  // `setHelpOpen(true)` was called ONLY from `TeachV1Zones` — the rollback
+  // skin — so under V2 the help dialog had no trigger at all. It matters more
+  // here than elsewhere: the planner's `GlobalShortcuts` (which owns the app's
+  // `?` overlay) is NOT mounted in the `(teach)` route group, which is exactly
+  // why Teach carries its own.
+  //
+  // WHY THE KEY BINDING LIVES HERE and not in `lib/use-teach-shortcuts.ts`:
+  // that hook bails on `if (!mod) return` after the Esc cascade, so every
+  // shortcut it owns is a modifier chord. `?` is Shift+/ — no modifier — and it
+  // would need a new branch ABOVE that bail plus a new option threaded through
+  // `TeachWorkspace`. Both of those files sit outside this lane's tree. The
+  // binding is three lines and its state is already in hand here, so it lives
+  // beside the Esc-layering effect below rather than reaching across an
+  // ownership line. If a second modifier-less Teach shortcut ever appears, that
+  // is the moment to lift both into the hook.
+  //
+  // Toggles rather than only opening, so the key that summons the dialog also
+  // dismisses it. Suppressed inside a text input / contenteditable — a teacher
+  // typing "?" into a note must get a question mark, not a dialog.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== "?" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.isContentEditable ||
+          t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT")
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setHelpOpen(!helpOpen);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [helpOpen, setHelpOpen]);
 
   // ── True-fullscreen Esc — TOP layer only (Escape layering, Wave 9a bug) ────
   // Capture phase so this can win over lower layers — but it DEFERS (returns
@@ -330,6 +372,20 @@ export function TeachV2Shell(props: TeachZonesProps): ReactNode {
           onClick={() => setBoardExpanded((v) => !v)}
         >
           <V2Icon name={boardExpanded ? "exit" : "fullscreen"} size={16} />
+        </Button>
+        {/* Help / keyboard shortcuts. A shortcuts dialog reachable only BY a
+            shortcut is no better than one with no trigger at all, so it gets a
+            visible control as well as the `?` key. Sits before the two
+            view-mode buttons because it is a reference, not a mode change. */}
+        <Button
+          variant="icon"
+          size="sm"
+          iconAriaLabel="Help and keyboard shortcuts"
+          tooltip="Keyboard shortcuts and a quick guide to the Teach workspace (?)"
+          aria-expanded={helpOpen}
+          onClick={() => setHelpOpen(!helpOpen)}
+        >
+          <V2Icon name="help" size={16} />
         </Button>
         <Button
           variant="icon"

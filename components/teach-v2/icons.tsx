@@ -27,7 +27,8 @@ export type V2IconName =
   | "eraser"
   | "text"
   | "image"
-  | "grip";
+  | "grip"
+  | "help";
 
 export interface V2IconProps {
   name: V2IconName;
@@ -173,6 +174,17 @@ export function V2Icon({ name, size = 18 }: V2IconProps): ReactNode {
           <circle cx="15" cy="12" r="1.4" />
           <circle cx="9" cy="17" r="1.4" />
           <circle cx="15" cy="17" r="1.4" />
+        </svg>
+      );
+    // Circled question mark — the Help / keyboard-shortcuts trigger. Matches
+    // the v1 chrome's HelpIcon (components/teach/chrome/TeachTopBar.tsx) so the
+    // control reads the same on both skins.
+    case "help":
+      return (
+        <svg {...common} {...STROKE}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.5 9a2.5 2.5 0 1 1 4.5 1.5c-.7.5-1.5 1-1.5 2.5" />
+          <line x1="12" y1="17" x2="12" y2="17.5" />
         </svg>
       );
     default:
