@@ -455,6 +455,12 @@ export function WeeklyLessonCard({
   // ── Stripe — solid by default, dashed when personally modified ────────────
   // The stripe sits behind the header band via z-index but still reads
   // through the 5px gap at the card's inline-start edge.
+  // `--wlc-rail` is the done hook (see the block above cardSurface). The
+  // fallback is the value the stripe already had, so a card that is not done is
+  // pixel-identical. The three-tier fork differentiation — solid vs dashed,
+  // §2 — is untouched: a done card that is also personally modified keeps its
+  // dashed rail, just desaturated.
+  const rail = `var(--wlc-rail, ${color.stripe})`;
   const stripeStyle: CSSProperties = {
     position: "absolute",
     insetBlock: 0,
@@ -463,9 +469,9 @@ export function WeeklyLessonCard({
     zIndex: 1,
     ...(lesson.modified
       ? {
-          backgroundImage: `repeating-linear-gradient(to bottom, ${color.stripe} 0 6px, transparent 6px 11px)`,
+          backgroundImage: `repeating-linear-gradient(to bottom, ${rail} 0 6px, transparent 6px 11px)`,
         }
-      : { background: color.stripe }),
+      : { background: rail }),
   };
 
   // ── Card shell ────────────────────────────────────────────────────────────
@@ -502,21 +508,40 @@ export function WeeklyLessonCard({
   // drag-collapsed state; during a drag ALL peers become chips) render opaque
   // paper with NO backdrop blur: clearer while dragging, and it removes the
   // backdrop-filter multiplication at the jank-critical moment (§4a perf review).
+  // ── THE DONE HOOK — why every surface colour below is wrapped in a var() ──
+  //
+  // This card computes its colours in JS and applies them through the inline
+  // `style` attribute. An inline declaration beats any stylesheet rule that is
+  // not `!important`, so a `.cardDone { background: … }` rule CANNOT restyle
+  // this card — which is why the done state used to be expressed as an inline
+  // `opacity` (the one thing a stylesheet did not have to win to apply).
+  //
+  // The fix is the same conversion commit de7a904 applied to
+  // `components/lesson-card`: express each colour as
+  // `var(--wlc-…, <the value it already had>)`. A custom property is a
+  // DIFFERENT property from the one declared inline, so a stylesheet CAN set
+  // it, while the fallback keeps the value byte-identical wherever the property
+  // is unset. Every card that is not done therefore renders EXACTLY as before
+  // (nothing sets these), and `.cardDone` in weekly-lesson-card.module.css
+  // recolours the done card by setting four values instead of by fading it.
   const frameSurface: CSSProperties =
     isFloating || isCompact
-      ? { background: "var(--paper)" }
+      ? { background: "var(--wlc-bg, var(--paper))" }
       : frame === "glass"
         ? {
             // Frosted only on RESTING full cards (drag-time chips gated opaque
             // above). §4b: measure resting-scroll FPS on a populated glass grid;
             // if it janks, drop the blur radius or cap by visible-card count.
-            background: "color-mix(in oklab, var(--paper) 72%, transparent)",
+            background:
+              "var(--wlc-bg, color-mix(in oklab, var(--paper) 72%, transparent))",
             backdropFilter: "blur(14px) saturate(1.2)",
             WebkitBackdropFilter: "blur(14px) saturate(1.2)",
           }
         : frame === "color"
-          ? { background: `color-mix(in oklch, ${color.cl} 42%, var(--paper))` }
-          : { background: "var(--paper)" };
+          ? {
+              background: `var(--wlc-bg, color-mix(in oklch, ${color.cl} 42%, var(--paper)))`,
+            }
+          : { background: "var(--wlc-bg, var(--paper))" };
 
   const cardSurface: CSSProperties = {
     position: "relative",
@@ -542,10 +567,38 @@ export function WeeklyLessonCard({
           : "var(--shadow-card)",
     transform: isFloating ? "rotate(-1.2deg)" : "none",
     cursor: "pointer",
-    // Done cards recede but stay readable — a gentle fade with only a light
-    // desaturation, so "done" scans at a glance without going washed-out.
-    opacity: done ? 0.66 : 1,
-    filter: done ? "saturate(72%)" : "none",
+    // ── NO `opacity` AND NO `filter` HERE. THIS IS LOAD-BEARING. ────────────
+    //
+    // This used to read `opacity: done ? 0.66 : 1` with a comment claiming the
+    // fade kept a done card "readable … without going washed-out". THAT CLAIM
+    // WAS FALSE, and measurably so. `opacity` on an element fades the whole
+    // SUBTREE at composite time, so every glyph in the header inherited it, and
+    // `.bandTitleSub`'s own 0.75 multiplied on top of it to an effective 0.49.
+    // Measured live on the running app at 1440 with an instrument that
+    // composites the ancestor opacity chain, photographs the backdrop off the
+    // blanked glyph pixels and grades the worst decile
+    // (`node scripts/qa-k-contrast.mjs --routes=weekly`, HEAD f4e81ff):
+    //
+    //   element            paper-wash (light)   paper-night (dark)   floor
+    //   .bandTitle              2.68                  4.27            4.5
+    //   .bandSubject            2.68                  4.27            4.5
+    //   .bandTime               2.68                  4.27            4.5
+    //   .bandTitleSub           2.03                  3.03            4.5
+    //
+    // All eight readings fail AA. An opacity-blind probe read the same elements
+    // at 5.14 / 7.85, which is why this survived every earlier sweep.
+    //
+    // The done signal is NOT dropped — it moves off the text and onto the
+    // SURFACE, exactly as `components/week-v2/WeekA.module.css:252` requires:
+    // "If a future state needs to recede, move the tint, the border or the
+    // weight — not `opacity` on an element that contains text." `.cardDone`
+    // pales the band tint, desaturates the 5px rail and quiets the band rule,
+    // all as mixes toward --surface/--paper so the recession reads the same way
+    // in Night as in light tone (a fade does not — it approaches the backdrop,
+    // which is dark in one tone and light in the other). On top of that the
+    // title keeps its line-through and the CompletionCheck keeps its filled
+    // state, so this card carries three done affordances where a WeekA tile
+    // carried only the fade.
     paddingInlineStart: 5,
   };
 
@@ -558,16 +611,18 @@ export function WeeklyLessonCard({
   // than the deep `color.gradient` the old expanded band used. This reads as
   // "subject-tinted header over off-white body" the same way collapsed and
   // expanded, which is the design contract for the redesigned card.
-  const bandSeparatorColor = `color-mix(in oklch, ${color.stripe} 45%, transparent)`;
+  const bandSeparatorColor = `var(--wlc-band-edge, color-mix(in oklch, ${color.stripe} 45%, transparent))`;
   // Header band tint — frame-aware (W3.6): color-forward gets a bolder subject
   // fill; glass lets the frost show through a lighter translucent tint; paper
   // keeps the subtle baseline. Tokens are tone-aware so all three adapt to dark.
+  // Wrapped in `--wlc-band-bg` (the done hook) — the fallback is the value each
+  // frame already had, so a card that is not done is pixel-identical.
   const bandTint =
     frame === "color"
-      ? `color-mix(in oklch, ${color.cl} 88%, var(--surface))`
+      ? `var(--wlc-band-bg, color-mix(in oklch, ${color.cl} 88%, var(--surface)))`
       : frame === "glass"
-        ? `color-mix(in oklch, ${color.cl} 40%, transparent)`
-        : `color-mix(in oklch, ${color.cl} 72%, var(--surface))`;
+        ? `var(--wlc-band-bg, color-mix(in oklch, ${color.cl} 40%, transparent))`
+        : `var(--wlc-band-bg, color-mix(in oklch, ${color.cl} 72%, var(--surface)))`;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -814,7 +869,7 @@ export function WeeklyLessonCard({
       // to 88px+ (full). Instead the compact↔full switch is an instant DOM
       // reflow; only the rich content inside uses AnimatePresence
       // (height: 0→auto) so text renders at its correct font-size every frame.
-      className={`cp-subj ${subject.cls} ${styles.card} ${isCompact ? styles.cardCompact : ""}`}
+      className={`cp-subj ${subject.cls} ${styles.card} ${isCompact ? styles.cardCompact : ""} ${done ? styles.cardDone : ""}`}
       data-style={style}
       // Scroll-into-view anchor — present in BOTH compact and full density
       // so scrollPlannerItemIntoView() always finds this card after a move or
@@ -1159,7 +1214,13 @@ export function WeeklyLessonCard({
                 className={styles.bandTitle}
                 style={{
                   color: color.cd,
-                  textDecoration: done ? "line-through" : "none",
+                  // `textDecorationLine`, NOT the `textDecoration` SHORTHAND.
+                  // The shorthand next to `textDecorationColor` made React log
+                  // "Updating textDecoration textDecorationColor … can lead to
+                  // styling bugs" on every completion toggle — caught in the
+                  // browser console during the §4b pass for this fix, since
+                  // toggling done is exactly what re-runs this render.
+                  textDecorationLine: done ? "line-through" : "none",
                   textDecorationColor: `color-mix(in oklch, ${color.cd} 40%, transparent)`,
                 }}
               >

@@ -5,7 +5,7 @@
      • header band layout (check · meta · controls · title · caret)
      • body, section rows, collapsed preview, expanded sections
      • footer chips, affordances, notes disclosure
-     • done-fade (via the card root's inline opacity/filter — no extra class)
+     • the done recession (`.cardDone` — a SURFACE recolour, never a fade)
      • ≥44px touch targets on all primary controls
      • :focus-visible rings throughout
      • prefers-reduced-motion guard */
@@ -26,12 +26,17 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* `background-color` replaces the `opacity` + `filter` entries that used to
+     sit here. Those two existed only to soften the done-fade this card no
+     longer has (see `.cardDone` below); nothing else on the root animates
+     either property, so they were dead the moment the fade went. The done
+     state now changes a colour, so a colour is what transitions — otherwise
+     ticking a lesson off snaps. */
   transition:
     box-shadow 0.15s ease,
     border-color 0.15s ease,
     transform 0.12s ease,
-    opacity 0.18s ease,
-    filter 0.18s ease;
+    background-color 0.18s ease;
   outline: none;
 }
 
@@ -43,6 +48,69 @@
   overflow: visible;
   cursor: default;
   height: auto;
+}
+
+/* ── Done card — the recession, as SURFACE and never as a subtree fade ────── */
+/* WHAT WAS HERE BEFORE, AND WHY IT HAD TO GO. There was no class at all: a done
+   card got `opacity: 0.66` as an INLINE style on the card root
+   (weekly-lesson-card.tsx), with a comment claiming the fade kept it "readable
+   … without going washed-out". `opacity` fades the whole SUBTREE at composite
+   time, so every glyph in the header inherited it, and `.bandTitleSub`'s own
+   0.75 multiplied on top into an effective 0.49. Measured live at 1440 with the
+   ancestor-opacity-compositing probe (`scripts/qa-k-contrast.mjs`, HEAD
+   f4e81ff): .bandTitle / .bandSubject / .bandTime read 2.68 on paper-wash and
+   4.27 on paper-night, and .bandTitleSub read 2.03 / 3.03 — against a 4.5
+   floor, all eight failing. An opacity-blind probe read the same elements at
+   5.14 / 7.85, which is why every earlier sweep called this clean.
+
+   WHERE THE SIGNAL WENT, AND WHY IT IS NOT SIMPLY DROPPED. Same move
+   `components/week-v2/WeekA.module.css:233-254` made, and this file is bound by
+   the rule it states: "If a future state needs to recede, move the tint, the
+   border or the weight — not `opacity` on an element that contains text." The
+   band tint drops from 72% of the subject fill (88% on Frame C, 40% on glass)
+   to 18%, the 5px fork rail desaturates to 45%, and the band's separator rule
+   quiets from 45% to 18%, so a done card visibly recedes from its neighbours in
+   the same column while its ink stays at FULL strength. Unlike WeekA, this card
+   was never relying on the fade alone — the title keeps its line-through and
+   the CompletionCheck keeps its filled state — so the surface change is the
+   third done affordance, not the only one.
+
+   TONE. Every value mixes toward `transparent` (revealing the card root's own
+   `--paper`/frost) or toward `--paper` itself, and `--c` / `--cl` are already
+   tone-aware, so the recession reads the same way in Night as in light tone. A
+   fade cannot do that: it walks the text toward the backdrop, which is dark in
+   one tone and light in the other, so it destroys contrast asymmetrically.
+
+   HOW IT REACHES AN INLINE STYLE AT ALL. It does not fight the inline
+   declaration — it cannot, an inline style outranks every stylesheet rule at
+   any specificity. It sets CUSTOM PROPERTIES that the inline values read
+   through `var(--wlc-…, <previous value>)` (the de7a904 conversion; see the
+   long note above `frameSurface` in the .tsx). A card that is not done sets
+   none of these and renders byte-identically to before.
+
+   SPECIFICITY / ORDER. `.cardDone` is (0,1,0) and so is `.card`, so this MUST
+   stay BELOW `.card` in this file, and the class is DOUBLED so a later
+   re-ordering still cannot revert it. Today the two rules share no property —
+   `.card` never sets a `--wlc-*` — so nothing depends on the order yet; the
+   belt and braces are there because the next person to add a `--wlc-*` default
+   to `.card` will not read this paragraph first. (Repo memory
+   cp-root-button-reset-trap: a modifier written above its base is dead.) */
+.cardDone.cardDone {
+  --wlc-band-bg: color-mix(in oklch, var(--cl) 18%, transparent);
+  --wlc-band-edge: color-mix(in oklch, var(--c) 18%, transparent);
+  --wlc-rail: color-mix(in oklab, var(--c) 45%, var(--paper));
+}
+
+/* The card ROOT carries subject colour on Frame C only (glass and paper roots
+   are neutral `--paper`, tinted or frosted), so `--wlc-bg` is set only there —
+   setting it unconditionally would ADD colour to a done card on the other two
+   frames, the wrong direction entirely. `:not(.cardCompact)` leaves the
+   drag-time chip exactly as it was: that branch is deliberately flat opaque
+   paper for drag legibility + blur cost, and a drag ghost is not a surface
+   anyone reads a completion state off. Precedent for the `:global` frame hook:
+   lesson-card.module.css:187. */
+:global([data-frame="color"]) .cardDone.cardDone:not(.cardCompact) {
+  --wlc-bg: color-mix(in oklch, var(--cl) 14%, var(--paper));
 }
 
 /* Full-mode content wrapper (band + body). Grows to consume the card root's
@@ -173,6 +241,11 @@
   min-height: 88px;
   flex: 0 0 auto;
   /* border-bottom is injected inline with the subject separator color. */
+  /* Matches the root's transition so the band tint and the card surface recede
+     together when a lesson is ticked off (`.cardDone`). */
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 /* ── Band top row: check · subject·time · right controls ─────────────────── */
@@ -464,13 +537,20 @@
    Smaller + muted so it reads as a qualifier, not a second headline. Rendered
    ONLY when a qualifier exists (the band's fixed min-height — not a reserved
    blank line — keeps the header uniform; fix #2). Single line. */
+/* NO `opacity` HERE. It was 0.75, and on a done card it multiplied with the
+   card root's 0.66 into an effective 0.49 — 2.03:1 on paper-wash and 3.03:1 on
+   paper-night against a 4.5 floor. Removing only the root's 0.66 does NOT clear
+   it: 0.75 alone still measured under the floor, so both had to go. The
+   "qualifier, not a second headline" hierarchy this fade was buying is already
+   carried by three other axes — --t-11 against the title's --t-16, weight 400
+   against 700, and it sits below the title in reading order — which is the same
+   argument WeekA.module.css:266-272 makes for the same removal. */
 .bandTitleSub {
   display: block;
   margin-top: 1px;
   font-size: var(--t-11);
   font-weight: 400;
   line-height: 1.3;
-  opacity: 0.75;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1026,6 +1106,9 @@
    true — opacity-only, no height/layout animation (spec §2.4). */
 @media (prefers-reduced-motion: reduce) {
   .card,
+  /* `.band` joined this list when it gained a background transition for the
+     done recession — the root alone is no longer the whole story. */
+  .band,
   .caret,
   .affordance,
   .affordanceVisual,
