@@ -87,12 +87,51 @@
 -- catches a mis-keyed lock (HIGH-4's failure mode) without catching a genuine
 -- interleaving bug. Do not read a green run as concurrency coverage.
 --
--- ⚠ STATUS, RECORDED HONESTLY: this file has NEVER BEEN EXECUTED. It was
--- authored in an environment with no local Postgres, and agents are barred from
--- running anything against production, so it is reviewed SQL rather than a
--- passing suite. Treat a first run as part of the apply, and expect to fix
--- fixture details. Do not cite this file as evidence the migration works until
--- someone has actually seen it print `== RESULTS ==` with every row true.
+-- ── STATUS: EXECUTED 2026-08-10. 47 of 47 assertions passed. ───────────────
+-- This header used to warn that the file had never been run. It has now been
+-- run, and the migration applied clean, so that warning is retired rather than
+-- softened. Environment: PostgreSQL 16.14 on a throwaway cluster (no Docker
+-- available; the server binaries were extracted from the Ubuntu .debs into a
+-- user directory, so nothing was installed system-wide). All 39 migrations in
+-- supabase/migrations/ applied in order, then this file.
+--
+-- ⚠ TWO SUPABASE STUBS THE MIGRATIONS ASSUME, beyond the ones listed under
+-- HOW TO RUN — both were discovered by hitting them, and a bare Postgres needs
+-- both or the chain stops:
+--   • `auth.jwt()` returning `current_setting('request.jwt.claims', true)::jsonb`
+--     — 20260607120000_claude_access_log_reconcile.sql:51 needs it.
+--   • an `extensions` SCHEMA with pgcrypto installed into it
+--     — 20260615120000_framework_selection.sql:192 needs it.
+--
+-- ⚠ AND ONE THAT IS NOT A STUB BUT A REAL PROPERTY OF THIS SCHEMA: no migration
+-- GRANTS anything on `school_years` (nor on the teach tables). Freshly applied
+-- to a bare Postgres, `information_schema.role_table_grants` shows privileges
+-- for `postgres` ONLY, while three policies exist — so as `authenticated` every
+-- scenario here dies with "permission denied for table school_years" before a
+-- single guard runs. The app works because a real Supabase PROJECT grants
+-- anon/authenticated/service_role on public tables by default; the repo relies
+-- on that platform default rather than creating it. A throwaway database must
+-- therefore run, AFTER the migrations:
+--     grant all on all tables    in schema public to anon, authenticated, service_role;
+--     grant all on all sequences in schema public to anon, authenticated, service_role;
+--     grant execute on all functions in schema public to anon, authenticated, service_role;
+--
+-- ── THE INSTRUMENT WAS PROVEN, NOT ASSUMED ─────────────────────────────────
+-- A green run on a never-before-executed harness is worth little on its own, so
+-- the counterfactual was run: the three guard triggers were dropped and the file
+-- re-run. It did NOT print a green table — it recorded 9 failures before
+-- aborting, and the four that matter name their own failure mode rather than
+-- reporting a bare false:
+--     c1_direct_deactivate_rejected  [NO ERROR — the write SUCCEEDED]
+--     c2_school_id_change_rejected   [NO ERROR — the write SUCCEEDED]
+--     f3_delete_active_year_rejected [NO ERROR — the write SUCCEEDED]
+--     g1_insert_active_year_rejected [NO ERROR — the write SUCCEEDED]
+-- plus the state checks c3/c4/f4/g2/g4. That is the SECURITY DEFINER
+-- inert-guard bug reproduced deliberately, and this file detecting it — which
+-- is the claim the header above makes and could not previously back.
+--
+-- STILL TRUE: this is not concurrency coverage (see above), and a green run
+-- here is not a substitute for the apply-day runbook checks in the migration.
 -- ###########################################################################
 
 \set ON_ERROR_STOP on
