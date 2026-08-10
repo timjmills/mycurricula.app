@@ -768,7 +768,7 @@ export function LessonCard({
               gap: 6,
               fontSize: 11.5,
               lineHeight: 1.45,
-              color: "var(--catchup)",
+              color: "var(--catchup-ink)",
               background: "var(--catchup-bg)",
               borderRadius: 5,
               padding: "6px 8px",

@@ -46,7 +46,7 @@
   width: 18px;
   height: 18px;
   border-radius: var(--r-4);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   background: var(--catchup-bg);
   transition: filter 0.12s ease;
 }
@@ -103,7 +103,7 @@
   width: 18px;
   height: 18px;
   border-radius: var(--r-4);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   background: var(--catchup-bg);
   flex: 0 0 auto;
 }
@@ -116,7 +116,7 @@
   font-size: var(--t-12);
   font-weight: 700;
   letter-spacing: 0.2px;
-  color: var(--catchup);
+  color: var(--catchup-ink);
 }
 
 /* X close button — compact ghost button, ink-toned, hover fill. */

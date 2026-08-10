@@ -230,7 +230,7 @@
 }
 
 .rowError {
-  color: var(--catchup);
+  color: var(--catchup-ink);
   font-weight: 600;
 }
 
@@ -348,7 +348,7 @@
 .unsavedNote {
   margin: 8px 0 0;
   font-size: var(--t-12);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   line-height: 1.5;
   max-width: 64ch;
 }

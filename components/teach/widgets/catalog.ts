@@ -11,7 +11,7 @@
 // generics (deduped into a named survivor per Ultraplan §4.2) keep their
 // metadata + body for backward-compatible rendering but are not offered.
 
-import type { WidgetType } from "@/lib/types";
+import type { SlideElementKind, WidgetType } from "@/lib/types";
 import type { TeachIconName } from "./icons";
 import type { BoardTint } from "./types";
 
@@ -37,6 +37,21 @@ export interface WidgetMeta {
    *  generics (deduped per §4.2) set this `false`: still renderable from an
    *  existing board, just not addable. Defaults to `true` when omitted. */
   addable?: boolean;
+  /**
+   * 7.21 SLIDE-ELEMENT facet: the element kinds this type can be placed as on
+   * the slide canvas (design handoff `source-home/teach.jsx:416-446`).
+   *
+   * This is a FACET, not a replacement. A type carrying it stays a perfectly
+   * ordinary addable widget — the facet only says "this type can ALSO be
+   * dropped on the slide bare, without card chrome". Nothing is retired by it:
+   * all 41 widgets remain in the catalogue and in the library.
+   *
+   * `resource` carries BOTH kinds because a doc and a chip are two
+   * presentations of the same reference (see lib/teach/slide-elements.ts) —
+   * which is what lets a chip be promoted to a doc by editing config rather
+   * than rewriting the row's type.
+   */
+  slideElement?: readonly SlideElementKind[];
 }
 
 /** Complete metadata for every widget type. Ordered so the picker mirrors the
@@ -328,6 +343,7 @@ const ALL_WIDGETS: readonly WidgetMeta[] = [
     icon: "text",
     tint: "yellow",
     category: "utilities",
+    slideElement: ["text"],
   },
   {
     type: "namepick",
@@ -368,6 +384,7 @@ const ALL_WIDGETS: readonly WidgetMeta[] = [
     icon: "embed",
     tint: "none",
     category: "utilities",
+    slideElement: ["doc", "chip"],
   },
   // ── Retired generics (deduped per §4.2; metadata kept for header rendering,
   //    body kept in the dispatch, but NOT offered in the picker) ─────────────
@@ -530,6 +547,14 @@ const BY_TYPE: Record<WidgetType, WidgetMeta> = ALL_WIDGETS.reduce(
 export function widgetMeta(type: WidgetType): WidgetMeta {
   return BY_TYPE[type];
 }
+
+/** The types that can be placed as a 7.21 slide element, with their kinds. The
+ *  "+" popover's "Add to the slide" group reads this, so adding a facet to a
+ *  catalogue entry is all it takes to offer a new element kind — the popover
+ *  never carries its own list to drift from. */
+export const SLIDE_ELEMENT_TYPES: readonly WidgetMeta[] = ALL_WIDGETS.filter(
+  (m) => m.slideElement != null && m.slideElement.length > 0,
+);
 
 /** Human label for a picker category (used as a section header). */
 export const CATEGORY_LABEL: Record<WidgetCategory, string> = {

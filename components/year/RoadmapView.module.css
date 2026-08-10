@@ -119,7 +119,7 @@
 }
 .legendPill[data-status="behind"] {
   background: var(--catchup-bg);
-  color: var(--catchup);
+  color: var(--catchup-ink);
 }
 .legendPill[data-status="not_started"] {
   background: var(--idle-tint);

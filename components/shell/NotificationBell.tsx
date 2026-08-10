@@ -391,8 +391,15 @@ function NotificationRow({
     }
   };
 
+  // The ink is paired with the fill in lib/realtime-presence.ts and must be
+  // applied with it — the .avatar rule's own `color: var(--on-solid)` is
+  // white, which measures 2.07:1 on the amber identity hue and 2.67:1 on
+  // teal. Setting it inline overrides the class for actor rows only; the
+  // system rows (.avatarSystem) keep their neutral pairing.
   const avatarStyle: CSSProperties | undefined =
-    item.actor !== null ? { background: item.actor.avatarColor } : undefined;
+    item.actor !== null
+      ? { background: item.actor.avatarColor, color: item.actor.avatarInk }
+      : undefined;
 
   return (
     <div

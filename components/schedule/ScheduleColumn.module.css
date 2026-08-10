@@ -33,7 +33,7 @@
 }
 
 .headerToday {
-  color: var(--catchup);
+  color: var(--catchup-ink);
   font-weight: 800;
   border-bottom-color: var(--catchup);
 }

@@ -37,7 +37,7 @@
   margin: 0 0 12px;
   padding: 10px 14px;
   font-size: var(--t-13);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   background: var(--catchup-bg);
   border: 1px solid color-mix(in srgb, var(--catchup) 28%, transparent);
   border-radius: var(--r-md);

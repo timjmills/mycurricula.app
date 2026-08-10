@@ -222,7 +222,7 @@ export function YearStatCards({
         value={skippedCount}
         caption="lessons"
         icon={<IconSkip />}
-        accent="var(--catchup)"
+        accent="var(--catchup-ink)"
         warn={skippedCount > 0}
       />
 

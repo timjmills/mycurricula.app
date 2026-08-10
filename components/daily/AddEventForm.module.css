@@ -177,7 +177,7 @@
 
 .errorMsg {
   font-size: var(--t-11);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   margin: 0;
 }
 

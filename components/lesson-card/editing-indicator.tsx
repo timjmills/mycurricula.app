@@ -95,7 +95,12 @@ export function EditingIndicator({
     height: 14,
     borderRadius: 999,
     background: primary.avatarColor,
-    color: "var(--paper)",
+    // `avatarInk`, never --paper. --paper is a SURFACE token: it is white in
+    // light tone and #1e1d2c in dark, so the initials silently inverted with
+    // the canvas while the fill stayed put — measured 2.67:1 on teal in light
+    // tone and 3.14:1 on purple in dark. The ink now travels with the fill
+    // (see lib/realtime-presence.ts) and every pair clears 4.5:1 in both tones.
+    color: primary.avatarInk,
     fontSize: 8,
     fontWeight: 700,
     letterSpacing: 0.1,

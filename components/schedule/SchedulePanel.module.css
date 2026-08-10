@@ -186,7 +186,7 @@
    so a teacher always sees where "today" lives. */
 .dayChipToday:not(.dayChipActive) {
   border-color: var(--catchup);
-  color: var(--catchup);
+  color: var(--catchup-ink);
 }
 
 .chipDay {

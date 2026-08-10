@@ -39,7 +39,7 @@
 
 .flameBtn:hover {
   background: var(--ink-100);
-  color: var(--catchup);
+  color: var(--catchup-ink);
 }
 
 .flameBtn:focus-visible {
@@ -57,7 +57,10 @@
    radius are inherited from the shared rule. */
 
 .catchupBadge {
-  background: var(--catchup);
+  /* --catchup-solid, not --catchup: the shared `.badge` rule paints the count
+     in --on-solid, and white on the raw flame is 4.21:1 — under AA for a
+     10px/700 numeral. The solid rung clears 5.13:1. */
+  background: var(--catchup-solid);
 }
 
 /* ── Responsive — fold into the top-bar collapse cascade ──────────────

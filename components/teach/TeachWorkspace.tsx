@@ -73,6 +73,13 @@ import type {
 import { type BoardEditorIntent, type ResourceItem } from "./board/editor";
 import { BoardFullscreen } from "./board/fullscreen";
 import { widgetMeta } from "@/components/teach/widgets";
+import {
+  DOC_DEFAULT_H,
+  elementKindForResourceKind,
+  isSlideElement,
+  SLIDE_ELEMENT_KEY,
+  widgetTypeForElement,
+} from "@/lib/teach/slide-elements";
 import { ANNOTATION_SWATCHES } from "./annotation";
 import { V2 } from "@/lib/v2-flag";
 import { TeachV1Zones } from "./TeachV1Zones";
@@ -1029,17 +1036,82 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             return;
           }
           case "addResource": {
+            // The v2 shell's own Writing-Bar "Resource" button emits THIS intent
+            // (components/teach-v2/WritingBar.tsx, another lane's file). Placing
+            // it as a 7.21 slide element here means the shipped surface gets the
+            // handoff's framed card / pill without that file changing at all —
+            // and it stays forward-only, because this path only ever creates.
             const gradeLevelId = boardGradeId(board);
             if (gradeLevelId == null) return;
+            const kind = elementKindForResourceKind(intent.resource.kind);
+            const config: Record<string, unknown> = {
+              [SLIDE_ELEMENT_KEY]: kind,
+              label: intent.resource.title,
+              kind: intent.resource.kind,
+            };
+            if (intent.resource.url) config.url = intent.resource.url;
             const widget = buildWidget(
               board.id,
               "resource",
               intent.resource.title,
-              intent.canvas,
+              // A doc needs an explicit height; the shell's intent carries only
+              // {x,y,w}, so stamp the handoff default when it is missing.
+              kind === "doc" && intent.canvas.h == null
+                ? { ...intent.canvas, h: DOC_DEFAULT_H }
+                : intent.canvas,
               gradeLevelId,
-              { label: intent.resource.title, kind: intent.resource.kind },
+              config,
             );
             await teach.upsertWidgetOnPage(board.id, intent.pageId, widget);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          }
+          // ── 7.21 slide elements ───────────────────────────────────────────
+          // A NEW placement only — this never rewrites an existing widget. The
+          // `element` discriminator goes into `config`, so the write lands on
+          // the SAME `upsertWidgetOnPage` chokepoint every other widget uses and
+          // therefore through `commitPages` → `stripNames` (privacy invariant).
+          case "addElement": {
+            const gradeLevelId = boardGradeId(board);
+            if (gradeLevelId == null) return;
+            const type = widgetTypeForElement(intent.element);
+            const title =
+              intent.element === "text"
+                ? "Text"
+                : (intent.resource?.title ?? "Resource");
+            const config: Record<string, unknown> = {
+              [SLIDE_ELEMENT_KEY]: intent.element,
+            };
+            if (intent.element === "text") {
+              config.text = intent.text ?? "";
+            } else if (intent.resource) {
+              config.label = intent.resource.title;
+              config.kind = intent.resource.kind;
+              if (intent.resource.url) config.url = intent.resource.url;
+            }
+            const widget = buildWidget(
+              board.id,
+              type,
+              title,
+              intent.canvas,
+              gradeLevelId,
+              config,
+            );
+            await teach.upsertWidgetOnPage(board.id, intent.pageId, widget);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          }
+          case "updateElementText": {
+            const src = pages
+              .find((p) => p.id === intent.pageId)
+              ?.widgets.find((w) => w.id === intent.widgetId);
+            // Only ever patch something that IS a slide element; a stray intent
+            // must never be able to stamp element config onto a widget card.
+            if (!src || !isSlideElement(src)) return;
+            await teach.upsertWidgetOnPage(board.id, intent.pageId, {
+              ...src,
+              config: { ...src.config, text: intent.text },
+            });
             await Promise.all([reloadBoards(), reloadPages()]);
             return;
           }
@@ -1048,7 +1120,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             await Promise.all([reloadBoards(), reloadPages()]);
             return;
           case "resizeWidget":
-            await teach.resizeWidget(intent.widgetId, intent.w);
+            // `intent.h` is present only from the doc element's two-axis grip;
+            // passing `undefined` PRESERVES an existing height (see the repo
+            // seam's tri-state), so a width-only nudge can't flatten a doc.
+            await teach.resizeWidget(intent.widgetId, intent.w, intent.h);
             await Promise.all([reloadBoards(), reloadPages()]);
             return;
           case "duplicateWidget": {
@@ -1060,7 +1135,14 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             const copy: Widget = {
               ...src,
               id: newWidgetId(src.type),
-              canvas: { x: base.x + 24, y: base.y + 24, w: base.w },
+              canvas: {
+                x: base.x + 24,
+                y: base.y + 24,
+                w: base.w,
+                // Carry an explicit height so duplicating a doc element gives a
+                // card the same size, not one silently reset to content-flow.
+                ...(base.h != null ? { h: base.h } : {}),
+              },
             };
             await teach.upsertWidgetOnPage(board.id, intent.pageId, copy);
             await Promise.all([reloadBoards(), reloadPages()]);

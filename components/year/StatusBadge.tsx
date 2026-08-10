@@ -37,9 +37,14 @@ const STATUS_STYLES: Record<
     label: "Modified",
   },
   skipped: {
-    // --catchup (#e0431a) — flame red at 14% tint → ~#fae8e4; contrast ~4.7:1 (AA).
-    bg: "color-mix(in srgb, var(--catchup) 14%, white)",
-    color: "var(--catchup)",
+    /* The "~4.7:1 (AA)" this comment used to claim was never true — measured
+       on the running app the pair read 3.47:1. `--catchup` is a fill colour,
+       not an ink; `--catchup-ink` is the text rung and reads 4.91:1 here.
+       The tint mixes into var(--surface) rather than a literal `white` so the
+       pill follows the canvas into dark tone, where the tone-branched ink
+       expects a dark backdrop. Light tone is unchanged (--surface = #fff). */
+    bg: "color-mix(in srgb, var(--catchup) 14%, var(--surface))",
+    color: "var(--catchup-ink)",
     label: "Skipped",
   },
   not_started: {
@@ -48,8 +53,8 @@ const STATUS_STYLES: Record<
     label: "Not Started",
   },
   behind: {
-    bg: "color-mix(in srgb, var(--catchup) 16%, white)",
-    color: "var(--catchup)",
+    bg: "color-mix(in srgb, var(--catchup) 16%, var(--surface))",
+    color: "var(--catchup-ink)",
     label: "Behind",
   },
 };

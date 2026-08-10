@@ -309,7 +309,7 @@ export function CatchupScreen() {
                 precedent ("Saved on this device for now…"). */}
             <p
               className={styles.metaRow}
-              style={{ color: "var(--catchup)" }}
+              style={{ color: "var(--catchup-ink)" }}
               role="note"
             >
               Catch-up decisions (done, skipped, carried, notes) are saved on

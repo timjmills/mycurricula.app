@@ -91,8 +91,8 @@ const FILTERS: FilterDefWithCopy[] = [
     id: "skipped",
     label: "Skipped",
     dotVar: "var(--catchup)",
-    activeVar: "color-mix(in srgb, var(--catchup) 12%, white)",
-    activeTextVar: "var(--catchup)",
+    activeVar: "color-mix(in srgb, var(--catchup) 12%, var(--surface))",
+    activeTextVar: "var(--catchup-ink)",
     tooltip:
       "Show lessons you marked skipped — they need a make-up day or to be moved into a future week",
   },
@@ -110,7 +110,7 @@ const FILTERS: FilterDefWithCopy[] = [
     label: "Needs Attention",
     dotVar: "var(--catchup)",
     activeVar: "var(--catchup-bg)",
-    activeTextVar: "var(--catchup)",
+    activeTextVar: "var(--catchup-ink)",
     tooltip:
       "Show units flagged as falling behind pace or needing review — catch-up candidates",
   },

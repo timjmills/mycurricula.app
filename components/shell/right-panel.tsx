@@ -75,7 +75,7 @@ const STATUS_COLORS: Record<LessonStatus, { bg: string; fg: string }> = {
   },
   carried: {
     bg: "var(--catchup-bg)",
-    fg: "var(--catchup)",
+    fg: "var(--catchup-ink)",
   },
   skipped: {
     bg: "var(--ink-100)",

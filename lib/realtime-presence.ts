@@ -54,16 +54,22 @@ const DISMISSED_KEY = "mycurricula:user:notif-dismissed";
  * token to tint the chip. Per Decision #9 we defer real avatars; the
  * initials-in-colored-chip is enough for W4-D1.
  *
- * `avatarColor` is a CSS color VALUE (typically a `var(--tag-*)` token
- * resolved to its hex) so consumers can drop it straight into
- * `background:`. Stable per teacher id so the chip is recognisable
- * across surfaces.
+ * `avatarColor` is a CSS color VALUE (a `var(--avatar-N)` token) so consumers
+ * can drop it straight into `background:`. Stable per teacher id so the chip
+ * is recognisable across surfaces.
+ *
+ * `avatarInk` is its MANDATORY partner — the on-colour for text painted on
+ * that fill. It is not optional styling: white ink clears AA on two of the
+ * five identity hues and fails on the other three (2.07:1 on amber), so a
+ * consumer that picks its own on-colour will silently ship an illegible chip.
+ * Always paint `color: avatarInk` wherever you paint `background: avatarColor`.
  */
 export interface TeacherIdentity {
   id: string;
   name: string;
   initials: string;
   avatarColor: string;
+  avatarInk: string;
 }
 
 /** Categories of notification — used by the bell row icon + voice. */
@@ -100,33 +106,35 @@ export interface NotificationItem {
 }
 
 // ── Avatar color assignment ──────────────────────────────────────────────
-// Stable per-teacher color drawn from the --tag-* palette in tokens.css.
-// Tokens that resolve to mid-saturation hues — readable as white-on-color
-// for the initials chip at the size we render (18–22px). NOT subject
-// colors: a teacher's identity must not be conflated with the subject
-// they teach, and the tag palette is the documented "identity, not
-// content" register (see app/tokens.css §Tag palette).
+// Stable per-teacher fill + ink drawn from the --avatar-N pairs in
+// tokens.css. NOT subject colors: a teacher's identity must not be conflated
+// with the subject they teach, and the avatar palette derives from the
+// documented "identity, not content" tag register (see app/tokens.css
+// §Presence / identity avatars).
 //
-// Resolved to hex values here so the consumer can use them via inline
-// `background:` without re-reading from CSS — these are tokens we own
-// and won't change without a coordinated update.
+// The fill and the ink travel TOGETHER. This used to hand back a bare
+// `var(--tag-*)` fill and leave the on-colour to each consumer, and both
+// consumers picked one that fails: the editing chip used `var(--paper)`
+// (which inverts to near-black in dark tone) and the notification row used
+// `var(--on-solid)` (white, which measures 2.07:1 on amber and 2.67:1 on
+// teal). Pairing them in the token layer is what makes that unrepresentable.
 
-const TAG_COLORS: readonly string[] = [
-  "var(--tag-indigo)",
-  "var(--tag-teal)",
-  "var(--tag-purple)",
-  "var(--tag-amber)",
-  "var(--tag-pink)",
+const AVATAR_SLOTS: readonly { fill: string; ink: string }[] = [
+  { fill: "var(--avatar-1)", ink: "var(--avatar-1-ink)" },
+  { fill: "var(--avatar-2)", ink: "var(--avatar-2-ink)" },
+  { fill: "var(--avatar-3)", ink: "var(--avatar-3-ink)" },
+  { fill: "var(--avatar-4)", ink: "var(--avatar-4-ink)" },
+  { fill: "var(--avatar-5)", ink: "var(--avatar-5-ink)" },
 ] as const;
 
-function colorForTeacherId(id: string): string {
+function avatarSlotForTeacherId(id: string): { fill: string; ink: string } {
   // Deterministic hash → bucket. Tiny FNV-ish mixer; sufficient for
   // 5-bucket distribution across the team and stable across reloads.
   let h = 0;
   for (let i = 0; i < id.length; i++) {
     h = (h * 31 + id.charCodeAt(i)) >>> 0;
   }
-  return TAG_COLORS[h % TAG_COLORS.length];
+  return AVATAR_SLOTS[h % AVATAR_SLOTS.length];
 }
 
 /** Build a TeacherIdentity for a Teacher fixture (id-stable color). */
@@ -135,11 +143,13 @@ function toIdentity(t: {
   name: string;
   initials: string;
 }): TeacherIdentity {
+  const slot = avatarSlotForTeacherId(t.id);
   return {
     id: t.id,
     name: t.name,
     initials: t.initials,
-    avatarColor: colorForTeacherId(t.id),
+    avatarColor: slot.fill,
+    avatarInk: slot.ink,
   };
 }
 

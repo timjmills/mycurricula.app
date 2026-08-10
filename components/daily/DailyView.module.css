@@ -1856,7 +1856,7 @@
    (--catchup) is the nearest semantic "error" color in tokens.css. */
 .addLessonRowError {
   font-size: var(--t-11);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   margin: 4px 2px 0;
 }
 

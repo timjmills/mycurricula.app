@@ -55,8 +55,14 @@ const VARIANT_STYLES: Record<
     color: "var(--important)",
   },
   danger: {
-    bg: "color-mix(in srgb, var(--catchup) 18%, white)",
-    color: "var(--catchup)",
+    // Mixed into var(--surface), not a literal `white`: a hard white mix
+    // renders a LIGHT pill on the dark canvas, and no single ink can serve
+    // both a light pill and a dark one. --catchup-ink branches on tone, so
+    // its backdrop has to as well. In light tone --surface IS #fff, so this
+    // is a no-op there. (The success/info/warn rows above have the same
+    // tone-blindness with their own inks — out of scope for this pass.)
+    bg: "color-mix(in srgb, var(--catchup) 18%, var(--surface))",
+    color: "var(--catchup-ink)",
   },
   neutral: {
     bg: "var(--ink-100)",

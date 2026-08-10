@@ -308,7 +308,7 @@
 
 .errorBanner {
   background: var(--catchup-bg);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   border: 1px solid color-mix(in srgb, var(--catchup) 30%, transparent);
   border-radius: var(--r-6);
   padding: 8px 12px;

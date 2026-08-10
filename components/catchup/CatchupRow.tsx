@@ -82,7 +82,7 @@ function rowBgFor(status: CatchupItem["status"]): string {
     case "partial":
       return "color-mix(in srgb, var(--important) 8%, white)";
     case "carried":
-      return "color-mix(in srgb, var(--catchup) 8%, white)";
+      return "color-mix(in srgb, var(--catchup) 8%, var(--surface))";
     case "skipped":
       return "var(--ink-100)";
     case "not_done":

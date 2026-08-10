@@ -219,7 +219,10 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--on-solid);
-  background: var(--catchup);
+  /* --catchup-solid, not --catchup: white on the raw flame measures 4.21:1,
+     under the AA floor for this 9px/700 label. The solid rung clears 5.13:1
+     and is the same flame, a shade deeper. */
+  background: var(--catchup-solid);
   border-radius: var(--r-4);
   padding: 2px 4px;
   z-index: 1;

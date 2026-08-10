@@ -22,6 +22,42 @@
      screen — the thing the height comment above exists to protect.
      Defaults to 0px, so this file is inert without that layout. */
   padding-top: var(--immersbar-clear, 0px);
+
+  /* ── A3 · corner + float grammar (CLAUDE.md §4 RULE #1) ─────────────────
+     The two columns are CARDS that float on the canvas, not edge-to-edge
+     regions. Straight from the 7.21 handoff, which is unambiguous:
+       .teach        { display:grid; gap:16px; … }
+       .teach-lesson { background:#fff; border:1px solid var(--border);
+                       border-radius:var(--r-2xl); overflow:hidden;
+                       box-shadow:var(--sh-lg) }
+       .teach-board  { …the same recipe… }
+     (source-home/views.css:342,347,362.) Its `--r-2xl` is 32px, identical to
+     ours, so the radius token ports across unchanged.
+
+     Measured before this: both columns painted square, gapless, borderless and
+     unshadowed — 4 of the 5 sharp-cornered painted elements on the surface. The
+     other bands (filmstrip, writing bar) are square by DESIGN: they sit inside
+     `.board`, whose `overflow: hidden` clips them to its radius, exactly as the
+     handoff nests them inside `.teach-board`.
+
+     `--teach-inset` / `--teach-gap` are read by the resizer's inline `left`
+     (TeachV2Shell.tsx) so the drag handle stays centred on the gap. Change one,
+     change the other. */
+  --teach-inset: 16px;
+  --teach-gap: 16px;
+  gap: var(--teach-gap);
+  padding-right: var(--teach-inset);
+  padding-bottom: var(--teach-inset);
+  padding-left: var(--teach-inset);
+}
+
+/* The floating-card recipe, shared by both columns. `.pane` (the lesson column)
+   carries it from LessonRail.module.css, which also drops the `border-right`
+   that was standing in for a boundary while the column was edge-to-edge. */
+.board {
+  border: 1px solid var(--border);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--sh-lg);
 }
 
 /* True-fullscreen projector takeover (Esc exits). z-index sits ABOVE the shell's
@@ -40,6 +76,16 @@
      60px band it is covering anyway. Same reason browser fullscreen is safe:
      the bar is mounted OUTSIDE rootRef, so it does not paint there at all. */
   padding-top: 0;
+  /* …and the float goes with it. A projected board fills the screen; a rounded
+     card inset 16px from the edge with a drop shadow would waste projector
+     area and draw a frame the class does not need. The handoff does the same
+     thing for its full-bleed frame (`.frame.fullbleed ~ .overlay` drops the
+     inset and the radius, app/chrome.css:1475). `.board` keeps its own radius
+     harmlessly — it is clipped to the viewport either way. */
+  padding-right: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+  gap: 0;
 }
 
 /* ── Resizer (Pointer Events) ─────────────────────────────────────────────── */

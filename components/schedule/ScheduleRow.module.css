@@ -128,7 +128,9 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--on-solid);
-  background: var(--catchup);
+  /* --catchup-solid: white on the raw flame is 4.21:1, under AA for this
+     10px/800 uppercase pill. */
+  background: var(--catchup-solid);
   padding: 1px 6px;
   border-radius: var(--r-pill);
 }

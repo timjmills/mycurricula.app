@@ -15,7 +15,7 @@
   background: color-mix(in srgb, var(--catchup) 8%, var(--paper));
   border: 1px solid color-mix(in srgb, var(--catchup) 25%, transparent);
   border-radius: var(--r-pill);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   font-size: var(--t-11);
   font-weight: 600;
   white-space: nowrap;

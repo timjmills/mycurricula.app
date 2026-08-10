@@ -92,7 +92,7 @@
   margin-top: 4px;
   padding: 4px 8px;
   font-size: var(--t-11);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   background: transparent;
   border: 1px dashed color-mix(in srgb, var(--catchup) 40%, transparent);
   border-radius: var(--r-4);
@@ -105,7 +105,7 @@
 }
 
 .addNote:hover {
-  background: color-mix(in srgb, var(--catchup) 8%, white);
+  background: color-mix(in srgb, var(--catchup) 8%, var(--surface));
   border-color: color-mix(in srgb, var(--catchup) 60%, transparent);
 }
 
@@ -154,7 +154,7 @@
 }
 
 .noteChip:hover {
-  background: color-mix(in srgb, var(--catchup) 18%, white);
+  background: color-mix(in srgb, var(--catchup) 18%, var(--surface));
 }
 
 .noteChip:focus-visible {
@@ -167,7 +167,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--catchup);
+  color: var(--catchup-ink);
   flex-shrink: 0;
 }
 

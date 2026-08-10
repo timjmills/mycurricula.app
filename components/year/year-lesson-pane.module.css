@@ -314,7 +314,7 @@
 }
 .due {
   background: color-mix(in srgb, var(--catchup) 16%, var(--surface));
-  color: var(--catchup);
+  color: var(--catchup-ink);
 }
 .up {
   background: color-mix(in srgb, var(--ink-500) 8%, var(--surface));

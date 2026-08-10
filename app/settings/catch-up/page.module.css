@@ -40,7 +40,7 @@
 }
 
 .inlineLink {
-  color: var(--catchup);
+  color: var(--catchup-ink);
   text-decoration: underline;
   font-weight: 600;
 }

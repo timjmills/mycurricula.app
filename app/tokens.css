@@ -413,6 +413,23 @@
   --fyi-bg: #e0eefb;
   --catchup: #e0431a; /* flame red — catch-up */
   --catchup-bg: #ffe6dd;
+  /* TEXT rung for the flame. `--catchup` is a FILL/stripe colour and is simply
+     a weak ink: measured on the running app it reads 4.21:1 as text on white
+     and 3.19:1 on a 20% tint of itself — i.e. it misses the 4.5 AA floor on
+     EVERY catch-up surface, in every frame and every theme. That is why this
+     is a token rung and not a per-component patch. Mixed toward black in
+     oklab so the hue is preserved (it stays the same flame, deepened) rather
+     than neutralised toward grey; 80% clears 5.24:1 on the WORST measured
+     catch-up backdrop (its own 20% tint) and 6.92:1 on plain --surface.
+     Same shape as --warn-ink above. Dark tone lifts instead of darkens — see
+     the [data-tone="dark"] block. */
+  --catchup-ink: color-mix(in oklab, var(--catchup) 80%, #000);
+  /* FILL rung for when the flame carries --on-solid text (the rail SOON chip,
+     count badges). White on raw --catchup is 4.21:1 — under the floor for the
+     9–11px labels these chips use. 92% toward black clears 5.13:1 and is
+     still unmistakably the same flame. Deliberately NOT tone-branched: the
+     fill does not move with the canvas, so the ink on it must not either. */
+  --catchup-solid: color-mix(in oklab, var(--catchup) 92%, #000);
   /* Core-curriculum mode — soft red/pink, not the dark urgent red.
      Carries the "this is the shared plan" warning without feeling like
      an emergency. */
@@ -432,6 +449,38 @@
   --tag-purple: #8b48d4;
   --tag-pink: #e54b94;
   --tag-gray: #8b909e;
+
+  /* ── Presence / identity avatars (fill + its ink) ─────────────────── */
+  /* The five buckets lib/realtime-presence.ts hashes a teacher into, for the
+     "someone else is editing" chip and the notification-row avatar. Drawn
+     from the --tag-* register above (identity, never subject) but shipped as
+     PAIRS, because no single ink clears AA on all five fills. Measured on the
+     running app at 8px/700 (the smallest render), both tones:
+
+       white on teal    2.67:1   white on amber   2.07:1   white on pink 3.64:1
+       dark  on indigo  3.20:1   dark  on purple  3.14:1
+
+     So the ink is chosen per hue instead of the hue being flattened to buy a
+     uniform ink — the identity colour is the information here, and deepening
+     amber far enough for white ink turns gold into bronze. Worst pair after
+     the change: 5.05:1 (pink).
+
+     Tone-invariant BY CONSTRUCTION. The fill is a fixed hue that does not
+     move with the canvas, so its on-colour must not move either. That is
+     exactly the bug this replaces: the chip used `var(--paper)`, which is
+     white in light tone and #1e1d2c in dark, so the ink silently inverted
+     under the teacher and took two of the five hues below AA. The dark inks
+     are therefore literal values, never var(--ink)/var(--paper). */
+  --avatar-1: var(--tag-indigo);
+  --avatar-1-ink: var(--on-solid); /* 5.17:1 */
+  --avatar-2: var(--tag-teal);
+  --avatar-2-ink: #14131d; /* 6.89:1 */
+  --avatar-3: var(--tag-purple);
+  --avatar-3-ink: var(--on-solid); /* 5.28:1 */
+  --avatar-4: var(--tag-amber);
+  --avatar-4-ink: #14131d; /* 8.87:1 */
+  --avatar-5: var(--tag-pink);
+  --avatar-5-ink: #14131d; /* 5.05:1 — the worst pair, and it clears */
 
   /* ── Tag-pill chrome (bg + fg pairs) ──────────────────────────────── */
   /* Soft pastel fill + deep contrast text, for resource-type pills,
@@ -2017,6 +2066,15 @@
     --important-bg: color-mix(in srgb, var(--important) 20%, var(--surface));
     --fyi-bg: color-mix(in srgb, var(--fyi) 20%, var(--surface));
     --catchup-bg: color-mix(in srgb, var(--catchup) 20%, var(--surface));
+    /* Dark tone LIFTS the flame ink instead of darkening it — the :root value
+       (80% toward black) measures 2.3:1 against the dark catch-up tints, so
+       carrying it over would make the label LESS legible, which is the whole
+       point of branching on tone. 74% toward white clears 4.95:1 on the worst
+       dark backdrop (--catchup-bg) and 6.02:1 on plain --surface. Same
+       treatment --core-mode-deep gets three lines below.
+       --catchup-solid is deliberately NOT overridden: it is a fixed fill that
+       carries white text in both tones. */
+    --catchup-ink: color-mix(in oklab, var(--catchup) 74%, white);
     --core-mode-bg: color-mix(in srgb, var(--core-mode) 20%, var(--surface));
     --core-mode-deep: color-mix(in srgb, var(--core-mode) 55%, white);
 

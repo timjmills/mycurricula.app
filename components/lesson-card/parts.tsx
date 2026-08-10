@@ -81,7 +81,11 @@ export function CompletionCheck({
     border = "1.4px solid var(--catchup)";
     glyph = (
       <span
-        style={{ fontSize: size * 0.7, color: "var(--catchup)", lineHeight: 1 }}
+        style={{
+          fontSize: size * 0.7,
+          color: "var(--catchup-ink)",
+          lineHeight: 1,
+        }}
       >
         ↻
       </span>

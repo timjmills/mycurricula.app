@@ -846,7 +846,7 @@
 
 .carryLabel {
   font-size: var(--t-10);
-  color: var(--catchup);
+  color: var(--catchup-ink);
   font-weight: 500;
 }
 
