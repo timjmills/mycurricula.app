@@ -11,14 +11,9 @@
   width: 64px;
   height: 100%;
   padding: 10px 0;
+  border-right: 1px solid var(--hairline);
   background: var(--rail-bg);
   overflow: hidden;
-  /* Same A3 card recipe as `.pane`: this 64px rail REPLACES the pane when the
-     lesson column is minimized (LessonRail.tsx:75), so it is the same floating
-     card at a narrower width — not a strip welded to the board. */
-  border: 1px solid var(--border);
-  border-radius: var(--r-2xl);
-  box-shadow: var(--sh-lg);
 }
 
 .railBar {
@@ -61,16 +56,9 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  border-right: 1px solid var(--hairline);
   background: var(--panel-bg);
   overflow: hidden;
-  /* A3 · the floating-card recipe, matching `.board` and the handoff's
-     `.teach-lesson` (7.21 source-home/views.css:347). The old `border-right`
-     was the boundary this column had while it ran edge-to-edge into the board;
-     a full border replaces it now that the two float apart with a 16px gap, and
-     a lone right edge would read as a seam between two separated cards. */
-  border: 1px solid var(--border);
-  border-radius: var(--r-2xl);
-  box-shadow: var(--sh-lg);
 }
 
 .paneStripe {

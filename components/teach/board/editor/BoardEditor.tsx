@@ -37,23 +37,11 @@ import type {
   Board,
   BoardPage,
   CanvasPosition,
-  SlideElementKind,
   SubjectId,
   ThemeOverride,
   Widget,
   WidgetType,
 } from "@/lib/types";
-import {
-  clampDocHeight,
-  DOC_DEFAULT_H,
-  DOC_DEFAULT_W,
-  DOC_MIN_W,
-  elementKindBadge,
-  elementKindForResourceKind,
-  elementLabel,
-  elementText,
-  slideElementOf,
-} from "@/lib/teach/slide-elements";
 import {
   BOARD_BASE_THEME,
   clean,
@@ -75,17 +63,9 @@ import {
   widgetMeta,
   TeachIcon,
   CORE_WIDGET_TYPES,
-  SLIDE_ELEMENT_TYPES,
 } from "@/components/teach/widgets";
 import { AppearancePanel, type ThemeProp } from "./AppearancePanel";
 import { useFocusTrap } from "../useFocusTrap";
-import { Button } from "@/components/ui/Button";
-import { Tooltip } from "@/components/ui/Tooltip";
-// The SAME strict sandbox tier the audited board-embed sink uses for a generic
-// link (no `allow-same-origin`, opaque origin). A doc card frames an arbitrary
-// teacher-supplied url, so it gets the strict tier — never the trusted-provider
-// one, which is reserved for the provider allowlist.
-import { GENERIC_LINK_SANDBOX } from "@/lib/board-embed";
 import styles from "./editor.module.css";
 
 // ── Geometry constants (raw px — geometry numbers are allowed) ──────────────
@@ -118,18 +98,6 @@ export interface ResourceItem {
   id: string;
   title: string;
   kind: string;
-  /** Public URL when the resource has one — drives the `doc` element's real
-   *  `<img>`/`<iframe>` body and its "Open in a new tab" button. Absent → the
-   *  card renders its placeholder page, exactly as the handoff does for a
-   *  resource with no live url (`teach.jsx:437`). */
-  url?: string;
-}
-
-/** Pick the element kind a dropped/picked resource lands as (handoff `:236`).
- *  The kind list itself lives in lib/teach/slide-elements.ts so this and the
- *  workspace's intent handler read ONE source. */
-function elementKindForResource(r: ResourceItem): SlideElementKind {
-  return elementKindForResourceKind(r.kind);
 }
 const SAMPLE_RESOURCES: readonly ResourceItem[] = [
   { id: "r1", title: "Verb Tenses Chart", kind: "PDF" },
@@ -163,31 +131,6 @@ export type BoardEditorIntent =
       resource: ResourceItem;
       canvas: CanvasPosition;
     }
-  /** Place a 7.21 SLIDE ELEMENT (text / doc / chip) at `canvas`. Distinct from
-   *  `addWidget`/`addResource` because the parent must stamp `config.element` —
-   *  the discriminator that makes the placement render as a bare text block /
-   *  framed card / pill instead of a widget card. FORWARD-ONLY: this intent only
-   *  ever CREATES; it never converts an existing widget. */
-  | {
-      type: "addElement";
-      pageId: string;
-      element: SlideElementKind;
-      canvas: CanvasPosition;
-      /** Present for `doc` / `chip` — the resource the element references. */
-      resource?: ResourceItem;
-      /** Present for `text` — the initial body (empty for a click-to-type). */
-      text?: string;
-    }
-  /** Commit a `text` element's edited body (contentEditable blur). Separate from
-   *  the appearance/geometry intents because it writes `config`, which is the
-   *  privacy-sensitive slice — the parent MUST route it through the repo's
-   *  `upsertWidgetOnPage`/`commitPages` chokepoint so `stripNames` runs. */
-  | {
-      type: "updateElementText";
-      pageId: string;
-      widgetId: string;
-      text: string;
-    }
   | {
       type: "moveWidget";
       pageId: string;
@@ -195,16 +138,7 @@ export type BoardEditorIntent =
       x: number;
       y: number;
     }
-  /** `h` is only sent by the two-axis `doc` element's corner grip. Omitted (the
-   *  width-only handle every widget card uses) means "keep the existing height",
-   *  so a width nudge can never flatten a doc a teacher sized. */
-  | {
-      type: "resizeWidget";
-      pageId: string;
-      widgetId: string;
-      w: number;
-      h?: number;
-    }
+  | { type: "resizeWidget"; pageId: string; widgetId: string; w: number }
   | { type: "duplicateWidget"; pageId: string; widgetId: string }
   | { type: "deleteWidget"; pageId: string; widgetId: string }
   | {
@@ -267,19 +201,14 @@ export interface BoardEditorProps {
 // the parent's props catch up (or on pointer-up commit).
 type GeomDraft = Record<string, Partial<CanvasPosition>>;
 
-/** Resolve a widget's live canvas position, preferring the optimistic draft.
- *  `h` stays OPTIONAL: only a `doc` element carries one, and spreading an
- *  `h: undefined` would be indistinguishable from "explicitly no height" at the
- *  repo seam, so the key is omitted entirely when absent. */
+/** Resolve a widget's live canvas position, preferring the optimistic draft. */
 function liveCanvas(w: Widget, draft: GeomDraft): CanvasPosition {
   const base: CanvasPosition = w.canvas ?? { x: 24, y: 24, w: DEFAULT_W };
   const d = draft[w.id];
-  const h = d?.h ?? base.h;
   return {
     x: d?.x ?? base.x,
     y: d?.y ?? base.y,
     w: d?.w ?? base.w,
-    ...(h != null ? { h } : {}),
   };
 }
 
@@ -462,344 +391,15 @@ function Placed({
   );
 }
 
-// ── Slide elements (7.21 handoff `source-home/teach.jsx:416-446`) ───────────
-//
-// The three placeable kinds render WITHOUT the widget-card chrome — that is the
-// whole point of the slide canvas: a teacher drops a line of text or a resource
-// onto the paper, not a titled tile. A widget with no `config.element` never
-// reaches this branch, so nothing already on a board changes appearance.
-//
-// EVERY value here is a token or a geometry number. The handoff's raw hex
-// (`#1C1B2E` text ink, `#fff` card fill) and its `font:700 19px` are deliberately
-// NOT ported — they would fail the legibility contract the moment the board's
-// paper went dark, and CLAUDE.md §4 forbids a hard-coded hex or px font-size in
-// a component regardless.
-
-interface ElementProps {
-  widget: Widget;
-  canvas: CanvasPosition;
-  kind: SlideElementKind;
-  selected: boolean;
-  present: boolean;
-  onSelect: (id: string) => void;
-  /** Begin a move drag from a specific affordance (grip / head / pill). */
-  onDragStart: (e: ReactPointerEvent, id: string) => void;
-  /** Begin a two-axis resize (doc only). */
-  onDocResizeStart: (e: ReactPointerEvent, id: string) => void;
-  onDelete: (id: string) => void;
-  /** Commit a text element's edited body. */
-  onCommitText: (id: string, text: string) => void;
-  /** Fill the stage with this doc (session-only — see `presentedId`). */
-  onPresent: (id: string) => void;
-}
-
-/** `text` — a bare contentEditable block with a hover grip (handoff `:416-424`,
- *  `teach-plus.css:77-84`). Empty on blur removes it, exactly as the handoff
- *  does (`:422`): an empty text box is invisible on a projector, so leaving one
- *  behind would strand an unselectable ghost on the slide. */
-function SlideText({
-  widget,
-  canvas,
-  selected,
-  present,
-  onSelect,
-  onDragStart,
-  onDelete,
-  onCommitText,
-}: ElementProps): ReactNode {
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const text = elementText(widget);
-
-  // Focus a freshly-placed (empty) box on mount so the teacher can just type.
-  // Safe to key on emptiness rather than tracking "which id did I just add":
-  // an empty text element is deleted on blur, so at most ONE can exist, and it
-  // is always the one just created.
-  useEffect(() => {
-    if (!present && text === "") bodyRef.current?.focus();
-    // Mount-only: re-running on `text` would steal focus back mid-edit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const commit = (): void => {
-    const next = bodyRef.current?.textContent?.trim() ?? "";
-    if (next === text) return;
-    if (!next) {
-      onDelete(widget.id);
-      return;
-    }
-    onCommitText(widget.id, next);
-  };
-
-  return (
-    <div
-      className={`${styles.slideText} ${selected && !present ? styles.slideSel : ""}`}
-      style={{ left: canvas.x, top: canvas.y, maxWidth: canvas.w }}
-      data-element="text"
-    >
-      {!present && (
-        <span
-          className={styles.textGrip}
-          title="Drag to move this text around the slide"
-          aria-hidden="true"
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            onSelect(widget.id);
-            onDragStart(e, widget.id);
-          }}
-        >
-          <TeachIcon name="more" size={14} />
-        </span>
-      )}
-      {/* The committed text is rendered as REAL CHILDREN, not written into the
-          node by an effect. That matters twice over:
-            • the slide's words are in the server HTML, so a board does not
-              paint blank for a frame before an effect fills it in;
-            • React only touches a DOM node when its OWN vdom child changes, and
-              `text` is this widget's committed value — which cannot change
-              while the teacher is typing (the commit happens on blur). So an
-              unrelated re-render (someone dragging another card, a selection
-              change) is a genuine no-op here and cannot wipe an in-progress
-              edit or jump the caret. */}
-      <div
-        ref={bodyRef}
-        className={styles.textBody}
-        contentEditable={!present}
-        suppressContentEditableWarning
-        role="textbox"
-        tabIndex={present ? -1 : 0}
-        aria-label="Slide text"
-        aria-multiline="true"
-        // The drag grip owns movement; typing must not start one.
-        onPointerDown={(e) => e.stopPropagation()}
-        onFocus={() => onSelect(widget.id)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          // Escape abandons the in-progress edit: put the committed value back
-          // in the node (React's vdom still holds it, so it will not fight us)
-          // and leave the box. `commit` then sees no change and emits nothing.
-          if (e.key === "Escape") {
-            e.preventDefault();
-            if (bodyRef.current) bodyRef.current.textContent = text;
-            bodyRef.current?.blur();
-          }
-        }}
-      >
-        {text}
-      </div>
-      {!present && (
-        <button
-          type="button"
-          className={styles.elX}
-          aria-label="Remove this text from the slide"
-          title="Remove this text from the slide"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => onDelete(widget.id)}
-        >
-          <TeachIcon name="x" size={14} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** `doc` — a framed, two-axis-resizable resource card (handoff `:425-440`,
- *  `teach-plus.css:27-40`). Real `<img>` / `<iframe>` when the resource has a
- *  live url; otherwise the handoff's placeholder page. */
-function SlideDoc({
-  widget,
-  canvas,
-  selected,
-  present,
-  onSelect,
-  onDragStart,
-  onDocResizeStart,
-  onDelete,
-  onPresent,
-}: ElementProps): ReactNode {
-  const label = elementLabel(widget);
-  const badge = elementKindBadge(widget);
-  const url = typeof widget.config?.url === "string" ? widget.config.url : "";
-  const kind = badge.toLowerCase();
-  const isImage = kind === "image";
-
-  return (
-    <div
-      className={`${styles.slideDoc} ${selected && !present ? styles.slideSel : ""}`}
-      style={{
-        left: canvas.x,
-        top: canvas.y,
-        width: canvas.w,
-        height: canvas.h ?? DOC_DEFAULT_H,
-      }}
-      data-element="doc"
-    >
-      <div
-        className={styles.docHead}
-        title="Drag to move this card around the slide"
-        onPointerDown={(e) => {
-          if (present) return;
-          const t = e.target as HTMLElement;
-          if (t.closest("button")) return;
-          e.stopPropagation();
-          onSelect(widget.id);
-          onDragStart(e, widget.id);
-        }}
-      >
-        {badge && <span className={styles.docBadge}>{badge}</span>}
-        <span className={styles.docLabel}>{label}</span>
-        {!present && (
-          <>
-            <Button
-              variant="icon"
-              size="sm"
-              className={styles.docBtn}
-              iconAriaLabel="Fill the slide with this resource"
-              tooltip="Blow this resource up to fill the whole slide — the class sees it full screen"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => onPresent(widget.id)}
-            >
-              <TeachIcon name="expand" size={14} />
-            </Button>
-            {url && (
-              <Button
-                variant="icon"
-                size="sm"
-                className={styles.docBtn}
-                iconAriaLabel="Open this resource in a new tab"
-                tooltip="Open the original file in a new browser tab, leaving the slide as it is"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() =>
-                  window.open(url, "_blank", "noopener,noreferrer")
-                }
-              >
-                <TeachIcon name="embed" size={14} />
-              </Button>
-            )}
-            <Button
-              variant="icon"
-              size="sm"
-              className={styles.docBtn}
-              iconAriaLabel="Remove this resource from the slide"
-              tooltip="Take this card off the slide. The resource itself stays in the lesson."
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => onDelete(widget.id)}
-            >
-              <TeachIcon name="x" size={14} />
-            </Button>
-          </>
-        )}
-      </div>
-      <div className={styles.docBody}>
-        {url && isImage ? (
-          // A resource url is arbitrary and teacher-supplied; next/image would
-          // need every host in `remotePatterns`. Matches the existing resource
-          // tiles (components/lesson-flow/resource-tile.tsx).
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt={label} draggable={false} />
-        ) : url ? (
-          <iframe src={url} title={label} sandbox={GENERIC_LINK_SANDBOX} />
-        ) : (
-          <div className={styles.docPlaceholder} aria-hidden="true">
-            <b>{label}</b>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <i key={i} style={{ width: `${90 - (i % 4) * 16}%` }} />
-            ))}
-          </div>
-        )}
-      </div>
-      {selected && !present && (
-        <span
-          className={styles.docResize}
-          role="button"
-          tabIndex={-1}
-          aria-hidden="true"
-          title="Drag to resize this card"
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            onDocResizeStart(e, widget.id);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-/** `chip` — a small pill: type badge + label + × (handoff `:442-446`). The whole
- *  pill is the drag handle, as in the handoff. */
-function SlideChip({
-  widget,
-  canvas,
-  selected,
-  present,
-  onSelect,
-  onDragStart,
-  onDelete,
-}: ElementProps): ReactNode {
-  const label = elementLabel(widget);
-  const badge = elementKindBadge(widget);
-  return (
-    <div
-      className={`${styles.slideChip} ${selected && !present ? styles.slideSel : ""}`}
-      style={{ left: canvas.x, top: canvas.y }}
-      data-element="chip"
-      role="button"
-      tabIndex={present ? -1 : 0}
-      aria-label={`${label}${badge ? ` (${badge})` : ""}`}
-      title="Drag to move this link around the slide"
-      onPointerDown={(e) => {
-        if (present) return;
-        const t = e.target as HTMLElement;
-        if (t.closest("button")) return;
-        e.stopPropagation();
-        onSelect(widget.id);
-        onDragStart(e, widget.id);
-      }}
-    >
-      {badge && <span className={styles.chipBadge}>{badge}</span>}
-      <span className={styles.chipLabel}>{label}</span>
-      {!present && (
-        <button
-          type="button"
-          className={styles.elX}
-          aria-label="Remove this link from the slide"
-          title="Remove this link from the slide"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => onDelete(widget.id)}
-        >
-          <TeachIcon name="x" size={13} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Dispatch a placed slide element to its renderer. */
-function PlacedElement(props: ElementProps): ReactNode {
-  if (props.kind === "text") return <SlideText {...props} />;
-  if (props.kind === "doc") return <SlideDoc {...props} />;
-  return <SlideChip {...props} />;
-}
-
-// ── Add popover — Text · Resource · Widget ──────────────────────────────────
-// The 7.21 slide canvas puts the two SLIDE ELEMENTS first (a teacher adding
-// something to a slide reaches for text or a resource far more often than a
-// widget) and keeps the widget catalogue underneath, unchanged. Nothing is
-// retired: all 41 widgets remain reachable, six in the core list and the rest
-// behind "More widgets…".
+// ── Add-widget popover ──────────────────────────────────────────────────────
 function AddWidgetPopover({
   types,
   onAdd,
-  onAddText,
-  onAddResource,
   onMore,
   onClose,
 }: {
   types: readonly WidgetType[];
   onAdd: (t: WidgetType) => void;
-  /** Place an empty `text` element at the canvas default and focus it. */
-  onAddText: () => void;
-  /** Open the resource picker (which places a `doc`/`chip` element). */
-  onAddResource: () => void;
   /** Open the full widget library. Omitted → the "More widgets…" row hides. */
   onMore?: () => void;
   onClose: () => void;
@@ -808,40 +408,9 @@ function AddWidgetPopover({
     <div
       className={styles.popover}
       role="menu"
-      aria-label="Add to this slide"
+      aria-label="Add a widget"
       onPointerLeave={onClose}
     >
-      <div className={styles.popGroup} role="presentation">
-        Add to the slide
-      </div>
-      {/* Driven by the catalogue's `slideElement` facet, not a second list here
-          — so a new element kind is one catalogue edit, with nothing to drift. */}
-      {SLIDE_ELEMENT_TYPES.map((meta) => {
-        const isText = meta.slideElement?.includes("text") ?? false;
-        return (
-          <button
-            key={meta.type}
-            type="button"
-            role="menuitem"
-            className={styles.popItem}
-            title={
-              isText
-                ? "Drop a line of text straight onto the slide — type into it right away"
-                : "Put one of this lesson's resources on the slide as a card the class can see"
-            }
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={isText ? onAddText : onAddResource}
-          >
-            <span className={styles.popIcon}>
-              <TeachIcon name={meta.icon} size={18} />
-            </span>
-            <span className={styles.popLabel}>{meta.label}</span>
-          </button>
-        );
-      })}
-      <div className={styles.popGroup} role="presentation">
-        Widgets
-      </div>
       {types.map((t) => {
         const meta = widgetMeta(t);
         return (
@@ -1301,13 +870,6 @@ export function BoardEditor({
   // Background scope: "board" sets board.background; "page" sets activePage.background.
   const [bgScope, setBgScope] = useState<"page" | "board">("board");
   const [geomDraft, setGeomDraft] = useState<GeomDraft>({});
-  // A `doc` element blown up to fill the stage (its head's ⤢ button). SESSION
-  // ONLY and deliberately so: the handoff persists a presented resource as the
-  // board BACKGROUND, but `Board.background` holds a paper id from the Teach
-  // background catalogue — widening it to carry a resource reference is a
-  // schema-shaped change this forward-only wave does not take. Nothing is lost
-  // on exit: the card is still on the slide exactly where it was.
-  const [presentedId, setPresentedId] = useState<string | null>(null);
   // Mirror the latest draft into a ref so gesture handlers can read the live
   // position at gesture-start without re-subscribing on every draft update
   // (avoids a stale-base jump when a second drag starts before props echo back).
@@ -1355,8 +917,7 @@ export function BoardEditor({
         const stillPending =
           (drift.x != null && drift.x !== c?.x) ||
           (drift.y != null && drift.y !== c?.y) ||
-          (drift.w != null && drift.w !== c?.w) ||
-          (drift.h != null && drift.h !== c?.h);
+          (drift.w != null && drift.w !== c?.w);
         if (stillPending) next[w.id] = drift;
         else changed = true;
       }
@@ -1381,15 +942,13 @@ export function BoardEditor({
     }
   }, [board.id, board.boardTheme, activePageId, widgets]);
 
-  // Deselect on Escape (a11y). Also exits a presented doc, so Escape always
-  // means "back out of what I'm in" rather than silently doing nothing there.
+  // Deselect on Escape (a11y).
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape") {
         setSelectedId(null);
         setAddOpen(false);
         setAppearanceOpen(false);
-        setPresentedId(null);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1510,52 +1069,6 @@ export function BoardEditor({
     [widgets, activePage.id, emit],
   );
 
-  // ── Two-axis resize — the `doc` element's corner grip ───────────────────────
-  // The widget handle above is width-only (a widget card's height flows from its
-  // content). A framed doc card must be sized on BOTH axes, so it gets its own
-  // gesture that commits `w` AND `h` in one intent. Same scale correction as the
-  // width handle: divide the pointer delta by the fit-to-width scale so the grip
-  // tracks the cursor on a shrunken A4/A3 stage.
-  const onDocResizeStart = useCallback(
-    (e: ReactPointerEvent, id: string) => {
-      const w = widgets.find((x) => x.id === id);
-      if (!w) return;
-      const start = liveCanvas(w, geomDraftRef.current);
-      const sx = e.clientX;
-      const sy = e.clientY;
-      const ow = start.w;
-      const oh = start.h ?? DOC_DEFAULT_H;
-      let lastW = ow;
-      let lastH = oh;
-
-      const move = (ev: PointerEvent) => {
-        const s = safeScale(scaleRef.current);
-        // A doc's floor is 180 (handoff `teach-plus.css:27`), which is BELOW the
-        // widget-card floor of 230 — so it uses its own clamp, not `clampW`.
-        lastW = Math.min(MAX_W, Math.max(DOC_MIN_W, ow + (ev.clientX - sx) / s));
-        lastH = clampDocHeight(oh + (ev.clientY - sy) / s);
-        setGeomDraft((d) => ({
-          ...d,
-          [id]: { ...d[id], w: lastW, h: lastH },
-        }));
-      };
-      const up = () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", up);
-        emit({
-          type: "resizeWidget",
-          pageId: activePage.id,
-          widgetId: id,
-          w: lastW,
-          h: lastH,
-        });
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-    },
-    [widgets, activePage.id, emit],
-  );
-
   // ── Add widget / resource ───────────────────────────────────────────────────
   const addWidget = (t: WidgetType) => {
     emit({
@@ -1567,156 +1080,41 @@ export function BoardEditor({
     setAddOpen(false);
   };
 
-  // ── Slide-element placement (7.21) ──────────────────────────────────────────
-  // A resource now lands as a SLIDE ELEMENT — a framed `doc` card for anything
-  // viewable, a `chip` pill for a bare link — matching the handoff's own split
-  // (`teach.jsx:236`). The intent carries the element kind; the parent stamps it
-  // into `config.element` on a NEW widget. No existing widget is touched.
-  /** Cascade successive un-pointed placements instead of stacking them all on
-   *  one coordinate, exactly as the handoff does (`teach.jsx:237` —
-   *  `70 + items.length * 28`). Without it, adding two things from the picker
-   *  puts the second exactly on top of the first, hiding it AND its controls.
-   *  Clamped so a busy page cannot walk a placement off the stage. */
-  const cascade = (base: number, axis: "x" | "y"): number => {
-    const stage = STAGE_SIZES[board.size ?? "wide"];
-    const step = widgets.length * 28;
-    const limit = (axis === "x" ? stage.w : stage.h) * 0.45;
-    return base + Math.min(step, limit);
-  };
-
-  const addResource = (r: ResourceItem, x?: number, y?: number) => {
-    const kind = elementKindForResource(r);
-    const w = kind === "doc" ? DOC_DEFAULT_W : DEFAULT_W;
+  const addResource = (r: ResourceItem, x = 160, y = 160) => {
     emit({
-      type: "addElement",
+      type: "addResource",
       pageId: activePage.id,
-      element: kind,
       resource: r,
-      canvas: {
-        x: Math.max(0, x ?? cascade(160, "x")),
-        y: Math.max(0, y ?? cascade(160, "y")),
-        w,
-        // Only a doc persists a height; a chip's pill sizes to its content.
-        ...(kind === "doc" ? { h: DOC_DEFAULT_H } : {}),
-      },
+      canvas: { x: Math.max(0, x), y: Math.max(0, y), w: DEFAULT_W },
     });
     setResOpen(false);
   };
 
-  /** Place a text element. `text` empty → the box mounts focused and empty, so
-   *  the teacher types straight into it (and an untouched box removes itself on
-   *  blur, so a stray click can never litter the slide). */
-  const addText = (text = "", x?: number, y?: number) => {
-    emit({
-      type: "addElement",
-      pageId: activePage.id,
-      element: "text",
-      text,
-      canvas: {
-        x: Math.max(0, x ?? cascade(120, "x")),
-        y: Math.max(0, y ?? cascade(120, "y")),
-        w: DEFAULT_W,
-      },
-    });
-    setAddOpen(false);
-  };
-
-  /** Map a client point to UNSCALED stage coordinates.
-   *
-   *  Anchors to the SCALED inner stage's on-screen rect (its
-   *  `getBoundingClientRect` already reflects the CSS scale transform), then
-   *  divides the in-rect offset by the same scale — the same fit-to-width
-   *  correction the drag gesture uses. Without it a drop on a shrunken A4/A3
-   *  stage lands far from the cursor. Centres a `w`-wide placement under the
-   *  pointer and clamps it inside the stage. Returns the canvas defaults when
-   *  the stage has not measured yet.
-   */
-  const stagePoint = (
-    clientX: number,
-    clientY: number,
-    w: number,
-  ): { x: number; y: number } => {
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/resource");
+    if (!id) return;
+    const r = resources.find((x) => x.id === id);
+    if (!r) return;
+    // Anchor to the SCALED inner stage's on-screen rect (its getBoundingClientRect
+    // already reflects the CSS scale transform), then divide the in-rect offset by
+    // the same scale so the drop maps to UNSCALED stage coordinates — the same
+    // fit-to-width correction the drag gesture uses. Without this, a drop on a
+    // shrunken A4/A3 stage lands far from the cursor. Center the DEFAULT_W-wide
+    // widget under the pointer (−DEFAULT_W/2, −30) and clamp inside the stage.
     const stage = STAGE_SIZES[board.size ?? "wide"];
     const rect = stageRef.current?.getBoundingClientRect();
     const s = safeScale(scaleRef.current);
     let x = 160;
     let y = 160;
     if (rect) {
-      x = (clientX - rect.left) / s - w / 2;
-      y = (clientY - rect.top) / s - 30;
+      x = (e.clientX - rect.left) / s - DEFAULT_W / 2;
+      y = (e.clientY - rect.top) / s - 30;
     }
-    return {
-      x: Math.max(0, Math.min(stage.w - w, x)),
-      y: Math.max(0, Math.min(stage.h - 80, y)),
-    };
+    x = Math.max(0, Math.min(stage.w - DEFAULT_W, x));
+    y = Math.max(0, Math.min(stage.h - 80, y));
+    addResource(r, x, y);
   };
-
-  // ── Drop-to-place (handoff `teach.jsx:239-243`) ─────────────────────────────
-  // Two payloads are accepted, both PERSISTABLE:
-  //   • `text/resource` — a resource id from the picker / lesson rail → doc/chip.
-  //   • `text/plain` (or `text/uri-list`) — dropped text → a text element.
-  // FILES are deliberately NOT accepted here; see the note on the paste handler.
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData("text/resource");
-    if (id) {
-      const r = resources.find((x) => x.id === id);
-      if (!r) return;
-      const w =
-        elementKindForResource(r) === "doc" ? DOC_DEFAULT_W : DEFAULT_W;
-      const pt = stagePoint(e.clientX, e.clientY, w);
-      addResource(r, pt.x, pt.y);
-      return;
-    }
-    const dropped = (
-      e.dataTransfer.getData("text/plain") ||
-      e.dataTransfer.getData("text/uri-list")
-    ).trim();
-    if (!dropped) return;
-    const pt = stagePoint(e.clientX, e.clientY, DEFAULT_W);
-    addText(dropped, pt.x, pt.y);
-  };
-
-  // ── Paste-to-place (handoff `teach.jsx:244-245`) ────────────────────────────
-  // Pasting text while the canvas has focus drops it onto the slide as a text
-  // element. Scoped to the canvas SUBTREE, not the document: a document-level
-  // listener would hijack a paste aimed at the page-rename field, the appearance
-  // panel, or a widget's own editor. (The handoff gets away with `document`
-  // because its prototype has no other inputs on the surface.)
-  //
-  // FILES ARE DELIBERATELY NOT HANDLED. The handoff's file path builds an
-  // `URL.createObjectURL` blob (`teach.jsx:50`) and then strips it again before
-  // saving (`:210-212`) — a pasted file survives only until reload. Placing a
-  // card that silently empties itself is worse than not offering it. A real
-  // board file upload needs a board owner-type in the R2 preflight allowlist
-  // (`app/api/resources/upload/route.ts` — another lane's file, and a
-  // schema-shaped change). Reported as handed back, not silently dropped.
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el || present) return;
-    const onPaste = (e: ClipboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      // Never steal a paste aimed at a real editable (a text element's own box,
-      // an input, a textarea) — that is the teacher typing, not placing.
-      if (
-        target?.isContentEditable ||
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA"
-      ) {
-        return;
-      }
-      const text = e.clipboardData?.getData("text/plain")?.trim();
-      if (!text) return;
-      e.preventDefault();
-      addText(text);
-    };
-    el.addEventListener("paste", onPaste as EventListener);
-    return () => el.removeEventListener("paste", onPaste as EventListener);
-    // `addText` is re-created every render; re-subscribing on the values it
-    // closes over (the page it writes to, the emitter, present mode) is the
-    // stable dependency set.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePage.id, emit, present]);
 
   // ── Appearance setters → intents ────────────────────────────────────────────
   const setWidgetProp = <K extends ThemeProp>(
@@ -1771,23 +1169,6 @@ export function BoardEditor({
   // The current stage dimensions (one lookup, reused by the canvas + the
   // render-time widget clamp).
   const stageSize = STAGE_SIZES[board.size ?? "wide"];
-
-  // The presented doc, resolved from the LIVE page rather than held in state, so
-  // deleting or paging away from it can never leave a stale overlay pinned over
-  // the slide (a stored copy would keep rendering a card that no longer exists).
-  const presentedElement =
-    presentedId != null
-      ? (widgets.find(
-          (w) => w.id === presentedId && slideElementOf(w) === "doc",
-        ) ?? null)
-      : null;
-  const presentedUrl =
-    presentedElement && typeof presentedElement.config?.url === "string"
-      ? presentedElement.config.url
-      : "";
-  const presentedIsImage =
-    presentedElement != null &&
-    elementKindBadge(presentedElement).toLowerCase() === "image";
 
   // The active page's effective background (tri-state, page beats board):
   //   page.background === undefined → inherit board.background
@@ -1858,7 +1239,7 @@ export function BoardEditor({
           <div style={{ position: "relative" }}>
             <TBtn
               icon={<TeachIcon name="plus" size={17} />}
-              label="Add"
+              label="Widget"
               ariaExpanded={addOpen}
               onClick={() => setAddOpen((o) => !o)}
             />
@@ -1866,11 +1247,6 @@ export function BoardEditor({
               <AddWidgetPopover
                 types={addableTypes}
                 onAdd={addWidget}
-                onAddText={() => addText()}
-                onAddResource={() => {
-                  setAddOpen(false);
-                  setResOpen(true);
-                }}
                 onMore={onBrowseAll}
                 onClose={() => setAddOpen(false)}
               />
@@ -1925,50 +1301,6 @@ export function BoardEditor({
 
       {/* ── Body: canvas + appearance panel ─────────────────────────────── */}
       <div className={styles.body}>
-        {/* EMBEDDED-MODE ADD AFFORDANCE.
-            In `embedded` mode the host shell supplies the chrome and the
-            editor's own toolbar — where the "+ Add" popover lives — is hidden.
-            On the shipped V2 surface that left the TEXT element with no entry
-            point at all: the shell's Writing Bar offers Resource and Background,
-            not Text. Rather than reach into the shell (another lane's files),
-            the editor floats its own trigger over the canvas, so every element
-            kind is reachable on the surface teachers actually use. Hidden in
-            Present — a projected board carries no authoring chrome. */}
-        {embedded && !present && (
-          <div className={styles.embeddedAdd}>
-            {/* Wrapped in <Tooltip> directly rather than via Button's `tooltip`
-                prop: only the Tooltip primitive takes `tooltipId`, and this is
-                an onboarding hint a teacher should be able to switch off once
-                they know the control (CLAUDE.md §4). */}
-            <Tooltip
-              content="Put something on this slide — a line of text, a resource, or a widget"
-              tooltipId="teach-slide-add"
-            >
-              <Button
-                variant="secondary"
-                size="sm"
-                leadingIcon={<TeachIcon name="plus" size={15} />}
-                aria-expanded={addOpen}
-                onClick={() => setAddOpen((o) => !o)}
-              >
-                Add
-              </Button>
-            </Tooltip>
-            {addOpen && (
-              <AddWidgetPopover
-                types={addableTypes}
-                onAdd={addWidget}
-                onAddText={() => addText()}
-                onAddResource={() => {
-                  setAddOpen(false);
-                  setResOpen(true);
-                }}
-                onMore={onBrowseAll}
-                onClose={() => setAddOpen(false)}
-              />
-            )}
-          </div>
-        )}
         <div
           ref={canvasRef}
           className={styles.canvas}
@@ -2002,46 +1334,7 @@ export function BoardEditor({
               if (e.target === e.currentTarget) setSelectedId(null);
             }}
           >
-            {widgets.map((w) => {
-              // 7.21 slide elements render WITHOUT the widget-card chrome. The
-              // branch is on `config.element`, which only a NEW placement ever
-              // carries — a widget added before this wave has no such key and
-              // takes the `Placed` path below, byte-for-byte as before.
-              const elementKind = slideElementOf(w);
-              if (elementKind) {
-                return (
-                  <PlacedElement
-                    key={w.id}
-                    widget={w}
-                    kind={elementKind}
-                    canvas={liveCanvas(w, geomDraft)}
-                    selected={w.id === selectedId}
-                    present={present}
-                    onSelect={setSelectedId}
-                    onDragStart={onDragStart}
-                    onDocResizeStart={onDocResizeStart}
-                    onPresent={setPresentedId}
-                    onCommitText={(id, text) =>
-                      emit({
-                        type: "updateElementText",
-                        pageId: activePage.id,
-                        widgetId: id,
-                        text,
-                      })
-                    }
-                    onDelete={(id) => {
-                      emit({
-                        type: "deleteWidget",
-                        pageId: activePage.id,
-                        widgetId: id,
-                      });
-                      setSelectedId(null);
-                      setPresentedId((p) => (p === id ? null : p));
-                    }}
-                  />
-                );
-              }
-              return (
+            {widgets.map((w) => (
               <Placed
                 key={w.id}
                 widget={w}
@@ -2101,54 +1394,7 @@ export function BoardEditor({
                   setSelectedId(null);
                 }}
               />
-              );
-            })}
-            {/* A `doc` element blown up to fill the paper. Session-only (see
-                `presentedId`), inside the stage so it inherits the exact rect +
-                fit-scale, and BELOW the annotation overlay so a teacher can
-                still write over what they are showing. */}
-            {presentedElement && (
-              <div className={styles.presentFill} data-element="present">
-                <div className={styles.presentHead}>
-                  <span className={styles.docLabel}>
-                    {elementLabel(presentedElement)}
-                  </span>
-                  <Button
-                    variant="icon"
-                    size="sm"
-                    className={styles.docBtn}
-                    iconAriaLabel="Shrink this resource back to its card"
-                    tooltip="Put this resource back to card size so the rest of the slide shows again"
-                    onClick={() => setPresentedId(null)}
-                  >
-                    <TeachIcon name="shrink" size={15} />
-                  </Button>
-                </div>
-                <div className={styles.presentBody}>
-                  {presentedUrl && presentedIsImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={presentedUrl}
-                      alt={elementLabel(presentedElement)}
-                      draggable={false}
-                    />
-                  ) : presentedUrl ? (
-                    <iframe
-                      src={presentedUrl}
-                      title={elementLabel(presentedElement)}
-                      sandbox={GENERIC_LINK_SANDBOX}
-                    />
-                  ) : (
-                    <div className={styles.docPlaceholder} aria-hidden="true">
-                      <b>{elementLabel(presentedElement)}</b>
-                      {Array.from({ length: 10 }).map((_, i) => (
-                        <i key={i} style={{ width: `${90 - (i % 4) * 16}%` }} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            ))}
             {/* Host overlay (v2 annotation glass) — TOP child of the scaled
                 paper, so it shares the paper's rect/scale/offset exactly. */}
             {overlay}
