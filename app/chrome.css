@@ -2225,6 +2225,61 @@
     display: contents;
   }
 
+  /* ── Catch-up ambient signal ─────────────────────────────────────────────
+     Restores the unprompted half of the retired top-bar flame. The COUNT was
+     never lost — <CatchUpModal> prints it in its own header — but it only ever
+     reached a teacher who already went looking. Two pieces, deliberately
+     split so neither says more than it knows:
+       • `.toolsdot` on the trigger — presence only, no number. It is what
+         makes the signal ambient; a count sealed inside a closed popover
+         reaches nobody.
+       • `.toolcount` on the Catch-up item — the number, next to the word that
+         says what it counts.
+     Both are absent at zero (the component does not render them), because a
+     badge reading "0" costs a glance and teaches nothing.
+
+     Token rungs, per the block above these in tokens.css: the dot is a DOT, so
+     it takes raw `--catchup`; the pill carries text, so it takes
+     `--catchup-solid` (white on raw --catchup is 4.21:1 — under AA for a
+     10px numeral; the solid rung clears 5.13:1). Neither is tone-branched:
+     `--catchup-solid` is a fixed fill, so the ink on it must not move either. */
+  .toolsbtn.toolsbtn-circle {
+    position: relative;
+  }
+  /* `--surface` inverts by tone, so one value rings the dot legibly on both
+     glass registers — dark ring on dark chrome, light on light — without the
+     rule branching on a theme name. */
+  .toolsmenu .toolsdot {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 9px;
+    height: 9px;
+    border-radius: var(--r-pill);
+    background: var(--catchup);
+    box-shadow: 0 0 0 2px var(--surface);
+    pointer-events: none;
+  }
+  /* In flow beneath the label rather than pinned to the item's corner: at
+     ≤480px `.tool` compresses to ~52px wide and a corner chip would sit on top
+     of the 21px icon. Stacked, it cannot collide at any width. */
+  .toolspop .tool .toolcount {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 16px;
+    padding: 0 5px;
+    border-radius: var(--r-pill);
+    background: var(--catchup-solid);
+    color: var(--on-solid);
+    font-family: var(--font-sans);
+    font-size: var(--t-10);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+
   /* Phone: keep all rows inside the viewport (tools share the width
      instead of each holding min-width:88px → ~352px, which clips at 375),
      swap the avatar for the popover Account row. */

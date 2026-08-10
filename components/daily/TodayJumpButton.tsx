@@ -42,13 +42,35 @@ import styles from "./TodayJumpButton.module.css";
 export interface TodayJumpButtonProps {
   /** Optional class hook so the host header can place/space the button. */
   className?: string;
+  /**
+   * The week the host is actually SHOWING, when that can differ from the
+   * shared `useAppState().week`. Daily has exactly one such window: a
+   * `?lesson=` deep link resolves at RENDER time into `viewWeek`/`viewDay`
+   * one paint before its effect moves the shared state (DailyView.tsx:406).
+   * During that paint the shared week still says "today", so a button reading
+   * it would sit disabled while the teacher is looking at a different day —
+   * the one moment they most need the jump. Defaults to the shared value, so
+   * a host with no such window passes nothing.
+   */
+  week?: number;
+  /** The day the host is actually SHOWING — same window, same reason. */
+  day?: number;
 }
 
 export function TodayJumpButton({
   className,
+  week: weekProp,
+  day: dayProp,
 }: TodayJumpButtonProps): ReactNode {
-  const { week, currentWeek, selectedDay, setWeek, setSelectedDay } =
-    useAppState();
+  const {
+    week: stateWeek,
+    currentWeek,
+    selectedDay: stateSelectedDay,
+    setWeek,
+    setSelectedDay,
+  } = useAppState();
+  const week = weekProp ?? stateWeek;
+  const selectedDay = dayProp ?? stateSelectedDay;
   const { days: schoolWeekDays } = useSchoolWeek();
 
   // ── Today resolution — SSR-safe house pattern (finding M4) ──────────────

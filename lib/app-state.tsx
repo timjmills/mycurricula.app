@@ -31,6 +31,8 @@ import type {
   CurrentWeekResolution,
 } from "@/lib/school-week-now";
 import { useAcademicYear } from "@/lib/use-academic-year";
+import { useSchoolWeek } from "@/lib/use-school-week";
+import { todayColumnIndex } from "@/lib/now-anchor";
 import { createClient } from "@/lib/supabase/client";
 import {
   PROFILE_EVENT,
@@ -431,7 +433,62 @@ export function AppStateProvider({
     setWeekState(next.week);
   }, [academicYearStart, academicYearEnd]);
 
-  const [selectedDay, setSelectedDay] = useState<number>(0);
+  // ── The selected day ────────────────────────────────────────────────────
+  // The exact companion of the week block above, and it was missing.
+  //
+  // WHAT WAS BROKEN. This was a bare `useState(0)` — the school week's FIRST
+  // configured day, forever. `currentWeek` had already been taught to track the
+  // real world; the day never was. So the planner opened on the right week and
+  // the wrong DAY, and `/daily` — the surface whose whole job is "what now?" —
+  // greeted a teacher on a Monday with Sunday's pane. Observed live: the day
+  // header reading "Sunday · Aug 9" against a browser clock of Monday Aug 10,
+  // captioned "No lessons planned for this day", while the week strip on the
+  // same screen marked a lesson as happening NOW.
+  //
+  // It was invisible for two reasons worth recording. `DailyView` DOES resolve
+  // today's column, but only to decide EMPHASIS (`isToday`) — it never moved
+  // the selection. And the one control that could have rescued it, the Day's
+  // "Today" jump, had lost its mount site entirely.
+  //
+  // THE GUARD is `weekTouchedRef`'s, for the same reason: the derivation is
+  // "where now is", never "where the teacher is looking". Every setter callsite
+  // is an explicit navigation — a day arrow, a `?date=` deep link, the Today
+  // jump, a click on a Weekly row, a Schedule column — so wrapping the setter
+  // claims the day on any of them, and the effect below then leaves it alone
+  // forever. Child effects run before this parent's, so a deep link still wins.
+  const { days: schoolWeekDays } = useSchoolWeek();
+  const [selectedDay, setSelectedDayState] = useState<number>(0);
+  const dayTouchedRef = useRef(false);
+  const setSelectedDay = useCallback((next: number): void => {
+    dayTouchedRef.current = true;
+    setSelectedDayState(next);
+  }, []);
+
+  // SSR-safety is why this is an effect and not a `useState` initialiser: the
+  // server has no user clock, so a today-derived initial value is a hydration
+  // mismatch waiting for a teacher in a timezone that disagrees with the box.
+  // Server and first client paint both render day 0; the real day lands one
+  // effect later. Same shape as `todayColIdx` in DailyView and the disabled
+  // state in TodayJumpButton.
+  //
+  // `schoolWeekDays` settles asynchronously too (SSR default → cache/server),
+  // so this re-runs when it does and re-derives against the school's ACTUAL
+  // configured week rather than the default one — the same re-derivation the
+  // academic-year effect above does for the week.
+  useEffect(() => {
+    if (dayTouchedRef.current) return;
+    const idx = todayColumnIndex(new Date(), schoolWeekDays);
+    // NON-SCHOOL DAY (a Saturday on a Sun–Thu week) resolves to null, and the
+    // deliberate choice is to leave the default alone rather than coerce it.
+    // There is genuinely no "today" column to select, and day 0 — the week's
+    // first instructional day — is the honest neutral landing for a weekend.
+    // Coercing to 0 here would be the same bug in a narrower window; refusing
+    // is also what TodayJumpButton does on a non-school day (it moves the week
+    // and leaves the day where it is).
+    if (idx === null) return;
+    setSelectedDayState(idx);
+  }, [schoolWeekDays]);
+
   const [subjectView, setSubjectView] = useState<SubjectId>("math");
   const [filters, setFilters] = useState<PlannerFilters>(EMPTY_FILTERS);
   const [leftPanelOpen, setLeftPanelOpen] = useState<boolean>(true);
@@ -683,6 +740,10 @@ export function AppStateProvider({
       setWeek,
       currentWeekInfo,
       selectedDay,
+      // Now a useCallback (it claims the day for the touched-ref guard), so it
+      // is a value the memo depends on rather than a bare setState identity.
+      // Stable across renders — listing it changes nothing but the lint.
+      setSelectedDay,
       subjectView,
       filters,
       updateFilters,

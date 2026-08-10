@@ -63,6 +63,7 @@ import { AddEventForm } from "./AddEventForm";
 import { Button, Tooltip } from "@/components/ui";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
+import { TodayJumpButton } from "./TodayJumpButton";
 import { useDailyScheduleMode } from "@/lib/daily-schedule-state";
 import { useLabels } from "@/lib/labels";
 // W4 — the v2 Day read canvas. Frame-branched internally (DayA / DayB /
@@ -769,6 +770,26 @@ export function DailyView({
           </nav>
         </div>
         <div className={styles.headerActions}>
+          {/* ── "Today" jump ─────────────────────────────────────────────────
+              Week's counterpart affordance is <WeekNavigator>'s Today button
+              (components/grid/WeekNavigator.tsx:112) — same word, same ghost
+              treatment, same "disabled when you are already there" rule — so a
+              teacher who learned it on Week recognises it here. Day had none:
+              the ◀ ▶ arrows step one day at a time, and nothing returned in one
+              tap after paging away.
+
+              It lives in this page header rather than beside the canvas arrows
+              for two reasons: DayHeader is shared by all three Day frames and
+              is a pure control with no app-state access, and this header is the
+              one piece of Day chrome that renders in BOTH View and Edit mode —
+              so the jump never disappears with a mode switch.
+
+              `week`/`day` are the VIEWED values, not the shared ones: see the
+              prop docs on TodayJumpButton for the one paint where they differ.
+              The "today" resolution itself is the button's own SSR-safe rule
+              (the same one this file uses at :204 for todayColIdx) — the clock
+              is never read during the first render. */}
+          <TodayJumpButton week={viewWeek} day={viewDay} />
           <DailySchedulePill />
           <Tooltip
             content="Open this day's boards full-screen for live class delivery"

@@ -13,6 +13,11 @@
 //   • Settings → /settings (reachable from EVERY route now, per R1c — the botbar
 //     gear only shows on Home+Daily).
 //
+// The Catch-up entry additionally carries the AMBIENT COUNT: a dot on the
+// trigger and a count pill on the item itself, both absent at zero. See the
+// derivation comment in the body for why the number comes from
+// `coverageSummary` and not a second count of its own.
+//
 // Styling: chrome.css owns everything. The trigger reuses the ported
 // `.toolsbtn.toolsbtn-circle.glass` recipe and the popover the `.toolspop`/
 // `.tool` recipe; the always-visible wrapper is `.toolsmenu` (distinct from the
@@ -29,10 +34,14 @@
 // high-consequence). Catch-up/Schedule/Archive/Settings are not destructive, so
 // none pass `required`.
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { TransitionLink } from "@/lib/view-transition";
 import { Tooltip } from "@/components/ui";
 import { CATCHUP_MODAL_TOGGLE_EVENT } from "@/components/catchup-v2";
+import { useAppState } from "@/lib/app-state";
+import { useCatchup } from "@/lib/catchup-state";
+import { coverageSummary } from "@/lib/catchup-data";
+import { usePlanner } from "@/lib/planner-store";
 
 export function ChromeToolsMenu(): ReactNode {
   const [open, setOpen] = useState(false);
@@ -69,10 +78,56 @@ export function ChromeToolsMenu(): ReactNode {
     setOpen(false);
   };
 
+  // ── Catch-up count — the ambient signal (restoration) ────────────────────
+  // The number itself was never lost: <CatchUpModal> renders it at its header
+  // (`${allItems.length} uncovered`). What was lost when the v1 top bar retired
+  // is that it only ever reached a teacher who already suspected there was
+  // something to see and opened the modal. This puts it back in the chrome.
+  //
+  // SAME SOURCE, not a second count. `coverageSummary().uncovered` and the
+  // modal's `deriveCatchupItems(...).length` are the identical filter — not
+  // archived, week ≤ the browsed week, effective status ≠ "done", with the same
+  // `actions` overlay applied — which lib/catchup-data states outright
+  // ("Equals items.length when no status filter is active"). `week` is the
+  // BROWSED week, exactly as the modal passes it, so paging back to week 5
+  // shrinks this badge and the modal's header together instead of the chrome
+  // promising rows the modal will not list.
+  //
+  // Both providers are guaranteed above every mount of this menu: the two
+  // callsites are ChromeTopBar (inside ChromeShell → app/(planner)/layout) and
+  // ImmersiveBarHost (app/(teach)/layout), and both layouts wrap PlannerProvider
+  // + CatchupProvider around the chrome — the same guarantee CatchUpModalHost
+  // already relies on from the same subtree.
+  //
+  // Hydration: `lessons` is whatever the store has at first paint (SSR and the
+  // first client render agree), and `actions`/`enabled` both initialise EMPTY /
+  // true and only load from localStorage in a post-mount effect — so nothing
+  // here differs between the server HTML and the first client paint.
+  const { week } = useAppState();
+  const { enabled: catchupEnabled, actions: catchupActions } = useCatchup();
+  const { lessons } = usePlanner();
+  const uncovered = useMemo(
+    () =>
+      coverageSummary(lessons, { currentWeek: week, actions: catchupActions })
+        .uncovered,
+    [lessons, week, catchupActions],
+  );
+  // A badge reading "0" is noise dressed as information — it costs a glance to
+  // learn nothing. Absent means nothing is uncovered. Also absent when the
+  // teacher has switched Catch-up off in Settings: an ambient nag from a
+  // feature they declined is worse than no signal at all.
+  const showCatchup = catchupEnabled && uncovered > 0;
+  const catchupCount = uncovered > 99 ? "99+" : String(uncovered);
+  const catchupPhrase = `${uncovered} lesson${uncovered === 1 ? "" : "s"} not covered`;
+
   return (
     <div className="toolsmenu" ref={rootRef}>
       <Tooltip
-        content="Tools — jump to any view, plus Catch-up, Schedule, Archive, and Settings"
+        content={
+          showCatchup
+            ? `Tools — jump to any view, plus Catch-up, Schedule, Archive, and Settings. The dot means Catch-up has ${catchupPhrase}.`
+            : "Tools — jump to any view, plus Catch-up, Schedule, Archive, and Settings"
+        }
         side="bottom"
         tooltipId="chrome-tools-menu"
       >
@@ -80,12 +135,20 @@ export function ChromeToolsMenu(): ReactNode {
           type="button"
           ref={triggerRef}
           className={"toolsbtn toolsbtn-circle glass" + (open ? " open" : "")}
-          aria-label="Tools"
+          /* The count itself belongs on the Catch-up item, where it names what
+             it counts. The trigger carries only "there is something in here" —
+             otherwise the number is sealed inside a closed popover and reaches
+             nobody unprompted, which is the whole loss being repaired. The dot
+             is aria-hidden and the fact is carried in the accessible name
+             instead, so a screen-reader user is told the same thing rather than
+             a decorative element. */
+          aria-label={showCatchup ? `Tools — ${catchupPhrase}` : "Tools"}
           aria-expanded={open}
           aria-controls={open ? popId : undefined}
           onClick={() => setOpen((v) => !v)}
         >
           <ToolsIcon />
+          {showCatchup && <span className="toolsdot" aria-hidden="true" />}
         </button>
       </Tooltip>
       {/* Disclosure popover, NOT role="menu": a menu role promises arrow-key
@@ -120,13 +183,28 @@ export function ChromeToolsMenu(): ReactNode {
               elected CatchUpModalHost (mounted by ChromeShell) owns the toggle
               listener; this only dispatches. */}
           <Tooltip
-            content="Catch-up — triage every uncovered lesson: mark taught, reschedule, bump, or plan"
+            content={
+              showCatchup ? (
+                <>
+                  <strong>Catch-up</strong> — triage every uncovered lesson:
+                  mark taught, reschedule, bump, or plan. {catchupPhrase} right
+                  now.
+                </>
+              ) : (
+                "Catch-up — triage every uncovered lesson: mark taught, reschedule, bump, or plan"
+              )
+            }
             side="bottom"
             tooltipId="chrome-tools-catchup"
           >
             <button
               type="button"
               className="tool"
+              /* The visible label stays the word; the count rides in the
+                 accessible name so it is not announced as a bare number
+                 floating after "Catch-up". Unset at zero, leaving the span to
+                 name the control as before. */
+              aria-label={showCatchup ? `Catch-up — ${catchupPhrase}` : undefined}
               onClick={closeAfter(() =>
                 window.dispatchEvent(
                   new CustomEvent(CATCHUP_MODAL_TOGGLE_EVENT),
@@ -135,6 +213,11 @@ export function ChromeToolsMenu(): ReactNode {
             >
               <FlagIcon />
               <span>Catch-up</span>
+              {showCatchup && (
+                <span className="toolcount" aria-hidden="true">
+                  {catchupCount}
+                </span>
+              )}
             </button>
           </Tooltip>
           <Tooltip

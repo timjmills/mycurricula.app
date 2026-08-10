@@ -299,7 +299,27 @@ vi.mock("@/lib/app-state", () => ({
     currentUser: { id: "u1", name: "Tess Teacher", initials: "TT" },
     editMode: "personal",
     setEditMode: () => {},
+    // The Tools menu's catch-up count uses the BROWSED week as its horizon,
+    // the same value CatchUpModal passes to the same function.
+    week: 1,
   }),
+}));
+
+// The Tools menu now reads the catch-up count for its ambient badge, so this
+// harness stubs the two stores that feed it. Deliberately stubs rather than
+// mounting the real providers: section A already asserts — against the layout
+// SOURCE — that `(teach)/layout.tsx` mounts CatchupProvider, which is where
+// that guarantee belongs. Wrapping the real providers here would make this
+// render test drag in the planner's whole hydration path to prove a fact the
+// static assertions already prove, and a provider dropped from the layout
+// would still be caught there. Zero lessons ⇒ no badge, so section E keeps
+// asserting the bar's own contract without a count in the way.
+vi.mock("@/lib/planner-store", () => ({
+  usePlanner: () => ({ lessons: [] }),
+}));
+
+vi.mock("@/lib/catchup-state", () => ({
+  useCatchup: () => ({ enabled: true, actions: new Map() }),
 }));
 
 describe("the bar /teach actually renders", () => {
