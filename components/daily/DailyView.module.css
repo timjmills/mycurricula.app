@@ -153,6 +153,42 @@
   outline-offset: 2px;
 }
 
+/* ── Touch-target inflation (RSP-01) ───────────────────────────────────────
+   Measured at 375 (isMobile + touch + dsf 3) and at 768: the crumbs render
+   50 x 21, against CLAUDE.md §4's >=44px. Width already clears the floor, so
+   only the height is short — but the whole box has to be inflated to keep the
+   target centred on the text.
+
+   Same idiom, and the same two-arm media query, as
+   components/ui/Button.module.css:125-170 — see the ruling there for why
+   `any-pointer: coarse` rather than `pointer: coarse` (a hybrid's PRIMARY
+   pointer is fine, so the narrower query misses every touch laptop and
+   trackpad-attached iPad).
+
+   `position: relative` is required here: `.breadcrumbLink` is static, so an
+   absolute ::before would anchor to an ancestor and put the hit area
+   somewhere other than on the crumb.
+
+   These are the only two crumbs in the row and they sit side by side, so the
+   inflation is vertical only (`width: 100%`) and cannot make them overlap
+   each other. */
+@media (any-pointer: coarse), (max-width: 900px) {
+  .breadcrumbLink {
+    position: relative;
+  }
+  .breadcrumbLink::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px;
+    min-height: 44px;
+    width: 100%;
+    height: 100%;
+  }
+}
+
 .breadcrumbSep {
   color: var(--faint);
   font-size: var(--t-11);

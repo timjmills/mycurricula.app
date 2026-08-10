@@ -2463,3 +2463,54 @@
     display: none !important;
   }
 }
+
+/* ── Touch-target inflation for the chrome controls (RSP-01) ──────────────
+   MEASURED, not assumed: at 375 (isMobile + touch + dsf 3) and at 768, the
+   view switcher renders 47-61 x 32 and the workspace switcher 124 x 38, on
+   every route and in all three frames. CLAUDE.md §4 requires >=44px on primary
+   actions, and the view switcher IS the app's top-level navigation.
+
+   THE IDIOM IS THE REPO'S OWN, not a new invention: a transparent, positioned
+   ::before that inflates the HIT area while the visible control keeps its
+   compact geometry. components/ui/Button.module.css:125-170 and
+   components/ui/ToggleGroup.module.css:80-98 already do exactly this — and
+   both of those measure 44px credited on the same run where these two do not,
+   which is what makes this the fix rather than an experiment.
+
+   BOTH MEDIA ARMS ARE REQUIRED, per the 2026-07-25 ruling written out at
+   Button.module.css:129-151. `(any-pointer: coarse)` catches touch devices
+   ABOVE 900px — an iPad Pro in landscape is 1024px and finger-driven, and
+   `pointer: coarse` misses it because the PRIMARY pointer on a hybrid is fine.
+   `(max-width: 900px)` stays as the fallback for anything that reports pointer
+   capability badly. Each arm carries `screen` because this file is otherwise
+   wrapped in `@media screen`, and a print stylesheet has no touch targets.
+
+   `position: relative` is set here and not inherited: neither `.view` nor
+   `.ctx-switch` is positioned today, so an absolute ::before would anchor to
+   some ancestor and place the hit area somewhere else entirely — silently, and
+   still measuring 44px if you only read the pseudo-element's own box.
+
+   Classes are DOUBLED (0,2,0). These are <button>s, and the `.cp-root button`
+   reset is (0,1,1) — a single-class rule would lose to it depending on
+   stylesheet order. `.ctx .ctx-switch` above already documents this same trap. */
+@media screen and (any-pointer: coarse), screen and (max-width: 900px) {
+  .view.view,
+  .ctx .ctx-switch.ctx-switch {
+    position: relative;
+  }
+  .view.view::before,
+  .ctx .ctx-switch.ctx-switch::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* Grow ONLY to the floor: width is already >=44px on both controls, and
+       `width/height: 100%` keeps the box on the control's own footprint so a
+       wider button does not get a needlessly wide target. */
+    min-width: 44px;
+    min-height: 44px;
+    width: 100%;
+    height: 100%;
+  }
+}
