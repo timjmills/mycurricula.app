@@ -55,6 +55,58 @@
   box-shadow: 0 5px 12px -5px rgba(0, 0, 0, 0.4);
 }
 
+/* IN DARK TONE THE BOUNDARY MOVES TO A BORDER, AND IT HAS TO.
+   ────────────────────────────────────────────────────────────────────────────
+   The lightness cap above is what makes the white monogram legible (1.4.3:
+   3.04-3.69 -> 7.11-8.00), but it capped the disc BELOW the point where the
+   fill can still separate from a dark canvas. Both constraints cannot be met by
+   one fill: on the `#1e1d2c` night surface they cross between L=0.54 and L=0.56
+   and neither clears at the crossover. Measured on the running app against the
+   REAL composited surround — sampled from the pixels around each disc, not
+   computed against an assumed `--surface` — the fill alone gives (1.4.11 floor
+   3.0):
+
+     subject   Night          Photo-Dim
+     math      1.97           2.10
+     reading   1.98           2.10
+     writing   1.85           1.95
+     grammar   1.87           1.97
+     spelling  1.91           2.05
+     ufli      1.88           2.04
+     explorers 2.03           2.19
+     sel       1.99           2.17
+
+   So the disc keeps the dark fill for the text and hands the BOUNDARY to a
+   bright rim. `max(l, 0.78)` is the mirror of the fill's `min(l, 0.45)`: same
+   hue, same chroma, lifted instead of capped, which is exactly what the
+   `--subj-N-bright` rung exists for (CLAUDE.md §4: "`-bright` (dots/outlines)").
+   It is not reachable as a token here — the `.cp-subj` bridge emits only
+   `--c/--cl/--cd` — so it is derived in place rather than by widening the
+   bridge, which is the subject-colour lane's file.
+
+   THE FLOOR IS 0.78 BECAUSE 0.72 LEFT TWO HUES SHORT, and the reason is worth
+   keeping: OKLCh lightness is perceptual, WCAG luminance is green-weighted, so
+   at equal L a magenta or violet carries markedly less relative luminance than
+   a gold or a green. At `max(l, 0.72)` six subjects cleared (3.03-3.27 on
+   Night) and `writing` and `grammar` — the two most chromatic hues — both
+   landed on **2.99**, i.e. failing by a hundredth. A single L floor has to be
+   set by the worst hue it must serve, not the average one.
+
+   LIGHT TONE GETS NOTHING, deliberately: there the capped fill is DARK against a
+   near-white panel, so the fill separates on its own and a bright rim would be
+   noise. Hence the tone branch — and note a lightness `max()` is as
+   tone-directional as the `min()` above, so an un-branched version of this rule
+   would wash the disc out on white exactly as the un-branched `min()` blackened
+   ink on night (see `WeekA.module.css` `.tileUnit`).
+
+   No layout cost: `.cp-root *` is `box-sizing: border-box` (tokens.css:1187),
+   and the disc's width/height are inline on the element, so the rim eats 1.5px
+   of fill rather than growing the box. */
+:global([data-tone="dark"]) .subjGlyph {
+  border: 1.5px solid color-mix(in oklab, var(--c) 58%, white);
+  border: 1.5px solid oklch(from var(--c) max(l, 0.78) c h);
+}
+
 /* ── Status dot ─────────────────────────────────────────────────────────── */
 .statusDot {
   width: 9px;
