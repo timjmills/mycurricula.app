@@ -274,6 +274,23 @@ export function RelocatePicker({
             >
               Week
             </label>
+            {/* The ± steppers share one disabled recipe. It used to be
+                `opacity: 0.38`, which is a subtree fade on an element whose
+                only content IS text (the − / + glyph at 16px, so the 4.5:1
+                floor applies — WCAG's large-text relaxation starts at
+                18.66px bold). Per WeekA.module.css:250 the state moves off
+                the ink and onto the surface: the button loses its raised
+                `--paper` fill for the flat `--ink-100` hairline, its border
+                softens a step, and the glyph steps from `--ink-700` to
+                `--ink-500` — still a legible ink, just a quieter one. Every
+                token is re-declared per tone in tokens.css, so this reads
+                correctly in Night without naming a theme.
+
+                `--ink-500` and NOT `--ink-400`: measured, not guessed.
+                `--ink-400` on `--ink-100` is 4.69:1 in light tone but only
+                4.43:1 in Night — a miss, and precisely the "passes in one
+                tone, fails in the other" trap this sweep exists to close.
+                `--ink-500` clears the floor in both. */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Tooltip content="Step back one school week." side="top">
                 <button
@@ -286,12 +303,15 @@ export function RelocatePicker({
                     width: 44,
                     height: 44,
                     borderRadius: 6,
-                    border: "1px solid var(--ink-200)",
-                    background: "var(--paper)",
-                    color: "var(--ink-700)",
+                    border: `1px solid ${
+                      week <= MIN_WEEK ? "var(--ink-150)" : "var(--ink-200)"
+                    }`,
+                    background:
+                      week <= MIN_WEEK ? "var(--ink-100)" : "var(--paper)",
+                    color:
+                      week <= MIN_WEEK ? "var(--ink-500)" : "var(--ink-700)",
                     fontSize: 16,
                     cursor: week <= MIN_WEEK ? "not-allowed" : "pointer",
-                    opacity: week <= MIN_WEEK ? 0.38 : 1,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -336,12 +356,15 @@ export function RelocatePicker({
                     width: 44,
                     height: 44,
                     borderRadius: 6,
-                    border: "1px solid var(--ink-200)",
-                    background: "var(--paper)",
-                    color: "var(--ink-700)",
+                    border: `1px solid ${
+                      week >= MAX_WEEK ? "var(--ink-150)" : "var(--ink-200)"
+                    }`,
+                    background:
+                      week >= MAX_WEEK ? "var(--ink-100)" : "var(--paper)",
+                    color:
+                      week >= MAX_WEEK ? "var(--ink-500)" : "var(--ink-700)",
                     fontSize: 16,
                     cursor: week >= MAX_WEEK ? "not-allowed" : "pointer",
-                    opacity: week >= MAX_WEEK ? 0.38 : 1,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",

@@ -205,8 +205,25 @@ export function SubjectColors({
                 minHeight: 56,
                 border: "1px solid var(--ink-150)",
                 borderRadius: 10,
-                background: editing ? "var(--ink-100)" : "var(--paper)",
-                opacity: locked ? 0.85 : 1,
+                // Locked recedes via the FILL, not a fade. The old
+                // `opacity: locked ? 0.85 : 1` sat on a row carrying the
+                // subject name and the swatch name, and it compounded: the
+                // "Locked" <Button> is `disabled`, and the Button primitive's
+                // own `.btn:disabled { opacity: 0.5 }` multiplied under it to
+                // 0.425 on that label. (That primitive rule is a separate,
+                // wider issue — it is a stylesheet rule, not inline, and is
+                // reported rather than changed here.)
+                //
+                // `--ink-50` is darker than `--paper` in light tone and
+                // darker than it in Night too, so a locked row recedes in
+                // both directions without branching on a theme. `editing`
+                // keeps precedence — a row cannot be both, since the picker
+                // only opens on an unlocked subject.
+                background: editing
+                  ? "var(--ink-100)"
+                  : locked
+                    ? "var(--ink-50)"
+                    : "var(--paper)",
               }}
             >
               <span

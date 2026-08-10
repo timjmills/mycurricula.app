@@ -186,11 +186,41 @@ export function StatusFilterBar({
       >
         <button
           className={styles.clearBtn}
-          onClick={onClear}
+          // Guarded, because `aria-disabled` PROMISES assistive tech that this
+          // control does nothing — and an unguarded `onClick` breaks that
+          // promise for exactly the users who were told to trust it. The
+          // comment below used to claim clicking was "a harmless no-op"; it
+          // wasn't, it called onClear, which allocates a fresh Set and
+          // re-renders. Harmless today, but the next callback to gain
+          // analytics or persistence would fire from a control announced as
+          // disabled. The guard makes the code true to what the attribute says.
+          onClick={hasActiveFilters ? onClear : undefined}
           aria-label="Clear all status filters"
           title="Remove every active status filter — the roadmap shows all lessons again"
-          // Dim when there's nothing to clear so it reads as inactive.
-          style={{ opacity: hasActiveFilters ? 1 : 0.45 }}
+          // Inactive = a quieter INK, not a fade. This used to be
+          // `opacity: hasActiveFilters ? 1 : 0.45` on a button whose entire
+          // content is the words "Clear filters" — a subtree fade over text,
+          // and inline, so no `data-tone` arm could reach it
+          // (WeekA.module.css:250).
+          //
+          // The replacement copies the pill pattern 30 lines above: the
+          // inline style sets a CSS CUSTOM PROPERTY that the stylesheet
+          // consumes with a token fallback, so the resolved colour still
+          // comes from the cascade and still re-derives per tone. `--ink-400`
+          // is a genuine step down from the resting `--ink-500` in BOTH
+          // tones — lighter than it on a light canvas, darker than it in
+          // Night — so "inactive" recedes either way without naming a theme.
+          //
+          // `aria-disabled` (not `disabled`) mirrors the visual state to
+          // assistive tech, which the opacity never did. It stays advisory:
+          // the button stays focusable and its handler is guarded off above,
+          // so keyboard users don't lose a stop in the tab order.
+          aria-disabled={hasActiveFilters ? undefined : true}
+          style={
+            hasActiveFilters
+              ? undefined
+              : ({ "--clear-color": "var(--ink-400)" } as React.CSSProperties)
+          }
         >
           Clear filters
           <IconX />

@@ -306,7 +306,19 @@ function RadioGroup<V extends string>({
           // appearance groups lay out the same way at every tier.
           gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))",
           gap: 8,
-          opacity: disabled ? 0.5 : 1,
+          // NO `opacity: disabled ? … : 1` HERE. It was 0.5, and this element
+          // wraps EVERY option's label AND description — so the appearance
+          // engine was fading the text of its own picker, and because an
+          // inline declaration outranks every author rule short of
+          // `!important`, no `data-tone` or `data-frame` arm could ever
+          // recover it. The standing rule is WeekA.module.css:250: do not
+          // express state as a subtree `opacity` on an element that contains
+          // text. The state moves to the SURFACE instead — see
+          // `.pickOption:disabled` in settings-card.module.css, which flattens
+          // the fill, dashes the border and kills the hover lift while the
+          // ink stays at full strength. The button's own `disabled` attribute
+          // + `aria-disabled` here already carry the state to AT, and the
+          // Tooltip carries `disabledReason` to sighted users.
         }}
       >
         {values.map((value) => {

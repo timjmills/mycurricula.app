@@ -64,7 +64,6 @@
   gap: 5px;
   padding: 6px 10px;
   background: transparent;
-  color: var(--ink-500);
   border: 0;
   font-size: var(--t-12);
   font-weight: 600;
@@ -76,8 +75,29 @@
     opacity 120ms ease;
 }
 
-.clearBtn:hover {
-  color: var(--ink);
+/* ── Clear-button INK — class DOUBLED on purpose ──────────────────────────
+   `.clearBtn` alone is (0,1,0) and loses to `.cp-root button { color: inherit }`
+   in tokens.css:1264, which is (0,1,1). That is not a new problem: this rule
+   previously read `color: var(--ink-500)` at single specificity, so the
+   resting colour was ALREADY dead and the button has been rendering at the
+   inherited `--ink-900` all along. Nobody noticed because the inline
+   `opacity: 0.45` this sweep removed was doing the entire job of signalling
+   "inactive" — which is exactly why deleting that fade without a WORKING
+   replacement would have deleted the state rather than recoloured it.
+
+   Doubling to (0,2,0) beats (0,1,1) — the same remedy chrome.css:2548 uses on
+   its own <button> rules for this identical reason. `--clear-color` is set
+   inline only in the inactive case (see StatusFilterBar.tsx), in the shape of
+   the `--pill-*` overrides above: the component hands the cascade a token,
+   never a resolved visual property, so the ink still re-derives per theme and
+   per tone. Hover honours the same override, so hovering an inactive button
+   does not brighten it back to full strength and undo the signal. */
+.clearBtn.clearBtn {
+  color: var(--clear-color, var(--ink-500));
+}
+
+.clearBtn.clearBtn:hover {
+  color: var(--clear-color, var(--ink));
 }
 
 .clearBtn:focus-visible {

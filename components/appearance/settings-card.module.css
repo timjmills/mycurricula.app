@@ -244,17 +244,54 @@
     border-color 140ms ease;
 }
 
-.pickOption:hover {
+/* `:not(:disabled)` is deliberate, not decoration. The disabled rules below
+   need to win, and a bare `.pickOption:hover` would tie them at (0,2,0) and
+   be settled by source order alone — the fragile arrangement CLAUDE.md warns
+   about. Qualifying the interactive states instead makes the precedence
+   structural. */
+.pickOption:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--theme-accent) 45%, var(--border));
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-1px);
 }
 
-.pickOption:active {
+.pickOption:not(:disabled):active {
   transform: translateY(0);
 }
 
 .pickOption[aria-checked="true"] {
   border: 1.5px solid var(--theme-accent);
   background: var(--theme-accent-soft);
+}
+
+/* ── Disabled option — the state lives on the SURFACE, never on the ink ──
+   This replaces an inline `opacity: 0.5` that appearance-controls.tsx used to
+   set on the whole `role="radiogroup"`. That fade covered every option's
+   label AND description, so the appearance engine dimmed the text of its own
+   picker; and being inline it outranked every author rule short of
+   `!important`, so no `data-tone` arm could recover it. Standing rule:
+   WeekA.module.css:250 — do not express state as a subtree `opacity` on an
+   element that contains text.
+
+   What carries the state instead, none of it spending contrast budget:
+   a dashed border (the "you cannot commit this" idiom already used for
+   provisional chrome), a flat `--hairline` fill in place of the raised
+   `--surface`, and the loss of the hover lift + pointer cursor. Both tokens
+   are re-declared per theme and per tone in tokens.css, so the treatment
+   re-derives in Night instead of branching on a theme name.
+
+   The SELECTED option keeps its accent fill and only takes the dashed
+   border: a disabled group still has a current value, and hiding which one
+   it is would delete information rather than de-emphasise it. Hence the
+   `:not([aria-checked="true"])` guard on the fill — (0,3,0), so it beats
+   `.pickOption` structurally rather than by ordering. */
+.pickOption:disabled {
+  border-style: dashed;
+  box-shadow: none;
+  transform: none;
+}
+
+.pickOption:disabled:not([aria-checked="true"]) {
+  background: var(--hairline);
+  border-color: var(--border);
 }
