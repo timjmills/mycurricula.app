@@ -417,10 +417,18 @@ describe("the glass Week canvas expands in place", () => {
           (el.getAttribute("aria-label") ?? "").startsWith("Open, teach, or post"),
       );
 
-      const row = Array.from(
-        (h.query("[role=group]")?.querySelectorAll("button") ?? []) as
-          Iterable<Element>,
-      ).find((b) => (b.textContent ?? "").trim() === "Planner hub");
+      // Queried through the DOCUMENT, not the harness container: the menu is a
+      // React portal to document.body (it has to be — a tile's hover `transform`
+      // was otherwise capturing its position:fixed containing block), so a
+      // container-scoped query finds nothing and this test would pass or fail
+      // for reasons unrelated to the row it is pinning.
+      const doc = (globalThis as unknown as { document: Document }).document;
+      const menuRows = Array.from(
+        doc.querySelectorAll<HTMLButtonElement>("[role=group] button"),
+      );
+      const row = menuRows.find(
+        (b) => (b.textContent ?? "").trim() === "Planner hub",
+      );
       expect(row).toBeTruthy();
       expect(row?.getAttribute("title")).toBe(
         "Open the Planner hub — browse the whole plan. It does not open this lesson.",
@@ -428,7 +436,11 @@ describe("the glass Week canvas expands in place", () => {
 
       // And the other three still carry the lesson, so the divergence is one row
       // and not a general loss of scope.
-      await h.click((el) => (el.textContent ?? "").trim() === "Teach");
+      const teach = menuRows.find(
+        (b) => (b.textContent ?? "").trim() === "Teach",
+      );
+      expect(teach).toBeTruthy();
+      await h.clickElement(teach!);
       expect(PUSHED).toEqual(["/teach?lesson=l-1"]);
     } finally {
       await h.unmount();

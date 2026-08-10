@@ -99,6 +99,16 @@
   border: 1px solid var(--border);
   box-shadow: var(--sh-lg);
   animation: lessonMenuIn 0.14s ease;
+  /* BACKSTOP for the JS clamp. The clamp positions the box from a PREDICTED
+     height (the metric constants in the .tsx), and a prediction can drift from
+     this file — a row that wraps, a token that grows, a row added without
+     updating the constants. When it drifts, the failure without this is a menu
+     whose last rows are cut off below the fold with no way to reach them; with
+     it, the menu scrolls instead. The rows are the same either way, so this
+     never changes a correct case. */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 @keyframes lessonMenuIn {
@@ -201,4 +211,20 @@
 /* Teach is the one row the handoff tints differently (views.css:607). */
 .menu.menu button.teach svg {
   color: var(--honey-600);
+}
+
+/* ── Group rule ───────────────────────────────────────────────────────────
+   Separates the handoff's four DESTINATIONS from the two forking rows ported
+   from the v1 card menu — different kinds of action, so they get a rule
+   rather than just adjacency. 1px inside 4px margins = the 9px the JS clamp
+   budgets for it (MENU_DIVIDER_H); keep the two in step.
+
+   `.menu.menu` for the same reason every other rule here doubles it — this
+   sits inside a `.cp-root` subtree — even though a <div> is not caught by the
+   `.cp-root button` reset specifically. Consistency here is cheaper than
+   remembering which selectors are exempt. */
+.menu.menu .divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
 }

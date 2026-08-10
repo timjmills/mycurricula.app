@@ -65,8 +65,23 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// …and it now also reads the Personal | Team-Curriculum mode, to decide
+// whether to offer its forking rows. Same class of breakage as the router
+// mock above: without this the mount throws "useAppState must be used within
+// an <AppStateProvider>" and every composer assertion in this file fails for a
+// reason that has nothing to do with the composer. "personal" is the resting
+// mode, and the rows it unlocks are all gated on lesson state this file's
+// fixtures do not set — so the Week card renders exactly as it did before.
+vi.mock("@/lib/app-state", () => ({
+  useAppState: () => ({ editMode: "personal" }),
+}));
+
 vi.mock("@/lib/planner-store", () => ({
   usePlanner: () => ({
+    // The kebab resolves its own lesson out of the store to read the fork
+    // flags. Empty is the honest value here: this file's card is mounted with
+    // a prop lesson and no document behind it.
+    lessons: [],
     subjectById: store.subjectById,
     units: store.units,
     getSections: () => store.sections,
