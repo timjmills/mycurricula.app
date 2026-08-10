@@ -162,3 +162,93 @@
   outline: 2px solid var(--c, var(--ink-700));
   outline-offset: 1px;
 }
+
+/* ══════════════════  FRAME C · COLOUR-FORWARD  ══════════════════════════════
+   Frame C paints this card as a DEEP SATURATED SUBJECT SOLID rather than the
+   white-or-tint surface every other frame uses. USER RULING 2026-08-07
+   (decision 20), reaffirmed 2026-08-09 — the muted-tint register the design
+   handoff specifies is the look the user rejected. The full provenance,
+   including the handoff line this knowingly contradicts and the measured
+   contrast figures, lives with the token tier in app/tokens.css; read it there
+   before changing any value here.
+
+   HOW THIS REACHES THE CARD AT ALL. lesson-card.tsx applies its colours through
+   the inline `style` attribute, which outranks every stylesheet rule that is not
+   `!important` — so a rule setting `background` here would simply lose. Instead
+   the component expresses each colour as `var(--lc-…, <its previous value>)`,
+   and this block sets those custom properties. A custom property is a different
+   property from the one declared inline, so the cascade lets it through. Frames
+   A and B set none of them and therefore render byte-identically to before.
+
+   This is the FIRST component wired to the frame token tier, chosen because it
+   carried no legacy debt to fight (zero hard-coded hex, rgba or px font sizes)
+   and because it is the shared card across Week, Day, List and Catch-up — so
+   one branch reaches four surfaces. */
+:global([data-frame="color"]) .card {
+  --lc-surface: linear-gradient(
+    150deg,
+    var(--sc-solid) 0%,
+    var(--sc-solid-2) 100%
+  );
+  /* The 5px subject rail the handoff specifies for Frame C, and one of the
+     parts of its recipe this ruling does NOT override. `--sc-rail` is the raw
+     subject solid, which is LIGHTER than the fill it sits on, so it reads as a
+     lit edge rather than a darker band. */
+  --lc-rail: var(--sc-rail);
+  /* Light tone needs no separate edge token — the fill separates from a white
+     page unaided, so the border is the gradient's own darker stop and reads as
+     a deepening rather than a second colour. */
+  --lc-edge: var(--sc-solid-2);
+
+  /* Ink ramp. These are ALPHA OVERLAYS on the card's own fill, not palette
+     colours — which is the only reason a component file may express them at
+     all. Every rung is measured against the WORST subject slot's fill
+     (--subj-14, the one with the least headroom), never against a mid one.
+
+     ⚠ THE USABLE BAND IS ONLY TEN POINTS WIDE, and the numbers are why these
+     three values look so close together. Measured by canvas readback against
+     the shipped tokens, worst-slot white-on-fill:
+         78% → 3.86   84% → 4.23   88% → 4.49   ← AA CLIFF
+         90% → 4.62   92% → 4.76   96% → 5.04   100% → 5.34
+     Anything below 90% FAILS the 4.5:1 body floor on the deepest slots, and
+     both consumers of the muted rung are 10px text, so the large-text 3:1
+     allowance does not apply. That leaves 90–100% for the entire ramp.
+
+     So on a deep saturated fill, hierarchy is carried mostly by WEIGHT AND
+     SIZE (the eyebrow is 700-weight uppercase 10.5px, the title 14px/500, the
+     preview 13px) and only secondarily by alpha. If these three look nearly
+     identical in a colour picker, that is the constraint working as intended —
+     do not "restore the hierarchy" by dropping the muted rung further, and do
+     not flatten them all to 100% either. */
+  /* The completion check paints its glyph straight onto the card when it is
+     unchecked / skipped / carried (parts.tsx). On a deep solid that glyph
+     vanishes — the carried `↻` measured 1.60:1 — so Frame C gives the box an
+     opaque white chip and lets the status colour keep its meaning on top of it
+     instead of recolouring the status. Measured on the running app: the carried
+     `↻` goes 1.60 → 4.21:1, which makes Frame C the BEST frame for this glyph
+     (Frame A reads 3.36 in light tone and 2.78 in dark).
+
+     ⚠ 4.21 still misses the 4.5 floor, and that residue is NOT Frame C's to
+     fix: `--catchup` (#e0431a) is simply a weak ink, and it fails in every
+     frame — the "carry-over" chip pairing it with `--catchup-bg` measures
+     3.28:1 in Frame A and Frame C alike. The real fix is a darker `--catchup`
+     or a dedicated `--catchup-ink` rung, which is a token-level change across
+     several components rather than something this card should special-case. */
+  --lc-check-bg: var(--on-solid);
+  --lc-check-edge: color-mix(in oklab, var(--on-solid) 70%, transparent);
+
+  --lc-ink-strong: var(--on-solid); /* 5.34:1 worst slot */
+  --lc-ink-body: color-mix(in oklab, var(--on-solid) 96%, transparent); /* 5.04 */
+  --lc-ink-muted: color-mix(in oklab, var(--on-solid) 92%, transparent); /* 4.76 */
+  --lc-ink-eyebrow: color-mix(in oklab, var(--on-solid) 92%, transparent); /* 4.76 */
+}
+
+/* Dark tone earns a SEPARATE border token, and this is not a polish choice.
+   Against the dark canvas (#1e1d2c) no single lightness satisfies both
+   white-text ≥4.5:1 on the fill AND fill-vs-canvas ≥3:1 (WCAG 1.4.11 non-text
+   contrast): the two curves cross between L=0.54 and L=0.56 and neither clears
+   at the crossover. The fill therefore keeps the lightness its text needs, and
+   `--sc-edge` (L=0.68) supplies the boundary the page needs. */
+:global([data-tone="dark"][data-frame="color"]) .card {
+  --lc-edge: var(--sc-edge);
+}

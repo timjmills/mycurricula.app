@@ -88,21 +88,24 @@ const AXIS_KEYED = /\[data-bg=|\[data-theme=/;
  *  guard itself. Only `night` forces a tone.
  *
  *  KNOWN REMAINING GAP — `data-frame` is not scanned, deliberately, and adding
- *  it is NOT a one-line change. Measured: a bare `\[data-frame=` widening
- *  surfaces 20 rules, only 9 of which are appearance rules.
- *    • 10 are FALSE POSITIVES from a NAME COLLISION: `resource-tile.module.css`
- *      uses a component-local `data-frame` whose values are `video|slides|
- *      document|image|url` (the resource type), unrelated to the appearance
- *      axis. Any widening must allowlist the axis values `glass|paper|color`.
- *    • The rest are the dormant Frame-A/C vocabulary (`.glass-dark`,
- *      `.fr-title`, `.fr-eyebrow`, `.badge`, `.chip.now`) already exempted
- *      below — but those selectors carry no `data-bg`, so that exemption's
- *      pattern does not reach them and would need widening in step.
- *    • The live one is Pastel (`WeekC.module.css`), whose tone-fixed ink is
- *      safe ONLY because Frame C forces light tone. That forcing is the Pastel
- *      port's `deriveTone(frame)` change; until it lands, this guard cannot
- *      express why the rule is legal. Widen the scan WITH that port, not
- *      before, or the guard reports a safe rule as a violation. */
+ *  it is NOT a one-line change. The measurement below was taken before
+ *  2026-08-09 and two of its three bullets have since been overtaken by events;
+ *  the counts are left as the historical record and MUST be re-measured by
+ *  whoever widens the scan, not carried forward.
+ *    • STILL TRUE: 10 are FALSE POSITIVES from a NAME COLLISION.
+ *      `resource-tile.module.css` uses a component-local `data-frame` whose
+ *      values are `video|slides|document|image|url` (the resource type),
+ *      unrelated to the appearance axis. Any widening must allowlist the axis
+ *      values `glass|paper|color`.
+ *    • GONE: the dormant Frame-A/C vocabulary (`.glass-dark`, `.fr-title`,
+ *      `.fr-eyebrow`, `.badge`, `.chip.now`) was DELETED from app/themes.css on
+ *      2026-08-09 — 99 rules that no .tsx could ever match. They are no longer
+ *      a reason the widening is hard, and their allowlist entry went with them.
+ *    • GONE: Pastel (`WeekC.module.css`) was retired by user ruling, so the
+ *      "safe only because Frame C forces light tone" case no longer exists.
+ *      Frame C is now colour-forward and renders in BOTH tones, which means
+ *      any tone-fixed ink under `[data-frame="color"]` is a real violation
+ *      rather than an exempt one — re-measure before widening. */
 const TONE_DETERMINED =
   /\[data-tone=|\[data-dim=|\[data-glass=|\[data-theme=["']?night["']?\]/;
 const INK_PROP =
@@ -374,11 +377,27 @@ const ALLOWLIST: { file: string; selector: RegExp; why: string }[] = [
   // contract at the value level. (It is separately DEAD: `data-bg` is
   // `photo|wash`; `ambient` is the v1 spelling that folded to `wash`,
   // themes.css:21. That is a cleanup, not a legibility bug.)
-  {
-    file: "app/themes.css",
-    selector: /\[data-frame="(glass|color)"\]\[data-bg="(photo|wash)"\]/,
-    why: 'DORMANT TIER. The Frame-A/C vocabulary (.card/.lane/.chip/.badge/.fr-chrome/.fr-title/.fr-eyebrow/.fr-strip/.metapill) is the ported handoff frame recipe; no .tsx in this repo renders those bare global class names, so none of it paints. The bare-root rule `[data-frame="glass"][data-bg="photo"] { color: #f4f6fb }` (themes.css:775) DOES match <html> and is the one live member — see the lane report.',
-  },
+  // REMOVED 2026-08-09, and the removal is the point. This entry exempted the
+  // "DORMANT TIER" in app/themes.css: the ported handoff frame vocabulary
+  // (.card / .lane / .chip / .badge / .fr-chrome / .fr-title / .fr-eyebrow /
+  // .fr-strip / .metapill), which no .tsx renders because this app styles its
+  // surfaces with CSS Modules and those selectors name bare global classes.
+  // Those 99 rules were DELETED rather than left exempt, so the entry stopped
+  // matching anything and the "no stale exemptions" test below failed — which
+  // is precisely the job that test exists to do.
+  //
+  // Two findings the entry carried, kept here so they are not lost with it:
+  //   • Its bare-root member survives the deletion and is now TONE-BRANCHED
+  //     (`[data-frame="glass"][data-bg="photo"][data-tone="dark"]` + a light
+  //     arm on `var(--ink)`), so it satisfies the contract in its own selector
+  //     and needs no exemption.
+  //   • The earlier claim that the un-branched form was "armed app-wide, inert
+  //     only because every component sets its own ink" was WRONG.
+  //     `app/globals.css` `body { color: var(--ink) }` is unconditional and
+  //     sits on the ancestor of every rendered node, so it blocks inheritance
+  //     from <html> outright. Measured under Photo-Bright: <html> computed
+  //     rgb(244,246,251) while <body>, a bare injected div, and a bare span in
+  //     #main-content all computed rgb(28,27,46).
   // Also NOT listed: `app/themes.css:1668` `.home[data-bg="photo"]
   // .lesson-menu button svg`. It sets `var(--accent)`, which the dark block
   // redefines, so it is tone-aware by value. (It is dormant besides —

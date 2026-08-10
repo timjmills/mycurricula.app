@@ -46,8 +46,19 @@ export function CompletionCheck({
   const skipped = status === "skipped";
   const carried = status === "carried";
 
-  let background = "transparent";
-  let border = "1.4px solid var(--ink-300)";
+  // The unchecked / skipped / carried states paint a GLYPH DIRECTLY ON THE CARD
+  // — the box itself is transparent — so their legibility depends entirely on
+  // what the card is made of. That was fine while every frame gave the card a
+  // white or pale-tint surface. Frame C makes it a deep saturated subject
+  // solid, and the carried `↻` measured 1.60:1 on it (down from an already-thin
+  // 3.36:1), i.e. effectively invisible.
+  //
+  // The fix keeps the SEMANTIC colour and changes the ground under it: Frame C
+  // sets `--lc-check-bg` to an opaque chip so `--catchup` red still reads as
+  // catch-up red. Every other frame leaves the property unset and gets the
+  // historical transparent box, unchanged.
+  let background = "var(--lc-check-bg, transparent)";
+  let border = "1.4px solid var(--lc-check-edge, var(--ink-300))";
   let glyph: React.ReactNode = null;
 
   if (done) {

@@ -134,8 +134,30 @@ export function LessonCard({
   const done = lesson.status === "done";
   const hasTasks = lesson.tasks.length >= 2;
 
+  // ── THE FRAME HOOK — why every colour below is wrapped in a var() ──────
+  //
+  // This card computes its colours in JS and applies them through the inline
+  // `style` attribute. An inline declaration beats any stylesheet rule that is
+  // not `!important`, so a `[data-frame="color"] .card { background: … }` rule
+  // CANNOT restyle this card — which is a large part of why the frame axis was
+  // inert on every surface that renders a LessonCard.
+  //
+  // The fix is the same one day-v2.module.css:539 documents: express each
+  // colour as `var(--lc-…, <the value it already had>)`. A custom property is
+  // a different property from the one declared inline, so a stylesheet CAN set
+  // it — while the fallback keeps the value byte-identical wherever the
+  // property is unset. Frames A and B therefore render EXACTLY as before (they
+  // set none of these), and Frame C restyles the card by setting five values
+  // in lesson-card.module.css rather than by rewriting these rules.
+  //
+  // Only ink and fill are hooked. Layout, density and the three-tier fork
+  // differentiation (solid vs dashed stripe, §2) are frame-invariant — the
+  // user retired frame-driven LAYOUT on 2026-08-01: "the appearance axes drive
+  // material and colour, never layout".
+
   // ── Stripe — solid by default, dashed when personally modified ────────
   const stripeWidth = isVivid ? 5 : 4;
+  const rail = `var(--lc-rail, ${color.stripe})`;
   const stripeStyle: CSSProperties = {
     position: "absolute",
     insetBlock: 0,
@@ -143,22 +165,24 @@ export function LessonCard({
     width: stripeWidth,
     ...(lesson.modified
       ? {
-          backgroundImage: `repeating-linear-gradient(to bottom, ${color.stripe} 0 6px, transparent 6px 11px)`,
+          backgroundImage: `repeating-linear-gradient(to bottom, ${rail} 0 6px, transparent 6px 11px)`,
         }
-      : { background: color.stripe }),
+      : { background: rail }),
   };
 
   // ── Card surface — white for quiet/calm, subject tint for vivid ───────
   const surface: CSSProperties = {
     position: "relative",
-    background: isVivid ? color.bg : "var(--paper)",
+    background: `var(--lc-surface, ${isVivid ? color.bg : "var(--paper)"})`,
     border: selected
-      ? `1.5px solid ${color.stripe}`
-      : isVivid
-        ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
-        : "1px solid var(--ink-150)",
+      ? `1.5px solid ${rail}`
+      : `1px solid var(--lc-edge, ${
+          isVivid
+            ? `color-mix(in oklch, ${color.deep} 14%, transparent)`
+            : "var(--ink-150)"
+        })`,
     boxShadow: dragging
-      ? `var(--shadow-drag), 0 0 0 1.5px ${color.stripe}`
+      ? `var(--shadow-drag), 0 0 0 1.5px ${rail}`
       : hovered
         ? "var(--shadow-drag-soft)"
         : "var(--shadow-card)",
@@ -167,7 +191,9 @@ export function LessonCard({
   };
 
   // Title always reads as ink-900 — verified AA on white and on the
-  // tinted vivid fill, since the fill is a light/highlight tone.
+  // tinted vivid fill, since the fill is a light/highlight tone. Under Frame C
+  // the fill is a deep saturated subject solid instead, so `--lc-ink-strong`
+  // flips it to the on-solid ramp; see lesson-card.module.css.
   const padX = dense ? 9 : 11;
 
   const openMenuAt = useCallback((x: number, y: number) => {
@@ -411,7 +437,7 @@ export function LessonCard({
               style={{
                 fontSize: 10.5,
                 fontWeight: 700,
-                color: color.deep,
+                color: `var(--lc-ink-eyebrow, ${color.deep})`,
                 textTransform: "uppercase",
                 letterSpacing: 0.6,
                 marginBottom: 1,
@@ -427,7 +453,7 @@ export function LessonCard({
               padding: teamModeCue ? "2px 6px" : 0,
               fontSize: 14,
               fontWeight: 500,
-              color: "var(--ink-900)",
+              color: "var(--lc-ink-strong, var(--ink-900))",
               lineHeight: 1.3,
               textWrap: "pretty",
               textDecoration: done ? "line-through" : "none",
@@ -486,7 +512,7 @@ export function LessonCard({
               gap: 5,
               fontSize: 11,
               lineHeight: 1.4,
-              color: color.deep,
+              color: `var(--lc-ink-body, ${color.deep})`,
               fontStyle: "italic",
               marginBottom: 3,
               textWrap: "pretty",
@@ -518,7 +544,9 @@ export function LessonCard({
               margin: 0,
               fontSize: 13,
               lineHeight: 1.45,
-              color: isVivid ? color.deep : "var(--ink-500)",
+              color: `var(--lc-ink-body, ${
+                isVivid ? color.deep : "var(--ink-500)"
+              })`,
               display: "-webkit-box",
               WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
@@ -547,7 +575,9 @@ export function LessonCard({
                 margin: 0,
                 fontSize: 13,
                 lineHeight: 1.5,
-                color: isVivid ? color.deep : "var(--ink-700)",
+                color: `var(--lc-ink-body, ${
+                  isVivid ? color.deep : "var(--ink-700)"
+                })`,
                 textWrap: "pretty",
               }}
             >
@@ -692,7 +722,9 @@ export function LessonCard({
                 alignItems: "center",
                 gap: 3,
                 fontSize: 10,
-                color: isVivid ? color.deep : "var(--ink-500)",
+                color: `var(--lc-ink-muted, ${
+                  isVivid ? color.deep : "var(--ink-500)"
+                })`,
               }}
             >
               <span aria-hidden style={{ fontSize: 11 }}>
@@ -789,7 +821,9 @@ function Section({
           fontWeight: 700,
           letterSpacing: 0.5,
           textTransform: "uppercase",
-          color: "var(--ink-400)",
+          // Inherited from the card root, so this sub-component needs no prop
+          // threading to follow the frame.
+          color: "var(--lc-ink-muted, var(--ink-400))",
           marginBottom: 5,
         }}
       >

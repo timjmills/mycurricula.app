@@ -393,8 +393,34 @@
   [data-frame="paper"][data-bg="wash"] .stage::after {
     background: rgba(252, 250, 246, 0.55);
   }
+  /* Frame C · photo — veil RAISED 0.58 → 0.82 (2026-08-09), to the same register
+     paper uses two rules above and that the glass light-tone pair composites to.
+     ────────────────────────────────────────────────────────────────────────
+     0.58 was the outlier among the three frames, and it was measurably too thin
+     for the light-tone ink rungs rather than merely lighter in character. On
+     `color-photo-bright` at 1440: `BoardLibrary .sortLabel` 2.94:1,
+     `TeachChooser .prompt` 3.17:1, `ResourceWall .viewBtn` 2.99:1 and
+     `.addSec` 2.40:1 — all four PASS on Frame A after its veil fix and failed
+     here for one reason: the stage under them was not light enough. That makes
+     it a STAGE defect, not four component defects, and the fix belongs here.
+
+     0.82 is not a taste pick, and it is not merely "what paper uses" — it is
+     the MINIMUM that clears. `--ink-500` (#57566b) over this veil composited on
+     the worst case a photograph can supply (black):
+         0.58 → 2.31 FAIL   0.70 → 3.33 FAIL   0.78 → 4.14 FAIL
+         0.82 → 4.60 PASS   0.86 → 5.08 PASS
+     Confirmed on the running app at `color-photo-bright`: 4.59. Do not shave
+     this back toward 0.7 to "let more photo through" — 0.78 still fails.
+
+     Raising it also suits what Frame C now IS: its cards are deep saturated
+     subject solids, and a busy photo competing with them is the thing that
+     reads as noise. Calmer ground, louder cards.
+
+     Dark tone does NOT inherit this — it has its own explicit override in §3
+     below (rgba(20,19,31,0.72)). Same shape as paper: a light base here, a dark
+     branch there. Do not merge them into one un-branched rule. */
   [data-frame="color"][data-bg="photo"] .stage::after {
-    background: rgba(255, 253, 248, 0.58);
+    background: rgba(255, 253, 248, 0.82);
   }
   [data-frame="color"][data-bg="wash"] .stage::after {
     background: rgba(255, 253, 248, 0.28);
@@ -763,13 +789,35 @@
       border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* ══════════════  THE FRAME AXIS' ROOT TIER — WHAT IS LEFT, AND WHY  ═══════
+     This section used to carry 99 further `[data-frame]` rules: the ported
+     handoff frame vocabulary, styling `.card` / `.lane` / `.chip` / `.badge` /
+     `.bar` / `.fr-chrome` / `.fr-title` / `.fr-eyebrow` / `.fr-strip` /
+     `.metapill` / `.glass-dark` / `.glass-light` as BARE GLOBAL class names.
+     Every one of them was deleted 2026-08-09, because every one of them was
+     unreachable: this app styles its surfaces with CSS Modules, whose class
+     names are hashed, so a selector written against the bare name `.card` can
+     never match the element that React actually renders. Verified by parsing
+     the `className` value of all 768 `.ts`/`.tsx` files under `app/`,
+     `components/` and `lib/` — sixteen of the seventeen class names had ZERO
+     callsites (the `done` / `now` apparent hits are `status === "done"` string
+     comparisons inside a className template, not class tokens).
+
+     That is why Frame C rendered almost identically to Frame A: the frame axis
+     had a rich recipe and nothing to apply it to. The fix is NOT to restore
+     these rules — it is to give the frame axis reach into the real component
+     stylesheets, which is what the `--sc-solid` / `--sc-solid-2` / `--sc-rail`
+     / `--sc-edge` tier in `app/tokens.css` and its consumers now do.
+
+     WHAT SURVIVES HERE, and why each earns its place:
+       • the 7 `.stage::after` veils + 2 dark-tone ones — `.stage` IS live,
+         rendered bare by `app/layout.tsx:158`.
+       • the 7 bare-root rules below — each selector matches `<html>` itself,
+         so they set the document ink per frame/background/register.
+     Nothing else in this file may be written against a bare global class name
+     without first proving a callsite renders it. ═══════════════════════════ */
+
   /* ═══════════════════  FRAME A · CALM GLASS  ═══════════════════ */
-  [data-frame="glass"] .card,
-  [data-frame="glass"] .lane,
-  [data-frame="glass"] .fr-chrome {
-    -webkit-backdrop-filter: blur(22px) saturate(1.25);
-    backdrop-filter: blur(22px) saturate(1.25);
-  }
 
   /* — glass on PHOTO · DARK frosted (default material) — cinematic, legible — */
   /* THE TONE BRANCH IS NOT DECORATION — this selector matches <html>, and the
@@ -799,595 +847,28 @@
   [data-frame="glass"][data-bg="photo"][data-tone="light"] {
     color: var(--ink);
   }
-  [data-frame="glass"][data-bg="photo"] .fr-chrome {
-    background: rgba(20, 24, 36, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: #f4f6fb;
-  }
-  [data-frame="glass"][data-bg="photo"] .card,
-  [data-frame="glass"][data-bg="photo"] .lane {
-    background: linear-gradient(
-      180deg,
-      rgba(24, 28, 42, 0.62) 0%,
-      rgba(15, 18, 28, 0.52) 100%
-    );
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    /* lit top-edge: inset 0 1px 0 rgba(255,255,255,.14) — dark-frosted register */
-    box-shadow:
-      0 18px 40px -20px rgba(8, 12, 22, 0.6),
-      inset 0 1px 0 rgba(255, 255, 255, 0.14);
-    color: #f4f6fb;
-  }
-  [data-frame="glass"][data-bg="photo"] .card {
-    border-left: 3px solid var(--sc);
-  }
-  [data-frame="glass"][data-bg="photo"] .badge {
-    background: color-mix(in srgb, var(--sc) 62%, rgba(18, 22, 34, 0.5));
-    border: 1px solid color-mix(in srgb, var(--sc) 55%, rgba(255, 255, 255, 0.4));
-    box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--sc) 75%, transparent);
-    color: #fff;
-  }
-  [data-frame="glass"][data-bg="photo"] .chip {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: rgba(255, 255, 255, 0.9);
-  }
-  [data-frame="glass"][data-bg="photo"] .chip.now {
-    background: var(--sc);
-    border-color: color-mix(in srgb, var(--sc) 55%, #fff);
-    color: #fff;
-    box-shadow: 0 5px 16px -4px color-mix(in srgb, var(--sc) 80%, transparent);
-  }
-  [data-frame="glass"][data-bg="photo"] .chip.done {
-    opacity: 0.6;
-  }
-  [data-frame="glass"][data-bg="photo"] .bar {
-    background: rgba(255, 255, 255, 0.16);
-  }
-  [data-frame="glass"][data-bg="photo"] .bar i {
-    background: color-mix(in srgb, var(--sc) 90%, #fff);
-    box-shadow: 0 0 14px color-mix(in srgb, var(--sc) 72%, transparent);
-  }
-  [data-frame="glass"][data-bg="photo"] .metapill {
-    background: rgba(20, 24, 36, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-  }
-
-  /* — glass·photo · LIGHT-frosted MAIN material (data-glass="light") — the
-     white-frosted register: translucent-white panels + dark ink — */
+  /* — glass·photo · LIGHT-frosted register (data-glass="light") → dark ink.
+     The register flips a panel's fill AND its text together (CLAUDE.md §4);
+     only the text half lives here now, on the root. — */
   [data-frame="glass"][data-bg="photo"][data-glass="light"] {
     color: var(--ink);
   }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-chrome {
-    /* opacity bumped 0.66→0.74 (Wave-2 re-audit): a bright photo bled through
-       the White-frosted chrome, washing out text legibility. */
-    background: rgba(255, 255, 255, 0.74);
-    border: 1px solid rgba(255, 255, 255, 0.85);
-    color: var(--ink-soft);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .card,
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .lane,
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-strip {
-    /* fill opacity bumped 0.76/0.58→0.86/0.72 (Wave-2 re-audit): keep the
-       white-frosted panel opaque enough that a bright photo can't bleed through
-       and hurt dark-ink contrast. */
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.86) 0%,
-      rgba(255, 255, 255, 0.72) 100%
-    );
-    border: 1px solid rgba(255, 255, 255, 0.85);
-    /* lit top-edge: inset 0 1px 0 rgba(255,255,255,.95) — white-frosted register */
-    box-shadow:
-      0 22px 50px -22px rgba(8, 12, 22, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.95);
-    color: var(--ink);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .badge {
-    background: var(--sc);
-    border: none;
-    color: #fff;
-    box-shadow: var(--sh-sm);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .chip {
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid var(--border);
-    color: var(--body);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .chip.now {
-    background: var(--sc);
-    border-color: transparent;
-    color: #fff;
-    box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--sc) 70%, transparent);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .chip.done {
-    opacity: 0.6;
-    background: rgba(255, 255, 255, 0.5);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .bar {
-    background: var(--idle-tint);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .bar i {
-    background: var(--sc);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .metapill {
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.85);
-    color: var(--ink-soft);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-title {
-    color: var(--ink);
-    text-shadow: none;
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-eyebrow {
-    color: var(--muted);
-  }
-
-  /* — dark frosted header strip (.fr-strip) on photo — section/list headers — */
-  [data-frame="glass"][data-bg="photo"] .fr-strip {
-    background: rgba(18, 22, 34, 0.56);
-    -webkit-backdrop-filter: blur(22px) saturate(1.3);
-    backdrop-filter: blur(22px) saturate(1.3);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: #f4f6fb;
-  }
-
-  /* — glass on WASH — LIQUID v5 (both registers) — flat liquid body, sharp
-     bright top edge, deep drop shadow, glowing subject rail —
-     WHITE frosted is the DEFAULT wash register. — */
+  /* — glass on WASH — WHITE frosted is the DEFAULT wash register → dark ink. — */
   [data-frame="glass"][data-bg="wash"] {
     color: var(--ink);
   }
-  [data-frame="glass"][data-bg="wash"] .fr-chrome {
-    background: rgba(255, 255, 255, 0.74);
-    border: 1px solid rgba(255, 255, 255, 0.95);
-    color: var(--ink-soft);
-    box-shadow: var(--sh-md);
-  }
-  [data-frame="glass"][data-bg="wash"] .card,
-  [data-frame="glass"][data-bg="wash"] .lane {
-    position: relative;
-    overflow: hidden;
-    border-radius: var(--r-xl);
-    background:
-      linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 1) 0%,
-        rgba(255, 255, 255, 0.55) 4%,
-        rgba(255, 255, 255, 0.08) 13%,
-        rgba(255, 255, 255, 0) 26%
-      ),
-      radial-gradient(
-        80% 38% at 26% 0%,
-        rgba(255, 255, 255, 0.92) 0%,
-        rgba(255, 255, 255, 0) 38%
-      ),
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--sc) 8%, rgba(255, 255, 255, 0.9)) 0%,
-        color-mix(in srgb, var(--sc) 19%, rgba(255, 255, 255, 0.58)) 100%
-      );
-    -webkit-backdrop-filter: blur(24px) saturate(2.4) brightness(1.05);
-    backdrop-filter: blur(24px) saturate(2.4) brightness(1.05);
-    border: 1px solid rgba(255, 255, 255, 1);
-    /* lit top-edge: inset 0 2px 0 rgba(255,255,255,1) — Liquid v5 white register */
-    box-shadow:
-      -8px 0 22px -8px color-mix(in srgb, var(--sc) 58%, transparent),
-      0 2px 5px rgba(22, 26, 42, 0.18),
-      0 30px 58px -22px rgba(22, 26, 42, 0.52),
-      inset 0 2px 0 rgba(255, 255, 255, 1),
-      inset 0 -1px 0 rgba(22, 26, 42, 0.12);
-    color: var(--ink);
-  }
-  /* glowing subject rail (both wash registers) */
-  [data-frame="glass"][data-bg="wash"] .card::before,
-  [data-frame="glass"][data-bg="wash"] .lane::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 7px;
-    z-index: 1;
-    border-radius: var(--r-xl) 0 0 var(--r-xl);
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sc) 55%, #fff) 0%,
-      var(--sc) 44%,
-      color-mix(in srgb, var(--sc) 86%, #000 10%) 100%
-    );
-    box-shadow:
-      0 0 16px 1px color-mix(in srgb, var(--sc) 60%, transparent),
-      1px 0 3px color-mix(in srgb, var(--sc) 75%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  }
-  [data-frame="glass"][data-bg="wash"] .badge {
-    color: #fff;
-    background: var(--sc);
-    box-shadow: var(--sh-sm);
-  }
-  [data-frame="glass"][data-bg="wash"] .chip {
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid var(--border);
-    color: var(--body);
-  }
-  [data-frame="glass"][data-bg="wash"] .chip.now {
-    background: var(--sc);
-    border-color: transparent;
-    color: #fff;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.6),
-      0 3px 12px -3px color-mix(in srgb, var(--sc) 65%, transparent);
-  }
-  [data-frame="glass"][data-bg="wash"] .chip.done {
-    opacity: 0.7;
-  }
-  [data-frame="glass"][data-bg="wash"] .bar {
-    background: var(--idle-tint);
-  }
-  [data-frame="glass"][data-bg="wash"] .bar i {
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sc) 84%, #fff) 0%,
-      var(--sc) 100%
-    );
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.7),
-      0 1px 5px -1px color-mix(in srgb, var(--sc) 60%, transparent);
-  }
-  [data-frame="glass"][data-bg="wash"] .metapill {
-    background: rgba(255, 255, 255, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.95);
-    color: var(--ink-soft);
-    box-shadow: var(--sh-sm);
-  }
-  [data-frame="glass"][data-bg="wash"] .card:hover,
-  [data-frame="glass"][data-bg="wash"] .lane:hover {
-    transform: translateY(-3px);
-  }
-
-  /* DARK frosted register on WASH (data-glass="dark") — same Liquid v5, dark body */
+  /* DARK frosted register on WASH (data-glass="dark") → white ink. */
   [data-frame="glass"][data-bg="wash"][data-glass="dark"] {
     color: #f4f6fb;
   }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .fr-chrome {
-    background: rgba(22, 26, 40, 0.62);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    color: #f4f6fb;
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .card,
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .lane {
-    background:
-      linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.66) 0%,
-        rgba(255, 255, 255, 0.22) 4%,
-        rgba(255, 255, 255, 0.04) 13%,
-        rgba(255, 255, 255, 0) 26%
-      ),
-      radial-gradient(
-        80% 38% at 26% 0%,
-        rgba(255, 255, 255, 0.34) 0%,
-        rgba(255, 255, 255, 0) 38%
-      ),
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--sc) 17%, rgba(32, 36, 52, 0.87)) 0%,
-        color-mix(in srgb, var(--sc) 8%, rgba(16, 19, 30, 0.78)) 100%
-      );
-    -webkit-backdrop-filter: blur(24px) saturate(2.2) brightness(1.06);
-    backdrop-filter: blur(24px) saturate(2.2) brightness(1.06);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    /* lit top-edge: inset 0 2px 0 rgba(255,255,255,.55) — Liquid v5 dark register */
-    box-shadow:
-      -8px 0 24px -8px color-mix(in srgb, var(--sc) 70%, transparent),
-      0 2px 6px rgba(8, 10, 22, 0.4),
-      0 30px 60px -22px rgba(8, 10, 22, 0.7),
-      inset 0 2px 0 rgba(255, 255, 255, 0.55),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.25);
-    color: #f4f6fb;
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .badge {
-    background: color-mix(in srgb, var(--sc) 62%, rgba(18, 22, 34, 0.5));
-    border: 1px solid color-mix(in srgb, var(--sc) 55%, rgba(255, 255, 255, 0.4));
-    color: #fff;
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .chip {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: rgba(255, 255, 255, 0.9);
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .chip.now {
-    background: var(--sc);
-    border-color: color-mix(in srgb, var(--sc) 55%, #fff);
-    color: #fff;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.4),
-      0 3px 12px -3px color-mix(in srgb, var(--sc) 70%, transparent);
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .chip.done {
-    opacity: 0.6;
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .bar {
-    background: rgba(255, 255, 255, 0.16);
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .metapill {
-    background: rgba(22, 26, 40, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: #fff;
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .fr-title {
-    color: #fff;
-  }
-  [data-frame="glass"][data-bg="wash"][data-glass="dark"] .fr-eyebrow {
-    color: rgba(255, 255, 255, 0.8);
-  }
-
-  /* — per-panel ACCENT modifiers — opt a single panel into the OPPOSITE
-     register anywhere in Glass (heroes / feature panels) — */
-  [data-frame="glass"] .glass-dark {
-    background: linear-gradient(
-      180deg,
-      rgba(24, 28, 42, 0.62) 0%,
-      rgba(15, 18, 28, 0.52) 100%
-    ) !important;
-    -webkit-backdrop-filter: blur(24px) saturate(1.3);
-    backdrop-filter: blur(24px) saturate(1.3);
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    box-shadow:
-      0 18px 40px -20px rgba(8, 12, 22, 0.6),
-      inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
-    color: #f4f6fb !important;
-  }
-  [data-frame="glass"] .glass-dark .fr-title {
-    color: #fff;
-    text-shadow: none;
-  }
-  [data-frame="glass"] .glass-dark .fr-eyebrow,
-  [data-frame="glass"] .glass-dark .sub {
-    color: rgba(255, 255, 255, 0.82);
-  }
-  [data-frame="glass"] .glass-light {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.74) 0%,
-      rgba(255, 255, 255, 0.56) 100%
-    ) !important;
-    -webkit-backdrop-filter: blur(32px) saturate(1.7);
-    backdrop-filter: blur(32px) saturate(1.7);
-    border: 1px solid rgba(255, 255, 255, 0.8) !important;
-    box-shadow:
-      0 24px 56px -24px rgba(8, 12, 22, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
-    color: var(--ink) !important;
-  }
-  [data-frame="glass"] .glass-light .fr-title {
-    color: var(--ink) !important;
-    text-shadow: none !important;
-  }
-  [data-frame="glass"] .glass-light .fr-eyebrow,
-  [data-frame="glass"] .glass-light .sub {
-    color: var(--body) !important;
-  }
-  [data-frame="glass"] .glass-light .metapill {
-    background: rgba(255, 255, 255, 0.6) !important;
-    border-color: rgba(255, 255, 255, 0.85) !important;
-    color: var(--ink-soft) !important;
-  }
-
-  /* glass headings */
-  [data-frame="glass"][data-bg="photo"] .fr-title {
-    color: #fff;
-    text-shadow: 0 2px 20px rgba(8, 12, 22, 0.45);
-  }
-  [data-frame="glass"][data-bg="wash"] .fr-title {
-    color: var(--ink);
-  }
-  [data-frame="glass"] .fr-eyebrow {
-    color: rgba(255, 255, 255, 0.86);
-  }
-  [data-frame="glass"][data-bg="wash"] .fr-eyebrow {
-    color: var(--muted);
-  }
-
-  /* subject-colour left rail on glass cards + lanes — PHOTO only (wash uses the
-     glossy ::before rail above) */
-  [data-frame="glass"][data-bg="photo"] .card {
-    border-left: 4px solid var(--sc);
-  }
-  [data-frame="glass"][data-bg="photo"] .lane {
-    border-left: 5px solid var(--sc);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .card {
-    border-left: 4px solid var(--sc);
-  }
-  [data-frame="glass"][data-bg="photo"][data-glass="light"] .lane {
-    border-left: 5px solid var(--sc);
-  }
-
   /* ═══════════════════  FRAME B · BRIGHT WORKSPACE (paper)  ═══════════════════ */
   [data-frame="paper"] {
     color: var(--ink);
   }
-  [data-frame="paper"] .fr-chrome {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    box-shadow: var(--sh-sm);
-    color: var(--ink-soft);
-  }
-  [data-frame="paper"] .card,
-  [data-frame="paper"] .lane {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    box-shadow: var(--sh-sm);
-    color: var(--ink);
-  }
-  [data-frame="paper"] .card {
-    border-top: 3px solid var(--sc);
-  }
-  [data-frame="paper"] .badge {
-    background: var(--sc);
-    color: #fff;
-  }
-  [data-frame="paper"] .chip {
-    background: var(--idle-tint);
-    color: var(--body);
-  }
-  [data-frame="paper"] .chip.done {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--muted);
-  }
-  [data-frame="paper"] .chip.now {
-    background: var(--sc);
-    color: #fff;
-  }
-  [data-frame="paper"] .bar {
-    background: var(--idle-tint);
-  }
-  [data-frame="paper"] .bar i {
-    background: var(--sc);
-  }
-  [data-frame="paper"] .metapill {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--ink-soft);
-    box-shadow: var(--sh-xs);
-  }
-  /* paper heading — signature 84px brand underline */
-  [data-frame="paper"] .fr-eyebrow {
-    color: var(--muted);
-  }
-  [data-frame="paper"] .fr-title {
-    color: var(--ink);
-    position: relative;
-    display: inline-flex;
-    padding-bottom: var(--s3);
-  }
-  [data-frame="paper"] .fr-title::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    width: 84px;
-    height: 4px;
-    border-radius: var(--r-pill);
-    background: var(--accent);
-  }
-  /* paper on WASH → flat document: crisp corners, hairline rows, tight, no float */
-  [data-frame="paper"][data-bg="wash"] .card,
-  [data-frame="paper"][data-bg="wash"] .lane {
-    border-radius: var(--r-sm);
-    box-shadow: var(--sh-xs);
-    background: rgba(255, 255, 255, 0.95);
-  }
-  [data-frame="paper"][data-bg="wash"] .card:hover,
-  [data-frame="paper"][data-bg="wash"] .lane:hover {
-    transform: none;
-    border-color: var(--brand-300);
-    box-shadow: var(--sh-xs);
-  }
-
   /* ═══════════════════  FRAME C · COLOR-FORWARD (color)  ═══════════════════ */
   [data-frame="color"] {
     color: var(--ink);
   }
-  [data-frame="color"] .fr-chrome {
-    background: rgba(255, 255, 255, 0.72);
-    -webkit-backdrop-filter: blur(16px);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: var(--sh-sm);
-    color: var(--ink-soft);
-  }
-  [data-frame="color"] .card {
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--sc) 26%, #fff) 0%,
-      var(--sct) 100%
-    );
-    border: 1px solid color-mix(in srgb, var(--sc) 30%, #fff);
-    box-shadow: var(--sh-sm);
-    color: var(--sci);
-  }
-  [data-frame="color"] .lane {
-    background: rgba(255, 255, 255, 0.74);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.85);
-    box-shadow: var(--sh-sm);
-    border-left: 5px solid var(--sc);
-  }
-  [data-frame="color"] .badge {
-    background: var(--sc);
-    color: #fff;
-  }
-  [data-frame="color"] .chip {
-    background: var(--sct);
-    color: var(--sci);
-  }
-  [data-frame="color"] .chip.now {
-    background: var(--sc);
-    color: #fff;
-  }
-  [data-frame="color"] .chip.done {
-    opacity: 0.7;
-  }
-  [data-frame="color"] .bar {
-    background: var(--sct);
-  }
-  [data-frame="color"] .bar i {
-    background: var(--sc);
-  }
-  [data-frame="color"] .metapill {
-    background: rgba(255, 255, 255, 0.66);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    color: var(--ink-soft);
-    box-shadow: var(--sh-xs);
-  }
-  /* color heading — signature gradient text clip (sanctioned only here) */
-  [data-frame="color"] .fr-eyebrow {
-    color: var(--ink-soft);
-  }
-  [data-frame="color"] .fr-title {
-    background: linear-gradient(
-      110deg,
-      var(--subj-6) 0%,
-      var(--subj-3) 34%,
-      var(--brand-500) 70%,
-      var(--subj-12) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  /* color on WASH → chroma: subject-tinted lanes, bolder fills, thick rails */
-  [data-frame="color"][data-bg="wash"] .lane {
-    background: linear-gradient(
-      100deg,
-      var(--sct) 0%,
-      color-mix(in srgb, var(--sct) 55%, #fff) 100%
-    );
-    border: 1px solid color-mix(in srgb, var(--sc) 26%, #fff);
-    border-left: 6px solid var(--sc);
-    box-shadow: var(--sh-sm);
-  }
-  [data-frame="color"][data-bg="wash"] .card {
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--sc) 44%, #fff) 0%,
-      var(--sct) 100%
-    );
-    border: 1px solid color-mix(in srgb, var(--sc) 36%, #fff);
-  }
-  [data-frame="color"][data-bg="wash"] .chip {
-    background: rgba(255, 255, 255, 0.7);
-    color: var(--sci);
-  }
-
   /* ════════════════════════════════════════════════════════════════════════
      3 · NIGHT TONE (data-tone="dark") — frame identity persists
      ────────────────────────────────────────────────────────────────────────
@@ -1402,72 +883,17 @@
   [data-tone="dark"][data-bg="photo"][data-frame="paper"] .stage::after {
     background: rgba(20, 19, 31, 0.86);
   }
+  /* Frame C · dark tone · photo — veil DEEPENED 0.55 → 0.72 (2026-08-09).
+     0.55 was tuned when Frame C's cards were pale subject TINTS, which needed
+     a bright ground to read as colour at all. Frame C is now colour-FORWARD:
+     its cards are deep saturated subject solids (`--sc-solid`, L=0.50). Two
+     busy, saturated layers competing at similar depth is what makes a photo
+     backdrop look like noise rather than atmosphere, and it costs the cards
+     their edge definition. 0.72 sits deliberately between glass·photo and the
+     near-opaque paper·photo (0.86): enough ground for the solids to sit on,
+     while the photo is still legibly a photo. */
   [data-tone="dark"][data-bg="photo"][data-frame="color"] .stage::after {
-    background: rgba(20, 19, 31, 0.55);
-  }
-
-  /* glass · Night → dark frosted panels */
-  [data-tone="dark"][data-frame="glass"][data-bg="wash"] .card,
-  [data-tone="dark"][data-frame="glass"][data-bg="wash"] .lane {
-    background: linear-gradient(
-      180deg,
-      rgba(40, 40, 58, 0.78) 0%,
-      rgba(34, 34, 50, 0.6) 100%
-    );
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: var(--ink);
-    box-shadow:
-      0 24px 50px -22px rgba(0, 0, 0, 0.6),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  }
-  [data-tone="dark"][data-frame="glass"][data-bg="wash"] .fr-chrome {
-    background: rgba(40, 40, 58, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: var(--ink-soft);
-  }
-  [data-tone="dark"][data-frame="glass"][data-bg="wash"] .fr-title {
-    color: var(--ink);
-  }
-  [data-tone="dark"][data-frame="glass"][data-bg="wash"] .chip {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.14);
-    color: var(--ink-soft);
-  }
-
-  /* paper · Night → dark surface, raised contrast */
-  [data-tone="dark"][data-frame="paper"] .card,
-  [data-tone="dark"][data-frame="paper"] .lane,
-  [data-tone="dark"][data-frame="paper"] .fr-chrome {
-    background: var(--surface);
-    border-color: var(--border);
-    color: var(--ink);
-  }
-  [data-tone="dark"][data-frame="paper"] .chip {
-    background: var(--idle-tint);
-    color: var(--ink-soft);
-  }
-  [data-tone="dark"][data-frame="paper"] .chip.done {
-    background: transparent;
-    border-color: var(--border);
-    color: var(--muted);
-  }
-
-  /* color · Night → tints darken, hue preserved */
-  [data-tone="dark"][data-frame="color"] .card {
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--sc) 40%, #1e1d2c) 0%,
-      color-mix(in srgb, var(--sc) 22%, #14131f) 100%
-    );
-    border: 1px solid color-mix(in srgb, var(--sc) 30%, #1e1d2c);
-    color: #fff;
-  }
-  [data-tone="dark"][data-frame="color"] .lane {
-    background: rgba(40, 40, 58, 0.7);
-    border-color: rgba(255, 255, 255, 0.12);
-  }
-  [data-tone="dark"][data-frame="color"] .lane .nm .t {
-    color: var(--ink);
+    background: rgba(20, 19, 31, 0.72);
   }
 
   /* ════════════════════════════════════════════════════════════════════════

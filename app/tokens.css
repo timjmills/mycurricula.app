@@ -1362,6 +1362,138 @@
   --c-deep: var(--sel-deep);
 }
 
+/* ══════════════════  FRAME C · COLOUR-FORWARD SUBJECT TIER  ══════════════════
+   The four tokens Frame C paints with. They hang off `.cp-subj` so they resolve
+   against whichever subject the element carries: `--c` is set per subject just
+   above (and overridden at runtime by the PaletteCssBridge in lib/palette.tsx,
+   which emits --c/--cl/--cd plus the --sc/--sct/--sci aliases onto
+   `.cp-subj.<id>`), so every one of these is a derivation of THAT subject's hue.
+
+   ⚠ THIS TIER KNOWINGLY CONTRADICTS THE DESIGN HANDOFF. Read this before
+   "fixing" it back to spec — it has been changed back once already.
+
+   The handoff's Frame C pitfalls list says, verbatim:
+       "Resist using this for dense planning grids (color fatigue); keep tints
+        in the muted register (no raw subject solids as large fills); only the
+        hero gets gradient type."
+       — Documents/Claude Design/6.24.26 design_handoff_v2_site/specs/
+         three-frames-spec.md:176
+
+   That muted-tint register is exactly what shipped, and it is exactly the look
+   the user REJECTED. USER RULING, 2026-08-07 (decision 20), reaffirmed
+   2026-08-09: Frame C is strongly colour-forward with DEEP SATURATED subject
+   colours. It was chosen over a "richer pastel" alternative and over an offer to
+   present options first — the ruling is settled, not an open question. So where
+   the handoff says "no raw subject solids as large fills", this tier
+   deliberately does the opposite, and CLAUDE.md §4's "the handoff wins for
+   look/behavior" is overridden HERE ONLY, by the user, on the record.
+
+   WHY NOT SIMPLY BRIGHTER. The handoff bundle's own brighter recipe (92%/58%
+   subject-to-white) FAILS AA — see components/week-v2/WeekC.module.css:206-216,
+   which records that measurement and darkens deliberately for the same reason.
+   Colour-forward here therefore means DEEPER and more saturated, not lighter:
+   deep enough to carry white text at AA, saturated enough to read as the
+   subject's hue rather than as a neutral.
+
+   THE RECIPE (measured live by canvas readback, not derived on paper):
+     • --sc-solid   L=0.50, chroma ×1.5 — the fill. White text on it measures
+       5.34:1 at the WORST slot (--subj-14) and 6.77:1 at the best; all 15 slots
+       clear the 4.5:1 body floor.
+     • --sc-solid-2 L=0.42 — the gradient's second stop, 7.43–9.26:1.
+     • --sc-rail    the raw subject solid, for the 5px lane rail the handoff
+       specifies and this ruling does NOT override.
+     • --sc-edge    L=0.68, chroma ×1.4 — a DARK-TONE-ONLY border.
+
+   WHY --sc-edge HAS TO EXIST. On dark tone no single lightness satisfies both
+   white-text ≥4.5:1 AND fill-vs-page ≥3:1 (WCAG 1.4.11 non-text contrast,
+   against the dark canvas, sampled as rgb(30,29,44) = #1e1d2c rather than
+   assumed).
+
+   ⚠ AN EARLIER VERSION OF THIS COMMENT SAID "the two curves cross between
+   L=0.54 and L=0.56 and NEITHER clears at the crossover". That was inherited
+   from the design pass and it is WRONG — corrected here after sweeping L per
+   hue, 0.40→0.85, against the sampled ground. What is actually true:
+
+     PER HUE, every one of the 15 slots HAS a viable band 3–4 points wide —
+     e.g. --subj-1 holds white text up to L=0.56 and separates from the canvas
+     from L=0.52, so L=0.54 satisfies both for that slot.
+
+     ACROSS ALL 15 there is no shared value, and it misses by ONE point:
+       highest L still holding white text  = 0.54  (--subj-12/13/14, the greens)
+       lowest  L still separating from bg  = 0.55  (--subj-4/5/6/7, rose→purple)
+     0.55 > 0.54, so the windows do not intersect.
+
+   Note WHICH hues set each end: the greens cap the text side and the
+   magentas/violets cap the non-text side. OKLCh lightness is perceptual while
+   WCAG luminance is green-weighted, so at equal L a magenta carries markedly
+   less relative luminance than a green. Deriving this band from one
+   "representative" hue gives a falsely comfortable answer — a sibling lane's
+   border floor cleared six subjects and failed writing and grammar at 2.99 by
+   one hundredth for exactly this reason. Always take the floor from the WORST
+   hue, and note that here the two ends are set by DIFFERENT worst hues.
+
+   The conclusion is unchanged and now rests on real numbers: this tier gives
+   all 15 slots ONE lightness, and no single value serves all 15 — so the fill
+   keeps L=0.50 for its text and a separate lighter edge supplies the boundary.
+   Measured 5.22:1 at the worst slot (--subj-6) against both the assumed and the
+   sampled ground. Light tone needs no edge — the fill separates from white
+   unaided — so the edge is applied only under [data-tone="dark"], never
+   declared away here.
+
+   ⚠ NO NEUTRALS ARE DECLARED IN THIS TIER, deliberately. A frame tier that
+   declares neutrals leaks the losing theme tier's tokens: :root[data-theme=
+   "night"] declares ~141 tokens against ~45 for a light theme, so any neutral
+   this tier does NOT redeclare survives from whichever theme was active. Judge a
+   tier by the token-set DIFFERENCE it creates, never by what it declares.
+
+   The color-mix forms below are the FALLBACK; the @supports block upgrades them
+   to relative colour. This must stay a @supports pair and never two flat
+   declarations — a custom property accepts any token stream, so the second of
+   two would always win, and `background: var(--sc-solid)` would then be invalid
+   at computed-value time and paint NOTHING. Same reasoning, same shape as
+   components/day-v2/day-v2.module.css:581.
+
+   ⚠ THE TWO BRANCHES ARE NOT THE SAME COLOUR, and that is a deliberate accepted
+   trade-off rather than an oversight. `color-mix(… var(--c) N%, black)` SCALES
+   each subject's existing lightness and chroma; the relative form FIXES L and
+   multiplies chroma. Measured drift between the branches: mean 57.5 sRGB units
+   on --sc-solid, max 94.7 (of a possible 441) on --subj-3's --sc-solid-2. Frame
+   C therefore looks perceptibly different on an engine without relative colour.
+
+   BOTH BRANCHES ARE AA-CLEAN — measured from THIS FILE's own declaration text
+   (parsed, not retyped), all 15 slots, worst slot per criterion:
+                              floor   fallback        relative
+     white text on fill        4.5    5.35 (subj-5)   5.34 (subj-14)
+     white text on stop 2      4.5    7.53 (subj-5)   7.43 (subj-12)
+     fill vs white page        3.0    5.35 (subj-5)   5.34 (subj-14)
+     edge vs dark canvas       3.0    5.38 (subj-9)   5.22 (subj-6)
+   Note the WORST SLOT MOVES between branches (subj-5 vs subj-14; subj-9 vs
+   subj-6) — a direct consequence of scaling-vs-fixing lightness, and the reason
+   a spot check on one hue proves nothing here. The specific worry that the
+   green slots might lose the floor is refuted: 13/14/15 read 5.42/5.36/5.41 in
+   the fallback, slightly BETTER than relative, because their source lightness
+   already sits low.
+
+   Per-subject fallback values were considered and rejected: 45 hand-tuned
+   literals (15 slots × 3 tokens) would violate the no-hard-coded-hex rule and
+   create a second source of truth that silently desynchronises the moment the
+   subject scale is re-derived. Relative colour has been Baseline Widely
+   Available since mid-2024, so the fallback serves a shrinking tail — and it
+   serves it legibly, which is the contract that matters. */
+.cp-subj {
+  --sc-solid: color-mix(in oklab, var(--c) 79%, black);
+  --sc-solid-2: color-mix(in oklab, var(--c) 67%, black);
+  --sc-rail: var(--c);
+  --sc-edge: color-mix(in oklab, var(--c) 88%, white);
+}
+@supports (color: oklch(from red l c h)) {
+  .cp-subj {
+    --sc-solid: oklch(from var(--c) 0.5 calc(c * 1.5) h);
+    --sc-solid-2: oklch(from var(--c) 0.42 calc(c * 1.5) h);
+    --sc-edge: oklch(from var(--c) 0.68 calc(c * 1.4) h);
+  }
+}
+
 /* Visible focus ring — used on interactive controls (settings pickers,
    swatch buttons) for keyboard accessibility. :focus-visible keeps the
    ring off mouse clicks while guaranteeing it for keyboard users. */
