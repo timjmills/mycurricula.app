@@ -334,6 +334,16 @@
   gap: 3px;
 }
 
+/* Empty state when the active subject has no tagged standards yet. Lifted
+   verbatim out of an inline `style` prop on the <p> (same three tokens) so a
+   frame/theme arm can reach it — an inline declaration outranks every author
+   stylesheet rule short of `!important`. */
+.standardEmpty {
+  padding: var(--r-2) 0;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+}
+
 .standardItem {
   display: flex;
   align-items: flex-start;

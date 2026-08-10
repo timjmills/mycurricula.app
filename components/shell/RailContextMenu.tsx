@@ -14,7 +14,9 @@
 // keeps the JSX honest, matches the rail's onboarding voice, and avoids
 // the temptation to bleed lesson-specific concerns into shell chrome.
 // The visual recipe + viewport-clamp behavior is copied from the lesson
-// menu so the two surfaces feel related.
+// menu so the two surfaces feel related. The recipe itself lives in
+// RailContextMenu.module.css — read its header for why this file no longer
+// declares the surface inline.
 //
 // ── Onboarding tooltips ──────────────────────────────────────────────────
 // Each menu item gets a Button `tooltip=` per CLAUDE.md §4 so a first-time
@@ -33,6 +35,33 @@ import {
 import { Button } from "@/components/ui";
 import type { RailIconId, RailSide } from "@/lib/use-rail-layout";
 import { RAIL_ICON_LABEL } from "./rail-icon-meta";
+import styles from "./RailContextMenu.module.css";
+
+/** Shared style for the three action rows.
+ *
+ *  ── Why the ink is wrapped in a var(), and why this is still inline ───────
+ *  These rows render through the `Button` primitive, whose `.btn.ghost`
+ *  rules (0,2,0) — including `:hover` at (0,3,0) — declare `color`. The
+ *  inline `color` is what makes a menu row full-strength ink instead of the
+ *  ghost variant's muted `--ink-soft`, on rest AND on hover. Moving it to a
+ *  single-class module rule (0,1,0) would lose to both and silently change
+ *  the menu, so the declaration stays where it is and gains a hook instead:
+ *  `var(--rcm-item-ink, <what it already was>)`.
+ *
+ *  A custom property is a DIFFERENT property from the one declared inline,
+ *  so `.rail-menu { --rcm-item-ink: … }` can now set it (custom properties
+ *  inherit, so the container is a sufficient handle), while the fallback
+ *  keeps the painted colour byte-identical wherever it is unset. Nothing
+ *  sets it today. Same conversion as ChromeClock's `--clk-dot` (4e0d90f)
+ *  and LessonCard's `--lc-*` (de7a904).
+ *
+ *  `width`/`justifyContent` stay bare: they are layout, and `.btn` declares
+ *  `justify-content: center` at (0,1,0), which a module rule would only tie. */
+const ITEM_STYLE = {
+  width: "100%",
+  justifyContent: "flex-start",
+  color: "var(--rcm-item-ink, var(--ink-900))",
+} as const;
 
 interface RailContextMenuProps {
   /** The icon the menu was opened from. Drives the labels and disabled
@@ -105,32 +134,16 @@ export function RailContextMenu({
       aria-label={`${label} placement`}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
-      style={{
-        position: "fixed",
-        top: pos.y,
-        left: pos.x,
-        zIndex: 1000,
-        minWidth: 200,
-        background: "var(--paper)",
-        borderRadius: 6,
-        border: "1px solid var(--ink-150)",
-        boxShadow: "var(--shadow-popover)",
-        padding: 4,
-        fontSize: 13,
-      }}
+      // `rail-menu` is an unstyled GLOBAL handle: the module class beside it
+      // is hashed and therefore invisible to app/themes.css, so a frame arm
+      // needs a stable selector to reach this overlay. See the module header.
+      className={`rail-menu ${styles.menu}`}
+      // Only the measured open position stays inline — everything
+      // presentational moved to RailContextMenu.module.css so the cascade
+      // can reach it (an inline declaration outranks every author rule).
+      style={{ top: pos.y, left: pos.x }}
     >
-      <div
-        style={{
-          fontSize: 10,
-          color: "var(--ink-400)",
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-          fontWeight: 500,
-          padding: "6px 10px 2px",
-        }}
-      >
-        {label}
-      </div>
+      <div className={styles.label}>{label}</div>
 
       <Button
         variant="ghost"
@@ -144,11 +157,7 @@ export function RailContextMenu({
             : `Move ${label} to the left rail — the site-wide chrome on the left edge of the planner.`
         }
         tooltipSide="right"
-        style={{
-          width: "100%",
-          justifyContent: "flex-start",
-          color: "var(--ink-900)",
-        }}
+        style={ITEM_STYLE}
       >
         Move to left rail
       </Button>
@@ -165,23 +174,12 @@ export function RailContextMenu({
             : `Move ${label} to the right rail — your context-specific shortcuts column on the right edge.`
         }
         tooltipSide="right"
-        style={{
-          width: "100%",
-          justifyContent: "flex-start",
-          color: "var(--ink-900)",
-        }}
+        style={ITEM_STYLE}
       >
         Move to right rail
       </Button>
 
-      <div
-        role="separator"
-        style={{
-          height: 1,
-          background: "var(--ink-100)",
-          margin: "4px 2px",
-        }}
-      />
+      <div role="separator" className={styles.sep} />
 
       <Button
         variant="ghost"
@@ -195,11 +193,7 @@ export function RailContextMenu({
             : `Hide ${label} from both rails — it stays in your settings so you can bring it back later.`
         }
         tooltipSide="right"
-        style={{
-          width: "100%",
-          justifyContent: "flex-start",
-          color: "var(--ink-900)",
-        }}
+        style={ITEM_STYLE}
       >
         Hide from rails
       </Button>

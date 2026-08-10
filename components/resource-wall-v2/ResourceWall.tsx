@@ -1060,7 +1060,11 @@ export function ResourceWall({
     wallMode === "custom"
       ? (activeCustom?.bg ?? null)
       : (presetBackgrounds[preset] ?? null);
-  const rootStyle = backgroundStyle(wallBackdrop);
+  // `--wall-bg` is the frame hook for the wall's own surface — see the note on
+  // `hooked()` in backgrounds.ts. The backdrop is per-wall state so it stays an
+  // inline declaration, but wrapped in a var() the frame/tone axes can override
+  // it. Nothing sets it today, so the paint is unchanged.
+  const rootStyle = backgroundStyle(wallBackdrop, "--wall-bg");
 
   const soloSection = useMemo(
     () => (solo ? (sections.find((s) => s.id === solo) ?? null) : null),

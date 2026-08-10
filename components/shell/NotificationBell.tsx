@@ -396,9 +396,24 @@ function NotificationRow({
   // white, which measures 2.07:1 on the amber identity hue and 2.67:1 on
   // teal. Setting it inline overrides the class for actor rows only; the
   // system rows (.avatarSystem) keep their neutral pairing.
+  //
+  // ── The cascade hooks (--nb-avatar-*) ───────────────────────────────────
+  // The inline declaration is load-bearing (it has to beat .avatar's own
+  // `color`), but an inline `style` outranks EVERY author stylesheet rule
+  // short of `!important` — so no frame/theme arm could reach an actor
+  // avatar at all. Wrapping each value as `var(--nb-avatar-…, <what it
+  // already was>)` hands that back: a custom property is a DIFFERENT
+  // property from background/color, so `.avatar { --nb-avatar-bg: … }` (or
+  // any ancestor — custom properties inherit) can now set it, while the
+  // fallback keeps the painted colour byte-identical. Nothing sets them
+  // today. Both fallbacks are themselves `var(--avatar-N…)` tokens from
+  // lib/realtime-presence, so the identity palette is unchanged.
   const avatarStyle: CSSProperties | undefined =
     item.actor !== null
-      ? { background: item.actor.avatarColor, color: item.actor.avatarInk }
+      ? {
+          background: `var(--nb-avatar-bg, ${item.actor.avatarColor})`,
+          color: `var(--nb-avatar-ink, ${item.actor.avatarInk})`,
+        }
       : undefined;
 
   return (

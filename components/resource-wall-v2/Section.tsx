@@ -285,7 +285,11 @@ export function Section({
     // recipe and the header dot resolve against it, so a palette change
     // re-tints without rewriting stored state.
     "--sc": subject.c,
-    ...backgroundStyle(bg),
+    // `--wall-sec-bg` is the frame hook: the pinned background still paints
+    // inline (it has to — it is per-section state, not a stylesheet's business),
+    // but as `var(--wall-sec-bg, <the value>)`, so a frame/tone arm can reach a
+    // section's surface. Unset today → byte-identical paint. See backgrounds.ts.
+    ...backgroundStyle(bg, "--wall-sec-bg"),
   } as React.CSSProperties;
 
   return (

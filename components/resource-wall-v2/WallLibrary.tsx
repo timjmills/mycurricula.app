@@ -514,15 +514,23 @@ export function WallLibrary({
                     <button
                       type="button"
                       className={`cp-subj ${entry.subjectId ?? ""} ${styles.thumb}`}
+                      // `--wall-thumb-bg` is the frame hook for the library
+                      // thumbnail — see `hooked()` in backgrounds.ts. All THREE
+                      // arms carry it, not just the stored-background one: a
+                      // hook that moved only the walls with a pinned background
+                      // would restyle a third of the grid and read as a bug.
+                      // Each keeps its previous value as the var() fallback, and
+                      // nothing sets the property today, so the grid is
+                      // byte-identical.
                       style={
                         entry.bg
-                          ? backgroundStyle(entry.bg)
+                          ? backgroundStyle(entry.bg, "--wall-thumb-bg")
                           : entry.subjectId
                             ? {
                                 background:
-                                  "linear-gradient(135deg, color-mix(in oklab, var(--c) 34%, var(--surface)), color-mix(in oklab, var(--c) 12%, var(--surface)))",
+                                  "var(--wall-thumb-bg, linear-gradient(135deg, color-mix(in oklab, var(--c) 34%, var(--surface)), color-mix(in oklab, var(--c) 12%, var(--surface))))",
                               }
-                            : { background: "var(--grad-dawn)" }
+                            : { background: "var(--wall-thumb-bg, var(--grad-dawn))" }
                       }
                       onClick={() =>
                         entry.isPreset && entry.preset

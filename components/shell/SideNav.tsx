@@ -276,6 +276,18 @@ function GearIcon(): ReactNode {
 // tokens (paper renders the original white-on-honey-tile lockup). SVG `fill`
 // presentation attributes do NOT resolve var() — the fills go through inline
 // style, which does.
+//
+// ── The cascade hook (--sn-logo-*) ────────────────────────────────────────
+// Re-POINTING --logo-book-a/b already worked from a stylesheet, because the
+// var() resolves at use time. What did NOT work was a rule wanting to set the
+// `fill` itself — an inline `style` declaration outranks every author rule
+// short of `!important`, and this glyph paints on every route. Wrapping the
+// value as `var(--sn-logo-a, <what it already was>)` fixes that: a custom
+// property is a DIFFERENT property from `fill`, so the cascade can set it,
+// and because custom properties INHERIT, any ancestor selector is a
+// sufficient handle — `.brand`/`.glyph` here, no new class needed. The
+// fallback keeps the painted colour byte-identical while nothing sets it,
+// which nothing does today. Same shape as ChromeClock's --clk-dot (4e0d90f).
 function BookGlyph(): ReactNode {
   return (
     <svg
@@ -287,11 +299,11 @@ function BookGlyph(): ReactNode {
     >
       <path
         d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5V5.5Z"
-        style={{ fill: "var(--logo-book-a)" }}
+        style={{ fill: "var(--sn-logo-a, var(--logo-book-a))" }}
       />
       <path
         d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13V4Z"
-        style={{ fill: "var(--logo-book-b)" }}
+        style={{ fill: "var(--sn-logo-b, var(--logo-book-b))" }}
         opacity=".5"
       />
     </svg>

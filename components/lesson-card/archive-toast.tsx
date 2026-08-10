@@ -124,6 +124,10 @@ export function ArchiveToast({
       role="status"
       aria-live="polite"
       aria-atomic="true"
+      // `archive-toast` is an unstyled GLOBAL handle. This toast has no
+      // stylesheet of any kind, so without it there is no selector for a
+      // frame/theme arm to hang the --atoast-* hooks below on.
+      className="archive-toast"
       style={{
         position: "fixed",
         bottom: 24,
@@ -139,8 +143,15 @@ export function ArchiveToast({
         gap: 12,
         padding: "0 8px 0 16px",
         minHeight: 48,
-        background: "var(--ink-900)",
-        color: "var(--paper)",
+        // ── THE CASCADE HOOKS — why these colours are wrapped in var() ──────
+        // Identical conversion to ConsequenceToast (this toast is where that
+        // primitive's visual contract was lifted from). An inline `style`
+        // declaration outranks every author stylesheet rule short of
+        // `!important`, so no frame/theme arm could reach this surface. The
+        // fallback is exactly what was painted before, so nothing moves until
+        // something sets the hook — and nothing does today.
+        background: "var(--atoast-bg, var(--ink-900))",
+        color: "var(--atoast-ink, var(--paper))",
         borderRadius: 10,
         boxShadow: "var(--shadow-popover)",
         fontSize: 13,
@@ -155,7 +166,9 @@ export function ArchiveToast({
     >
       {/* Message */}
       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
-        <span style={{ color: "var(--ink-300)", marginRight: 4 }}>
+        <span
+          style={{ color: "var(--atoast-eyebrow-ink, var(--ink-300))", marginRight: 4 }}
+        >
           Archived:
         </span>
         {displayTitle}
@@ -163,16 +176,24 @@ export function ArchiveToast({
 
       {/* Undo button — distinct from the dismiss × so the teacher can scan
           quickly and find "Undo" in the expected position.
-          The dark toast background (ink-900) requires an inverted color
-          treatment; className carries the overrides on top of Button's tokens. */}
+          The inverted toast background (ink-900) requires an inverted color
+          treatment, which the style prop carries on top of Button's tokens.
+
+          The hairline was a literal `rgba(255,255,255,0.22)` — a real bug,
+          not just a cascade lockout. The slab inverts with tone (--ink-900
+          background, --paper text), so in dark tone it is a near-WHITE panel
+          on which a 22% white hairline is invisible. --toast-invert-hairline
+          (tokens.css, beside --on-solid) derives the same 22% from --paper,
+          the toast's own ink, so it tracks the surface — and is byte-
+          identical in light tone, where --paper IS #ffffff. */}
       <Button
         variant="ghost"
         size="md"
         onClick={handleUndo}
         tooltip="Restore this lesson to the planner — undoes the archive while this toast is visible"
         style={{
-          border: "1px solid rgba(255,255,255,0.22)",
-          color: "var(--paper)",
+          border: "1px solid var(--atoast-undo-border, var(--toast-invert-hairline))",
+          color: "var(--atoast-undo-ink, var(--paper))",
           letterSpacing: 0.2,
           flexShrink: 0,
         }}
@@ -187,7 +208,10 @@ export function ArchiveToast({
         iconAriaLabel="Dismiss notification"
         onClick={handleDismiss}
         tooltip="Dismiss this notification now (the archive will still complete)"
-        style={{ color: "var(--ink-400)", flexShrink: 0 }}
+        style={{
+          color: "var(--atoast-close-ink, var(--ink-400))",
+          flexShrink: 0,
+        }}
       >
         ×
       </Button>

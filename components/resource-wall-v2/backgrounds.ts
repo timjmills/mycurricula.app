@@ -264,22 +264,68 @@ export interface BackgroundStyle {
 }
 
 /**
+ * THE FRAME HOOK — the custom-property names a wall SURFACE may be reached by.
+ *
+ * A closed union, not a free string, on purpose: this module's whole discipline
+ * is that CSS is built from our own tables and never from a caller's text (see
+ * the header). A `hook` interpolates into the emitted declaration, so it gets
+ * the same treatment as every other value here — three named constants, no
+ * string path in.
+ *
+ * One name per surface rather than one shared name, because a custom property
+ * INHERITS. `--wall-sec-bg` set on a section would flow down into that section's
+ * own background popover, where every preview swatch would then paint the
+ * section's colour instead of the descriptor it is previewing. Separate names
+ * keep a surface hook from silently repainting a preview of a different value.
+ */
+export type BackgroundHook = "--wall-bg" | "--wall-sec-bg" | "--wall-thumb-bg";
+
+/**
+ * Wrap a built value so a stylesheet can reach it.
+ *
+ * An inline `style` declaration outranks every author rule short of
+ * `!important`, so `background: <value>` on a section made
+ * `[data-frame="color"] .sec { background: … }` unreachable — the frame and
+ * tone axes could not touch a pinned wall background at all. Expressed as
+ * `var(--wall-sec-bg, <value>)` the declaration reads a DIFFERENT property,
+ * which the cascade can set, while the fallback keeps the painted result
+ * byte-identical wherever nothing sets it. Nothing sets these today: this hands
+ * control back to the cascade, it does not spend it. Same conversion as
+ * ChromeClock's `--clk-dot` (4e0d90f) and LessonCard's (de7a904).
+ *
+ * Note the hook only exists where a descriptor exists. A "follow page style"
+ * section writes no inline background at all, so the cascade was already in
+ * charge there — `.sec:not(.hasBg)` in Section.module.css is that arm.
+ */
+function hooked(value: string, hook?: BackgroundHook): string {
+  return hook ? `var(${hook}, ${value})` : value;
+}
+
+/**
  * Build the inline style for a background descriptor. `null` → an empty style
  * (follow page). Subject-relative recipes resolve against `--sc`, which the
  * Section sets from useSubjectColor — so this never needs the subject id and a
  * palette change re-tints without touching stored state.
+ *
+ * `hook` opts the caller into the frame hook above. SURFACES pass one; the
+ * background popover's preview swatches deliberately do NOT, because a swatch's
+ * job is to show one specific descriptor's value — a hook there would let an
+ * ancestor's override repaint the preview and lie about what clicking it does.
  */
-export function backgroundStyle(bg: WallBackground | null): BackgroundStyle {
+export function backgroundStyle(
+  bg: WallBackground | null,
+  hook?: BackgroundHook,
+): BackgroundStyle {
   if (!bg) return {};
   switch (bg.kind) {
     case "subject":
-      return { background: SUBJECT_TINTS[bg.tint] };
+      return { background: hooked(SUBJECT_TINTS[bg.tint], hook) };
     case "color":
-      return { background: COLOR_SWATCHES[bg.swatch] };
+      return { background: hooked(COLOR_SWATCHES[bg.swatch], hook) };
     case "translucent":
-      return { background: translucentValue(bg.shade, bg.opacity) };
+      return { background: hooked(translucentValue(bg.shade, bg.opacity), hook) };
     case "wash":
-      return { background: WASHES[bg.wash] };
+      return { background: hooked(WASHES[bg.wash], hook) };
     case "photo":
       // Re-gate at the sink. isSafePhotoSrc already ran at parse time; this
       // second check is the one that matters if a descriptor ever reaches here
@@ -287,7 +333,13 @@ export function backgroundStyle(bg: WallBackground | null): BackgroundStyle {
       // construction in a test). Rejected → follow-page, never a raw url().
       if (!isSafePhotoSrc(bg.src)) return {};
       return {
-        backgroundImage: cssUrl(bg.src),
+        // The hook covers the image too, so a frame arm can replace a photo
+        // surface. Setting it to a non-image value makes this declaration
+        // invalid at computed-value time (→ no image), which is the override
+        // behaving as asked; such an arm sets `background-color` alongside.
+        // size/position stay unhooked: they are geometry, and this module's
+        // contract is that a background can never reposition its section.
+        backgroundImage: hooked(cssUrl(bg.src), hook),
         backgroundSize: "cover",
         backgroundPosition: "center",
       };

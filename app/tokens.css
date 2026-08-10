@@ -1074,6 +1074,22 @@
      themes and would flip such text dark-on-dark. */
   --on-solid: #ffffff;
 
+  /* Hairline on an INVERTED surface — the team ConsequenceToast and the
+     lesson ArchiveToast, both of which paint `background: var(--ink-900)` +
+     `color: var(--paper)`. That pair INVERTS with tone: in light tone the
+     toast is a near-black slab with white text; in dark tone --ink-900 is
+     #f0eff8 and --paper is #1e1d2c, so the same slab is near-white with dark
+     text. Both toasts previously hard-coded `rgba(255,255,255,0.22)` for the
+     Undo button's hairline, which is correct only on the light-tone (dark)
+     slab and vanishes to invisible on the dark-tone (light) one.
+
+     Deriving it from --paper — the toasts' OWN ink — makes it follow the
+     surface for free, and is byte-identical in light tone where --paper is
+     literally #ffffff. Branches on tone because --paper does; declared here
+     on :root so the var(--paper) inside resolves against the same element
+     the tone attribute sits on. */
+  --toast-invert-hairline: color-mix(in srgb, var(--paper) 22%, transparent);
+
   /* Ink over the honey gradient CTA (--grad-honey). Honey is NOT themed, so
      this stays a fixed warm-dark; pairs ≥4.5:1 over the honey fill in every
      theme. Use this — not a raw hex — for text/icons on a .honey button. */

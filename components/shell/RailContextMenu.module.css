@@ -1,0 +1,58 @@
+/* RailContextMenu.module.css — the rail icon placement popover.
+   All color / radius / type from var(--…) only. Zero hex, zero rgba.
+
+   ── Why this file exists (added in the inline-style → cascade pass) ────────
+   The whole menu used to declare its surface inline: `background:
+   var(--paper)`, `border: 1px solid var(--ink-150)`, `box-shadow:
+   var(--shadow-popover)`, the label's `color: var(--ink-400)`, the
+   separator's `background: var(--ink-100)`. Token-valued, so a THEME could
+   still move it — but an inline `style` declaration outranks every author
+   stylesheet rule short of `!important`, so no `[data-frame="…"]` (or any
+   other) selector could ever reach the menu. It was the one app-shell
+   overlay with no stylesheet at all.
+
+   Everything that is not per-open geometry now lives here. The component
+   keeps `top`/`left` inline because those are measured at open time (the
+   viewport clamp in useLayoutEffect) — that is data, not styling.
+
+   ── The `.rail-menu` global handle ────────────────────────────────────────
+   These class names are hashed, so `app/themes.css` cannot target them. The
+   component therefore also carries a stable, unstyled `rail-menu` global
+   class on the same element, exactly so a frame/theme arm can write
+   `[data-frame="color"] .rail-menu { … }` (0,2,0) and out-specify `.menu`
+   (0,1,0) below. Nothing sets it today.
+
+   NOT registered in the "SURFACE THEMING CONTRACT" list in app/themes.css
+   §5: joining that list would paint an accent radial wash on this menu under
+   the five non-Clear themes, which is a VISUAL change. This pass is strictly
+   behaviour-preserving — the handle is now in place for whoever makes that
+   call. */
+
+.menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-6);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--t-13);
+}
+
+/* Section caption above the actions — names the icon the menu belongs to. */
+.label {
+  padding: 6px 10px 2px;
+  color: var(--ink-400);
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Hairline between the two "move to…" rows and the destructive "hide" row. */
+.sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--ink-100);
+}

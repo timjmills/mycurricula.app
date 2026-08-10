@@ -100,7 +100,18 @@ const FILTER_STANDARD_CODES_GLOBAL = [
 // CSS custom property on the subject class — resolved at paint time.
 // The chip dot lives inside a span carrying .cp-subj.<id> so --c resolves to
 // the correct subject color for both Normal and Highlight palettes.
-const SUBJECT_DOT_COLOR = "var(--c)";
+//
+// ── The cascade hook (--lfp-dot) ─────────────────────────────────────────
+// This is still applied via the `style` prop, and an inline declaration
+// outranks EVERY author stylesheet rule short of `!important` — so a
+// frame/theme arm could never re-treat this dot (only re-point --c, which
+// is the team-locked subject hue and not a per-frame knob). Wrapping it as
+// `var(--lfp-dot, var(--c))` hands control back: a custom property is a
+// DIFFERENT property from `background`, so `.chipDot { --lfp-dot: … }` —
+// the class already on this very element — can now set it, while the
+// fallback keeps the painted colour byte-identical. Nothing sets it today.
+// Same shape as ChromeClock's --clk-dot (4e0d90f).
+const SUBJECT_DOT_COLOR = "var(--lfp-dot, var(--c))";
 
 // ── Toggle helpers ───────────────────────────────────────────────────────────
 
@@ -416,14 +427,12 @@ export function LeftFilterPanel(): ReactNode {
             </p>
           </Tooltip>
           <div className={styles.standardList}>
+            {/* Empty state — was fully inline (font-size / colour / padding).
+                A plain <p> with no competing primitive rule, so the whole
+                declaration moved to the module, which is strictly better than
+                a var() hook: the rule itself is now cascade-reachable. */}
             {standardCodes.length === 0 && (
-              <p
-                style={{
-                  fontSize: "var(--t-11)",
-                  color: "var(--ink-400)",
-                  padding: "var(--r-2) 0",
-                }}
-              >
+              <p className={styles.standardEmpty}>
                 No standards in this subject yet.
               </p>
             )}

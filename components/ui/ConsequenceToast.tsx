@@ -88,6 +88,7 @@ export function ConsequenceToast({
       role="status"
       aria-live="polite"
       aria-atomic="true"
+      className="consequence-toast"
       style={{
         position: "fixed",
         bottom: 24,
@@ -99,8 +100,22 @@ export function ConsequenceToast({
         gap: 12,
         padding: "0 8px 0 16px",
         minHeight: 48,
-        background: "var(--ink-900)",
-        color: "var(--paper)",
+        // ── THE CASCADE HOOKS — why these colours are wrapped in var() ──────
+        // Same conversion 4e0d90f applied to ChromeClock's subject dot, for
+        // the same reason: an inline `style` declaration outranks EVERY
+        // author stylesheet rule short of `!important`, so no frame/theme arm
+        // could ever reach this toast. This primitive is the shared-toast
+        // floor every team-scoped commit fires through, so it was locking out
+        // the cascade app-wide.
+        //
+        // The value is `var(--ctoast-…, <what it already was>)`. A custom
+        // property is a DIFFERENT property from the one declared inline, so a
+        // stylesheet can now set it, while the fallback keeps the painted
+        // colour byte-identical wherever it is unset. Nothing sets them
+        // today. The toast has no stable class, so it carries the unstyled
+        // global `consequence-toast` handle below for a selector to hang on.
+        background: "var(--ctoast-bg, var(--ink-900))",
+        color: "var(--ctoast-ink, var(--paper))",
         borderRadius: 10,
         boxShadow: "var(--shadow-popover)",
         fontSize: 13,
@@ -121,9 +136,18 @@ export function ConsequenceToast({
           size="md"
           onClick={handleUndo}
           tooltip="Undo this change — reverts the team-wide effect while this toast is visible"
+          // The hairline was a literal `rgba(255,255,255,0.22)` — a real bug,
+          // not just a lockout. This slab INVERTS with tone (background
+          // --ink-900 / text --paper), so in dark tone it is a near-WHITE
+          // panel and a 22% white hairline is invisible on it. --toast-
+          // invert-hairline (tokens.css, beside --on-solid) derives the same
+          // 22% from --paper — the toast's own ink — so it follows the
+          // surface, and is byte-identical in light tone where --paper IS
+          // #ffffff. The two colour props also gain hooks, per the note on
+          // the container above.
           style={{
-            border: "1px solid rgba(255,255,255,0.22)",
-            color: "var(--paper)",
+            border: "1px solid var(--ctoast-undo-border, var(--toast-invert-hairline))",
+            color: "var(--ctoast-undo-ink, var(--paper))",
             letterSpacing: 0.2,
             flexShrink: 0,
           }}
@@ -138,7 +162,10 @@ export function ConsequenceToast({
         iconAriaLabel="Dismiss notification"
         onClick={handleDismiss}
         tooltip="Dismiss this notification now (the change still applies)"
-        style={{ color: "var(--ink-400)", flexShrink: 0 }}
+        style={{
+          color: "var(--ctoast-close-ink, var(--ink-400))",
+          flexShrink: 0,
+        }}
       >
         ×
       </Button>

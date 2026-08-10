@@ -58,17 +58,30 @@ import { ChromeToolsMenu } from "./ChromeToolsMenu";
 import { ChromeAccountMenu } from "./ChromeAccountMenu";
 
 // ── Brand glyph (bundle LOGO_SVG, themable fills) ─────────────────────────
+//
+// ── The cascade hook (--ctb-logo-*) ───────────────────────────────────────
+// Re-POINTING --logo-book-a/b already worked from a stylesheet, because the
+// var() resolves at use time. What did NOT work was a rule wanting to set the
+// `fill` itself — an inline `style` declaration outranks every author rule
+// short of `!important`, and this glyph paints on every route. Wrapping the
+// value as `var(--ctb-logo-a, <what it already was>)` fixes that: a custom
+// property is a DIFFERENT property from `fill`, so the cascade can set it,
+// and because custom properties INHERIT, the existing `.brand .glyph svg`
+// selector in app/chrome.css is already a sufficient handle — no new class.
+// The fallback keeps the painted colour byte-identical while nothing sets
+// it, which nothing does today. Same shape as ChromeClock's --clk-dot
+// (4e0d90f); SideNav's BookGlyph carries the twin --sn-logo-* pair.
 
 function LogoGlyph(): ReactNode {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"
-        style={{ fill: "var(--logo-book-a)" }}
+        style={{ fill: "var(--ctb-logo-a, var(--logo-book-a))" }}
       />
       <path
         d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13V4Z"
-        style={{ fill: "var(--logo-book-b)" }}
+        style={{ fill: "var(--ctb-logo-b, var(--logo-book-b))" }}
       />
     </svg>
   );
