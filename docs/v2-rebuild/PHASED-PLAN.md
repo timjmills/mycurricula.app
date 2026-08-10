@@ -1,5 +1,21 @@
 # mycurricula.app — v2 Site Rebuild + Backend Rewiring — Phased Implementation Plan
 
+> ## ⛔ SUPERSEDED — 2026-08-10
+>
+> **This Phase-0–4 plan was never the lineage that shipped.** v2 was built and
+> cut over on the **13-wave** plan; this document is a competing proposal that
+> was not adopted. `docs/7.23.26-unified-v2-plan.md` §343-344 directed that the
+> 13-wave lineage be crowned and this file bannered as superseded — that
+> instruction was never executed until now, and in the interim §451-454 of the
+> same file asserted this file was *already* bannered when it was not.
+>
+> **Read `docs/7.23.26-unified-v2-plan.md` for what actually shipped.** Keep this
+> file for its per-phase detail only. Do not treat its sequencing, its phase
+> numbering, or its status claims as current, and do not start work from it.
+>
+> ---
+>
+> **Superseded claim, left visible:**
 > **Status:** FINALIZED proposal, ready for adversarial audit (Claude-terminal + Codex) and for
 > reconciliation with the user's terminal plan.
 > **Companion:** `v2-delta-analysis.md` — the consolidated surface-by-surface delta (8 analyses) this

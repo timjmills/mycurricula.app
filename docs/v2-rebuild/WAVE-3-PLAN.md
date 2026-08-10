@@ -1,5 +1,22 @@
 # Wave 3 — Chrome + core views (PHASED-PLAN Phase 1)
 
+> ## ✅ COMPLETE — status corrected 2026-08-10
+>
+> **Wave 3 shipped.** v2 went to production default-ON on **2026-07-23**; every
+> W3 item is on `master`. This is a historical build plan, not an active one —
+> do not pick work from it. The branch it names (`claude/v2-wave3-chrome`) is
+> merged and gone.
+>
+> Two of its statements are now false and are corrected here rather than
+> rewritten below: the design authority is **three** bundles deep, newest first —
+> `7.21.26` > `7.2.26` > `6.24.26` (each later bundle wins only on its own
+> deltas) — and **Frame C is COLOR-FORWARD, not Pastel**, per the user ruling of
+> 2026-08-07. Anything below that assumes 7.2.26 is the newest handoff, or that
+> Frame C takes a pastel skin, is superseded.
+>
+> ---
+>
+> **Superseded claim, left visible:**
 > **Status:** ACTIVE build plan — **REVISED 2026-07-02 for the 7.2.26 handoff.**
 > Branch `claude/v2-wave3-chrome` (off `claude/v2-wave2-engine`, which holds the
 > Phase-0 appearance engine). W3.1, W3.2, and W3.3a are landed on this branch.

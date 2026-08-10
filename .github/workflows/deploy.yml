@@ -129,14 +129,29 @@ jobs:
           # an operator reading it under pressure would conclude rollback was
           # disabled and never attempt it.
           #
-          # It is NOT faithful: NOTHING assigns `documentElement.dataset.style`
-          # anywhere in the codebase, under either flag state, while
-          # app/tokens.css:1646-1656 still carries three `:root[data-style=…]`
-          # rules that v1 styling depends on. So a flag-OFF deploy restores the
-          # v1 chrome and route canvases WITHOUT the v1 style axis — a hybrid.
-          # Do not describe this as "restoring production v1"; it gets you a
-          # v1-shaped build with a missing axis, which is a different thing to
-          # be debugging at 2am.
+          # Its fidelity is UNVERIFIED — not proven broken, and not proven good.
+          # Both words are load-bearing; do not drop either.
+          #
+          # NOTHING assigns `documentElement.dataset.style` anywhere, under
+          # either flag state (lib/theme.tsx stamps frame/glass/bg/theme/dim/
+          # tone/canvas/palette on the root, never `style`), so the three
+          # `:root[data-style=…]` blocks at app/tokens.css:1646-1656 can never
+          # match.
+          #
+          # An earlier version of THIS note called that a hybrid, on the grounds
+          # that "v1 styling depends on those rules". It does not. Those blocks
+          # define only `--card-fill` and `--card-stripe-w`, and both have ZERO
+          # consumers repo-wide — the only hits are the six definition lines.
+          # v1 card styling actually flows through `useTheme().style` in JS
+          # (lesson-card.tsx branches on `isVivid`), which works under flag-OFF.
+          # So there is no KNOWN visual regression from this axis.
+          #
+          # What is missing is proof: nobody has built a flag-OFF artifact and
+          # walked it. Treat "restores v1" as unverified, and if you ever need
+          # this lever for real, budget time to check the result rather than
+          # assuming it. Deliberately NOT being fixed — v1 is deleted this cycle
+          # (task #7), so new v1 fidelity would have a known expiry. That is a
+          # choice, recorded here so it does not later read as an oversight.
           #
           # ⚠ THIS LEVER DIES WITH THE v1 DELETION (task #7). Once the v1 route
           # canvases are gone there is nothing for "0" to select, and rollback
