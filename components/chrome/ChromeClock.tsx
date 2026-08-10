@@ -44,8 +44,11 @@
 //     same value the top-bar "Week N" reads). Store edits (rename, move,
 //     archive) update the chip live because `lessons` re-renders us.
 //   • Subject dot color = useSubjectColor(subjectId).c — the palette
-//     bridge's accent, applied as an inline value exactly like the lesson
-//     cards do. Never an invented color (CLAUDE.md §4 subject map).
+//     bridge's accent. Never an invented color (CLAUDE.md §4 subject map).
+//     It reaches the dot as `var(--clk-dot, <that accent>)`, not as a bare
+//     inline value — see the frame-hook note on `.pdot` below for why the
+//     bare form was unreachable by the frame axis (and note the lesson cards
+//     no longer do it inline either; de7a904 converted them first).
 //
 // ── Tick model + SSR safety ──────────────────────────────────────────────
 // Same discipline as components/shell/Clock.tsx (the v1 top-bar clock):
@@ -234,9 +237,33 @@ function ClockRow({ block, lesson, first, minute }: ClockRowProps): ReactNode {
   // for the `.per-btn` + hover-card + onPick followup.
   return (
     <div className="per">
+      {/* ── THE FRAME HOOK — why the dot's colour is wrapped in a var() ─────
+          Same conversion de7a904 applied to LessonCard, for the same reason:
+          an inline `style` declaration outranks EVERY author stylesheet rule
+          short of `!important`, so `[data-frame="color"] .clock .pdot { … }`
+          could never have reached this dot. app/chrome.css:2061 records the
+          blocker in place — this is the edit it points at.
+
+          The value is expressed as `var(--clk-dot, <what it already was>)`.
+          A custom property is a DIFFERENT property from the one declared
+          inline, so a stylesheet can now set it, while the fallback keeps the
+          painted colour byte-identical wherever it is unset. Nothing sets it
+          today, so every frame and both tones render exactly as before; this
+          change hands control back to the cascade, it does not spend it.
+
+          `cp-subj <subject>` comes along because without it the hook would be
+          useless for a SUBJECT dot. app/chrome.css:2052-2064 warns that no
+          chrome surface carries `.cp-subj`, so `--c` — the hue the whole Frame
+          C token tier (`--sc-solid`, `--sc-rail`, …) derives from — fails
+          substitution there and paints NOTHING. `.cp-subj` and its subject
+          subclasses declare ONLY custom properties (app/tokens.css:1272-1414,
+          1532-1547; app/globals.css's twin is @media print and also
+          custom-property-only), so adding them is visually inert while giving
+          a future `.clock .pdot { --clk-dot: var(--sc-rail); }` a real hue to
+          derive from. Same idiom as DayEditSplit.module.css:146. */}
       <span
-        className="pdot"
-        style={{ background: color.c }}
+        className={`pdot cp-subj ${block.subject}`}
+        style={{ background: `var(--clk-dot, ${color.c})` }}
         aria-hidden="true"
       />
       <span className="pmeta">
