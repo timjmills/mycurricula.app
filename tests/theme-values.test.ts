@@ -114,6 +114,16 @@ describe("mc-theme-axes cookie codec", () => {
   });
 });
 
+// ⚠ THESE SEVEN CASES ARE A READABLE SPOT CHECK, NOT THE PARITY GUARD.
+// They document the five rules in order at a glance, which is worth keeping —
+// but hand-picked cases only test the branches their author remembered, and
+// they never execute the BOOT SCRIPT, which is the second place tone is
+// derived. The authoritative check is the full cross-product in
+// `tests/theme-derivation-parity.test.ts`: it runs the real boot script out of
+// lib/theme-init.tsx against all 84 (theme × glass × bg × dim) combinations and
+// compares each to deriveTone. Add coverage THERE, not by lengthening this
+// list. (SSR is not a third derivation — app/layout.tsx calls deriveTone
+// directly; that is asserted structurally in the same file.)
 describe("deriveTone (SSR/boot/provider parity)", () => {
   it("applies the five rules in order, autoTone last", () => {
     expect(deriveTone("night", "light", "wash", "bright", "light")).toBe("dark");
