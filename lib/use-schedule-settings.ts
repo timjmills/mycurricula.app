@@ -24,7 +24,12 @@
 //      plans ("ab"), or rotates on an N-day cycle ("cycle", 2–10
 //      instructional days). CLAUDE.md §1 mandates rotation support
 //      independent of the calendar week — never assume a weekly-only
-//      cycle. Stored under `mycurricula:team:schedule-rotation`.
+//      cycle. Stored under `mycurricula:team:schedule-rotation:<notebook>`
+//      — NOTEBOOK-scoped (USER-RULED: a rotation is a grade level's
+//      pattern, not a school's and not one teacher's), so a browser holds
+//      one rotation per grade rather than one for all of them. The bare
+//      key survives only as the read-once migration source. Build it with
+//      `scheduleRotationStorageKey()`; never hand-write the literal.
 //
 //      ONE-TIME SEED: the onboarding wizard already collects rotation +
 //      cycle length (lib/onboarding-state.tsx, `data.rotation` /
@@ -50,7 +55,9 @@
 // read seam) so the fixture fallback and shape conversion live in one
 // place.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNotebookState } from "@/lib/notebook-state";
+import { teamScopedKey, type TeamScope } from "@/lib/team-scoped-key";
 import type { Weekday } from "@/lib/use-school-week";
 import { WEEKDAY_INDEX } from "@/lib/use-school-week";
 import { SUBJECT_BY_ID } from "@/lib/mock";
@@ -88,13 +95,38 @@ export const DEFAULT_ROTATION: RotationSettings = {
  * (see the module header). It migrates to a server row when the
  * team-settings backend lands.
  */
-const ROTATION_STORAGE_KEY = "mycurricula:team:schedule-rotation";
+const ROTATION_STORAGE_KEY_BASE = "mycurricula:team:schedule-rotation";
+
+/**
+ * Build the rotation key for a notebook scope. Pure + exported so the rule is
+ * unit-testable without React, and so the probe scripts can IMPORT the key
+ * instead of hand-writing the flat literal — a probe that builds its own key
+ * silently configures nothing the moment the key moves, then passes while
+ * testing an unconfigured app (see lib/team-scoped-key.ts).
+ *
+ * NOTEBOOK-scoped, USER-RULED: a rotating timetable is a grade level's
+ * pattern, not a school's and not one teacher's. That puts it on the same
+ * `activeNotebookId` seam as the subject keys rather than the workspace seam
+ * the calendar keys use.
+ */
+export function scheduleRotationStorageKey(scope: TeamScope): string {
+  return teamScopedKey(ROTATION_STORAGE_KEY_BASE, scope);
+}
 
 /** The onboarding wizard's persistence key (lib/onboarding-state.tsx).
  *  Read once for the rotation seed; never written from here. */
 const ONBOARDING_STORAGE_KEY = "mycurricula:onboarding";
 
 const ROTATION_VALUES: readonly ScheduleRotation[] = ["none", "ab", "cycle"];
+
+/** Rotation settings TOGETHER WITH the key they were read under. The stamp is
+ *  what makes a stale-scope read detectable; a bare value cannot say which
+ *  notebook it came from. */
+interface LoadedRotation {
+  /** `null` before the first load (SSR + the first client paint). */
+  storageKey: string | null;
+  settings: RotationSettings;
+}
 
 /** Clamp a cycle length to a valid integer in [MIN, MAX]; non-numbers
  *  fall back to the default. */
@@ -124,12 +156,12 @@ function normalizeRotation(input: unknown): RotationSettings {
   return { rotation, cycleLength: clampCycleLength(obj.cycleLength) };
 }
 
-/** Read + parse the stored rotation. Returns null when unset or when the
- *  stored JSON is malformed (private mode, quota exhaustion, etc.). */
-function readRotationFromStorage(): RotationSettings | null {
+/** Read + parse the rotation under one key. Returns null when unset or when
+ *  the stored JSON is malformed (private mode, quota exhaustion, etc.). */
+function readRotationFromStorage(storageKey: string): RotationSettings | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(ROTATION_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (raw == null) return null;
     return normalizeRotation(JSON.parse(raw));
   } catch {
@@ -160,13 +192,72 @@ function seedRotationFromOnboarding(): RotationSettings | null {
   }
 }
 
-function persistRotation(value: RotationSettings): void {
-  if (typeof window === "undefined") return;
+/**
+ * Persist the rotation under one key. Failures are swallowed for the caller —
+ * in-memory state is still right — but REPORTED, because the legacy migration
+ * below deletes the only other copy once it believes this write landed.
+ *
+ * @returns true when the value is known to be persisted.
+ */
+function persistRotation(storageKey: string, value: RotationSettings): boolean {
+  if (typeof window === "undefined") return false;
   try {
-    window.localStorage.setItem(ROTATION_STORAGE_KEY, JSON.stringify(value));
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
+    return true;
   } catch {
     // Storage disabled / quota exceeded — state still updates in-memory.
+    return false;
   }
+}
+
+/**
+ * Resolve a notebook's rotation, migrating the pre-scoping value if this is
+ * the first notebook to meet it, and seeding from onboarding when there is
+ * nothing to migrate.
+ *
+ * Exported and separated from the hook for the reason `loadTeamSubjectOrder`
+ * is: the migration lives in an effect, effects do not run under
+ * `react-dom/server`, and a guard that cannot be exercised is how the subject
+ * ORDER key's first "read-once" fallback shipped while actually being read
+ * once PER SCOPE.
+ *
+ * Precedence: this scope's own value → the pre-scoping bare key, CLAIMED by
+ * the first notebook to observe it (written under that notebook's key, then
+ * removed, delete conditional on a confirmed write) → the one-time onboarding
+ * seed. The seed is deliberately NOT claim-and-deleted: `mycurricula:
+ * onboarding` is the teacher's setup answers, still owned by the wizard, and
+ * a fresh notebook inheriting the school's rotation pattern is a sane DEFAULT
+ * rather than another notebook's configuration leaking in.
+ */
+export function loadScheduleRotation(storageKey: string): RotationSettings {
+  const stored = readRotationFromStorage(storageKey);
+  if (stored != null) return stored;
+
+  if (storageKey !== ROTATION_STORAGE_KEY_BASE) {
+    const legacy = readRotationFromStorage(ROTATION_STORAGE_KEY_BASE);
+    if (legacy != null) {
+      // DELETE ONLY AFTER A CONFIRMED WRITE — at quota or in private mode the
+      // scoped write fails silently while removeItem succeeds, and deleting
+      // regardless would destroy the team's only saved rotation.
+      if (persistRotation(storageKey, legacy)) {
+        try {
+          window.localStorage.removeItem(ROTATION_STORAGE_KEY_BASE);
+        } catch {
+          // Migration missed, value intact: the next notebook claims it.
+        }
+      }
+      return legacy;
+    }
+  }
+
+  const seeded = seedRotationFromOnboarding();
+  if (seeded != null) {
+    // Persist so the seed is genuinely one-time FOR THIS SCOPE — the scoped
+    // key existing is the "already seeded" marker.
+    persistRotation(storageKey, seeded);
+    return seeded;
+  }
+  return { ...DEFAULT_ROTATION };
 }
 
 // ── Rotation: hook ─────────────────────────────────────────────────────────
@@ -185,66 +276,99 @@ export function useScheduleRotation(): {
   setRotation: (r: ScheduleRotation) => void;
   setCycleLength: (n: number) => void;
 } {
-  const [settings, setSettings] = useState<RotationSettings>(() => ({
-    ...DEFAULT_ROTATION,
-  }));
+  // The notebook scope, resolved INSIDE the hook — load-bearing for the same
+  // reason it is on the subject hooks: two instances that took scope as a
+  // parameter could disagree, and a save would write one key while the reader
+  // watched another. (Consequence: this hook requires a <NotebookProvider>.
+  // Its only consumer, app/settings/schedule/page.tsx, is under one.)
+  const { activeNotebookId } = useNotebookState();
+  const scope = activeNotebookId || null;
+  const storageKey = useMemo(() => scheduleRotationStorageKey(scope), [scope]);
 
-  // Post-mount: sync from localStorage; seed from the wizard when unset.
-  useEffect(() => {
-    const stored = readRotationFromStorage();
-    if (stored != null) {
-      setSettings(stored);
-      return;
-    }
-    const seeded = seedRotationFromOnboarding();
-    if (seeded != null) {
-      setSettings(seeded);
-      // Persist the seed so the team key exists from now on (the
-      // one-time part of "one-time seed") and other tabs converge.
-      persistRotation(seeded);
-    }
+  // State is STAMPED with the key it was read under. Scoping the key alone is
+  // not enough: React state survives a notebook switch, so between the render
+  // that resolves the new key and the effect that loads it, the hook holds the
+  // PREVIOUS notebook's rotation under the NEW notebook's key — and a setter
+  // in that window would persist it there. Same defect, and same fix, as
+  // tasks #19 and #26.
+  const [loaded, setLoaded] = useState<LoadedRotation>(() => ({
+    storageKey: null,
+    settings: { ...DEFAULT_ROTATION },
+  }));
+  const latestRef = useRef<LoadedRotation>(loaded);
+
+  const apply = useCallback((key: string, next: RotationSettings): void => {
+    const value: LoadedRotation = { storageKey: key, settings: next };
+    latestRef.current = value;
+    setLoaded(value);
   }, []);
 
+  // Post-mount (and on scope change): sync from localStorage, migrating the
+  // pre-scoping value or seeding from the wizard as needed. RE-KEYING is the
+  // point of the `storageKey` dep — switching notebook must re-read that
+  // notebook's rotation, never carry the previous one forward.
+  useEffect(() => {
+    apply(storageKey, loadScheduleRotation(storageKey));
+  }, [apply, storageKey]);
+
   // Cross-tab sync — fires on OTHER tabs only, so a settings change in
-  // one tab updates a /schedule deep-link open in another.
+  // one tab updates a /schedule deep-link open in another. This scope only.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = (e: StorageEvent): void => {
-      if (e.key !== ROTATION_STORAGE_KEY) return;
+      if (e.key !== storageKey) return;
       if (e.newValue == null) {
-        setSettings({ ...DEFAULT_ROTATION });
+        apply(storageKey, { ...DEFAULT_ROTATION });
         return;
       }
       try {
-        setSettings(normalizeRotation(JSON.parse(e.newValue)));
+        apply(storageKey, normalizeRotation(JSON.parse(e.newValue)));
       } catch {
         // Ignore malformed values; keep current state.
       }
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
-  }, []);
+  }, [apply, storageKey]);
 
-  // Setters merge into the current value, normalize, persist. Depending
-  // on `settings` keeps the closure fresh without functional-updater
-  // side effects.
-  const setRotation = useCallback(
-    (r: ScheduleRotation): void => {
-      const next = normalizeRotation({ ...settings, rotation: r });
-      setSettings(next);
-      persistRotation(next);
+  /** Merge a patch into THIS scope's current value, normalize, persist.
+   *  Never merges onto a value stamped with another key — in the switch
+   *  window that would carry the previous notebook's rotation across. Re-reads
+   *  this scope instead: a synchronous localStorage read, exact, and legal in
+   *  an event handler. */
+  const commit = useCallback(
+    (patch: Partial<RotationSettings>): void => {
+      const held = latestRef.current;
+      const base =
+        held.storageKey === storageKey
+          ? held.settings
+          : loadScheduleRotation(storageKey);
+      const next = normalizeRotation({ ...base, ...patch });
+      apply(storageKey, next);
+      // Cross-tab semantics here are last-writer-wins, inherited from the
+      // localStorage layer rather than chosen for this key — see the same note
+      // on useSubjectOverrides. A revision/compare-and-retry scheme belongs
+      // across every team and personal hook at once (task #25).
+      persistRotation(storageKey, next);
     },
-    [settings],
+    [apply, storageKey],
+  );
+
+  const setRotation = useCallback(
+    (r: ScheduleRotation): void => commit({ rotation: r }),
+    [commit],
   );
 
   const setCycleLength = useCallback(
-    (n: number): void => {
-      const next = normalizeRotation({ ...settings, cycleLength: n });
-      setSettings(next);
-      persistRotation(next);
-    },
-    [settings],
+    (n: number): void => commit({ cycleLength: n }),
+    [commit],
   );
+
+  // KEY-BOUND READ. Until this scope's own value has loaded, report the
+  // DEFAULT rotation rather than the previous notebook's — the honest state
+  // for that frame is "not loaded here", not another grade's pattern.
+  const settings =
+    loaded.storageKey === storageKey ? loaded.settings : DEFAULT_ROTATION;
 
   return {
     rotation: settings.rotation,
