@@ -31,9 +31,16 @@
 // That is the mistake this file exists to stop repeating.
 //
 // ON THE FRAME AXIS (`data-frame ∈ glass|paper|color`), deliberately NOT swept
-// here. Static answer: NOTHING under components/chrome or components/catchup-v2
-// branches on `data-frame`/`data-version`, and no frame-conditional CSS hides
-// the tools or catchup controls — so the frame cannot change which tree mounts.
+// here. Static answer: nothing under components/chrome or components/catchup-v2
+// branches on `data-frame`, and no frame-conditional CSS hides the tools or
+// catchup controls — so the frame cannot change which tree MOUNTS. (Since
+// 2026-08-10 it does change how the chrome LOOKS: app/chrome.css carries a
+// `[data-frame="color"]` material arm for `.glass` / `.iconbtn` / `.toolsbtn`.
+// That is fill, blur and shadow only, so this probe's counts are unaffected —
+// but a future visual assertion here would need the sweep. The `data-version`
+// half of the old wording is deleted rather than kept: that attribute is
+// emitted nowhere in this codebase, so naming it implied an axis that does not
+// exist.)
 // An earlier sweep in this file seeded `mycurricula:user:theme-frame` in
 // localStorage and was REMOVED as an instrument that lied: the applied frame
 // came back `paper` for all three requests (the server/DB preference wins), so

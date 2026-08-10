@@ -157,9 +157,12 @@ async function sample(page, label) {
         label,
         // The frame ACTUALLY APPLIED — never what we asked for.
         frameAttr: document.documentElement.dataset.frame ?? null,
-        versionAttr:
-          document.querySelector("[data-version]")?.getAttribute("data-version") ??
-          null,
+        // A `versionAttr` readout sat here and was DEAD: `data-version` is not
+        // emitted anywhere in this codebase (CLAUDE.md §4, corrected
+        // 2026-08-07 — `lib/theme.tsx` sets `root.dataset.frame` and nothing
+        // else), so the querySelector never matched and the field was always
+        // null. A probe field that can only ever report one value is not a
+        // measurement; it is a line of output that looks like one.
         // ── the doubted element ──
         doubtedCount: document.querySelectorAll(doubted).length,
         // ── the known-good peer, same toolbar, same JSX block ──
@@ -258,7 +261,7 @@ async function run(frame, width, { shot = false } = {}) {
     .catch(() => false);
 
   const closed = await sample(page, "CLOSED");
-  log(`  frame requested: ${frame}   ·   frame APPLIED: ${closed.frameAttr}   ·   data-version: ${closed.versionAttr}`);
+  log(`  frame requested: ${frame}   ·   frame APPLIED: ${closed.frameAttr}`);
   const framePinned = closed.frameAttr === frame;
   if (!framePinned) {
     log(`  ✗ FRAME MISMATCH — this row measures ${closed.frameAttr}, NOT ${frame}. Numbers below are void.`);

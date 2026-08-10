@@ -244,11 +244,25 @@
 }
 
 /* Dark tone earns a SEPARATE border token, and this is not a polish choice.
-   Against the dark canvas (#1e1d2c) no single lightness satisfies both
-   white-text ≥4.5:1 on the fill AND fill-vs-canvas ≥3:1 (WCAG 1.4.11 non-text
-   contrast): the two curves cross between L=0.54 and L=0.56 and neither clears
-   at the crossover. The fill therefore keeps the lightness its text needs, and
-   `--sc-edge` (L=0.68) supplies the boundary the page needs. */
+   Against the dark canvas (sampled #1e1d2c, not assumed) no single lightness
+   serves ALL FIFTEEN subject slots for both white-text ≥4.5:1 on the fill AND
+   fill-vs-canvas ≥3:1 (WCAG 1.4.11 non-text contrast).
+
+   Be precise about the shape of that, because an earlier draft of this comment
+   got it wrong and the wrong version argues for a different design. It is NOT
+   that "the curves cross and neither clears" — swept per hue 0.40→0.85, EVERY
+   slot has a viable band 3–4 points wide (--subj-1 holds white text to L=0.56
+   and separates from the canvas from L=0.52, so L=0.54 serves it). What is true
+   is that the fifteen bands share no common value, and they miss by ONE point:
+     highest L still holding white text = 0.54  (the greens, --subj-12/13/14)
+     lowest  L still separating from bg = 0.55  (rose→purple, --subj-4/5/6/7)
+   Note the two ends are capped by DIFFERENT worst hues — OKLCh lightness is
+   perceptual while WCAG luminance is green-weighted, so at equal L a magenta
+   carries markedly less luminance than a green.
+
+   So the constraint binds only because this token must serve the whole scale.
+   The fill keeps the lightness its text needs and `--sc-edge` (L=0.68) supplies
+   the boundary the page needs. See the fuller derivation in app/tokens.css. */
 :global([data-tone="dark"][data-frame="color"]) .card {
   --lc-edge: var(--sc-edge);
 }

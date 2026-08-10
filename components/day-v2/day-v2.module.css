@@ -740,8 +740,16 @@
   --dc-ink: var(--ink-900);
   --dc-fill: color-mix(in srgb, var(--c) 12%, transparent);
   --dc-fill-strong: color-mix(in srgb, var(--c) 20%, transparent);
+  /* `--dc-solid` CARRIED THE TWO-FLAT-DECLARATION SHAPE the `--dc-foot` note
+     above warns about ("pre-existing and out of scope here, but do not copy
+     it") — it is in scope now, and it was a live bug, not a style nit. A custom
+     property accepts ANY token stream, so on an engine without relative colour
+     the second declaration still won; `--dc-solid` then held an unparseable
+     value, `background: var(--dc-solid)` became invalid at computed-value time,
+     and the step-number disc painted NOTHING. `@supports` is the only form that
+     actually falls back, so the relative upgrade moved into the block below.
+     The colour is unchanged on every engine that has relative colour. */
   --dc-solid: color-mix(in oklab, var(--c) 58%, black);
-  --dc-solid: oklch(from var(--c) min(l, 0.4) c h);
   --dc-solid-ink: #fff;
   --dc-edge: color-mix(in srgb, var(--c) 30%, transparent);
   --dc-edge-strong: color-mix(in srgb, var(--c) 48%, transparent);
@@ -757,12 +765,50 @@
   border: 1px solid var(--border);
   box-shadow: var(--sh-md);
 }
+@supports (color: oklch(from red l c h)) {
+  :global([data-frame="paper"]) .vcDetail {
+    --dc-solid: oklch(from var(--c) min(l, 0.4) c h);
+  }
+}
 
-/* ── FRAME C · COLOR — the base recipe above, stated so the set is explicit ─ */
-/* Deliberately empty of overrides: the `.vcDetail` block IS the colour-forward
-   card, and duplicating it here would be a second copy to keep in step. This
-   selector exists so a reader looking for "what does frame C do" finds an
-   answer rather than an absence, and so the three frames read as a set. */
+/* ── FRAME C · COLOR — the base recipe above, plus the one thing it lacks ─── */
+/* The `.vcDetail` block IS the colour-forward card; its fill, gradient and ink
+   are deliberately NOT duplicated here, because a second copy would drift.
+
+   ⚠ THIS SECTION USED TO BE EMPTY, AND THE ONE THING IT NOW ADDS IS A BOUNDARY.
+   Frame C is the only frame that gives this card no border — glass and paper
+   each set their own — and on dark tone that is a measured accessibility gap,
+   not a stylistic one: the card's own top stop reads **1.67:1 against the dark
+   canvas rgb(30,29,44)** at the worst slot (--subj-6), well under the 3:1 WCAG
+   1.4.11 non-text floor. On Night the focus card simply has no edge.
+
+   `--sc-edge` (app/tokens.css, L=0.68) is the token that exists for this case:
+   5.22:1 against the same canvas at ITS worst slot (--subj-6 again in the
+   relative branch, --subj-9 in the fallback). The FILL is untouched — its
+   white text needs L≈0.40 and the page boundary needs L≥0.55, and across all
+   15 slots those windows do not intersect, so the edge is a second token
+   rather than a lighter fill.
+
+   MATERIAL, NOT LAYOUT — the 2026-08-01 single-Day ruling holds. `.cp-root *`
+   is `box-sizing: border-box` (app/tokens.css:1187), and /daily renders inside
+   `.cp-root` via app/(planner)/layout.tsx, so the border consumes padding
+   rather than growing the box. Nothing moves, resizes or reorders.
+
+   ⚠ AND THE THING THIS SECTION DELIBERATELY DOES **NOT** DO: repoint the
+   gradient onto `--sc-solid` / `--sc-solid-2`. That is what the shared tier is
+   for, WeekC now does exactly that, and doing it here would FAIL AA. This
+   card's binding element is not plain white body ink — it is the 11px/800
+   `.dcTl` eyebrow at 0.82 opacity inside `.dcTarget`'s rgba(255,255,255,.14)
+   panel. Composited through that stack and measured across all 15 slots:
+       today  `oklch(from var(--c) min(l,.4) c h)`   4.70:1  (--subj-15)   ok
+       repointed to `--sc-solid`                     3.32:1  (--subj-13)   FAIL
+   The tier fixes lightness at L=0.50 for a card whose text sits directly on
+   the fill; this card layers two translucent surfaces on top of it first and
+   therefore needs the darker L≈0.40 ramp. Same ruling, different stack — do
+   not "finish the repoint" here without re-measuring the eyebrow. */
+:global([data-frame="color"][data-tone="dark"]) .vcDetail {
+  border: 1px solid var(--sc-edge);
+}
 
 /* ── The rail — same job in every frame, different material ───────────────── */
 /* "The rail stays the rail" (user, 2026-08-01): its content, order and

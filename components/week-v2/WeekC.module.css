@@ -203,22 +203,60 @@
   transition:
     transform 0.12s ease,
     box-shadow 0.12s ease;
-  /* Subject hue → a DEEP gradient. The whole gradient is darkened toward a
-     FIXED dark anchor (`black`, NOT var(--ink-900) which inverts to near-white
-     on Night and would break the white text). Worst case is the lightest
-     subject at the START (58% hue / 42% black); since the subject scale was
-     re-derived for its own 3:1 floor (lib/subject-color.ts) every solid got
-     darker or stayed put, so that worst case is now --subj-6 magenta at
-     white-on-start 9.76:1 — well above the 4.5 body floor, and the darker 40%
-     end lands higher again. (It was 6.5:1 on the old, lighter gold; the number
-     moved, the conclusion did not.) This is the same recipe + AA reasoning the
-     shipped DayC hero uses (day-v2.module.css) — the bundle's brighter 92%/58%
-     recipe fails AA on gold, so it is deliberately darkened here. */
-  background: linear-gradient(
-    150deg,
-    color-mix(in oklab, var(--c, var(--brand-500)) 58%, black),
-    color-mix(in oklab, var(--c, var(--brand-500)) 40%, black)
-  );
+  /* Subject hue → a DEEP gradient, straight off the shared Frame C token tier.
+     ──────────────────────────────────────────────────────────────────────────
+     THIS USED TO STATE ITS OWN RECIPE — `color-mix(in oklab, var(--c) 58%,
+     black)` → `… 40%, black)` — and the note here defended it on the strength
+     of white-on-start reading 9.76:1. That number was true and it was the
+     WRONG THING TO OPTIMISE. Mixing toward black scales CHROMA down with
+     lightness, so 58%/40% lands the tile at 9.76–15.21:1 white contrast: an
+     almost-black tile with a faint hue in it. day-v2.module.css:502 recorded
+     exactly this failure for the DayC hero ("reads as near-black faintly
+     tinted") and moved off it; this file kept the recipe it was copied from.
+
+     USER RULING 2026-08-07 (decision 20), reaffirmed 2026-08-09: Frame C is
+     strongly colour-forward with DEEP SATURATED subject colour. A tile a
+     teacher reads as black is not that. So the two stops now come from
+     `--sc-solid` / `--sc-solid-2` (app/tokens.css, the `.cp-subj` Frame C
+     tier), which fix lightness at L=0.50 / L=0.42 and multiply chroma by 1.5
+     instead of collapsing it. Read that token block before changing a value
+     here — it carries the derivation and the handoff line it knowingly
+     contradicts. Every `.tile` carries `.cp-subj` + the subject class
+     (WeekC.tsx:545-549), so the tier always resolves; the old
+     `var(--c, var(--brand-500))` fallback was never reachable.
+
+     WHAT THE REPOINT COSTS, AND WHY THE FOUR RULES BELOW MOVED WITH IT.
+     Measured by canvas readback over all 15 subject slots, worst slot named:
+         white on the fill      9.76 → 5.34 (--subj-14)
+     5.34 still clears the 4.5 body floor, but it leaves a TEN-POINT BAND for
+     everything layered on the tile, exactly as lesson-card.module.css:208-222
+     documents for the same tokens. Anything that was legible only because the
+     old fill was nearly black had to be re-derived, and four things were:
+     `.tileTime`'s opacity, `.tileDone`'s fade, `.tileUnit`'s white chip and
+     `.tileModified`'s outline. Each carries its own measurement below.
+
+     NO `@supports` PAIR IS NEEDED HERE. The tier itself is the pair; this rule
+     only references the resulting custom properties, so the fallback branch
+     reaches the tile for free. */
+  background: linear-gradient(150deg, var(--sc-solid), var(--sc-solid-2));
+  /* The edge. On light tone the fill separates from the page unaided, so the
+     border is the gradient's own darker stop and reads as a deepening rather
+     than a second colour — the same choice lesson-card makes. Declared in BOTH
+     tones (dark swaps the value below, not the presence) so the tile's box
+     geometry never changes with the tone. */
+  border: 1px solid var(--sc-solid-2);
+}
+
+/* Dark tone earns a LIGHTER border, and it is not a polish choice: against the
+   dark canvas rgb(30,29,44) the fill itself measures 2.45:1 at --subj-6, below
+   the 3:1 WCAG 1.4.11 non-text floor, so on Night the tile has no boundary at
+   all. `--sc-edge` (L=0.68) is the token that exists for precisely this — it
+   reads 5.22:1 against the same canvas. The fill is unchanged, because the
+   lightness its white text needs and the lightness the page boundary needs do
+   not intersect across all 15 slots (app/tokens.css records the sweep). */
+:global(:root[data-tone="dark"]) .tile,
+:global(.home[data-tone="dark"]) .tile {
+  border-color: var(--sc-edge);
 }
 
 .tile:hover {
@@ -234,9 +272,32 @@
   }
 }
 
-/* Done — recede (store-owned completion; never forks). */
+/* Done — recede (store-owned completion; never forks).
+   ────────────────────────────────────────────────────────────────────────────
+   THIS WAS `opacity: .72` AND THAT WAS ALREADY FAILING — the repoint only made
+   it visible. Element opacity fades the tile AND its white text toward the page
+   together, so on a light page both converge on the same colour and the
+   contrast between them collapses. Measured over all 15 slots, white title on
+   the faded fill against a white page:
+                            opacity .72   .85    .95
+       old 58%/black fill        4.43     6.33   8.45      ← .72 already <4.5
+       --sc-solid fill           3.20     4.07   4.89
+   There is no good opacity: the cost is proportional, and .95 — the first rung
+   that clears — is too weak to read as a state at all.
+
+   So "done" stops being a FADE and becomes a DRAIN: the tile stays fully opaque
+   and loses its saturation. White has no saturation, so the ink is untouched,
+   and `saturate()` is luminance-preserving, so the fill barely moves — white on
+   the drained fill measures 6.14:1 at the worst slot (--subj-15), BETTER than
+   the 5.34 of a live tile. On a frame whose whole language is saturated subject
+   colour, "the colour has gone out of it" is also the more legible cue.
+
+   `filter` makes the tile a containing block for fixed-position descendants.
+   Checked before using it: nothing in the tile subtree is `position: fixed` —
+   the unit chip opens the GLOBAL workspace host and Tooltip portals to
+   document.body, so both leave the subtree entirely. */
 .tileDone {
-  opacity: 0.72;
+  filter: saturate(0.4);
 }
 
 /* Now — the live "in progress" ring (bundle B:1015 uses --ink). Applied ONLY
@@ -265,7 +326,12 @@
    moved-arrow + "Modified" pill (the other two tiers) ride the ForkCues atom,
    whose amber reads on the dark gradient. */
 .tileModified {
-  outline: 2px dashed rgba(255, 255, 255, 0.6);
+  /* 0.6 white was chosen against the old near-black fill. On `--sc-solid` the
+     same alpha reads 2.89:1 at --subj-14 — under the 3:1 non-text floor, i.e. a
+     fork cue a teacher can miss. 0.75 restores it to 3.68:1 and is still
+     visibly softer than the solid-white selection ring it has to stay
+     distinguishable from. */
+  outline: 2px dashed color-mix(in oklab, var(--on-solid) 75%, transparent);
   outline-offset: -5px;
 }
 
@@ -284,7 +350,12 @@
 .tileTime {
   font-size: 10px;
   font-weight: 600;
-  opacity: 0.85;
+  /* 0.85 → 0.92. At 10px/600 this is NOT WCAG-large text, so it owes the full
+     4.5:1. On the repointed fill 0.85 measures 4.29:1 at --subj-14 and 0.88
+     measures 4.49 — the AA cliff sits between 0.88 and 0.90. 0.92 lands 4.76,
+     the same rung lesson-card.module.css:242 uses for its muted ink against
+     the same tokens, measured from the same table. */
+  opacity: 0.92;
 }
 
 /* The unit pop-in chip on a DEEP subject gradient with white text. The ghost
@@ -296,17 +367,29 @@
    rule clears `.btn.ghost` (0,2,0), with the hover/focus rules qualified to clear
    `.btn.ghost:hover:not(:disabled)` (0,4,0) and `.btn:focus-visible` (0,2,0) by
    specificity rather than by stylesheet order. */
+/* THE CHIP HAD TO INVERT WITH THE REPOINT, and the direction is the opposite
+   of the obvious one. It used to be cut from translucent WHITE (18% rest / 30%
+   hover) — which works on the DayC hero because that card's fill is nearly
+   black, but on `--sc-solid` a white veil lifts the chip's background toward
+   the white text sitting on it. Measured across all 15 slots: 18% white reads
+   3.85:1 (--subj-13) and 30% reads 3.09:1 (--subj-12) — note the worst slot
+   MOVES between the two, so a spot check on one hue proves nothing. MORE white
+   makes it WORSE. So the chip is cut from
+   the tile's own DARKER stop instead — `--sc-solid-2`, 7.43:1 at its worst slot
+   (--subj-12) — and reads as a recess rather than a highlight. Hover brightens
+   only the BORDER, which owes the 3:1 non-text floor rather than 4.5, so the
+   affordance is free. */
 .tileUnit.tileUnit.tileUnit {
   align-self: flex-start;
   margin-top: 2px;
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.32);
-  color: #fff;
+  background: var(--sc-solid-2);
+  border-color: color-mix(in oklab, var(--on-solid) 32%, transparent);
+  color: var(--on-solid);
 }
 .tileUnit.tileUnit.tileUnit:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: #fff;
-  color: #fff;
+  background: var(--sc-solid-2);
+  border-color: var(--on-solid);
+  color: var(--on-solid);
 }
 /* --ink-900 is near-black in light tone — no ring at all on this gradient. */
 .tileUnit.tileUnit.tileUnit:focus-visible {

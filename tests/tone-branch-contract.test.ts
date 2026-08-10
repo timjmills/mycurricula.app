@@ -73,7 +73,22 @@ const TONE_AWARE = toneAwareTokens();
 const stripComments = (src: string): string =>
   src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
 
-const AXIS_KEYED = /\[data-bg=|\[data-theme=/;
+/**
+ * The appearance axes whose value does NOT determine a tone, so a rule keyed on
+ * one still owes an explicit tone branch.
+ *
+ * ⚠ `data-frame` IS MATCHED BY VALUE, NOT BY NAME, and that is load-bearing.
+ * `components/lesson-flow/resource-tile.module.css` uses a component-local
+ * `data-frame` whose values are `video|slides|document|image|url` — the
+ * resource TYPE, an entirely different axis that happens to share a name. Ten
+ * of its rules pin a literal ink, none of them is an appearance-axis rule, and
+ * a scan keyed on the attribute name alone reports all ten as violations.
+ * Restricting the match to the three appearance values (`FRAME_VALUES`,
+ * lib/theme-values.ts:77) separates them structurally — there is no allowlist
+ * entry to go stale, and no way for the exemption to widen on its own.
+ */
+const AXIS_KEYED =
+  /\[data-bg=|\[data-theme=|\[data-frame=["']?(?:glass|paper|color)["']?[\]"']/;
 /** Selectors that already determine the tone. `data-dim` decides it on the photo
  *  path; `data-glass` is the Frame-A register, which CLAUDE.md §4 defines as
  *  flipping "a panel's fill AND its text together" — so a rule keyed on it picks
@@ -87,25 +102,42 @@ const AXIS_KEYED = /\[data-bg=|\[data-theme=/;
  *  surface: precisely the bug this file exists to catch, waved through by the
  *  guard itself. Only `night` forces a tone.
  *
- *  KNOWN REMAINING GAP — `data-frame` is not scanned, deliberately, and adding
- *  it is NOT a one-line change. The measurement below was taken before
- *  2026-08-09 and two of its three bullets have since been overtaken by events;
- *  the counts are left as the historical record and MUST be re-measured by
- *  whoever widens the scan, not carried forward.
- *    • STILL TRUE: 10 are FALSE POSITIVES from a NAME COLLISION.
- *      `resource-tile.module.css` uses a component-local `data-frame` whose
- *      values are `video|slides|document|image|url` (the resource type),
- *      unrelated to the appearance axis. Any widening must allowlist the axis
- *      values `glass|paper|color`.
- *    • GONE: the dormant Frame-A/C vocabulary (`.glass-dark`, `.fr-title`,
- *      `.fr-eyebrow`, `.badge`, `.chip.now`) was DELETED from app/themes.css on
- *      2026-08-09 — 99 rules that no .tsx could ever match. They are no longer
- *      a reason the widening is hard, and their allowlist entry went with them.
- *    • GONE: Pastel (`WeekC.module.css`) was retired by user ruling, so the
- *      "safe only because Frame C forces light tone" case no longer exists.
- *      Frame C is now colour-forward and renders in BOTH tones, which means
- *      any tone-fixed ink under `[data-frame="color"]` is a real violation
- *      rather than an exempt one — re-measure before widening. */
+ *  `data-frame` IS NOW SCANNED (2026-08-10, task #16). It was the last
+ *  appearance axis outside the sweep, and the three reasons it stayed out have
+ *  each been resolved rather than carried forward:
+ *    • THE NAME COLLISION IS REAL AND IS HANDLED BY VALUE-MATCHING, not by an
+ *      allowlist — see AXIS_KEYED below. `resource-tile.module.css` has ten
+ *      rules on a component-local `data-frame` (`video|slides|document|image|
+ *      url`); matching only `glass|paper|color` excludes all ten structurally,
+ *      so there is no exemption that could go stale.
+ *    • THE DORMANT VOCABULARY IS GONE. `.glass-dark`, `.fr-title`,
+ *      `.fr-eyebrow`, `.badge`, `.chip.now` and the rest — 99 rules no .tsx
+ *      could match — were DELETED from app/themes.css on 2026-08-09, and their
+ *      allowlist entry went with them.
+ *    • THE THIRD REASON WAS NEVER TRUE, and correcting it is the point of this
+ *      paragraph. The old note exempted WeekC's tone-fixed ink on the grounds
+ *      that "Frame C forces light tone". FRAME C HAS NEVER FORCED A TONE.
+ *      `deriveTone(resolved, glass, bg, dim, autoTone)` (lib/theme-values.ts
+ *      :168, re-exported through lib/theme.tsx) takes theme, glass register,
+ *      background and dim — `data-frame` is not a parameter at all. A Frame C
+ *      surface renders in dark tone under Night, or under Photo-Dim, exactly
+ *      like every other frame. An exemption resting on that claim would have
+ *      waved through precisely the bug this file exists to catch.
+ *
+ *      WeekC's `.tile { color: #fff }` is nonetheless NOT a violation, for a
+ *      different and much stronger reason: its FILL IS TONE-INDEPENDENT. The
+ *      tile paints `var(--sc-solid)` → `var(--sc-solid-2)`, both derived from
+ *      `--c` alone with no tone branch anywhere in their definition
+ *      (app/tokens.css), so the surface under that white ink is the same deep
+ *      subject solid in both tones — 5.34:1 at the worst of 15 slots, measured.
+ *      Tone-fixed ink on a tone-fixed fill is a matched pair; the contract's
+ *      failure mode is a fill that MOVES while the ink does not.
+ *
+ *      (It is also outside the scan's reach either way, and the distinction
+ *      matters to anyone extending this file: WeekC is selected in TSX by
+ *      `frame === "color"`, not by a CSS attribute selector, so no rule in
+ *      WeekC.module.css names `[data-frame]` at all. The scan sees CSS-level
+ *      branching only — a whole stylesheet chosen in React is invisible to it.) */
 const TONE_DETERMINED =
   /\[data-tone=|\[data-dim=|\[data-glass=|\[data-theme=["']?night["']?\]/;
 const INK_PROP =
@@ -257,6 +289,29 @@ describe("the scanner itself", () => {
     expect(TONE_AWARE.has("--surface")).toBe(true);
     // --on-solid is white in BOTH ramps: it is the token the shipped bug used.
     expect(TONE_AWARE.has("--on-solid")).toBe(false);
+  });
+
+  it("treats the frame axis as axis-keyed, and the resource-tile one as not", () => {
+    // Without this the `data-frame` widening is a silent no-op: a regex that
+    // matched nothing would leave every test in this file green while the axis
+    // it claims to cover went unscanned. Both directions are asserted.
+    expect(AXIS_KEYED.test('[data-frame="color"] .card')).toBe(true);
+    expect(AXIS_KEYED.test('[data-frame="glass"][data-bg="photo"] .x')).toBe(
+      true,
+    );
+    expect(AXIS_KEYED.test(":global([data-frame='paper']) .vcDetail")).toBe(
+      true,
+    );
+    // The resource-TYPE axis of the same name — must stay invisible to the scan.
+    expect(AXIS_KEYED.test('.tile[data-frame="video"] .frame')).toBe(false);
+    expect(AXIS_KEYED.test('.previewFrame[data-frame="document"]')).toBe(false);
+    // And the corpus really does contain frame-keyed rules to scan, so this is
+    // not a guard over an empty set.
+    const framed = appStylesheets().filter((f) =>
+      /\[data-frame=["']?(?:glass|paper|color)/.test(stripComments(read(f))),
+    );
+    expect(framed.length).toBeGreaterThan(1);
+    expect(framed).toContain("app/themes.css");
   });
 
   it("classifies values the way the contract does", () => {

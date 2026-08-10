@@ -148,10 +148,40 @@
   place-items: center;
   position: relative;
 }
-/* Complete (progress === 1): solid subject disc + subject-hued lift. */
+/* Complete (progress === 1): solid subject disc + subject-hued lift.
+   ────────────────────────────────────────────────────────────────────────────
+   THE FILL WAS `var(--clc)` — the RAW subject solid — under `.check`'s white
+   ✓, and that combination FAILS AA. Measured by canvas readback across all 15
+   subject slots: white on the raw solid is **3.04:1** at --subj-5, against a
+   4.5 floor that applies in full because the glyph is 14px/800 and WCAG-large
+   starts at 18.66px bold. The `text-shadow` two rules below is described there
+   as "a legibility aid on the lighter marker hues"; a shadow is not contrast
+   and does not count toward the floor.
+
+   `--sc-solid` (app/tokens.css, the `.cp-subj` Frame C tier — the cluster
+   carries `.cp-subj.<id>`, YearC.tsx:75, so it resolves on every descendant)
+   fixes lightness at L=0.50 with chroma ×1.5 and takes the same glyph to
+   **5.34:1** at ITS worst slot (--subj-14). It is also the colour-forward
+   answer rather than a darkening: chroma goes UP, not down. */
 .discDone {
-  background: var(--clc);
+  background: var(--sc-solid);
   box-shadow: 0 6px 16px -6px var(--clc);
+  /* 2px to match `.discPartial` so all three disc states share one geometry —
+     previously done/partial/unstarted were 0 / 2 / 1.5px, which moved the ✓
+     box between states. On light tone the disc separates from the tinted card
+     unaided, so this border is the disc's own colour and reads as nothing; the
+     dark-tone rule below is where it earns its place. */
+  border: 2px solid var(--sc-solid);
+}
+/* Dark tone: the fill that carries the ✓ is too dark to also carry the disc's
+   own boundary. Against the dark canvas rgb(30,29,44) `--sc-solid` measures
+   2.45:1 (--subj-6), under the 3:1 WCAG 1.4.11 non-text floor, while
+   `--sc-edge` measures 5.22:1 — which is exactly why that token exists rather
+   than a single lighter fill. Same split, same reason, as the WeekC tile and
+   the DayC focus card. */
+:global(:root[data-tone="dark"]) .discDone,
+:global(.home[data-tone="dark"]) .discDone {
+  border-color: var(--sc-edge);
 }
 /* Partial (0 < p < 1): light subject wash + solid subject ring. */
 .discPartial {

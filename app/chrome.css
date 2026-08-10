@@ -2042,6 +2042,121 @@
     opacity: 0.92;
     text-shadow: 0 1px 8px rgba(255, 255, 255, 0.7);
   }
+
+  /* ══════════════  FRAME C · COLOUR-FORWARD — THE CHROME MATERIAL  ══════════
+     Until this block, chrome.css carried 106 `data-tone` branches and ZERO
+     `data-frame` ones. That is a large part of why Frame C rendered almost
+     identically to Frame A: the chrome layer is on every route, it is the first
+     thing a teacher sees, and the frame axis could not reach it at all.
+
+     ⚠ READ THIS BEFORE ADDING `var(--sc-solid)` HERE. The Frame C token tier
+     (app/tokens.css) hangs off `.cp-subj`, and `--c` — the hue every one of
+     those tokens derives from — is declared ONLY on `.cp-subj` and its subject
+     subclasses (app/tokens.css:1223). No chrome surface carries that class:
+     ChromeTopBar, ChromeClock, ChromeContext, ModeSwitch, ViewEditToggle and
+     ChromeToolsMenu are all school/time/identity chrome, not subject-scoped.
+     So `--sc-solid` here is not merely wrong-looking, it is GUARANTEED-INVALID:
+     `var(--c)` fails substitution, `color-mix()` becomes invalid at
+     computed-value time, and `background: var(--sc-solid)` paints NOTHING.
+     (`.pdot`, the clock's period dot, IS subject-coloured — but ChromeClock.tsx
+     :237-240 writes it as an inline `style`, which no stylesheet can override.
+     That is the same shape S3 had to unpick on lesson-card, and fixing it means
+     editing components/chrome, not this file.)
+
+     SO WHAT DOES FRAME C DO TO CHROME? It gets OUT OF THE WAY. In a frame whose
+     whole proposition is deep saturated subject colour in the CONTENT, the
+     chrome's job is to stop competing for the same attention — and a 16%
+     translucent panel does compete, because it takes its colour from whatever
+     photograph is behind it. Frame C therefore trades the frosted register for
+     a quieter, flatter, more OPAQUE one: the backdrop contributes ~28% instead
+     of ~84%, the blur drops 18px → 16px, and the deep drop shadow becomes
+     `--sh-sm`.
+
+     These are the handoff's own Frame C chrome values, restored rather than
+     invented: `[data-frame="color"] .fr-chrome` (rgba(255,255,255,.72),
+     blur(16px), 1px rgba(255,255,255,.8), var(--sh-sm), var(--ink-soft)) and
+     its dark twin `rgba(40,40,58,.7)` / rgba(255,255,255,.14). Both were
+     deleted from app/themes.css on 2026-08-09 — correctly, because `.fr-chrome`
+     is a frame-GALLERY demo class with zero app consumers. This block is where
+     that recipe lands on the selectors that actually render.
+
+     ONE DELIBERATE DEPARTURE FROM THE HANDOFF. `.fr-chrome` drops the inner top
+     highlight entirely. CLAUDE.md §4 makes that highlight non-negotiable
+     ("Glass always carries an inner top highlight — the lit-edge read… never
+     replace floating-chrome glass with a flat opaque card"), and the class here
+     is literally `.glass`. That is a POLICY rule rather than a look the handoff
+     governs, so it wins: the highlight is kept, at reduced strength, and the
+     panel stays translucent rather than going opaque.
+
+     TONE, NOT THEME, STILL CHOOSES THE INK — and here it chooses it by VALUE:
+     `--ink` and `--ink-soft` are both redefined in the `data-tone="dark"` block
+     (app/tokens.css), so one declaration serves both tones and cannot drift out
+     of step with the fill. Only the FILL needs a tone branch.
+
+     SPECIFICITY, NOT SOURCE ORDER. Every rule below names both `data-frame` and
+     `data-tone` (0,3,0 — or 0,4,0 with a state class), so it outranks the
+     existing `:root[data-tone="light"] .x` arms (0,2,0) on specificity. Written
+     at (0,2,0) they would merely TIE those arms and win on being later, which
+     is the trap this repo has hit before: at equal specificity source order
+     decides, and a block appended to the end of a file silently swallows every
+     state rule above it. Dual-scoped `:root` + `.home` per the file header. */
+
+  :root[data-frame="color"][data-tone="light"] .glass,
+  .home[data-frame="color"][data-tone="light"] .glass,
+  :root[data-frame="color"][data-tone="light"] .iconbtn,
+  .home[data-frame="color"][data-tone="light"] .iconbtn,
+  :root[data-frame="color"][data-tone="light"] .toolsbtn,
+  .home[data-frame="color"][data-tone="light"] .toolsbtn {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    box-shadow:
+      var(--sh-sm),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    color: var(--ink-soft);
+  }
+  :root[data-frame="color"][data-tone="dark"] .glass,
+  .home[data-frame="color"][data-tone="dark"] .glass,
+  :root[data-frame="color"][data-tone="dark"] .iconbtn,
+  .home[data-frame="color"][data-tone="dark"] .iconbtn,
+  :root[data-frame="color"][data-tone="dark"] .toolsbtn,
+  .home[data-frame="color"][data-tone="dark"] .toolsbtn {
+    background: rgba(40, 40, 58, 0.7);
+    border-color: rgba(255, 255, 255, 0.14);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    box-shadow:
+      var(--sh-sm),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    color: var(--ink-soft);
+  }
+
+  /* Hover and the tools launcher's open state. These exist because the rules
+     they have to beat are themselves state-qualified — `:root[data-tone=
+     "light"] .toolsbtn.open` is (0,3,0) and would otherwise TIE the base arm
+     above and win on order, leaving an open launcher indistinguishable from a
+     closed one. Each step is a fill step only; nothing here touches ink. */
+  :root[data-frame="color"][data-tone="light"] .iconbtn:hover,
+  .home[data-frame="color"][data-tone="light"] .iconbtn:hover,
+  :root[data-frame="color"][data-tone="light"] .toolsbtn:hover,
+  .home[data-frame="color"][data-tone="light"] .toolsbtn:hover {
+    background: rgba(255, 255, 255, 0.88);
+  }
+  :root[data-frame="color"][data-tone="light"] .toolsbtn.open,
+  .home[data-frame="color"][data-tone="light"] .toolsbtn.open {
+    background: rgba(255, 255, 255, 0.94);
+  }
+  :root[data-frame="color"][data-tone="dark"] .iconbtn:hover,
+  .home[data-frame="color"][data-tone="dark"] .iconbtn:hover,
+  :root[data-frame="color"][data-tone="dark"] .toolsbtn:hover,
+  .home[data-frame="color"][data-tone="dark"] .toolsbtn:hover {
+    background: rgba(54, 54, 78, 0.82);
+  }
+  :root[data-frame="color"][data-tone="dark"] .toolsbtn.open,
+  .home[data-frame="color"][data-tone="dark"] .toolsbtn.open {
+    background: rgba(62, 62, 88, 0.88);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
