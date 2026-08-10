@@ -888,9 +888,27 @@ export function ThemeProvider({
       }, THEME_TRANSITION_MS);
     }
 
-    // v2 DOM attributes. data-style is INTENTIONALLY dropped from the v2 path;
-    // data-palette is kept because the PaletteProvider bridge + some v1 surfaces
-    // still read it.
+    // v2 DOM attributes. data-style is INTENTIONALLY dropped from the v2 path.
+    //
+    // ⚠ CORRECTED 2026-08-10. This comment used to say data-palette "is kept
+    // because the PaletteProvider bridge + some v1 surfaces still read it".
+    // BOTH halves of that are false, and it is the first thing a contributor
+    // reads when they try to delete the stamp below — so it was actively
+    // preventing a safe cleanup.
+    //
+    //   • The PaletteProvider bridge does NOT read it. lib/palette.tsx:136-137
+    //     says so in terms ("nothing here reads it"), and lib/palette-data.ts:220
+    //     adds that its `type` parameter "is accepted but NO LONGER read". The
+    //     axis was retired 2026-08-07 (decision 4).
+    //   • No "v1 surface" reads it either. There are ZERO `[data-palette]`
+    //     selectors in any stylesheet under app/ or components/.
+    //
+    // So `root.dataset.palette` below is written and consumed by nothing. It is
+    // left in place only because it is one of CLAUDE.md §4's five lockstep
+    // surfaces: removing it means removing it from app/layout.tsx's SSR attrs,
+    // the boot arrays, the teacher_preferences CHECK and the wave probe IN THE
+    // SAME COMMIT. tests/theme-derivation-parity.test.ts fails if they drift.
+    // Sequenced with the v1 deletion (task #7), not before.
     root.dataset.frame = frame;
     root.dataset.glass = glass;
     root.dataset.bg = bg;

@@ -34,6 +34,22 @@ The v2 bundle appeared to contain two engines. **Resolved by reading the shipped
   of the same idea; `data-frame` ≡ `data-version`. **Decided (§4.2):** adopt the clean `data-frame`
   naming, implement the *behavior the bundle demonstrates* (the bundle is canonical for behavior per
   the README).
+
+> **⚠ CLARIFIED 2026-08-10 (verified against `f77acd6`).** The equivalence
+> `data-frame ≡ data-version` is TRUE **of the handoff's own two spellings** —
+> the bundle's `data-version` and `modes.css`'s `data-frame` describe one axis,
+> and that is all this bullet was ever claiming. It is left standing.
+>
+> It is **NOT true of our DOM**, and it has been misread that way. We adopted the
+> `data-frame` naming and **never emitted `data-version` at all**:
+> `lib/theme.tsx` stamps frame/glass/bg/theme/dim/tone/canvas/palette, and the
+> six `data-version` occurrences in our CSS are **all comments** citing this
+> bundle. Any selector keyed on `[data-version]` is dead — a large part of why
+> Frame C rendered almost identically to Frame A before `de7a904`.
+>
+> The bullet immediately above this one (the runnable mockup's attribute list) is
+> also a statement about the **mockup**, not our code, and is likewise correct.
+> Read both as handoff archaeology, not as a description of this app.
 - The current app's `data-style` (quiet/calm/vivid) + `data-palette` (normal/highlight) +
   `mycurricula:user:theme*` keys have **ZERO presence** in v2. → `data-style` is **replaced** by the
   Frame axis; `data-palette`'s global toggle is **dropped** (subject color goes inline `--sc/--sct/--sci`).
@@ -106,9 +122,23 @@ copied from the demo. Same for the **Team-mode pink caution glow** (v2 replaces 
    `lib/palette-data.ts` + `tokens.css` `.cp-subj` aliases / the palette bridge → this is a
    **token/alias change, NOT a data migration**; it re-hues the UI but touches no saved lesson data.
    Update all 8 in `palette-data.ts` + the `--<subject>` aliases.
-2. **Appearance-engine naming → `data-frame` ENGINE, DROP `data-style`.** Clean `modes.css`
+2. **Appearance-engine naming → `data-frame` ENGINE, DROP `data-style`.** ✅ **SHIPPED — this is no
+   longer a proposal (marked 2026-08-10, verified against `f77acd6`).** Clean `modes.css`
    `data-frame` (glass/paper/color) naming, implemented with the bundle's proven behavior.
    `data-palette` → inline `--sc/--sct/--sci`; `data-theme` splits into `data-theme` + `data-tone`.
+
+   > **What actually shipped, where it differs from this line.** `data-frame`,
+   > `data-theme` and the derived `data-tone` are live and stamped by
+   > `lib/theme.tsx`. `--sc/--sct/--sci` are emitted per subject by
+   > `lib/palette.tsx:142,150`. But **`data-style` was not "dropped" so much as
+   > never stamped on the root** — no code assigns
+   > `documentElement.dataset.style` in either flag state, which leaves
+   > `app/tokens.css:1646-1656`'s three `:root[data-style=…]` rules matching
+   > nothing. And **`data-palette` is still stamped** (`lib/theme.tsx:901`,
+   > `app/layout.tsx:131`) while being read by nothing — zero `[data-palette]`
+   > selectors exist, and `lib/palette.tsx:136-137` says so outright. The axis was
+   > formally retired 2026-08-07 (decision 4). See
+   > `WAVE-2-VALUE-MATRIX.md` claims 5–6.
 3. **Navigation → SEAMLESS FEEL, KEEP ROUTING (hybrid).** Keep Next.js App Router (deep-links/SSR/
    seams) but make background + chrome a **persistent shell that doesn't unmount**, with client-side
    **View Transitions** for the seamless swap. (User: best long-term, ok with either.)

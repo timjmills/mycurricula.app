@@ -1,5 +1,27 @@
 # Wave audit prompt — dual §4a (Claude + Codex) + §4b live-QA (phone/tablet/desktop)
 
+> **⚠ CORRECTED 2026-08-10 — DO NOT RUN THIS UNMODIFIED. Verified against `f77acd6`.**
+>
+> This file is **executable**: it is a prompt an auditor runs to produce a
+> **GO/NO-GO**, and its git refs still resolve — so it runs, and then reaches a
+> verdict on a false premise. Two instructions told the auditor to *verify* a
+> fact that is not true, which meant a correct build would be reported as a
+> defect (or, worse, the auditor would "confirm" the false fact to satisfy the
+> prompt).
+>
+> - **`:58` and `:81` — "there is NO `NEXT_PUBLIC_V2` runtime flag (clean
+>   cutover)."** False. The flag exists (`lib/v2-flag.ts:64`), is default-ON, and
+>   `NEXT_PUBLIC_V2=0` selects v1. Both lines are corrected below. Full detail in
+>   `WAVE-2-VALUE-MATRIX.md`, claim 1 — including the one narrow sense in which
+>   the word "runtime" was defensible (the flag is inlined at build time and is
+>   not switchable on a running deploy).
+> - **`:105` is CORRECT and is deliberately left alone** — `data-style` really is
+>   not emitted on the v2 DOM path. Nothing stamps `documentElement.dataset.style`
+>   in either flag state. Do not "consistency-fix" it along with the others.
+>
+> The §4a/§4b structure, the lockstep list, and the live-QA walk are all still
+> sound; only the flag premise was wrong.
+
 > Reusable per-wave audit, run **in the terminal** (Codex + browser MCP + native git live there).
 > Instantiated below for **Wave 2 (appearance engine)**. For later visual waves, swap the BRANCH/RANGE
 > and the §4b "surfaces to walk" list; everything else holds.
@@ -54,8 +76,11 @@ REVIEW 1 — Codex (sandbox NEVER weakened; pipe the diff per the §4a Windows n
   file/line, severity, concrete failure scenario, fix. VERIFY against the handoff + the frozen value matrix.
   Focus: (1) ADDITIVE/back-compat — NO v1-only token tier deleted from app/tokens.css (--chrome-accent-*,
   --rail-bg/--panel-bg, --logo-*, --wf-*/--teach-*, --tag-*, --hl-*, scrims, z-scale); style/palette/
-  setStyle/setPalette still on useTheme() so a git-level v1 rollback + the command-palette still compile —
-  STRUCTURAL compat only; there is NO NEXT_PUBLIC_V2 runtime flag (clean cutover). (2) ALLOWLIST LOCKSTEP —
+  setStyle/setPalette still on useTheme() so a git-level v1 rollback + the command-palette still compile.
+  [CORRECTED 2026-08-10 — was: "STRUCTURAL compat only; there is NO NEXT_PUBLIC_V2 runtime flag (clean
+  cutover)". FALSE: NEXT_PUBLIC_V2 exists (lib/v2-flag.ts:64), default-ON, and NEXT_PUBLIC_V2=0 selects
+  v1 at BUILD time. Compat is structural AND flag-selectable. Do not report the flag's existence as a
+  defect.] (2) ALLOWLIST LOCKSTEP —
   the value matrix is IDENTICAL across lib/theme.tsx guards, lib/theme-init.tsx boot arrays, the
   teacher_preferences SQL CHECK, app/layout.tsx SSR attrs, scripts/probe-theme-wave.mjs; list any mismatch.
   (3) MIGRATION safety — the localStorage + teacher_preferences migration maps paper/cloud→clear and seeds
@@ -78,8 +103,19 @@ REVIEW 2 — independent Claude (the §4a substitute, required on cloud where Co
 ## PART B — §4b Live QA Audit Gate (REAL browser; phone 375–414 · tablet 768–834 · desktop 1280–1440)
 
 ```text
-Wave 2 is a CLEAN CUTOVER: there is NO NEXT_PUBLIC_V2 runtime flag. The single running app emits the v2
-axes unconditionally — v2 is the only path. v1 compatibility is STRUCTURAL only: the preserved v1 token
+Wave 2 is a CUTOVER WITH A BUILD-TIME ESCAPE HATCH. [CORRECTED 2026-08-10 — this paragraph previously
+read "a CLEAN CUTOVER: there is NO NEXT_PUBLIC_V2 runtime flag … v2 is the only path". That was false.]
+NEXT_PUBLIC_V2 exists (lib/v2-flag.ts:64), is default-ON, and NEXT_PUBLIC_V2=0 builds the v1 path — it
+gates the chrome (app/(planner)/layout.tsx) and the router (V2_ROUTER_GATED = true, lib/v2-flag.ts:120).
+It is inlined by `next build`, so it is NOT switchable on a running deploy; it is selected at build time.
+docs/7.16.26-cutover-readiness.md documents it as the production rollback lever — but do NOT audit it as
+a proven one. It BUILDS (the die() at check-v2-flag.mjs:181 is guarded at :179 by
+`RAW === "0" && !routerGated`, and V2_ROUTER_GATED = true, so it does not fire). It is NOT verified
+FAITHFUL: nothing stamps root `data-style` in EITHER flag state, so tokens.css:1646-1656 never matches
+and a flag-OFF deploy is v1-shaped with that axis missing. No known visual regression follows (those
+rules define only --card-fill/--card-stripe-w, which have no consumers), but no one has built and walked
+a flag-OFF artifact. Treat "restores v1" as UNVERIFIED, not as proven-broken and not as proven-good.
+A default build emits the v2 axes. v1 compatibility is BOTH structural AND flag-selectable: the preserved v1 token
 tiers + the deprecated style/palette/setStyle/setPalette API stay on useTheme() so a git-level rollback
 still compiles, but there is no runtime "v1 mode" to switch into. Wave 2 has NO new v2 SCREEN yet (it's
 the engine), so the live-QA = a v1-compat regression proof + a v2 engine smoke, each run at ALL THREE

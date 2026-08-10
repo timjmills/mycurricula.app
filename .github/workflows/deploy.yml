@@ -115,10 +115,35 @@ jobs:
           # by `next build`, so a rollback is a REBUILD — a Worker env change has
           # no effect. Sourced from a repository variable so a flip is "change the
           # variable + re-run this workflow" (a redeploy), NOT a code commit
-          # (§4a M2). Defaults to "1" if the variable is unset. Note "0" is
-          # currently rejected by scripts/check-v2-flag.mjs until the router
-          # gates land — the deploy will fail loudly rather than ship the
-          # half-gated state.
+          # (§4a M2). Defaults to "1" if the variable is unset.
+          #
+          # "0" BUILDS AND SHIPS as of 2026-08-10 — but it is a PARTIAL
+          # fallback, not a faithful v1 restore. Read both halves before
+          # relying on it in an incident.
+          #
+          # It builds: an earlier version of this note said "0" was "currently
+          # rejected by scripts/check-v2-flag.mjs until the router gates land".
+          # The gates landed, lib/v2-flag.ts sets V2_ROUTER_GATED = true, and
+          # that script's die() is guarded by `RAW === "0" && !routerGated`, so
+          # it no longer fires. That stale note was worse than a broken lever —
+          # an operator reading it under pressure would conclude rollback was
+          # disabled and never attempt it.
+          #
+          # It is NOT faithful: NOTHING assigns `documentElement.dataset.style`
+          # anywhere in the codebase, under either flag state, while
+          # app/tokens.css:1646-1656 still carries three `:root[data-style=…]`
+          # rules that v1 styling depends on. So a flag-OFF deploy restores the
+          # v1 chrome and route canvases WITHOUT the v1 style axis — a hybrid.
+          # Do not describe this as "restoring production v1"; it gets you a
+          # v1-shaped build with a missing axis, which is a different thing to
+          # be debugging at 2am.
+          #
+          # ⚠ THIS LEVER DIES WITH THE v1 DELETION (task #7). Once the v1 route
+          # canvases are gone there is nothing for "0" to select, and rollback
+          # becomes revert-the-merge + redeploy. Whoever lands that deletion must
+          # update this comment and docs/7.16.26-cutover-readiness.md:63-70 in
+          # the SAME commit — silently removing the documented rollback path is
+          # the kind of omission that only surfaces during an incident.
           NEXT_PUBLIC_V2: ${{ vars.NEXT_PUBLIC_V2 || '1' }}
 
       - name: Summary
